@@ -25,10 +25,19 @@ data class MediaMeta(
 data class MediaAttachment(
     val id: String,
     val type: MediaType,
-    val url: String,
+    /** 元サイズのファイル (url)。処理中は `null`。リモートのメディアでは接続中サーバのキャッシュ。 */
+    val url: String?,
+    /** リモートサーバ上の元ファイル (remote_url)。ローカルのメディアでは `null`。 */
+    val remoteUrl: String?,
     val previewUrl: String?,
     val meta: MediaMeta?,
     val blurhash: String?,
     /** 代替テキスト。 */
     val description: String?,
-)
+) {
+    /** 表示・再生に使う URL の候補。先頭から試し、読み込みに失敗したら次を使う。 */
+    val viewUrls: List<String> get() = listOfNotNull(url, remoteUrl).distinct()
+
+    /** 元のファイル。保存やブラウザで開くときに使う (リモートの原本を優先)。 */
+    val originalUrl: String? get() = remoteUrl ?: url
+}

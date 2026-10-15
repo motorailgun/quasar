@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.layout.CollapsibleContent
@@ -22,7 +22,7 @@ fun PinnedPosts(
     modifier: Modifier = Modifier,
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaAttachment) -> Unit = {},
+    onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     if (posts.isEmpty()) return

@@ -11,7 +11,9 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`) |
-| ビルド | AGP 9 (built-in Kotlin), version catalog `gradle/libs.versions.toml` |
+| 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
+| ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
+| SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
 
 DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。
 
@@ -42,7 +44,8 @@ es.aria_on_the_planet.quasar
     │   ├── poll/PollView.kt        投票 (選択肢 / 結果) + PollMath.kt (割合・残り時間)
     │   ├── scaffold/DetailScaffold.kt 詳細画面共通の骨組み (戻る付きトップバー + スクロールでタイトル切替 + PTR)
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
-    │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
+    │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem、インライン再生) + MediaClick
+    │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
@@ -52,6 +55,7 @@ es.aria_on_the_planet.quasar
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
     ├── timeline/                   タイムライン画面 + ViewModel
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
+    ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
     └── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
 ```
 
@@ -142,12 +146,16 @@ enum class MediaType { Image, Video, Gifv, Audio, Unknown }
 data class MediaAttachment(
     val id: String,
     val type: MediaType,
-    val url: String,               // url ?: remote_url ?: preview_url
+    val url: String?,              // url (処理中は null。リモートのメディアは接続中サーバのキャッシュ)
+    val remoteUrl: String?,        // remote_url (元サーバの原本。ローカルなら null)
     val previewUrl: String?,
     val meta: MediaMeta?,          // original / small のサイズと duration だけを取り出す
     val blurhash: String?,
     val description: String?,      // 代替テキスト
-)
+) {
+    val viewUrls: List<String>     // 表示・再生の候補 [url, remote_url]。読めなければ次を試す
+    val originalUrl: String?       // 保存・ブラウザで開く用 (remote_url ?: url)
+}
 
 data class MediaMeta(val original: MediaSize?, val small: MediaSize?, val durationSeconds: Double?) {
     val aspectRatio: Float?        // small 優先、なければ original。width/height から計算
@@ -284,8 +292,12 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * アスペクト比不明時は 1:1、極端な比率は 1/3〜3 に丸めて Crop 表示する。
 * 種別ごとの表示: video=再生アイコン、gifv=「GIF」ラベル、audio=プレビューが無ければ音声アイコン。
 * プレースホルダ/エラー時は BlurHash (`rememberBlurHashPainter`) を使う。
-* メディアビューア未実装のため、タイムラインではタップでメディア URL をブラウザで開いている。
-* 未対応: `sensitive` (閲覧注意) によるぼかし表示。
+* タップ: メディアのタップはメディアビューア (unknown は元ファイルをブラウザ)。video / gifv / audio は**中央の再生ボタンだけ**
+  その場でミュート再生 (`LocalInlinePlayback`。**自動再生はしない**。帯域の細いサーバが多いため)、再生中のタップで再生位置ごとビューアへ。
+  呼び出し側へは `onMediaClick: (MediaClick) -> Unit` (ポスト + メディア + 再生位置 + 一覧での各メディアの位置) で伝え、
+  `Context.openMedia` に渡す。位置はビューアを上下スワイプで閉じるときに縮んで戻る先。
+* 再生・ビューアの詳細は [docs/media-viewer.md](docs/media-viewer.md)。
+* `sensitive` (閲覧注意) のぼかしと目アイコンは「Content Warning / NSFW」を参照。
 
 ## 画面
 
@@ -326,6 +338,11 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   ポスト本体のタップ (`onPostClick`) はタイムライン・プロフィール (ピン留め含む)・ポスト詳細から `openPost` する。
 * 既知の挙動: Compose はテキスト内リンクのタッチ判定を最小 48dp に広げるため、本文先頭のリンクの直上
   (投稿者行・時刻) をタップするとリンクが開くことがある。
+* **メディアビューア** (`MediaViewerActivity`): `Context.openMedia(MediaClick)` で起動する (extra は `MediaViewerArgs` の JSON)。
+  同じポストのメディアを左右スワイプ、上下スワイプ (ゴムのように引っかかり、離すと一覧の元の位置へ縮んで戻る。透過 Activity)、
+  右上メニュー (ブラウザで開く。
+  保存は差し込み口のみ)。video / gifv / audio は Media3 で再生し、ダブルタップ ±10 秒・シークバー・「現在 / 全体」・ミュート。
+  設計・PiP への準備・注意点は [docs/media-viewer.md](docs/media-viewer.md)。
 
 * **Login (暫定)**: サーバ URL とアクセストークン (任意) を入力。トークンなしでは Home を無効化。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) は後続タスク。
@@ -421,6 +438,86 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 ## 開発メモ
 
 * ビルド: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug`
-* テスト: `./gradlew :app:testDebugUnitTest`
-* Expressive API は `@OptIn(ExperimentalMaterial3ExpressiveApi::class)` が必要。
-* 文字列リソースは `res/values/strings.xml` に置く。
+  (システムに Java が無いので Android Studio 同梱の JBR を使う)
+* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテストのみ。instrumentation / UI テストは無い)
+* Expressive API は `@OptIn(ExperimentalMaterial3ExpressiveApi::class)` が必要。material3 は BOM ではなく 1.5.x を個別指定。
+* **できる限り pure Jetpack Compose で、モダンな書き方にする**。XML は Android の仕組み上 Compose で代わりがきかないもの
+  (manifest、Activity のテーマ = ウィンドウ属性、文字列リソース等) に限る。
+  * アニメーションは Compose (`animate*` / `Animatable` / `AnimatedVisibility` 等) で書く。`res/anim` の XML や
+    `overridePendingTransition` / `overrideActivityTransition` での Activity 遷移アニメーションは使わない
+    (メディアビューアは透過 Activity + テーマで遷移アニメーションを切り、出入りを Compose で描いている)。
+  * 「戻る」の横取りは `androidx.navigationevent` の `NavigationBackHandler` (予測型「戻る」の進み具合も取れる) を使い、
+    `BackHandler` / `OnBackPressedCallback` は使わない。manifest で `enableOnBackInvokedCallback="true"`。
+* 文字列リソースは `res/values/strings.xml` に置く (今は英語のみ)。
+* コミットはユーザーが行う。エージェントはコミットしない (頼まれた場合を除く)。
+
+### ロジックの置き場所とテスト
+* 一覧の組み立て・書き換えは純粋関数にし、ユニットテストを付ける。壊れやすい所は特に厚めに:
+  `NotificationGroupingTest` (通知のグルーピング・合流)、`TimelineItemTest` (gap・新着・上限)、
+  `TimelineSyncTest` (ストリーム・補完の段取り)、`PostFeedTest` (ページング)。
+* `android.util.Log` は JVM テストでは動かない (`isReturnDefaultValues` 未設定)。テスト対象のクラスではログを
+  直接呼ばず、`TimelineSync(onError = ...)` のように外から受け取る。
+* 実データの JSON の形が怪しいときは、公開 API (`/api/v1/timelines/public` 等) から取ってきて、一時的なテストで
+  DTO が読めるか確かめるとよい (ドキュメントと実装が違うことがある。下記)。
+
+## 引き継ぎ: 注意点・落とし穴
+
+### API / サーバの癖
+* ドキュメントと型が違うことがある: Mastodon 4.8.0-alpha は `NotificationGroup.most_recent_notification_id` を数値で
+  返す → `StringOrNumberSerializer` で受けている。他の ID フィールドでも起きうる。
+* Mastodon の ID は文字列だが大小比較は数値として行う (`MastodonIdComparator`: 桁数 → 辞書順)。文字列のまま
+  比較しない (`"100" < "99"` になる)。
+* 次ページの `max_id` は「表示上の末尾」ではなく「取得した生ページの最古 ID」から決める (`FeedState.nextMaxId`)。
+  並び替え (ユーザー単位のグルーピング) や v2 の `page_min_id` で、末尾が最古とは限らないため。
+* v2 通知の `notifications_count` はグループ全体の総数。ページ境界で同じグループが分かれても足さない。
+* 引用のフォールバック「RE: <リンク>」は Mastodon が `<p class="quote-inline">`、Misskey 由来が
+  `<br><br><span class="quote-inline">` で来る (`simplifyMastodonHtml`)。
+* 動画の `meta.original` には `aspect` が無い (width / height から計算)。未設定のヘッダ画像は `.../missing.png`。
+* `Status.application` (User Agent) は他サーバのポストでは返らない。
+* サーバによっては公開タイムラインも要ログイン (mastodon.social は 422)。ストリーミングは 4.2 以降すべて要ログイン。
+* 認証済みの Local / Global はミュート・ブロック・フィルタが効く (公開 API の結果と差が出ても正常)。
+* グローバルは「サーバに届いた順」で並び、表示時刻 (投稿日時) は前後する。
+
+### Compose / UI
+* LazyColumn のキーは一意に保つ。同じポストが別の行にも出うる場所 (ピン留めと投稿一覧など) は 1 アイテムに
+  まとめるかキーに接頭辞を付ける。重複キーはクラッシュする。
+* テキスト内リンクのタッチ判定は最低 48dp に広がるため、本文先頭のリンクの直上 (投稿者行・時刻) のタップで
+  リンクが開くことがある (既知の挙動)。
+* `StickToTopEffect` はコンポジション中に LazyListState を読んで「直前に先頭にいたか」を判定している。
+  一覧の先頭キーの決め方を変えるときは挙動を確認する。
+* カスタム絵文字の縦横比はメモリ上のキャッシュのみ。初回は正方形で表示され、読み込み後に幅が変わる。
+
+### ビルド
+* Gradle のインクリメンタルコンパイルが古い結果を返して、正しいコードでも型エラーになることがあった。
+  不可解なエラーは `./gradlew :app:compileDebugKotlin --rerun` で確かめる。
+* release ビルドは R8 (minify) 無効。`material-icons-extended` が大きいので、有効にするか必要なアイコンだけにする。
+
+### 実機での確認 (adb)
+* 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。
+  `adb devices` の先頭の device を使う。切断・ロック・スリープは頻繁に起きる → 勝手にエミュレータへ切り替えず、
+  ユーザーに再接続・解除を頼む。
+* 座標決め打ちのタップは許可されているが、アプリの外 (ブラウザ等) に出たら即中断する。リンクを避けるため、
+  ポストを開くときはアクション行の空き部分をタップする。
+* 先頭へ戻るために下方向スワイプを繰り返すと pull-to-refresh が発動し一覧が読み直される (gap も消える)。
+  ボタン等を探すときは fling しないよう長めの duration (1500ms 程度) でゆっくりスクロールする。
+* 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
+* gap の動作確認は流量のあるグローバルで行う: `TimelineViewModel.StreamGlobalTimeline = true` にして、別画面を
+  開いて (= 切断) 8 分ほど待ってから戻る。確認後は必ず `false` に戻す。
+* ストリームの接続状況は logcat の `StreamingClient` (接続・切断・受信イベントの種類と文字数のみ。トークンや本文は出さない)。
+
+## 未対応・今後の課題
+
+* **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
+  OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
+* **操作**: お気に入り・ブースト・ブックマーク・リプライ・投稿・フォローは未実装 (表示のみ)。投票だけは送信できる
+  (実機では未送信)。
+* **メディアビューア**: 保存 (MediaStore)、PiP、画像のピンチズーム、代替テキストの表示は未実装
+  ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
+* **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。
+  v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
+* **自動更新**: グローバルは購読しない、通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
+  通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。
+* **プロフィール**: フォローボタン、投稿 / 返信 / メディアのタブ。
+* **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
+* **ローカライズ**: 文字列は英語のみ。
+* **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

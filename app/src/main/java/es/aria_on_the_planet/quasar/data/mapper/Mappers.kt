@@ -199,7 +199,8 @@ fun MediaAttachmentDto.toDomain() = MediaAttachment(
         "audio" -> MediaType.Audio
         else -> MediaType.Unknown
     },
-    url = url ?: remoteUrl ?: previewUrl.orEmpty(),
+    url = url,
+    remoteUrl = remoteUrl,
     previewUrl = previewUrl,
     meta = meta?.toDomain(),
     blurhash = blurhash,

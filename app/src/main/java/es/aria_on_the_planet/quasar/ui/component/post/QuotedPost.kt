@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.modifier.bottomFadingEdge
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +33,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Quote
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
@@ -56,7 +56,7 @@ fun QuotedPost(
     modifier: Modifier = Modifier,
     mediaHeight: Dp = PostCardDefaults.MediaHeight * 0.75f,
     onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaAttachment) -> Unit = {},
+    onMediaClick: (MediaClick) -> Unit = {},
     maxHeight: Dp? = null,
     nested: Boolean = false,
 ) {
@@ -123,7 +123,8 @@ fun QuotedPost(
                     attachments = post.mediaAttachments,
                     height = mediaHeight,
                     sensitive = post.sensitive,
-                    onClick = onMediaClick,
+                    artworkUrl = post.author.iconUrl,
+                    onClick = { tap -> onMediaClick(tap.toClick(post)) },
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }

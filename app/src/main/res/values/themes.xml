@@ -1,3 +1,11 @@
 <resources>
     <style name="Theme.Quasar" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- メディアビューア: 上下スワイプで閉じるときに元の画面が透けて見えるよう透過にする。
+         黒背景と出入りのアニメーションは Compose 側 (DismissibleViewer) で描くので、ウィンドウのアニメーションは無し -->
+    <style name="Theme.Quasar.MediaViewer">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

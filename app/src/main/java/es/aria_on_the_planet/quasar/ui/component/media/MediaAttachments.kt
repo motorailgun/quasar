@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -26,32 +27,47 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
 import es.aria_on_the_planet.quasar.ui.component.modifier.horizontalFadingEdges
+import es.aria_on_the_planet.quasar.ui.component.player.InlineControls
+import es.aria_on_the_planet.quasar.ui.component.player.LocalInlinePlayback
+import es.aria_on_the_planet.quasar.ui.component.player.MediaPlayer
+import es.aria_on_the_planet.quasar.ui.component.player.PlaybackSnapshot
+import es.aria_on_the_planet.quasar.ui.component.player.isPlayable
 
 /**
  * 添付メディアの並び。全アイテムを [height] で揃え、幅はアスペクト比から決める。
  * 合計幅が収まらない場合は横スクロールし、まだスクロールできる側の端をフェードさせる。
  *
  * @param sensitive 閲覧注意 (NSFW)。`true` なら各メディアを初期状態でぼかし、右上の目アイコンで切り替えられる。
+ * @param artworkUrl audio をインライン再生するときに回すアイコン (投稿者)。
+ * @param onClick ビューアを開く等。インライン再生中にタップされた場合は再生位置が付く。
+ *   各メディアのウィンドウ上の位置も付ける (ビューアを閉じるときに縮んで戻る先)。
  */
 @Composable
 fun MediaAttachments(
@@ -59,9 +75,13 @@ fun MediaAttachments(
     height: Dp,
     modifier: Modifier = Modifier,
     sensitive: Boolean = false,
-    onClick: (MediaAttachment) -> Unit = {},
+    artworkUrl: String? = null,
+    onClick: (MediaTap) -> Unit = {},
 ) {
     if (attachments.isEmpty()) return
+    // 再描画は不要なので State にせず、レイアウトのたびに上書きしてタップ時に読む
+    val bounds = remember { mutableMapOf<String, Rect>() }
+    val windowSize = LocalWindowInfo.current.containerSize
     val scrollState = rememberScrollState()
     val startFade by animateFloatAsState(if (scrollState.canScrollBackward) 1f else 0f, label = "startFade")
     val endFade by animateFloatAsState(if (scrollState.canScrollForward) 1f else 0f, label = "endFade")
@@ -77,7 +97,11 @@ fun MediaAttachments(
                     attachment = attachment,
                     height = height,
                     sensitive = sensitive,
-                    onClick = { onClick(attachment) },
+                    artworkUrl = artworkUrl,
+                    onClick = { playback -> onClick(MediaTap(attachment, playback, bounds.toMap(), windowSize)) },
+                    modifier = Modifier.onGloballyPositioned {
+                        bounds[attachment.id] = Rect(it.positionInWindow(), it.size.toSize())
+                    },
                 )
             }
         }
@@ -86,6 +110,10 @@ fun MediaAttachments(
 
 /**
  * 添付メディア 1 件。高さ固定で、幅はアスペクト比に従う。
+ *
+ * タップは [onClick] (ビューア)。video / gifv / audio は中央の再生ボタンだけ別扱いで、[LocalInlinePlayback] が
+ * あればその場で再生する (ミュート、自動再生はしない)。インライン再生中にタップすると再生位置を付けて [onClick] を呼ぶ。
+ * 一覧から外れたら止める。
  *
  * @param sensitive `true` なら初期状態でぼかし、右上の目アイコン (またはメディア自体のタップ) で表示する。
  *   `false` なら目アイコンは出さない。
@@ -96,61 +124,118 @@ fun MediaAttachmentItem(
     height: Dp,
     modifier: Modifier = Modifier,
     sensitive: Boolean = false,
-    onClick: () -> Unit = {},
+    artworkUrl: String? = null,
+    onClick: (PlaybackSnapshot?) -> Unit = {},
 ) {
     var hidden by rememberSaveable(attachment.id, sensitive) { mutableStateOf(sensitive) }
+    val playback = LocalInlinePlayback.current?.takeIf { attachment.type.isPlayable }
+    // 同じメディアが一覧の複数の場所に出ても区別できるよう、持ち主はこの表示ごとに作る
+    val owner = remember { Any() }
+    val playing = playback != null && playback.isActive(owner)
+    DisposableEffect(playback, owner) {
+        onDispose { playback?.stop(owner) }
+    }
     Box(
         modifier = modifier
             .height(height)
             .width(height * displayAspectRatio(attachment))
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            // ぼかし中のタップは表示に切り替えるだけにする
-            .clickable(onClick = { if (hidden) hidden = false else onClick() }),
+            .clickable(onClick = {
+                when {
+                    // ぼかし中のタップは表示に切り替えるだけにする
+                    hidden -> hidden = false
+                    playing -> {
+                        val snapshot = playback.snapshot(owner)
+                        // ビューアは透過 Activity で、この画面は ON_STOP にならないので明示的に止める
+                        playback.stop(owner)
+                        onClick(snapshot)
+                    }
+                    else -> onClick(null)
+                }
+            }),
         contentAlignment = Alignment.Center,
     ) {
-        val placeholder = rememberBlurHashPainter(attachment.blurhash)
-        if (hidden && placeholder != null) {
-            // BlurHash があればそれをぼかし表示にする (本体の画像は読み込まない)
-            Image(
-                painter = placeholder,
-                contentDescription = stringResource(R.string.media_sensitive),
+        if (playing) {
+            MediaPlayer(
+                media = attachment,
+                player = playback.player,
+                artworkUrl = artworkUrl,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-            )
-        } else if (attachment.previewUrl != null) {
-            AsyncImage(
-                model = attachment.previewUrl,
-                contentDescription = if (hidden) stringResource(R.string.media_sensitive) else attachment.description,
-                placeholder = placeholder,
-                error = placeholder,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (hidden) Modifier.blur(HiddenBlurRadius) else Modifier),
-            )
+            ) {
+                playback.player?.let { InlineControls(it, attachment) }
+                if (playback.failed) PlaybackFailedLabel()
+            }
         } else {
-            Icon(
-                imageVector = if (attachment.type == MediaType.Audio) Icons.Outlined.AudioFile else Icons.Outlined.BrokenImage,
-                contentDescription = attachment.description,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(32.dp),
+            MediaThumbnail(
+                attachment = attachment,
+                hidden = hidden,
+                onPlay = {
+                    if (playback != null) playback.play(owner, attachment, muted = true) else onClick(null)
+                },
             )
-        }
-        when (attachment.type) {
-            MediaType.Video -> PlayBadge()
-            MediaType.Gifv -> TypeLabel("GIF", Modifier.align(Alignment.BottomStart))
-            MediaType.Audio -> if (attachment.previewUrl != null) PlayBadge()
-            MediaType.Image, MediaType.Unknown -> Unit
         }
         if (sensitive) {
             SensitiveToggle(
                 hidden = hidden,
-                onToggle = { hidden = !hidden },
+                onToggle = {
+                    hidden = !hidden
+                    if (hidden) playback?.stop(owner)
+                },
                 modifier = Modifier.align(Alignment.TopEnd),
             )
         }
     }
+}
+
+/** 再生していないときの表示 (サムネイル + 種別のバッジ)。再生できる種別は中央の再生ボタンで [onPlay]。 */
+@Composable
+private fun BoxScope.MediaThumbnail(attachment: MediaAttachment, hidden: Boolean, onPlay: () -> Unit) {
+    val placeholder = rememberBlurHashPainter(attachment.blurhash)
+    if (hidden && placeholder != null) {
+        // BlurHash があればそれをぼかし表示にする (本体の画像は読み込まない)
+        Image(
+            painter = placeholder,
+            contentDescription = stringResource(R.string.media_sensitive),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    } else if (attachment.previewUrl != null) {
+        AsyncImage(
+            model = attachment.previewUrl,
+            contentDescription = if (hidden) stringResource(R.string.media_sensitive) else attachment.description,
+            placeholder = placeholder,
+            error = placeholder,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (hidden) Modifier.blur(HiddenBlurRadius) else Modifier),
+        )
+    } else {
+        Icon(
+            imageVector = if (attachment.type == MediaType.Audio) Icons.Outlined.AudioFile else Icons.Outlined.BrokenImage,
+            contentDescription = attachment.description,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(32.dp),
+        )
+    }
+    if (attachment.type == MediaType.Gifv) TypeLabel("GIF", Modifier.align(Alignment.BottomStart))
+    // ぼかし中はメディア全体のタップで表示に切り替えるので、再生ボタンは出さない
+    if (attachment.type.isPlayable && !hidden) PlayButton(onPlay)
+}
+
+@Composable
+private fun BoxScope.PlaybackFailedLabel() {
+    Text(
+        text = stringResource(R.string.player_error),
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.White,
+        modifier = Modifier
+            .align(Alignment.Center)
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 /** 閲覧注意メディアのぼかし切り替え (右上の目アイコン)。 */
@@ -175,17 +260,26 @@ private fun SensitiveToggle(hidden: Boolean, onToggle: () -> Unit, modifier: Mod
     }
 }
 
+/** その場で再生するボタン。見た目は 40dp だが、押しやすいよう周囲 4dp もタッチ範囲にする。 */
 @Composable
-private fun PlayBadge() {
-    Icon(
-        Icons.Filled.PlayArrow,
-        contentDescription = null,
-        tint = Color.White,
-        modifier = Modifier
-            .size(40.dp)
-            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-            .padding(6.dp),
-    )
+private fun PlayButton(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(onClickLabel = stringResource(R.string.player_play_inline), onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.PlayArrow,
+            contentDescription = stringResource(R.string.player_play),
+            tint = Color.White,
+            modifier = Modifier
+                .size(40.dp)
+                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                .padding(6.dp),
+        )
+    }
 }
 
 @Composable

@@ -6,11 +6,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
@@ -34,13 +34,12 @@ class PostActivity : ComponentActivity() {
                         initializer { PostViewModel(session, statusId, container.statusRepository) }
                     },
                 )
-                val uriHandler = LocalUriHandler.current
                 PostScreen(
                     viewModel = viewModel,
                     onBack = ::finish,
                     onUserClick = ::openProfile,
                     onPostClick = { post -> if (post.statusId != statusId) openPost(post) },
-                    onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
+                    onMediaClick = ::openMedia,
                 )
             }
         }

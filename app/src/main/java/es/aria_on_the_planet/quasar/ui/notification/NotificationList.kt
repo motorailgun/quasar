@@ -49,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
@@ -78,7 +79,7 @@ fun NotificationList(
     onLoadMore: () -> Unit = {},
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaAttachment) -> Unit = {},
+    onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     LoadMoreEffect(state, onLoadMore)
@@ -126,7 +127,7 @@ fun NotificationItem(
     modifier: Modifier = Modifier,
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaAttachment) -> Unit = {},
+    onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     if (group.type.isCompact) {

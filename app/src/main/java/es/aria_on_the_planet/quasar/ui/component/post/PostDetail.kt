@@ -28,7 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
@@ -50,7 +50,7 @@ fun PostDetail(
     mediaHeight: Dp = PostDetailDefaults.MediaHeight,
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaAttachment) -> Unit = {},
+    onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     Column(
@@ -123,7 +123,8 @@ fun PostDetail(
                 attachments = post.mediaAttachments,
                 height = mediaHeight,
                 sensitive = post.sensitive,
-                onClick = onMediaClick,
+                artworkUrl = post.author.iconUrl,
+                onClick = { tap -> onMediaClick(tap.toClick(post)) },
                 modifier = Modifier.padding(top = 12.dp),
             )
         }

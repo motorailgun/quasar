@@ -6,11 +6,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
@@ -34,14 +34,13 @@ class ProfileActivity : ComponentActivity() {
                         initializer { ProfileViewModel(session, accountId, container.accountRepository, container.statusRepository) }
                     },
                 )
-                val uriHandler = LocalUriHandler.current
                 ProfileScreen(
                     viewModel = viewModel,
                     onBack = ::finish,
                     // 同じアカウントのポスト (自分の投稿) からは遷移しない
                     onUserClick = { user -> if (user.inServerId != accountId) openProfile(user) },
                     onPostClick = ::openPost,
-                    onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
+                    onMediaClick = ::openMedia,
                 )
             }
         }

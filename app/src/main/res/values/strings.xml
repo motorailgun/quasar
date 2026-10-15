@@ -75,6 +75,22 @@
     <string name="media_sensitive">Sensitive media</string>
     <string name="media_show">Show media</string>
     <string name="media_hide">Hide media</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_play_inline">Play here</string>
+    <string name="player_mute">Mute</string>
+    <string name="player_unmute">Unmute</string>
+    <!-- 再生時間「現在 / 全体」 -->
+    <string name="player_time">%1$s / %2$s</string>
+    <string name="player_time_unknown">--:--</string>
+    <string name="media_viewer_position">%1$d / %2$d</string>
+    <string name="player_error">Can\'t play this media</string>
+    <string name="media_viewer_close">Close</string>
+    <string name="media_viewer_menu">More options</string>
+    <string name="media_viewer_save">Save</string>
+    <string name="media_viewer_open_in_browser">Open in browser</string>
+    <string name="media_viewer_unsupported">This media type can\'t be shown in the app</string>
+    <string name="media_viewer_load_error">Couldn\'t load the image</string>
     <string name="column_notifications">Notifications</string>
     <string name="timeline_load_gap">Load more</string>
     <string name="column_empty">Nothing here yet</string>

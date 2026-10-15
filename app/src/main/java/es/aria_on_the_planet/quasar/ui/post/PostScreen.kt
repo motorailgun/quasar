@@ -26,8 +26,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
@@ -49,7 +49,7 @@ fun PostScreen(
     onBack: () -> Unit,
     onUserClick: (User) -> Unit,
     onPostClick: (Post) -> Unit,
-    onMediaClick: (MediaAttachment) -> Unit,
+    onMediaClick: (MediaClick) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()

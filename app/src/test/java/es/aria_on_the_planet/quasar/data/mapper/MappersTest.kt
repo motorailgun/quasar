@@ -100,7 +100,12 @@ class MappersTest {
         assertEquals(21.7, video.meta!!.durationSeconds!!, 0.0)
         assertNull(video.description)
         assertEquals(MediaType.Unknown, post.mediaAttachments[1].type)
-        assertEquals("https://r/x", post.mediaAttachments[1].url)
+        assertEquals(listOf("https://e/v.mp4"), video.viewUrls)
+        assertEquals("https://e/v.mp4", video.originalUrl)
+        val unknown = post.mediaAttachments[1]
+        assertNull(unknown.url)
+        assertEquals(listOf("https://r/x"), unknown.viewUrls)
+        assertEquals("https://r/x", unknown.originalUrl)
         assertEquals("Example", post.card?.title)
         assertNull(post.card?.imageUrl)
     }

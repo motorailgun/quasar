@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DisplayAspectRatioTest {
-    private fun media(meta: MediaMeta?) = MediaAttachment("1", MediaType.Image, "u", "p", meta, null, null)
+    private fun media(meta: MediaMeta?) = MediaAttachment("1", MediaType.Image, "u", null, "p", meta, null, null)
 
     @Test
     fun prefersSmallSize() {

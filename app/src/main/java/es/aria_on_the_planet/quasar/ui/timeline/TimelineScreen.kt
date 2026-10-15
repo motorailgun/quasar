@@ -42,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -54,11 +53,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.post.openPost
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -72,7 +72,6 @@ fun TimelineScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     // カラムごとにスクロール位置を保持する
     val listStates = ColumnType.entries.associateWith { rememberLazyListState() }
-    val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
 
     // 画面が前面にある間だけストリーミングで自動更新する
@@ -125,8 +124,7 @@ fun TimelineScreen(
             },
         ) {
             val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
-            // メディアビューアができるまではブラウザで開く
-            val onMediaClick: (MediaAttachment) -> Unit = { media -> runCatching { uriHandler.openUri(media.url) } }
+            val onMediaClick: (MediaClick) -> Unit = context::openMedia
             val timelineType = state.selected.timeline
             when {
                 current.items.isEmpty() && (current.isRefreshing || !current.loaded) ->

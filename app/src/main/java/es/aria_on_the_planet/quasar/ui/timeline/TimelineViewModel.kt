@@ -4,30 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.Session
-import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
-import kotlinx.coroutines.CancellationException
+import es.aria_on_the_planet.quasar.ui.feed.PostFeed
+import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-
-data class TimelineUiState(
-    val posts: List<Post> = emptyList(),
-    val isRefreshing: Boolean = false,
-    val isLoadingMore: Boolean = false,
-    val endReached: Boolean = false,
-    val error: String? = null,
-    val loaded: Boolean = false,
-)
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 
 data class TimelineScreenState(
     val selected: TimelineType,
     val available: List<TimelineType>,
-    val timelines: Map<TimelineType, TimelineUiState>,
+    val timelines: Map<TimelineType, PostFeedState>,
 ) {
-    val current: TimelineUiState get() = timelines.getValue(selected)
+    val current: PostFeedState get() = timelines.getValue(selected)
 }
 
 class TimelineViewModel(
@@ -39,67 +30,39 @@ class TimelineViewModel(
         it != TimelineType.Home || session.accessToken != null
     }
 
-    private val _state = MutableStateFlow(
+    private val feeds: Map<TimelineType, PostFeed> = available.associateWith { type ->
+        PostFeed(viewModelScope) { maxId -> repository.fetch(session, type, maxId) }
+    }
+
+    private val selected = MutableStateFlow(available.first())
+
+    val state: StateFlow<TimelineScreenState> = combine(
+        listOf(selected) + feeds.values.map { it.state },
+    ) { values ->
         TimelineScreenState(
-            selected = available.first(),
+            selected = values[0] as TimelineType,
             available = available,
-            timelines = available.associateWith { TimelineUiState() },
+            timelines = available.zip(values.drop(1).map { it as PostFeedState }).toMap(),
         )
-    )
-    val state: StateFlow<TimelineScreenState> = _state.asStateFlow()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, snapshot())
 
     init {
-        refresh(_state.value.selected)
+        feeds.getValue(selected.value).refresh()
     }
 
     fun select(type: TimelineType) {
-        _state.update { it.copy(selected = type) }
-        if (!_state.value.timelines.getValue(type).loaded) refresh(type)
+        selected.value = type
+        val feed = feeds.getValue(type)
+        if (!feed.state.value.loaded) feed.refresh()
     }
 
-    fun refresh(type: TimelineType = _state.value.selected) {
-        val current = _state.value.timelines.getValue(type)
-        if (current.isRefreshing) return
-        updateTimeline(type) { it.copy(isRefreshing = true, error = null) }
-        viewModelScope.launch {
-            try {
-                val posts = repository.fetch(session, type)
-                updateTimeline(type) {
-                    it.copy(posts = posts, isRefreshing = false, loaded = true, endReached = posts.isEmpty())
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                updateTimeline(type) { it.copy(isRefreshing = false, loaded = true, error = e.message ?: e.toString()) }
-            }
-        }
-    }
+    fun refresh(type: TimelineType = selected.value) = feeds.getValue(type).refresh()
 
-    fun loadMore(type: TimelineType = _state.value.selected) {
-        val current = _state.value.timelines.getValue(type)
-        if (current.isRefreshing || current.isLoadingMore || current.endReached) return
-        val maxId = current.posts.lastOrNull()?.id ?: return
-        updateTimeline(type) { it.copy(isLoadingMore = true, error = null) }
-        viewModelScope.launch {
-            try {
-                val older = repository.fetch(session, type, maxId)
-                updateTimeline(type) { s ->
-                    val known = s.posts.mapTo(HashSet()) { it.id }
-                    s.copy(
-                        posts = s.posts + older.filter { it.id !in known },
-                        isLoadingMore = false,
-                        endReached = older.isEmpty(),
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                updateTimeline(type) { it.copy(isLoadingMore = false, error = e.message ?: e.toString()) }
-            }
-        }
-    }
+    fun loadMore(type: TimelineType = selected.value) = feeds.getValue(type).loadMore()
 
-    private fun updateTimeline(type: TimelineType, transform: (TimelineUiState) -> TimelineUiState) {
-        _state.update { s -> s.copy(timelines = s.timelines + (type to transform(s.timelines.getValue(type)))) }
-    }
+    private fun snapshot() = TimelineScreenState(
+        selected = selected.value,
+        available = available,
+        timelines = feeds.mapValues { it.value.state.value },
+    )
 }

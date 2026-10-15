@@ -14,5 +14,25 @@
     <string name="post_bookmark">Bookmark</string>
     <string name="post_action_done">Done</string>
     <string name="post_reactions">Favourites</string>
+    <string name="post_pinned">Pinned</string>
     <string name="post_boosted_by">%1$s boosted</string>
+    <string name="back">Back</string>
+    <string name="profile_posts">Posts</string>
+    <string name="profile_following">Following</string>
+    <string name="profile_followers">Followers</string>
+    <string name="profile_posts_count">%1$s posts</string>
+    <string name="profile_joined">Joined %1$s</string>
+    <string name="profile_locked">Locked account</string>
+    <string name="profile_bot">Bot</string>
+    <string name="profile_verified">Verified</string>
+    <string name="profile_no_posts">No posts yet</string>
+    <string name="profile_error">Failed to load profile: %1$s</string>
+    <string name="expand">Show more</string>
+    <string name="collapse">Show less</string>
+    <string name="profile_followed_by_one">Followed by %1$s</string>
+    <string name="profile_followed_by_two">Followed by %1$s and %2$s</string>
+    <plurals name="profile_followed_by_others">
+        <item quantity="one">Followed by %1$s, %2$s, and %3$d other you follow</item>
+        <item quantity="other">Followed by %1$s, %2$s, and %3$d others you follow</item>
+    </plurals>
 </resources>

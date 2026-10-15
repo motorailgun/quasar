@@ -1,5 +1,7 @@
 package es.aria_on_the_planet.quasar.data.remote
 
+import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
+import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,12 +41,50 @@ class MastodonApi(
         addQueryParameter("limit", limit.toString())
     }
 
+    /** https://docs.joinmastodon.org/methods/accounts/#get */
+    suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =
+        get(serverUrl, accessToken, "api/v1/accounts/$id") {}
+
+    /**
+     * https://docs.joinmastodon.org/methods/accounts/#statuses
+     *
+     * @param pinned `true` ならピン留めされたポストのみ取得する。
+     */
+    suspend fun accountStatuses(
+        serverUrl: String,
+        accessToken: String?,
+        id: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+        pinned: Boolean = false,
+    ): List<StatusDto> = getStatuses(serverUrl, accessToken, "api/v1/accounts/$id/statuses") {
+        maxId?.let { addQueryParameter("max_id", it) }
+        addQueryParameter("limit", limit.toString())
+        if (pinned) addQueryParameter("pinned", "true")
+    }
+
+    /** https://docs.joinmastodon.org/methods/accounts/#familiar_followers (要認証) */
+    suspend fun familiarFollowers(
+        serverUrl: String,
+        accessToken: String,
+        ids: List<String>,
+    ): List<FamiliarFollowersDto> = get(serverUrl, accessToken, "api/v1/accounts/familiar_followers") {
+        ids.forEach { addQueryParameter("id[]", it) }
+    }
+
     private suspend fun getStatuses(
         serverUrl: String,
         accessToken: String?,
         path: String,
         query: HttpUrl.Builder.() -> Unit,
-    ): List<StatusDto> = withContext(Dispatchers.IO) {
+    ): List<StatusDto> = get(serverUrl, accessToken, path, query)
+
+    private suspend inline fun <reified T> get(
+        serverUrl: String,
+        accessToken: String?,
+        path: String,
+        crossinline query: HttpUrl.Builder.() -> Unit,
+    ): T = withContext(Dispatchers.IO) {
         val url = serverUrl.toHttpUrl().newBuilder()
             .addPathSegments(path)
             .apply(query)
@@ -58,7 +98,7 @@ class MastodonApi(
             if (!response.isSuccessful) {
                 throw MastodonApiException(response.code, "HTTP ${response.code}: $body")
             }
-            json.decodeFromString<List<StatusDto>>(body)
+            json.decodeFromString<T>(body)
         }
     }
 

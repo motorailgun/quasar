@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.data.mapper
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
+import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
@@ -14,6 +15,8 @@ import es.aria_on_the_planet.quasar.domain.model.MediaSize
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PreviewCard
+import es.aria_on_the_planet.quasar.domain.model.Profile
+import es.aria_on_the_planet.quasar.domain.model.ProfileField
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import es.aria_on_the_planet.quasar.domain.model.User
 import java.net.URI
@@ -34,6 +37,27 @@ fun AccountDto.toDomain() = User(
     note = note,
     emojis = emojis.map { it.toDomain() },
 )
+
+fun AccountDto.toProfile() = Profile(
+    user = toDomain(),
+    // Mastodon は未設定時に missing.png を返すので、それはヘッダ無しとして扱う
+    headerUrl = header?.takeUnless { it.isBlank() || it.endsWith("/missing.png") },
+    postsCount = statusesCount,
+    followingCount = followingCount,
+    followersCount = followersCount,
+    fields = fields.map { it.toDomain() },
+    createdAt = createdAt?.let { parseInstantOrNull(it) },
+    locked = locked,
+    bot = bot,
+)
+
+fun FieldDto.toDomain() = ProfileField(
+    name = name,
+    value = value,
+    verifiedAt = verifiedAt?.let { parseInstantOrNull(it) },
+)
+
+private fun parseInstantOrNull(value: String): Instant? = runCatching { Instant.parse(value) }.getOrNull()
 
 fun StatusDto.toDomain(): Post {
     val boosted = reblog

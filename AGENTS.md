@@ -27,8 +27,8 @@ es.aria_on_the_planet.quasar
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
-│   └── repository/TimelineRepository.kt
-├── domain/model/                   UI が扱うモデル (User, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment)
+│   └── repository/                 TimelineRepository, AccountRepository
+├── domain/model/                   UI が扱うモデル (User, Profile, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -38,9 +38,12 @@ es.aria_on_the_planet.quasar
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
-    │   └── modifier/               汎用 Modifier (FadingEdges 等)
+    │   ├── layout/CollapsibleContent.kt 高さ超過時に折りたたみ + フェード + 展開ボタン
+    │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
+    ├── feed/PostFeed.kt            max_id ページングするポスト一覧の状態管理 (ViewModel から使う)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
-    └── timeline/                   タイムライン画面 + ViewModel
+    ├── timeline/                   タイムライン画面 + ViewModel
+    └── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -59,6 +62,23 @@ data class User(
     val note: String,         // プロフィール文 (HTML, カスタム絵文字を含みうる)
     val emojis: List<CustomEmoji>,
 )
+
+// User は一覧表示に必要な最小限。プロフィール画面用の詳細は Profile に分ける
+// User.fullScreenName: ローカルユーザーにも所属ドメインを付けた username@domain
+
+data class Profile(
+    val user: User,
+    val headerUrl: String?,        // header。未設定時の .../missing.png は null にする
+    val postsCount: Int,           // statuses_count
+    val followingCount: Int,       // following_count
+    val followersCount: Int,       // followers_count
+    val fields: List<ProfileField>,
+    val createdAt: Instant?,
+    val locked: Boolean,
+    val bot: Boolean,
+)
+
+data class ProfileField(val name: String, val value: String /* HTML */, val verifiedAt: Instant?)
 
 data class Post(
     val id: String,
@@ -128,6 +148,19 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 
 ページングは `max_id` (古い方向) を使う。`TimelineRepository.fetch(type, maxId)` が `List<Post>` を返す。
 
+| 用途 | エンドポイント |
+| --- | --- |
+| プロフィール | `GET /api/v1/accounts/:id` |
+| プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
+| ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
+| 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
+
+`:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
+
+### PostFeed (`ui/feed/PostFeed.kt`)
+ポスト一覧のページング状態 (`PostFeedState`: posts / isRefreshing / isLoadingMore / endReached / error / loaded) と
+`refresh()` / `loadMore()` をまとめたもの。`TimelineViewModel` (種別ごとに 1 つ) と `ProfileViewModel` が使う。
+
 ## 再利用 UI コンポーネント
 
 ### EmojiText (`ui/component/text/EmojiText.kt`)
@@ -157,6 +190,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 * `PostList(posts, onLoadMore, isLoadingMore, modifier, contentPadding, header, ...)`
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
+* 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
 
 ### LinkPreviewCard (`ui/component/card/LinkPreviewCard.kt`)
 * `LinkPreviewCard(card: PreviewCard, modifier, onClick: ((PreviewCard) -> Unit)? = null)`
@@ -175,6 +209,28 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 * 未対応: `sensitive` (閲覧注意) によるぼかし表示。
 
 ## 画面
+
+* **Profile** (`ProfileActivity`): `Context.openProfile(user)` で起動する (extra はアカウント ID のみ)。
+  * X のプロフィールを参考にした構成: ヘッダ画像 + 半分重なるアイコン (UserIcon, 88dp) / 表示名 (EmojiText) +
+    鍵・bot バッジ / `@username@domain` / bio (EmojiText, HTML) / フィールド / 登録日 / 投稿・フォロー・フォロワー数。
+  * フィールドは角丸の面に key: value で並べ、`verified_at` があるものは tertiary 色 + 認証アイコン。
+  * 件数は 1 万以上で短縮表記 (`CompactDecimalFormat`)。
+  * ヘッダ部分は `PostList` の `header` スロットに入れ、投稿一覧と 1 本の LazyColumn にする。
+    ヘッダが画面外に出るとトップバーに表示名と投稿数を出す。
+  * フィールドの認証アイコン枠は常に確保し、認証有無で key/value の列位置がずれないようにする。
+  * **ピン留めポスト**: `GET /api/v1/accounts/:id/statuses?pinned=true`。サーバによっては多いので 20 件で打ち切る
+    (`AccountRepository.MaxPinnedPosts`)。ヘッダ直下に `PinnedPosts` として 1 つの LazyColumn アイテムで置く
+    (通常一覧にも同じポストが含まれうるため、キー衝突を避ける)。セクション見出しは置かず、各ポストに
+    `PostCard(pinned = true)` で小さな Pinned ラベル (12dp アイコン + labelSmall) を付ける。画面高の 30% を超える場合は `CollapsibleContent`
+    で折りたたみ、下端フェード + `>` (下向き、展開時は上向き) ボタンで展開する。
+  * **自分がフォローしている人のうちのフォロワー** ("followers you follow"): `GET /api/v1/accounts/familiar_followers?id[]=:id`
+    (要認証。未ログインなら呼ばない)。統計行の下に、重ねたアイコン最大 3 つ + 「Followed by A, B, and N others you follow」。
+  * ピン留め・フォロワー情報は補助情報 (`ProfileExtras`) 扱いで、取得失敗時はログのみで非表示にする。
+  * 未実装: フォローボタン、投稿/返信/メディアのタブ切り替え、familiar followers の一覧画面。
+  * 注: API の Profile エンティティ (`/api/v1/profile`) はログイン中ユーザー自身の編集用 (raw な値) で、
+    他人のプロフィール表示には Account を使う。ドメインの `Profile` は表示用で、API の Profile とは別物。
+* 遷移: `PostCard` のアイコン・表示名 (+ screenName)・「〜 boosted」ラベルのタップで `onUserClick`。
+  タイムラインとプロフィールの両方から `openProfile` する (プロフィール中の本人の投稿からは遷移しない)。
 
 * **Login (暫定)**: サーバ URL とアクセストークン (任意) を入力。トークンなしでは Home を無効化。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) は後続タスク。

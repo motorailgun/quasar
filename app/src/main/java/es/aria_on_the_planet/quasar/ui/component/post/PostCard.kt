@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -54,12 +55,14 @@ object PostCardDefaults {
  * ポスト 1 件。タイムライン・プロフィール等で再利用する stateless コンポーネント。
  *
  * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
+ * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
  */
 @Composable
 fun PostCard(
     post: Post,
     modifier: Modifier = Modifier,
     mediaHeight: Dp = PostCardDefaults.MediaHeight,
+    pinned: Boolean = false,
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
@@ -70,8 +73,16 @@ fun PostCard(
             .clickable { onPostClick(post) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
+        if (pinned) {
+            PinnedLabel(Modifier.padding(start = 52.dp, bottom = 2.dp))
+        }
         post.boostedBy?.let { booster ->
-            BoostedByLabel(booster, Modifier.padding(start = 52.dp, bottom = 4.dp))
+            BoostedByLabel(
+                booster,
+                Modifier
+                    .padding(start = 52.dp, bottom = 4.dp)
+                    .clickable { onUserClick(booster) },
+            )
         }
         Row {
             UserIcon(
@@ -80,7 +91,7 @@ fun PostCard(
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                AuthorLine(post)
+                AuthorLine(post, onAuthorClick = { onUserClick(post.author) })
                 Spacer(Modifier.size(4.dp))
                 EmojiText(
                     text = post.text,
@@ -108,36 +119,44 @@ fun PostCard(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun UserIcon(user: User, modifier: Modifier = Modifier) {
+fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
     AsyncImage(
         model = user.iconUrl,
         contentDescription = user.screenName,
         modifier = modifier
-            .size(40.dp)
+            .size(size)
             .clip(MaterialShapes.Cookie9Sided.toShape()),
     )
 }
 
 @Composable
-private fun AuthorLine(post: Post) {
+private fun AuthorLine(post: Post, onAuthorClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        EmojiText(
-            text = post.author.displayName.ifBlank { post.author.screenName },
-            emojis = post.author.emojis,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = "@${post.author.screenName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
+        // 表示名 + screenName をまとめてタップ領域にする (時刻は含めない)
+        Row(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .clickable(onClick = onAuthorClick),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EmojiText(
+                text = post.author.displayName.ifBlank { post.author.screenName },
+                emojis = post.author.emojis,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "@${post.author.screenName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             text = relativeTime(post.createdAt),
@@ -164,6 +183,24 @@ private fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.tertiary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PinnedLabel(modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Outlined.PushPin,
+            contentDescription = null,
+            modifier = Modifier.size(12.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = stringResource(R.string.post_pinned),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

@@ -13,6 +13,34 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 
 /**
+ * 下端をフェードアウトさせ、内容が続いていることを示す。
+ *
+ * @param strength フェード強度 0〜1。描画フェーズでのみ読まれる。
+ */
+fun Modifier.bottomFadingEdge(
+    height: Dp,
+    strength: () -> Float,
+): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val amount = strength()
+        if (amount <= 0f) return@drawWithContent
+        val edge = height.toPx().coerceAtMost(size.height / 2)
+        drawRect(
+            brush = Brush.verticalGradient(
+                0f to Color.Black,
+                1f to Color.Black.copy(alpha = 1f - amount),
+                startY = size.height - edge,
+                endY = size.height,
+            ),
+            topLeft = Offset(0f, size.height - edge),
+            size = Size(size.width, edge),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+
+/**
  * 左右の端をフェードアウトさせ、その方向にまだスクロールできることを示す。
  * スクロール系 Modifier より前 (外側) に付けること。
  *

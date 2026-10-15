@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.mapper
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
+import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
@@ -91,5 +92,28 @@ class MappersTest {
         assertEquals("https://r/x", post.mediaAttachments[1].url)
         assertEquals("Example", post.card?.title)
         assertNull(post.card?.imageUrl)
+    }
+
+    @Test
+    fun mapsProfile() {
+        val profile = alice.copy(
+            header = "https://remote.example/headers/original/missing.png",
+            statusesCount = 19600, followingCount = 683, followersCount = 435,
+            createdAt = "2018-02-01T00:00:00.000Z", locked = true,
+            fields = listOf(
+                FieldDto("Web", "<a href=\"https://example.com\">example.com</a>", "2024-01-01T00:00:00.000+00:00"),
+                FieldDto("Lang", "ja", null),
+            ),
+        ).toProfile()
+        assertNull(profile.headerUrl)
+        assertEquals(19600, profile.postsCount)
+        assertEquals(683, profile.followingCount)
+        assertEquals(435, profile.followersCount)
+        assertEquals(true, profile.locked)
+        assertEquals("2018-02-01T00:00:00Z", profile.createdAt.toString())
+        assertEquals(listOf(true, false), profile.fields.map { it.verifiedAt != null })
+
+        val withHeader = alice.copy(header = "https://remote.example/h.png").toProfile()
+        assertEquals("https://remote.example/h.png", withHeader.headerUrl)
     }
 }

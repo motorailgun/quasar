@@ -21,7 +21,30 @@ data class AccountDto(
     @SerialName("display_name") val displayName: String = "",
     val note: String = "",
     val avatar: String,
+    val header: String? = null,
     val emojis: List<CustomEmojiDto> = emptyList(),
+    val locked: Boolean = false,
+    val bot: Boolean = false,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("statuses_count") val statusesCount: Int = 0,
+    @SerialName("following_count") val followingCount: Int = 0,
+    @SerialName("followers_count") val followersCount: Int = 0,
+    val fields: List<FieldDto> = emptyList(),
+)
+
+/** https://docs.joinmastodon.org/entities/FamiliarFollowers/ */
+@Serializable
+data class FamiliarFollowersDto(
+    val id: String,
+    val accounts: List<AccountDto> = emptyList(),
+)
+
+/** https://docs.joinmastodon.org/entities/Account/#Field */
+@Serializable
+data class FieldDto(
+    val name: String,
+    val value: String,
+    @SerialName("verified_at") val verifiedAt: String? = null,
 )
 
 /** https://docs.joinmastodon.org/entities/PreviewCard/ */

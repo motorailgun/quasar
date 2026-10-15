@@ -43,7 +43,7 @@ fun EmojiText(
             AnnotatedString.fromHtml(
                 htmlString = simplifyMastodonHtml(text),
                 linkStyles = TextLinkStyles(style = SpanStyle(color = linkColor)),
-            ).trimEnd()
+            ).trimWhitespace()
         } else {
             AnnotatedString(text)
         }
@@ -74,7 +74,10 @@ private fun emojiInlineContent(emojis: List<CustomEmoji>): Map<String, InlineTex
         }
     }
 
-private fun AnnotatedString.trimEnd(): AnnotatedString {
+/** HTML 変換で前後に残る空白・改行を取り除く。 */
+private fun AnnotatedString.trimWhitespace(): AnnotatedString {
+    val start = text.indexOfFirst { !it.isWhitespace() }
+    if (start == -1) return AnnotatedString("")
     val end = text.indexOfLast { !it.isWhitespace() } + 1
-    return if (end == length) this else subSequence(0, end)
+    return if (start == 0 && end == length) this else subSequence(start, end)
 }

@@ -48,13 +48,15 @@ fun PostList(
 ) {
     val currentOnLoadMore by rememberUpdatedState(onLoadMore)
     LaunchedEffect(state) {
+        // 末尾付近にいる間は件数が増えるたびに再判定する (1 ページが画面に収まる場合も続きを読む)
         snapshotFlow {
             val info = state.layoutInfo
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-            info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - LoadMoreThreshold
+            val nearEnd = info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - LoadMoreThreshold
+            if (nearEnd) info.totalItemsCount else -1
         }
             .distinctUntilChanged()
-            .filter { it }
+            .filter { it >= 0 }
             .collect { currentOnLoadMore() }
     }
 

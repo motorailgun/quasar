@@ -7,11 +7,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.ui.component.player.LocalInlinePlayback
 import es.aria_on_the_planet.quasar.ui.component.player.rememberInlinePlayback
+import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
+import es.aria_on_the_planet.quasar.ui.component.time.rememberTickingNow
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
 
 /**
- * 各 Activity の setContent の最上位。テーマとアプリ全体の設定を提供する。
+ * 各 Activity の setContent の最上位。テーマとアプリ全体の設定・表示用の現在時刻 ([LocalNow]) を提供する。
  *
  * @param inlinePlayback 一覧での動画等のインライン再生を有効にするか (Activity ごとに Player を 1 つ持つ)。
  */
@@ -23,10 +25,12 @@ fun QuasarAppContent(
 ) {
     val displaySettings by container.displaySettings.collectAsStateWithLifecycle()
     val playback = if (inlinePlayback) rememberInlinePlayback(container.okHttpClient) else null
+    val now by rememberTickingNow()
     QuasarTheme {
         CompositionLocalProvider(
             LocalDisplaySettings provides displaySettings,
             LocalInlinePlayback provides playback,
+            LocalNow provides now,
             content = content,
         )
     }

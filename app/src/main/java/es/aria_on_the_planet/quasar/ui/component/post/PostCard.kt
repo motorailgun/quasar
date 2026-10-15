@@ -81,6 +81,7 @@ import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
 import java.time.Duration
 import java.time.Instant
+import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
 
 object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
@@ -260,7 +261,7 @@ private fun RowScope.AuthorNameAndTime(post: Post, onAuthorClick: () -> Unit) {
     }
     Spacer(Modifier.width(8.dp))
     Text(
-        text = relativeTime(post.createdAt),
+        text = relativeTime(post.createdAt, LocalNow.current),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

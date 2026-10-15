@@ -65,6 +65,7 @@ import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.post.relativeTime
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
+import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
 
 /**
  * 通知の一覧。サーバ側グループ ([NotificationEntry.Single]) と、ユーザー単位にまとめた行
@@ -230,7 +231,7 @@ private fun CompactNotification(
             Spacer(Modifier.size(8.dp))
             // 名前だけ太字にするため HTML で組む (名前はエスケープ済み)
             val boldName = first?.let { "<b>${TextUtils.htmlEncode(it.displayName.ifBlank { it.screenName })}</b>" }.orEmpty()
-            val time = group.latestAt?.let { " · " + relativeTime(it) }.orEmpty()
+            val time = group.latestAt?.let { " · " + relativeTime(it, LocalNow.current) }.orEmpty()
             EmojiText(
                 text = group.type.groupMessage(boldName, others = group.count - 1) + time,
                 emojis = first?.emojis.orEmpty(),
@@ -294,7 +295,7 @@ private fun AccountReactionsItem(
             )
             Spacer(Modifier.size(8.dp))
             val boldName = "<b>${TextUtils.htmlEncode(account.displayName.ifBlank { account.screenName })}</b>"
-            val time = entry.latestAt?.let { " · " + relativeTime(it) }.orEmpty()
+            val time = entry.latestAt?.let { " · " + relativeTime(it, LocalNow.current) }.orEmpty()
             EmojiText(
                 text = entry.type.multiplePostsMessage(boldName, entry.members.size) + time,
                 emojis = account.emojis,
@@ -383,7 +384,7 @@ private fun NotificationHeader(group: NotificationGroup, onUserClick: (User) -> 
         group.latestAt?.let { at ->
             Spacer(Modifier.width(8.dp))
             Text(
-                text = relativeTime(at),
+                text = relativeTime(at, LocalNow.current),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

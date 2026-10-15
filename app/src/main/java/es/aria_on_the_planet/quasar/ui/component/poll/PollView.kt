@@ -42,6 +42,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import kotlinx.coroutines.launch
+import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
 
 private val OptionShape = RoundedCornerShape(8.dp)
 private val OptionMinHeight = 40.dp
@@ -215,7 +216,7 @@ private fun PollFooter(poll: Poll) {
     }
     val state = when {
         poll.expired -> stringResource(R.string.poll_final_results)
-        poll.expiresAt != null -> when (val left = timeLeft(poll.expiresAt)) {
+        poll.expiresAt != null -> when (val left = timeLeft(poll.expiresAt, LocalNow.current)) {
             is TimeLeft.Days -> pluralStringResource(R.plurals.poll_days_left, left.value, left.value)
             is TimeLeft.Hours -> pluralStringResource(R.plurals.poll_hours_left, left.value, left.value)
             is TimeLeft.Minutes -> pluralStringResource(R.plurals.poll_minutes_left, left.value, left.value)

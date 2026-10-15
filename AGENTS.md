@@ -49,6 +49,7 @@ es.aria_on_the_planet.quasar
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
+    │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
@@ -247,6 +248,12 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
+
+### 相対時刻の更新 (`ui/component/time/Now.kt`)
+* 「3m」等の相対時刻・投票の残り時間は `LocalNow.current` を現在時刻として計算する (`relativeTime(at, LocalNow.current)`、
+  `timeLeft(expiresAt, LocalNow.current)`)。`Instant.now()` を直接使うと時間が経っても表示が進まない。
+* `QuasarAppContent` が `rememberTickingNow()` で `NowTickIntervalMillis` (15 秒) ごとに進めて提供する。
+  前面 (STARTED) の間だけ進め、前面に戻ったら即更新する。間隔はこの定数で調整する。
 
 ### 折りたたみ (`ui/component/layout/`)
 * 開閉状態は `rememberExpandedState(key)` (statusId 等のキー付き rememberSaveable) で持ち、CW・長文・ピン留めで共通。

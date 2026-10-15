@@ -34,6 +34,8 @@ data class Post(
     val statusId: String = id,
     /** リプライ先の Status ID。リプライでなければ `null`。 */
     val inReplyToId: String? = null,
+    /** リプライ先アカウントの acct (`username` または `username@domain`)。特定できなければ `null`。 */
+    val inReplyToAcct: String? = null,
 )
 
 /** 投稿に使われたアプリ (User Agent)。 */

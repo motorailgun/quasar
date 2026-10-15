@@ -15,6 +15,8 @@
     <string name="post_action_done">Done</string>
     <string name="post_reactions">Favourites</string>
     <string name="post_pinned">Pinned</string>
+    <string name="post_reply_to">Reply to %1$s</string>
+    <string name="post_reply">Reply</string>
     <string name="post_boosted_by">%1$s boosted</string>
     <string name="back">Back</string>
     <string name="profile_posts">Posts</string>

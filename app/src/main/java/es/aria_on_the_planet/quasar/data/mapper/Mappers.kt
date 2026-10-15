@@ -66,6 +66,16 @@ fun FieldDto.toDomain() = ProfileField(
 
 private fun parseInstantOrNull(value: String): Instant? = runCatching { Instant.parse(value) }.getOrNull()
 
+/**
+ * リプライ先アカウントの acct。API は ID しか返さないので、自分自身へのリプライなら投稿者、
+ * それ以外はメンションから同じ ID のものを探す。
+ */
+private fun StatusDto.replyTargetAcct(): String? {
+    val targetId = inReplyToAccountId ?: return null
+    if (targetId == account.id) return account.acct
+    return mentions.firstOrNull { it.id == targetId }?.acct
+}
+
 fun StatusDto.toDomain(): Post {
     val boosted = reblog
     val body = boosted ?: this
@@ -93,6 +103,7 @@ fun StatusDto.toDomain(): Post {
         boostedBy = if (boosted != null) account.toDomain() else null,
         statusId = body.id,
         inReplyToId = body.inReplyToId,
+        inReplyToAcct = body.replyTargetAcct(),
     )
 }
 

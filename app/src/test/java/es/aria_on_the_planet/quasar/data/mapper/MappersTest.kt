@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.data.mapper
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ApplicationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MentionDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
@@ -169,5 +170,21 @@ class MappersTest {
         assertEquals(true, status("NSFW", true).sensitive)
         assertNull(status(" ", false).contentWarning)
         assertEquals(false, status("", false).sensitive)
+    }
+
+    @Test
+    fun resolvesReplyTargetAcct() {
+        fun reply(toAccount: String?, mentions: List<MentionDto> = emptyList()) = StatusDto(
+            id = "1", createdAt = "2026-10-15T00:00:00Z", account = alice,
+            inReplyToId = toAccount?.let { "p" }, inReplyToAccountId = toAccount, mentions = mentions,
+        ).toDomain().inReplyToAcct
+        // 自分へのリプライ (スレッドの続き)
+        assertEquals("alice@remote.example", reply("1"))
+        // 他人へのリプライはメンションから
+        assertEquals("bob", reply("2", listOf(MentionDto("9", "carol", "carol@x"), MentionDto("2", "bob", "bob"))))
+        // メンションに無い
+        assertNull(reply("3"))
+        // リプライでない
+        assertNull(reply(null))
     }
 }

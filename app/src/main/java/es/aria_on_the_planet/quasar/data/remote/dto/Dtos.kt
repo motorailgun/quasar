@@ -32,6 +32,14 @@ data class AccountDto(
     val fields: List<FieldDto> = emptyList(),
 )
 
+/** https://docs.joinmastodon.org/entities/Status/#Mention */
+@Serializable
+data class MentionDto(
+    val id: String,
+    val username: String,
+    val acct: String,
+)
+
 /** Status.application: https://docs.joinmastodon.org/entities/Status/#application */
 @Serializable
 data class ApplicationDto(
@@ -140,6 +148,8 @@ data class StatusDto(
     @SerialName("spoiler_text") val spoilerText: String = "",
     val sensitive: Boolean = false,
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
+    @SerialName("in_reply_to_account_id") val inReplyToAccountId: String? = null,
+    val mentions: List<MentionDto> = emptyList(),
     @SerialName("replies_count") val repliesCount: Int = 0,
     @SerialName("reblogs_count") val reblogsCount: Int = 0,
     @SerialName("favourites_count") val favouritesCount: Int = 0,

@@ -61,6 +61,8 @@ object PostCardDefaults {
  * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
  * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
  * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (未ログイン時など)。
+ * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
+ *   返信関係が別の形で分かる場所では `false` にする。
  */
 @Composable
 fun PostCard(
@@ -72,6 +74,7 @@ fun PostCard(
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
+    showReplyIndicator: Boolean = true,
 ) {
     Column(
         modifier = modifier
@@ -89,6 +92,9 @@ fun PostCard(
                     .padding(start = 52.dp, bottom = 4.dp)
                     .clickable { onUserClick(booster) },
             )
+        }
+        if (showReplyIndicator && post.inReplyToId != null) {
+            ReplyToLabel(post.inReplyToAcct, Modifier.padding(start = 52.dp, bottom = 4.dp))
         }
         Row {
             UserIcon(
@@ -206,6 +212,26 @@ private fun AuthorLine(post: Post, onAuthorClick: () -> Unit) {
             text = relativeTime(post.createdAt),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ReplyToLabel(acct: String?, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.AutoMirrored.Outlined.Reply,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.tertiary,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = if (acct != null) stringResource(R.string.post_reply_to, "@$acct") else stringResource(R.string.post_reply),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.tertiary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

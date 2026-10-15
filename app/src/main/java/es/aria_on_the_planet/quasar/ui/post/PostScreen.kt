@@ -103,6 +103,7 @@ fun PostScreen(
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
                             onVote = onVote,
+                            showReplyIndicator = false,
                         )
                     }
                     item(key = "main", contentType = "main") {
@@ -150,6 +151,7 @@ fun PostScreen(
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
                             onVote = onVote,
+                            showReplyIndicator = false,
                         )
                     }
                 }

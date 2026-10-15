@@ -33,22 +33,36 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
+import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import java.time.Duration
 import java.time.Instant
 
-/** ポスト 1 件。タイムライン・プロフィール等で再利用する stateless コンポーネント。 */
+object PostCardDefaults {
+    val MediaHeight: Dp = 160.dp
+}
+
+/**
+ * ポスト 1 件。タイムライン・プロフィール等で再利用する stateless コンポーネント。
+ *
+ * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
+ */
 @Composable
 fun PostCard(
     post: Post,
     modifier: Modifier = Modifier,
+    mediaHeight: Dp = PostCardDefaults.MediaHeight,
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
+    onMediaClick: (MediaAttachment) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -74,6 +88,17 @@ fun PostCard(
                     isHtml = true,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                if (post.mediaAttachments.isNotEmpty()) {
+                    MediaAttachments(
+                        attachments = post.mediaAttachments,
+                        height = mediaHeight,
+                        onClick = onMediaClick,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                post.card?.let { card ->
+                    LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
+                }
                 Spacer(Modifier.size(8.dp))
                 PostActionRow(post)
             }

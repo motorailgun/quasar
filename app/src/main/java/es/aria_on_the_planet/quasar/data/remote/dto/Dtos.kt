@@ -24,6 +24,43 @@ data class AccountDto(
     val emojis: List<CustomEmojiDto> = emptyList(),
 )
 
+/** https://docs.joinmastodon.org/entities/PreviewCard/ */
+@Serializable
+data class PreviewCardDto(
+    val url: String,
+    val title: String = "",
+    val description: String = "",
+    val image: String? = null,
+    val blurhash: String? = null,
+)
+
+/** https://docs.joinmastodon.org/entities/MediaAttachment/ */
+@Serializable
+data class MediaAttachmentDto(
+    val id: String,
+    val type: String,
+    val url: String? = null,
+    @SerialName("preview_url") val previewUrl: String? = null,
+    @SerialName("remote_url") val remoteUrl: String? = null,
+    val meta: MediaMetaDto? = null,
+    val description: String? = null,
+    val blurhash: String? = null,
+)
+
+/** `meta` はメディア種別やサーバによって中身が異なるため、使うキーだけを緩く受ける。 */
+@Serializable
+data class MediaMetaDto(
+    val original: MediaSizeDto? = null,
+    val small: MediaSizeDto? = null,
+)
+
+@Serializable
+data class MediaSizeDto(
+    val width: Double? = null,
+    val height: Double? = null,
+    val duration: Double? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Status/ */
 @Serializable
 data class StatusDto(
@@ -36,6 +73,8 @@ data class StatusDto(
     @SerialName("favourites_count") val favouritesCount: Int = 0,
     val emojis: List<CustomEmojiDto> = emptyList(),
     val reblog: StatusDto? = null,
+    @SerialName("media_attachments") val mediaAttachments: List<MediaAttachmentDto> = emptyList(),
+    val card: PreviewCardDto? = null,
     // 以下は認証時のみ返される
     val favourited: Boolean? = null,
     val reblogged: Boolean? = null,

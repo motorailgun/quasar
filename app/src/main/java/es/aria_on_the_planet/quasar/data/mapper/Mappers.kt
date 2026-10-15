@@ -2,9 +2,18 @@ package es.aria_on_the_planet.quasar.data.mapper
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
+import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.domain.model.MediaMeta
+import es.aria_on_the_planet.quasar.domain.model.MediaSize
+import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PreviewCard
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import es.aria_on_the_planet.quasar.domain.model.User
 import java.net.URI
@@ -38,6 +47,8 @@ fun StatusDto.toDomain(): Post {
         boostsCount = body.reblogsCount,
         reactionsCount = body.favouritesCount,
         emojis = body.emojis.map { it.toDomain() },
+        mediaAttachments = body.mediaAttachments.map { it.toDomain() },
+        card = body.card?.toDomain(),
         viewer = PostViewerState(
             bookmarked = body.bookmarked == true,
             reblogged = body.reblogged == true,
@@ -45,6 +56,42 @@ fun StatusDto.toDomain(): Post {
         ),
         boostedBy = if (boosted != null) account.toDomain() else null,
     )
+}
+
+fun PreviewCardDto.toDomain() = PreviewCard(
+    url = url,
+    title = title,
+    description = description,
+    imageUrl = image,
+    blurhash = blurhash,
+)
+
+fun MediaAttachmentDto.toDomain() = MediaAttachment(
+    id = id,
+    type = when (type) {
+        "image" -> MediaType.Image
+        "video" -> MediaType.Video
+        "gifv" -> MediaType.Gifv
+        "audio" -> MediaType.Audio
+        else -> MediaType.Unknown
+    },
+    url = url ?: remoteUrl ?: previewUrl.orEmpty(),
+    previewUrl = previewUrl,
+    meta = meta?.toDomain(),
+    blurhash = blurhash,
+    description = description?.takeIf { it.isNotBlank() },
+)
+
+private fun MediaMetaDto.toDomain() = MediaMeta(
+    original = original?.toSize(),
+    small = small?.toSize(),
+    durationSeconds = original?.duration,
+)
+
+private fun MediaSizeDto.toSize(): MediaSize? {
+    val w = width ?: return null
+    val h = height ?: return null
+    return MediaSize(w.toInt(), h.toInt())
 }
 
 /** プロフィール URL (例: `https://example.com/@alice`) からサーバ URL を取り出す。 */

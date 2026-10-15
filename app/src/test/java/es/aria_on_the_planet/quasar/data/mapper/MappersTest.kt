@@ -1,6 +1,11 @@
 package es.aria_on_the_planet.quasar.data.mapper
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
+import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
+import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import org.junit.Assert.assertEquals
@@ -61,5 +66,30 @@ class MappersTest {
         assertEquals(7, post.boostsCount)
         assertEquals(true, post.viewer.reblogged)
         assertEquals("bob", post.boostedBy?.screenName)
+    }
+
+    @Test
+    fun mapsMediaAndCard() {
+        val post = StatusDto(
+            id = "10", createdAt = "2026-10-15T00:00:00Z", account = alice,
+            mediaAttachments = listOf(
+                MediaAttachmentDto(
+                    id = "m1", type = "video", url = "https://e/v.mp4", previewUrl = "https://e/v.png",
+                    meta = MediaMetaDto(original = MediaSizeDto(864.0, 1080.0, 21.7), small = MediaSizeDto(512.0, 640.0)),
+                    blurhash = "LEHV6nWB2yk8pyo0adR*.7kCMdnj", description = "",
+                ),
+                MediaAttachmentDto(id = "m2", type = "unknown", remoteUrl = "https://r/x"),
+            ),
+            card = PreviewCardDto(url = "https://example.com", title = "Example"),
+        ).toDomain()
+        val video = post.mediaAttachments[0]
+        assertEquals(MediaType.Video, video.type)
+        assertEquals(0.8f, video.meta!!.aspectRatio!!, 0.001f)
+        assertEquals(21.7, video.meta!!.durationSeconds!!, 0.0)
+        assertNull(video.description)
+        assertEquals(MediaType.Unknown, post.mediaAttachments[1].type)
+        assertEquals("https://r/x", post.mediaAttachments[1].url)
+        assertEquals("Example", post.card?.title)
+        assertNull(post.card?.imageUrl)
     }
 }

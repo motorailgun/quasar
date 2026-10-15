@@ -19,7 +19,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -36,10 +38,12 @@ fun PostList(
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues = PaddingValues(),
+    mediaHeight: Dp = PostCardDefaults.MediaHeight,
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
+    onMediaClick: (MediaAttachment) -> Unit = {},
     header: (LazyListScope.() -> Unit)? = null,
 ) {
     val currentOnLoadMore by rememberUpdatedState(onLoadMore)
@@ -61,7 +65,13 @@ fun PostList(
     ) {
         header?.invoke(this)
         items(posts, key = { it.id }, contentType = { "post" }) { post ->
-            PostCard(post = post, onUserClick = onUserClick, onPostClick = onPostClick)
+            PostCard(
+                post = post,
+                mediaHeight = mediaHeight,
+                onUserClick = onUserClick,
+                onPostClick = onPostClick,
+                onMediaClick = onMediaClick,
+            )
             HorizontalDivider()
         }
         if (isLoadingMore) {

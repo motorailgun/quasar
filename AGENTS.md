@@ -28,13 +28,17 @@ es.aria_on_the_planet.quasar
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
 │   └── repository/TimelineRepository.kt
-├── domain/model/                   UI が扱うモデル (User, Post, Timeline, CustomEmoji)
+├── domain/model/                   UI が扱うモデル (User, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
     │   ├── text/EmojiText.kt       カスタム絵文字対応テキスト (Text のラッパー)
     │   ├── post/PostCard.kt        ポスト 1 件
-    │   └── post/PostList.kt        ポストの集合 (LazyColumn)
+    │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
+    │   ├── card/LinkPreviewCard.kt リンクプレビュー
+    │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
+    │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
+    │   └── modifier/               汎用 Modifier (FadingEdges 等)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
     └── timeline/                   タイムライン画面 + ViewModel
 ```
@@ -65,6 +69,8 @@ data class Post(
     val boostsCount: Int,          // reblogs_count
     val reactionsCount: Int,       // favourites_count (将来絵文字リアクション対応時に拡張)
     val emojis: List<CustomEmoji>,
+    val mediaAttachments: List<MediaAttachment>,  // media_attachments (0〜15 件)
+    val card: PreviewCard?,        // 本文中の URL のリンクプレビュー
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
 )
@@ -76,12 +82,38 @@ data class PostViewerState(
     val favourited: Boolean,       // favourited
 )
 
+data class PreviewCard(
+    val url: String,
+    val title: String,
+    val description: String,      // 空文字のことがある
+    val imageUrl: String?,         // image
+    val blurhash: String?,
+)
+
+enum class MediaType { Image, Video, Gifv, Audio, Unknown }
+
+data class MediaAttachment(
+    val id: String,
+    val type: MediaType,
+    val url: String,               // url ?: remote_url ?: preview_url
+    val previewUrl: String?,
+    val meta: MediaMeta?,          // original / small のサイズと duration だけを取り出す
+    val blurhash: String?,
+    val description: String?,      // 代替テキスト
+)
+
+data class MediaMeta(val original: MediaSize?, val small: MediaSize?, val durationSeconds: Double?) {
+    val aspectRatio: Float?        // small 優先、なければ original。width/height から計算
+}
+
 enum class TimelineType { Home, Local, Global }
 
 data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイムライン 1 : ポスト N
 ```
 
-* 件数・`viewer` フラグはブーストの場合も中身 (`reblog`) の値を使う。
+* 件数・`viewer` フラグ・メディア・カードはブーストの場合も中身 (`reblog`) の値を使う。
+* `meta` はメディア種別やサーバで中身が異なる (動画の original には `aspect` が無い等) ため、DTO では
+  `width` / `height` / `duration` のみを nullable な `Double` で緩く受け、アスペクト比は自前で計算する。
 * ブースト (`reblog != null`) は中身のポストを `Post` とし、`boostedBy` にブーストしたユーザーを入れる。
   ページングには元の Status ID が必要なので、`Post.id` は外側の Status ID を使い、表示用 ID と区別しない。
 * `User` は `inServerId + serverUrl` で一意。
@@ -105,13 +137,15 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
   * `isHtml = true` のとき Mastodon の HTML を `AnnotatedString.fromHtml` で変換 (リンク付き)。
   * `:shortcode:` を `emojis` と照合し、`InlineTextContent` + Coil の `AsyncImage` で画像に置換。
   * 絵文字サイズは `fontSize` に追従 (em 単位)。
-* 変換処理 (`buildEmojiAnnotatedString`) は純粋関数として分離し、ユニットテスト可能にする。
+* 変換処理 (`replaceEmojiShortcodes`, `simplifyMastodonHtml`) は純粋関数として分離し、ユニットテスト可能にする。
 
 ### PostCard (`ui/component/post/PostCard.kt`)
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。
 
-* `PostCard(post: Post, modifier, onUserClick, onPostClick)`
-* 構成: (ブースト表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / アクション行
+* `PostCard(post: Post, modifier, mediaHeight: Dp = PostCardDefaults.MediaHeight, onUserClick, onPostClick, onMediaClick)`
+* 構成: (ブースト表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) /
+  添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / アクション行
+* `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=tertiary, リアクション=primary, ブックマーク=secondary) で表示する。
   現時点では表示のみで、操作 (favourite/reblog/bookmark API 呼び出し) は未実装。
@@ -123,6 +157,22 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 * `PostList(posts, onLoadMore, isLoadingMore, modifier, contentPadding, header, ...)`
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
+
+### LinkPreviewCard (`ui/component/card/LinkPreviewCard.kt`)
+* `LinkPreviewCard(card: PreviewCard, modifier, onClick: ((PreviewCard) -> Unit)? = null)`
+* `OutlinedCard` で、左に画像 (あれば。BlurHash プレースホルダ付き)、右にホスト名・タイトル・説明文。
+* `onClick` 未指定時は `LocalUriHandler` でリンク先を開く。
+
+### MediaAttachments / MediaAttachmentItem (`ui/component/media/MediaAttachments.kt`)
+* `MediaAttachments(attachments, height: Dp, modifier, onClick)` が `MediaAttachmentItem` を横に並べる。
+* 全アイテムを `height` に揃え、幅は `height * アスペクト比`。合計幅が収まらない場合は `horizontalScroll`。
+* まだスクロールできる側の端は 24dp フェードさせる (`ScrollState.canScrollBackward/Forward` + アニメーション)。
+  汎用の `Modifier.horizontalFadingEdges` (`ui/component/modifier/FadingEdges.kt`) を使い、スクロール Modifier より外側に付ける。
+* アスペクト比不明時は 1:1、極端な比率は 1/3〜3 に丸めて Crop 表示する。
+* 種別ごとの表示: video=再生アイコン、gifv=「GIF」ラベル、audio=プレビューが無ければ音声アイコン。
+* プレースホルダ/エラー時は BlurHash (`rememberBlurHashPainter`) を使う。
+* メディアビューア未実装のため、タイムラインではタップでメディア URL をブラウザで開いている。
+* 未対応: `sensitive` (閲覧注意) によるぼかし表示。
 
 ## 画面
 

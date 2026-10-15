@@ -13,6 +13,10 @@ data class Post(
     val boostsCount: Int,
     val reactionsCount: Int,
     val emojis: List<CustomEmoji>,
+    /** 添付メディア (0〜15 件)。 */
+    val mediaAttachments: List<MediaAttachment> = emptyList(),
+    /** 本文中の URL のリンクプレビュー。 */
+    val card: PreviewCard? = null,
     /** ログイン中ユーザーがこのポストに対して行った操作。 */
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */

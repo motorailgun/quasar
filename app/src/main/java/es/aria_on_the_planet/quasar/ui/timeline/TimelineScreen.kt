@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -60,6 +61,7 @@ fun TimelineScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     // タイムラインごとにスクロール位置を保持する
     val listStates = TimelineType.entries.associateWith { rememberLazyListState() }
+    val uriHandler = LocalUriHandler.current
 
     val error = state.current.error
     LaunchedEffect(error) {
@@ -117,6 +119,8 @@ fun TimelineScreen(
                     state = listStates.getValue(state.selected),
                     isLoadingMore = timeline.isLoadingMore,
                     onLoadMore = { viewModel.loadMore(state.selected) },
+                    // メディアビューアができるまではブラウザで開く
+                    onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
                 )
             }
         }

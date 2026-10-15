@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.ui.component.post
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -67,27 +68,37 @@ fun PostDetail(
                     .clickable { onUserClick(booster) },
             )
         }
-        Row(
-            modifier = Modifier.clickable { onUserClick(post.author) },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            UserIcon(user = post.author)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                EmojiText(
-                    text = post.author.displayName.ifBlank { post.author.screenName },
-                    emojis = post.author.emojis,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "@${post.author.fullScreenName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        // 投稿者 (タップでプロフィール) と、右端に公開範囲のアイコン
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // タップ領域は投稿者の部分だけにする
+            Box(Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.clickable { onUserClick(post.author) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    UserIcon(user = post.author)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        EmojiText(
+                            text = post.author.displayName.ifBlank { post.author.screenName },
+                            emojis = post.author.emojis,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "@${post.author.fullScreenName}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (post.visibility.hasIcon) {
+                Spacer(Modifier.width(8.dp))
+                VisibilityIcon(post.visibility, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.size(12.dp))

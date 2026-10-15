@@ -30,6 +30,7 @@ import es.aria_on_the_planet.quasar.domain.model.ProfileField
 import es.aria_on_the_planet.quasar.domain.model.Quote
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
+import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.User
 import java.net.URI
 import java.time.Instant
@@ -99,6 +100,7 @@ fun StatusDto.toDomain(): Post {
         quote = body.quote?.toDomain(),
         contentWarning = body.spoilerText.takeIf { it.isNotBlank() },
         sensitive = body.sensitive,
+        visibility = postVisibility(body.visibility),
         application = body.application?.let { PostApplication(it.name, it.website?.takeIf(String::isNotBlank)) },
         viewer = PostViewerState(
             bookmarked = body.bookmarked == true,
@@ -165,6 +167,14 @@ fun PollDto.toDomain() = Poll(
     voted = voted == true,
     ownVotes = ownVotes.orEmpty(),
 )
+
+/** 未知の値 (互換サーバ独自の `local` 等) は制限を付けず公開として扱い、ブーストの可否はサーバに任せる。 */
+internal fun postVisibility(value: String): PostVisibility = when (value) {
+    "unlisted" -> PostVisibility.Unlisted
+    "private" -> PostVisibility.Private
+    "direct" -> PostVisibility.Direct
+    else -> PostVisibility.Public
+}
 
 fun QuoteDto.toDomain() = Quote(
     state = when (state) {

@@ -26,6 +26,8 @@ data class Post(
     val contentWarning: String? = null,
     /** メディアが閲覧注意 (NSFW) か。 */
     val sensitive: Boolean = false,
+    /** 公開範囲。 */
+    val visibility: PostVisibility = PostVisibility.Public,
     /** ログイン中ユーザーがこのポストに対して行った操作。 */
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */
@@ -37,6 +39,24 @@ data class Post(
     /** リプライ先アカウントの acct (`username` または `username@domain`)。特定できなければ `null`。 */
     val inReplyToAcct: String? = null,
 )
+
+/** ポストの公開範囲 (visibility)。 */
+enum class PostVisibility {
+    Public,
+    /** 未収載 (Mastodon の UI では「ひかえめな公開」)。 */
+    Unlisted,
+    /** フォロワー限定。 */
+    Private,
+    /** 言及した相手のみ。 */
+    Direct;
+
+    /**
+     * ブーストできる公開範囲か。フォロワー限定は投稿者自身ならブーストできるが、
+     * ログイン中のアカウントをまだ把握していないので一律に不可として扱う。
+     */
+    val boostable: Boolean
+        get() = this == Public || this == Unlisted
+}
 
 /** 投稿に使われたアプリ (User Agent)。 */
 data class PostApplication(

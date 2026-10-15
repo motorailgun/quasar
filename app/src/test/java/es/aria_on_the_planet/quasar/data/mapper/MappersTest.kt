@@ -20,6 +20,7 @@ import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import kotlinx.serialization.json.Json
+import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -259,5 +260,15 @@ class MappersTest {
         val decoded = Json { ignoreUnknownKeys = true }
             .decodeFromString<GroupedNotificationsResultsDto>(json)
         assertEquals("5980585", decoded.notificationGroups[0].mostRecentNotificationId)
+    }
+
+    @Test
+    fun visibilityMapsKnownValuesAndFallsBackToPublic() {
+        assertEquals(PostVisibility.Public, postVisibility("public"))
+        assertEquals(PostVisibility.Unlisted, postVisibility("unlisted"))
+        assertEquals(PostVisibility.Private, postVisibility("private"))
+        assertEquals(PostVisibility.Direct, postVisibility("direct"))
+        // 互換サーバ独自の値
+        assertEquals(PostVisibility.Public, postVisibility("local"))
     }
 }

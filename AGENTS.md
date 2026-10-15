@@ -110,6 +110,7 @@ data class Post(
     val application: PostApplication?, // application (name, website)。リモートのポストでは null
     val contentWarning: String?,   // spoiler_text (空なら null)
     val sensitive: Boolean,        // sensitive (メディアの閲覧注意)。CW とは独立
+    val visibility: PostVisibility, // visibility (Public / Unlisted / Private / Direct)。未知の値は Public
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
@@ -228,6 +229,8 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * リプライ表示: `inReplyToId` があるポストは、ブースト表示と同じ形 (アイコン + tertiary 色) で「Reply to @acct」を出す。
   acct は `in_reply_to_account_id` を、自分へのリプライなら投稿者、それ以外は `mentions` から引いて求める
   (見つからなければ「Reply」)。Post 画面のスレッドでは縦線で関係が分かるので `showReplyIndicator = false`。
+* 公開範囲: 投稿者行 (名前 / @acct) と同じ高さの右端に `VisibilityIcon` (公式 Web UI を元に、公開・フォロワー限定は出さず、
+  未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
 * 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / 投票 (PollView) /
   添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
 * `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
@@ -276,7 +279,12 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   反映は `statusId` 一致で、ブーストの外側・引用先も含めて、ViewModel が持つ全一覧 (全カラム + 通知、ピン留め、スレッド全体) に当てる。
   `withAction` は既にその状態なら何もしない (重ねても件数がずれない)。テストは `PostActionTest` / `PostActionControllerTest`。
 * `reblog` の応答はブースト自体の Status (中身は `reblog`) だが、`toDomain` で中身の件数・状態が取り出される。
-* 失敗時の UI 通知 (スナックバー等) は無い (ログのみ)。非公開・DM のポストのブーストもボタンは押せ、サーバのエラーで巻き戻る。
+* フォロワー限定・ダイレクトのポストはブーストボタンをグレーアウトする (`PostVisibility.boostable`。既にブースト済みなら
+  取り消しのため押せる)。自分のフォロワー限定ポストはサーバ上はブーストできるが、ログイン中のアカウントをまだ持っていない
+  ので一律に不可としている。
+* 失敗時の UI 通知 (スナックバー等) は無い (ログのみ)。
+* 押下時のアニメーション: 押している間の縮小・オン時の弾み (motionScheme の spring)、件数の上下スライド、オン時に
+  アイコンの後ろから粒が散る `Modifier.actionBurst` (`ActionBurst.kt`、clip より外側で描く)。
 
 ### PollView (`ui/component/poll/PollView.kt`)
 * `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。
@@ -530,7 +538,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
 * **操作**: リプライ・投稿・フォローは未実装。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
-  操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、非公開ポストのブーストボタン無効化は未対応。
+  操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
 * **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。

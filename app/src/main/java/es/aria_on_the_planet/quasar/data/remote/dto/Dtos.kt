@@ -198,6 +198,7 @@ data class StatusDto(
     val content: String = "",
     @SerialName("spoiler_text") val spoilerText: String = "",
     val sensitive: Boolean = false,
+    val visibility: String = "public",
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
     @SerialName("in_reply_to_account_id") val inReplyToAccountId: String? = null,
     val mentions: List<MentionDto> = emptyList(),

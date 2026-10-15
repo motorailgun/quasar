@@ -25,8 +25,10 @@ import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -215,38 +217,53 @@ fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
 @Composable
 private fun AuthorLine(post: Post, onAuthorClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // 表示名 + screenName をまとめてタップ領域にする (時刻は含めない)
-        Row(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .clickable(onClick = onAuthorClick),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EmojiText(
-                text = post.author.displayName.ifBlank { post.author.screenName },
-                emojis = post.author.emojis,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "@${post.author.screenName}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
+        // 表示名 + screenName + 時刻は左に詰め、公開範囲のアイコンは右端に寄せる
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            AuthorNameAndTime(post, onAuthorClick)
         }
-        Spacer(Modifier.width(8.dp))
+        if (post.visibility.hasIcon) {
+            Spacer(Modifier.width(8.dp))
+            // アクション行のアイコンと同じ幅の枠の中央に置き、右端のブックマークと縦に揃える
+            Box(Modifier.size(ActionIconSize), contentAlignment = Alignment.Center) {
+                VisibilityIcon(post.visibility, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.AuthorNameAndTime(post: Post, onAuthorClick: () -> Unit) {
+    // 表示名 + screenName をまとめてタップ領域にする (時刻は含めない)
+    Row(
+        modifier = Modifier
+            .weight(1f, fill = false)
+            .clickable(onClick = onAuthorClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        EmojiText(
+            text = post.author.displayName.ifBlank { post.author.screenName },
+            emojis = post.author.emojis,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(Modifier.width(4.dp))
         Text(
-            text = relativeTime(post.createdAt),
+            text = "@${post.author.screenName}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
+    Spacer(Modifier.width(8.dp))
+    Text(
+        text = relativeTime(post.createdAt),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -343,6 +360,8 @@ fun PostActionRow(post: Post, modifier: Modifier = Modifier, onAction: OnPostAct
             count = post.boostsCount,
             active = viewer.reblogged,
             activeColor = MaterialTheme.extendedColors.reblog.color,
+            // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
+            enabled = post.visibility.boostable || viewer.reblogged,
             onClick = onAction?.let { { it(post, PostActionType.Boost) } },
         )
         PostActionButton(
@@ -369,6 +388,7 @@ private val ActionPaddingHorizontal = 6.dp
 
 /**
  * アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタンになる。
+ * [enabled] が `false` ならグレーアウトして押せない。
  *
  * アニメーションは Expressive の motionScheme (テーマの spring) に合わせる:
  * 押している間はアイコンを縮め、タップでオンになったらアイコンを弾ませて後ろから粒を散らす ([actionBurst])。
@@ -383,11 +403,16 @@ private fun PostActionButton(
     count: Int? = null,
     active: Boolean = false,
     activeColor: Color = MaterialTheme.colorScheme.primary,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     val motion = MaterialTheme.motionScheme
     val color by animateColorAsState(
-        if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        when {
+            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha)
+            active -> activeColor
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
         animationSpec = motion.defaultEffectsSpec(),
         label = "postActionColor",
     )
@@ -432,6 +457,7 @@ private fun PostActionButton(
                 if (onClick != null) {
                     Modifier.toggleable(
                         value = active,
+                        enabled = enabled,
                         interactionSource = interactionSource,
                         indication = ripple(),
                         role = Role.Switch,
@@ -481,6 +507,9 @@ private fun PostActionButton(
 }
 
 private val ActionIconSize = 18.dp
+
+/** 押せない項目の色の不透明度 (Material の disabled content と同じ)。 */
+private const val DisabledAlpha = 0.38f
 
 /** 押している間のアイコンの縮小率。 */
 private const val PressedIconScale = 0.8f

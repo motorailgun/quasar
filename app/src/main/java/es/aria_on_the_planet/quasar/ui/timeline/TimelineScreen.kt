@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,10 +47,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.domain.model.TimelineType
+import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.ui.feed.posts
+import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
@@ -62,14 +68,14 @@ fun TimelineScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
-    // タイムラインごとにスクロール位置を保持する
-    val listStates = TimelineType.entries.associateWith { rememberLazyListState() }
+    // カラムごとにスクロール位置を保持する
+    val listStates = ColumnType.entries.associateWith { rememberLazyListState() }
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
 
     val error = state.current.error
     LaunchedEffect(error) {
-        if (error != null && state.current.posts.isNotEmpty()) snackbarHostState.showSnackbar(error)
+        if (error != null && state.current.items.isNotEmpty()) snackbarHostState.showSnackbar(error)
     }
 
     Scaffold(
@@ -95,39 +101,57 @@ fun TimelineScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        val timeline = state.current
+        val current = state.current
         val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
-            isRefreshing = timeline.isRefreshing && timeline.posts.isNotEmpty(),
+            isRefreshing = current.isRefreshing && current.items.isNotEmpty(),
             onRefresh = { viewModel.refresh() },
             state = pullState,
             modifier = Modifier.fillMaxSize().padding(padding),
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullState,
-                    isRefreshing = timeline.isRefreshing && timeline.posts.isNotEmpty(),
+                    isRefreshing = current.isRefreshing && current.items.isNotEmpty(),
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
         ) {
+            val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
+            // メディアビューアができるまではブラウザで開く
+            val onMediaClick: (MediaAttachment) -> Unit = { media -> runCatching { uriHandler.openUri(media.url) } }
+            val timelineType = state.selected.timeline
             when {
-                timeline.posts.isEmpty() && (timeline.isRefreshing || !timeline.loaded) ->
+                current.items.isEmpty() && (current.isRefreshing || !current.loaded) ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
 
-                timeline.posts.isEmpty() && timeline.error != null ->
-                    CenteredMessage(stringResource(R.string.timeline_error, timeline.error))
+                current.items.isEmpty() && current.error != null ->
+                    CenteredMessage(stringResource(R.string.timeline_error, current.error!!))
 
-                else -> PostList(
-                    posts = timeline.posts,
+                current.items.isEmpty() ->
+                    CenteredMessage(stringResource(R.string.column_empty))
+
+                timelineType == null -> NotificationList(
+                    notifications = state.notifications.items,
                     modifier = Modifier.fillMaxSize(),
                     state = listStates.getValue(state.selected),
-                    isLoadingMore = timeline.isLoadingMore,
+                    isLoadingMore = current.isLoadingMore,
                     onLoadMore = { viewModel.loadMore(state.selected) },
                     onUserClick = context::openProfile,
                     onPostClick = context::openPost,
-                    onVote = if (viewModel.canVote) viewModel::vote else null,
-                    // メディアビューアができるまではブラウザで開く
-                    onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
+                    onMediaClick = onMediaClick,
+                    onVote = onVote,
+                )
+
+                else -> PostList(
+                    posts = state.timelines.getValue(timelineType).posts,
+                    modifier = Modifier.fillMaxSize(),
+                    state = listStates.getValue(state.selected),
+                    isLoadingMore = current.isLoadingMore,
+                    onLoadMore = { viewModel.loadMore(state.selected) },
+                    onUserClick = context::openProfile,
+                    onPostClick = context::openPost,
+                    onVote = onVote,
+                    onMediaClick = onMediaClick,
                 )
             }
         }
@@ -137,9 +161,9 @@ fun TimelineScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TimelineSelector(
-    available: List<TimelineType>,
-    selected: TimelineType,
-    onSelect: (TimelineType) -> Unit,
+    available: List<ColumnType>,
+    selected: ColumnType,
+    onSelect: (ColumnType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -147,19 +171,29 @@ private fun TimelineSelector(
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         available.forEachIndexed { index, type ->
+            val checked = type == selected
+            // 4 カラムでは等幅にラベルが収まらないので、選択中のみラベルを出して幅を広げる
+            val weight by animateFloatAsState(if (checked) SelectedWeight else 1f, label = "columnWeight")
             ToggleButton(
-                checked = type == selected,
+                checked = checked,
                 onCheckedChange = { onSelect(type) },
-                modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                modifier = Modifier.weight(weight).semantics { role = Role.RadioButton },
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     available.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
             ) {
-                Icon(type.icon(), contentDescription = null, modifier = Modifier.size(18.dp))
-                Box(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                Text(stringResource(type.label()))
+                val label = stringResource(type.label())
+                Icon(
+                    type.icon(),
+                    contentDescription = if (checked) null else label,
+                    modifier = Modifier.size(18.dp),
+                )
+                if (checked) {
+                    Box(Modifier.size(ToggleButtonDefaults.IconSpacing))
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
@@ -172,14 +206,18 @@ private fun CenteredMessage(message: String) {
     }
 }
 
-private fun TimelineType.icon() = when (this) {
-    TimelineType.Home -> Icons.Outlined.Home
-    TimelineType.Local -> Icons.Outlined.Groups
-    TimelineType.Global -> Icons.Outlined.Public
+private const val SelectedWeight = 1.8f
+
+private fun ColumnType.icon() = when (this) {
+    ColumnType.Home -> Icons.Outlined.Home
+    ColumnType.Notifications -> Icons.Outlined.Notifications
+    ColumnType.Local -> Icons.Outlined.Groups
+    ColumnType.Global -> Icons.Outlined.Public
 }
 
-private fun TimelineType.label() = when (this) {
-    TimelineType.Home -> R.string.timeline_home
-    TimelineType.Local -> R.string.timeline_local
-    TimelineType.Global -> R.string.timeline_global
+private fun ColumnType.label() = when (this) {
+    ColumnType.Home -> R.string.timeline_home
+    ColumnType.Notifications -> R.string.column_notifications
+    ColumnType.Local -> R.string.timeline_local
+    ColumnType.Global -> R.string.timeline_global
 }

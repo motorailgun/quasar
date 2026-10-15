@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.di
 import android.content.Context
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SessionStore
@@ -24,4 +25,5 @@ class AppContainer(context: Context) {
     val timelineRepository = TimelineRepository(api)
     val accountRepository = AccountRepository(api)
     val statusRepository = StatusRepository(api)
+    val notificationRepository = NotificationRepository(api)
 }

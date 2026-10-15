@@ -13,10 +13,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -24,8 +20,7 @@ import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
 
 /**
  * ポストの集合。タイムライン・プロフィールの投稿一覧などで再利用する。
@@ -47,19 +42,7 @@ fun PostList(
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     header: (LazyListScope.() -> Unit)? = null,
 ) {
-    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
-    LaunchedEffect(state) {
-        // 末尾付近にいる間は件数が増えるたびに再判定する (1 ページが画面に収まる場合も続きを読む)
-        snapshotFlow {
-            val info = state.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-            val nearEnd = info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - LoadMoreThreshold
-            if (nearEnd) info.totalItemsCount else -1
-        }
-            .distinctUntilChanged()
-            .filter { it >= 0 }
-            .collect { currentOnLoadMore() }
-    }
+    LoadMoreEffect(state, onLoadMore, LoadMoreThreshold)
 
     LazyColumn(
         modifier = modifier,

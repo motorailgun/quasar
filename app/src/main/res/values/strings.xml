@@ -75,4 +75,17 @@
     <string name="media_sensitive">Sensitive media</string>
     <string name="media_show">Show media</string>
     <string name="media_hide">Hide media</string>
+    <string name="column_notifications">Notifications</string>
+    <string name="column_empty">Nothing here yet</string>
+    <string name="notification_mention">%1$s mentioned you</string>
+    <string name="notification_status">%1$s posted</string>
+    <string name="notification_reblog">%1$s boosted your post</string>
+    <string name="notification_follow">%1$s followed you</string>
+    <string name="notification_follow_request">%1$s requested to follow you</string>
+    <string name="notification_favourite">%1$s favourited your post</string>
+    <string name="notification_poll">A poll has ended</string>
+    <string name="notification_update">%1$s edited a post</string>
+    <string name="notification_quote">%1$s quoted your post</string>
+    <string name="notification_quoted_update">%1$s edited a post you quoted</string>
+    <string name="notification_unknown">Notification from %1$s</string>
 </resources>

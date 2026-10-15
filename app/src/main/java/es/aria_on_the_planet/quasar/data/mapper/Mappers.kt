@@ -6,6 +6,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
+import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
 import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
@@ -15,6 +16,8 @@ import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
 import es.aria_on_the_planet.quasar.domain.model.MediaType
+import es.aria_on_the_planet.quasar.domain.model.Notification
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.PollOption
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -106,6 +109,26 @@ fun StatusDto.toDomain(): Post {
         inReplyToAcct = body.replyTargetAcct(),
     )
 }
+
+fun NotificationDto.toDomain() = Notification(
+    id = id,
+    type = when (type) {
+        "mention" -> NotificationType.Mention
+        "status" -> NotificationType.Status
+        "reblog" -> NotificationType.Reblog
+        "follow" -> NotificationType.Follow
+        "follow_request" -> NotificationType.FollowRequest
+        "favourite" -> NotificationType.Favourite
+        "poll" -> NotificationType.Poll
+        "update" -> NotificationType.Update
+        "quote" -> NotificationType.Quote
+        "quoted_update" -> NotificationType.QuotedUpdate
+        else -> NotificationType.Unknown
+    },
+    createdAt = Instant.parse(createdAt),
+    account = account.toDomain(),
+    post = status?.toDomain(),
+)
 
 fun PollDto.toDomain() = Poll(
     id = id,

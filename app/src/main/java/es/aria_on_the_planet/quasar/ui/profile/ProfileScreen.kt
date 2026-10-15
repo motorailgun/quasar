@@ -27,6 +27,7 @@ import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
+import es.aria_on_the_planet.quasar.ui.feed.posts
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

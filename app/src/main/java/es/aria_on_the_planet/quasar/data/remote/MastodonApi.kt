@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.data.remote
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
+import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,17 @@ class MastodonApi(
      */
     suspend fun statusContext(serverUrl: String, accessToken: String?, id: String): ContextDto =
         get(serverUrl, accessToken, "api/v1/statuses/$id/context") {}
+
+    /** https://docs.joinmastodon.org/methods/notifications/#get (要認証) */
+    suspend fun notifications(
+        serverUrl: String,
+        accessToken: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): List<NotificationDto> = get(serverUrl, accessToken, "api/v1/notifications") {
+        maxId?.let { addQueryParameter("max_id", it) }
+        addQueryParameter("limit", limit.toString())
+    }
 
     /** https://docs.joinmastodon.org/methods/polls/#vote (要認証) */
     suspend fun votePoll(serverUrl: String, accessToken: String, pollId: String, choices: List<Int>): PollDto =

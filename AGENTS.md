@@ -43,9 +43,11 @@ es.aria_on_the_planet.quasar
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
+    │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── layout/CollapsibleContent.kt 高さ超過時に折りたたみ + フェード + 展開ボタン
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
-    ├── feed/PostFeed.kt            max_id ページングするポスト一覧の状態管理 (ViewModel から使う)
+    ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting
+    ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
     ├── timeline/                   タイムライン画面 + ViewModel
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
@@ -178,15 +180,17 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
+| 通知 | `GET /api/v1/notifications` (要認証、max_id ページング) |
 | ポスト | `GET /api/v1/statuses/:id` |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
 
-### PostFeed (`ui/feed/PostFeed.kt`)
-ポスト一覧のページング状態 (`PostFeedState`: posts / isRefreshing / isLoadingMore / endReached / error / loaded) と
-`refresh()` / `loadMore()` をまとめたもの。`TimelineViewModel` (種別ごとに 1 つ) と `ProfileViewModel` が使う。
+### PagedFeed / PostFeed (`ui/feed/`)
+`PagedFeed<T>` は max_id ページングの状態 (`FeedState<T>`: items / isRefreshing / isLoadingMore / endReached / error / loaded) と
+`refresh()` / `loadMore()` / `updateItems()` をまとめた汎用クラス。`PostFeed` はそのポスト版
+(`PostFeedState = FeedState<Post>`、`.posts` は `.items` の別名)。通知は `PagedFeed<Notification>` をそのまま使う。
 
 ## 再利用 UI コンポーネント
 
@@ -311,6 +315,17 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 
 * **Login (暫定)**: サーバ URL とアクセストークン (任意) を入力。トークンなしでは Home を無効化。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) は後続タスク。
+* **カラム** (`ColumnType`): Home / Notifications / Local / Global。Home と通知はログイン時のみ。
+  4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
+* **通知カラム** (`ui/notification/`): グルーピングしない素朴な一覧。
+  * リアクション (favourite / reblog) とフォロー (follow / follow_request) はコンパクト表示 (x_notifications.png 参考):
+    左に種別の塗りアイコン (お気に入り=primary, ブースト=tertiary, フォロー=secondary)、右に**した側**のアイコン →
+    「**名前** 〜しました · 時刻」(名前は HTML エスケープして `<b>`) → 対象ポストの抜粋 (onSurfaceVariant・最大 3 行、
+    CW があれば警告文)。メディアがあれば右端に 56dp のサムネイル (閲覧注意は BlurHash のみ)。タップで対象ポスト。
+  * それ以外 (mention / status / quote / update / poll 等) は「アイコン + 〜しました + 時刻」の見出しと PostCard。
+    mention では「mentioned you」と重複するので `PostCard(showReplyIndicator = false)`。
+  * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
+  grouped notifications (v2) は未使用。
 * **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。

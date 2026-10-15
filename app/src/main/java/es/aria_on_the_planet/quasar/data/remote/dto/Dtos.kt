@@ -79,6 +79,16 @@ data class QuoteDto(
     @SerialName("quoted_status_id") val quotedStatusId: String? = null,
 )
 
+/** https://docs.joinmastodon.org/entities/Notification/ */
+@Serializable
+data class NotificationDto(
+    val id: String,
+    val type: String,
+    @SerialName("created_at") val createdAt: String,
+    val account: AccountDto,
+    val status: StatusDto? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Context/ */
 @Serializable
 data class ContextDto(

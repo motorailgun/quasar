@@ -4,6 +4,8 @@ import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ApplicationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MentionDto
+import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
@@ -186,5 +188,21 @@ class MappersTest {
         assertNull(reply("3"))
         // リプライでない
         assertNull(reply(null))
+    }
+
+    @Test
+    fun mapsNotifications() {
+        val status = StatusDto(id = "s", createdAt = "2026-10-15T00:00:00Z", account = alice)
+        fun n(type: String, withStatus: Boolean) =
+            NotificationDto("n", type, "2026-10-15T01:00:00.000Z", bob, if (withStatus) status else null).toDomain()
+        assertEquals(NotificationType.Favourite, n("favourite", true).type)
+        assertEquals("s", n("favourite", true).post!!.statusId)
+        assertEquals(NotificationType.Follow, n("follow", false).type)
+        assertNull(n("follow", false).post)
+        assertEquals("bob", n("follow", false).account.screenName)
+        assertEquals(NotificationType.QuotedUpdate, n("quoted_update", true).type)
+        // 未対応・将来の種別
+        assertEquals(NotificationType.Unknown, n("admin.sign_up", false).type)
+        assertEquals(NotificationType.Unknown, n("added_to_collection", false).type)
     }
 }

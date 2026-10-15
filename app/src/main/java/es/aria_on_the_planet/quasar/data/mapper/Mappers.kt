@@ -118,6 +118,7 @@ fun NotificationDto.toDomain() = Notification(
     createdAt = Instant.parse(createdAt),
     account = account.toDomain(),
     post = status?.toDomain(),
+    groupKey = groupKey,
 )
 
 /** v2 のレスポンスを、ID で参照されているアカウント・ポストを解決したグループの一覧にする。 */
@@ -133,6 +134,7 @@ fun GroupedNotificationsResultsDto.toDomain(): List<NotificationGroup> {
             post = group.statusId?.let { statusesById[it] }?.toDomain(),
             latestAt = group.latestPageNotificationAt?.let { parseInstantOrNull(it) },
             pageMinId = group.pageMinId ?: group.mostRecentNotificationId,
+            latestNotificationId = group.mostRecentNotificationId,
         )
     }
 }

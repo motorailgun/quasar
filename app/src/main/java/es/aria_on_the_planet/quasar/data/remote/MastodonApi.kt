@@ -4,6 +4,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
+import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
@@ -30,8 +31,10 @@ class MastodonApi(
         accessToken: String?,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
+        sinceId: String? = null,
     ): List<StatusDto> = getStatuses(serverUrl, accessToken, "api/v1/timelines/home") {
         maxId?.let { addQueryParameter("max_id", it) }
+        sinceId?.let { addQueryParameter("since_id", it) }
         addQueryParameter("limit", limit.toString())
     }
 
@@ -41,9 +44,11 @@ class MastodonApi(
         local: Boolean,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
+        sinceId: String? = null,
     ): List<StatusDto> = getStatuses(serverUrl, accessToken, "api/v1/timelines/public") {
         if (local) addQueryParameter("local", "true")
         maxId?.let { addQueryParameter("max_id", it) }
+        sinceId?.let { addQueryParameter("since_id", it) }
         addQueryParameter("limit", limit.toString())
     }
 
@@ -65,8 +70,10 @@ class MastodonApi(
         accessToken: String,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
+        sinceId: String? = null,
     ): List<NotificationDto> = get(serverUrl, accessToken, "api/v1/notifications") {
         maxId?.let { addQueryParameter("max_id", it) }
+        sinceId?.let { addQueryParameter("since_id", it) }
         addQueryParameter("limit", limit.toString())
     }
 
@@ -76,8 +83,10 @@ class MastodonApi(
         accessToken: String,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
+        sinceId: String? = null,
     ): GroupedNotificationsResultsDto = get(serverUrl, accessToken, "api/v2/notifications") {
         maxId?.let { addQueryParameter("max_id", it) }
+        sinceId?.let { addQueryParameter("since_id", it) }
         addQueryParameter("limit", limit.toString())
     }
 
@@ -86,6 +95,10 @@ class MastodonApi(
         post(serverUrl, accessToken, "api/v1/polls/$pollId/votes") {
             choices.forEach { add("choices[]", it.toString()) }
         }
+
+    /** https://docs.joinmastodon.org/methods/instance/#v2 の `configuration.urls.streaming`。 */
+    suspend fun streamingUrl(serverUrl: String): String? =
+        get<InstanceDto>(serverUrl, null, "api/v2/instance") {}.configuration?.urls?.streaming
 
     /** https://docs.joinmastodon.org/methods/accounts/#get */
     suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =

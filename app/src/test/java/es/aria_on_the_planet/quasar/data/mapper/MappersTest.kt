@@ -197,7 +197,10 @@ class MappersTest {
     fun mapsNotifications() {
         val status = StatusDto(id = "s", createdAt = "2026-10-15T00:00:00Z", account = alice)
         fun n(type: String, withStatus: Boolean) =
-            NotificationDto("n", type, "2026-10-15T01:00:00.000Z", bob, if (withStatus) status else null).toDomain()
+            NotificationDto(
+                id = "n", type = type, createdAt = "2026-10-15T01:00:00.000Z", account = bob,
+                status = if (withStatus) status else null,
+            ).toDomain()
         assertEquals(NotificationType.Favourite, n("favourite", true).type)
         assertEquals("s", n("favourite", true).post!!.statusId)
         assertEquals(NotificationType.Follow, n("follow", false).type)

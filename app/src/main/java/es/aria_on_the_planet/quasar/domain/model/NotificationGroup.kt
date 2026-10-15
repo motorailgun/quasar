@@ -20,6 +20,8 @@ data class NotificationGroup(
     val latestAt: Instant?,
     /** このページに含まれる最も古い通知の ID。次ページ取得の `max_id` に使う。 */
     val pageMinId: String,
+    /** グループ内で最も新しい通知の ID。新着の重複判定と並び順に使う。 */
+    val latestNotificationId: String = pageMinId,
 ) {
     /**
      * ページ境界で分かれた同じグループの続き ([older]) を統合する。
@@ -34,13 +36,18 @@ data class NotificationGroup(
     )
 }
 
-/** v1 の通知を 1 件だけのグループとして扱う。 */
-fun Notification.asGroup() = NotificationGroup(
-    key = "ungrouped-$id",
+/**
+ * v1 の通知を 1 件だけのグループとして扱う。
+ *
+ * @param useGroupKey `true` ならサーバのグループキー (v2) を使う。ストリーミングの通知を v2 の一覧へ合流させるとき用。
+ */
+fun Notification.asGroup(useGroupKey: Boolean = false) = NotificationGroup(
+    key = groupKey?.takeIf { useGroupKey } ?: "ungrouped-$id",
     type = type,
     count = 1,
     accounts = listOf(account),
     post = post,
     latestAt = createdAt,
     pageMinId = id,
+    latestNotificationId = id,
 )

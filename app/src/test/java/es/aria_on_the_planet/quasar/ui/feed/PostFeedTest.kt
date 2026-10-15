@@ -31,7 +31,7 @@ class PostFeedTest {
         }
         feed.refresh()
         feed.loadMore()
-        assertEquals(listOf("3", "2", "1"), feed.state.value.posts.map { it.id })
+        assertEquals(listOf("3", "2", "1"), feed.state.value.items.posts.map { it.id })
         assertFalse(feed.state.value.endReached)
 
         feed.loadMore()
@@ -48,7 +48,7 @@ class PostFeedTest {
         fail = true
         feed.loadMore()
         val state = feed.state.value
-        assertEquals(listOf("1"), state.posts.map { it.id })
+        assertEquals(listOf("1"), state.items.posts.map { it.id })
         assertEquals("boom", state.error)
         assertFalse(state.isLoadingMore)
     }

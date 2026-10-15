@@ -1,5 +1,8 @@
 package es.aria_on_the_planet.quasar.ui.notification
 
+import es.aria_on_the_planet.quasar.data.streaming.StreamChannel
+import es.aria_on_the_planet.quasar.data.streaming.StreamEvent
+import es.aria_on_the_planet.quasar.domain.model.Notification
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.NotificationType.Favourite
@@ -235,5 +238,132 @@ class NotificationGroupingTest {
         val page = listOf(serverGroup(30, listOf("a")).copy(pageMinId = "12"), reaction(20, "b"), reaction(15, "c"))
         assertEquals("12", nextNotificationMaxId(page))
         assertEquals(null, nextNotificationMaxId(emptyList()))
+    }
+
+    // --- 新しい側への追加 (ストリーミング・補完) ------------------------------------------------------
+
+    /** ストリームで届く通知 1 件 (v2 のグループキー付き)。 */
+    private fun streamed(id: Int, who: String, type: NotificationType = Favourite, groupKey: String = "ungrouped-$id", postId: String = "p$id") =
+        reaction(id, who, type, postId).copy(key = groupKey)
+
+    @Test
+    fun streamedNotificationGoesToTop() {
+        val list = refresh(listOf(mention(20), mention(19)))
+        assertEquals(listOf("30", "20", "19"), describe(prependNotification(list, mention(30), isSingleNotification = true)))
+    }
+
+    @Test
+    fun ignoresAlreadyIncludedNotification() {
+        val list = refresh(listOf(mention(20), mention(19)))
+        assertSame(list, prependNotification(list, mention(20), isSingleNotification = true))
+        // サーバ側グループの最新 ID 以下も取り込み済み
+        val grouped = refresh(listOf(serverGroup(20, listOf("a", "b")).copy(latestNotificationId = "25")))
+        assertSame(grouped, prependNotification(grouped, streamed(24, "c", groupKey = "Favourite-p20"), isSingleNotification = true))
+    }
+
+    @Test
+    fun streamedNotificationJoinsServerGroupAndMovesToTop() {
+        val list = refresh(listOf(mention(30), serverGroup(20, listOf("a", "b")).copy(latestNotificationId = "20")))
+        val result = prependNotification(list, streamed(40, "c", groupKey = "Favourite-p20", postId = "p20"), isSingleNotification = true)
+        assertEquals(listOf("Favourite-p20", "30"), describe(result))
+        val group = (result[0] as NotificationEntry.Single).group
+        assertEquals(3, group.count)
+        assertEquals(listOf("c", "a", "b"), group.accounts.map { it.inServerId })
+        assertEquals("40", group.latestNotificationId)
+    }
+
+    @Test
+    fun streamedReactionIsAbsorbedIntoUserGroupAndMovesToTop() {
+        val list = refresh(listOf(mention(30), reaction(20, "a"), reaction(19, "a"), reaction(18, "a")))
+        assertEquals(listOf("30", "Favourite:a(20,19,18)"), describe(list))
+        val result = prependNotification(list, streamed(40, "a"), isSingleNotification = true)
+        assertEquals(listOf("Favourite:a(40,20,19,18)", "30"), describe(result))
+    }
+
+    @Test
+    fun streamedReactionReachingThresholdFormsUserGroupAtTop() {
+        val list = refresh(listOf(reaction(20, "a"), mention(19), reaction(18, "a"), mention(17)))
+        val result = prependNotification(list, streamed(40, "a"), isSingleNotification = true)
+        assertEquals(listOf("Favourite:a(40,20,18)", "19", "17"), describe(result))
+    }
+
+    @Test
+    fun memberLeavingUserGroupDissolvesItBelowThreshold() {
+        val list = refresh(listOf(reaction(20, "a"), reaction(19, "a"), reaction(18, "a"), mention(17)))
+        // 19 のポストに別の人 b もお気に入り → 19 のグループは複数人になり、a の行から外れる (a は 2 件に減るので解散)
+        val result = prependNotification(list, streamed(40, "b", groupKey = "ungrouped-19", postId = "p19"), isSingleNotification = true)
+        assertEquals(listOf("19", "20", "18", "17"), describe(result))
+        assertEquals(listOf("b", "a"), (result[0] as NotificationEntry.Single).group.accounts.map { it.inServerId })
+    }
+
+    @Test
+    fun backfilledGroupsReplaceCountsAndKeepOrder() {
+        val list = refresh(listOf(serverGroup(20, listOf("a")).copy(count = 2, latestNotificationId = "20"), mention(10)))
+        val newer = listOf(
+            mention(50),
+            // 20 のグループの続き: 総数 5 (既存 2 に足すのではなく置き換える)
+            serverGroup(20, listOf("c", "d")).copy(count = 5, latestNotificationId = "45"),
+            mention(30),
+        )
+        val result = prependNotificationGroups(list, newer)
+        assertEquals(listOf("50", "Favourite-p20", "30", "10"), describe(result))
+        val group = (result[1] as NotificationEntry.Single).group
+        assertEquals(5, group.count)
+        assertEquals(listOf("c", "d", "a"), group.accounts.map { it.inServerId })
+    }
+
+    @Test
+    fun backfillAfterStreamKeepsNewestFirst() {
+        var list = refresh(listOf(mention(10)))
+        list = prependNotification(list, mention(50), isSingleNotification = true)
+        list = prependNotificationGroups(list, listOf(mention(40), mention(30)))
+        assertEquals(listOf("50", "40", "30", "10"), describe(list))
+    }
+
+    @Test
+    fun keysStayUniqueAcrossStreamAndPaging() {
+        val whos = listOf("a", "b", "a", "c", "a")
+        var list = refresh((60 downTo 51).map { reaction(it, whos[it % whos.size]) })
+        (61..80).forEach { id ->
+            val incoming = if (id % 4 == 0) mention(id) else streamed(id, whos[id % whos.size])
+            list = prependNotification(list, incoming, isSingleNotification = true)
+            list = appendNotificationPage(list, listOf(reaction(110 - id, whos[id % whos.size])))
+            val keys = list.map { it.key } + list.flatMap { it.groups }.map { "g:" + it.key }
+            assertEquals("keys must be unique: $keys", keys.size, keys.toSet().size)
+        }
+        // 先頭側は新しい順
+        val latest = list.map { e -> e.groups.maxOf { it.latestNotificationId.toInt() } }
+        assertEquals(latest.take(5), latest.take(5).sortedDescending())
+    }
+
+    @Test
+    fun newestNotificationIdIsNumericMax() {
+        assertEquals("100", newestNotificationId(refresh(listOf(mention(99), mention(100), mention(98)))))
+    }
+
+    // --- ストリーム・補完の適用 -----------------------------------------------------------------
+
+    @Test
+    fun streamEventsApplyToNotifications() {
+        val list = refresh(listOf(reaction(20, "a"), mention(10)))
+        val toGroup: (Notification) -> NotificationGroup = { n -> mention(n.id.toInt()) }
+        val received = applyStreamEvent(list, StreamEvent.NotificationReceived(
+            Notification("30", Mention, Instant.EPOCH, user("x"), null),
+        ), toGroup)
+        assertEquals(listOf("30", "20", "10"), describe(received))
+        // 通知中のポストの編集を反映
+        val edited = post("p20").copy(text = "edited")
+        val afterEdit = applyStreamEvent(list, StreamEvent.StatusUpdate(edited), toGroup)
+        assertEquals("edited", (afterEdit[0] as NotificationEntry.Single).group.post!!.text)
+        // 関係ないイベントはそのまま
+        assertSame(list, applyStreamEvent(list, StreamEvent.Update(StreamChannel.User, post("p99")), toGroup))
+        assertSame(list, applyStreamEvent(list, StreamEvent.StatusUpdate(post("p99")), toGroup))
+    }
+
+    @Test
+    fun notificationBackfillRequestsRefreshOnFullPage() {
+        val list = refresh(listOf(mention(10)))
+        assertEquals(listOf("30", "20", "10"), describe(applyNotificationBackfill(list, listOf(mention(30), mention(20)), pageLimit = 3)!!))
+        assertEquals(null, applyNotificationBackfill(list, listOf(mention(40), mention(30), mention(20)), pageLimit = 3))
     }
 }

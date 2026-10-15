@@ -7,6 +7,7 @@ import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SessionStore
+import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -31,4 +32,5 @@ class AppContainer(context: Context) {
     val accountRepository = AccountRepository(api)
     val statusRepository = StatusRepository(api)
     val notificationRepository = NotificationRepository(api)
+    val streamingClient = StreamingClient(okHttpClient, json, api)
 }

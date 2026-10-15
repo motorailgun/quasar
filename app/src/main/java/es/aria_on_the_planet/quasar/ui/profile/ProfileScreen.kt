@@ -27,7 +27,6 @@ import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
-import es.aria_on_the_planet.quasar.ui.feed.posts
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -60,7 +59,7 @@ fun ProfileScreen(
             profile == null -> DetailLoading()
 
             else -> PostList(
-                posts = posts.posts,
+                items = posts.items,
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
                 isLoadingMore = posts.isLoadingMore,
@@ -85,7 +84,7 @@ fun ProfileScreen(
                             )
                         }
                     }
-                    if (posts.posts.isEmpty()) {
+                    if (posts.items.isEmpty()) {
                         item(key = "posts_status", contentType = "status") {
                             Box(
                                 Modifier

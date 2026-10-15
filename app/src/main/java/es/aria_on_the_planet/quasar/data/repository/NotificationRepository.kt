@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.data.repository
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Notification
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.asGroup
 
@@ -23,14 +24,18 @@ class NotificationRepository(
     private val mastodonApi: MastodonApi,
     var api: NotificationApi = NotificationApi.Grouped,
 ) {
-    /** [maxId] より古い通知を取得する。要ログイン。 */
-    suspend fun fetch(session: Session, maxId: String? = null): List<NotificationGroup> {
+    /** [maxId] より古い (または [sinceId] より新しい) 通知を取得する。要ログイン。 */
+    suspend fun fetch(session: Session, maxId: String? = null, sinceId: String? = null): List<NotificationGroup> {
         val token = requireNotNull(session.accessToken) { "Notifications require login" }
         return when (api) {
             NotificationApi.Grouped ->
-                mastodonApi.groupedNotifications(session.serverUrl, token, maxId).toDomain()
+                mastodonApi.groupedNotifications(session.serverUrl, token, maxId, sinceId = sinceId).toDomain()
             NotificationApi.Ungrouped ->
-                mastodonApi.notifications(session.serverUrl, token, maxId).map { it.toDomain().asGroup() }
+                mastodonApi.notifications(session.serverUrl, token, maxId, sinceId = sinceId).map { it.toDomain().asGroup() }
         }
     }
+
+    /** ストリーミングで届いた通知を、今の API の一覧と同じキー体系のグループにする。 */
+    fun toGroup(notification: Notification): NotificationGroup =
+        notification.asGroup(useGroupKey = api == NotificationApi.Grouped)
 }

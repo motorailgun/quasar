@@ -76,6 +76,7 @@
     <string name="media_show">Show media</string>
     <string name="media_hide">Hide media</string>
     <string name="column_notifications">Notifications</string>
+    <string name="timeline_load_gap">Load more</string>
     <string name="column_empty">Nothing here yet</string>
     <string name="notification_mention">%1$s mentioned you</string>
     <string name="notification_status">%1$s posted</string>

@@ -84,6 +84,7 @@ data class QuoteDto(
 data class NotificationDto(
     val id: String,
     val type: String,
+    @SerialName("group_key") val groupKey: String? = null,
     @SerialName("created_at") val createdAt: String,
     val account: AccountDto,
     val status: StatusDto? = null,
@@ -111,6 +112,22 @@ data class NotificationGroupDto(
     @SerialName("latest_page_notification_at") val latestPageNotificationAt: String? = null,
     @SerialName("sample_account_ids") val sampleAccountIds: List<String> = emptyList(),
     @SerialName("status_id") val statusId: String? = null,
+)
+
+/** https://docs.joinmastodon.org/entities/Instance/ のうち使う部分。 */
+@Serializable
+data class InstanceDto(
+    val configuration: InstanceConfigurationDto? = null,
+)
+
+@Serializable
+data class InstanceConfigurationDto(
+    val urls: InstanceUrlsDto? = null,
+)
+
+@Serializable
+data class InstanceUrlsDto(
+    val streaming: String? = null,
 )
 
 /** https://docs.joinmastodon.org/entities/Context/ */

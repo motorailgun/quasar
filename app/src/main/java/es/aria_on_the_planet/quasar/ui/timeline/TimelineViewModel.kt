@@ -1,12 +1,15 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
@@ -14,6 +17,7 @@ import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
 import es.aria_on_the_planet.quasar.ui.feed.submitVote
 import es.aria_on_the_planet.quasar.ui.notification.NotificationEntry
 import es.aria_on_the_planet.quasar.ui.notification.appendNotificationPage
@@ -49,6 +53,7 @@ class TimelineViewModel(
     private val repository: TimelineRepository,
     private val statusRepository: StatusRepository,
     private val notificationRepository: NotificationRepository,
+    private val streamingClient: StreamingClient,
 ) : ViewModel() {
 
     /** 投票できるか (要ログイン)。 */
@@ -68,6 +73,9 @@ class TimelineViewModel(
         scope = viewModelScope,
         nextMaxIdOf = ::nextNotificationMaxId,
         append = { current, page -> appendNotificationPage(current, page) },
+        // ストリーム・補完で伸びたら古い側を捨てる (gap は作らない)
+        trim = { it.take(MaxNotificationEntries) },
+        nextMaxIdOfItems = { entries -> nextNotificationMaxId(entries.flatMap { it.groups }) },
     ) { maxId -> notificationRepository.fetch(session, maxId) }
 
     private val selected = MutableStateFlow(available.first())
@@ -103,6 +111,35 @@ class TimelineViewModel(
         if (type != null) feeds.getValue(type).loadMore() else notifications.loadMore()
     }
 
+    private val sync = TimelineSync(
+        scope = viewModelScope,
+        timelines = feeds,
+        streamedTimelines = streamChannelsFor(available, includeGlobal = StreamGlobalTimeline)
+            .map { it.timelineType }
+            .filterTo(HashSet()) { it in feeds },
+        notifications = notifications.takeIf { ColumnType.Notifications in available },
+        fetchPosts = { type, maxId, sinceId -> repository.fetch(session, type, maxId = maxId, sinceId = sinceId) },
+        fetchNewerNotifications = { sinceId -> notificationRepository.fetch(session, sinceId = sinceId) },
+        toGroup = notificationRepository::toGroup,
+        pageLimit = MastodonApi.DEFAULT_LIMIT,
+        onError = { message, error -> Log.w(TAG, message, error) },
+    )
+
+    /**
+     * ストリーミングでカラムを自動更新する。collect している間 (= 画面が前面にある間) だけ接続し、
+     * 呼び出し側のコルーチンがキャンセルされると切断する。グローバルは流量が多いので通常は購読しない。
+     */
+    suspend fun stream() {
+        val channels = streamChannelsFor(available, includeGlobal = StreamGlobalTimeline)
+        streamingClient.events(session, channels).collect(sync::handle)
+    }
+
+    /** gap (未取得の区間) を上側から 1 ページ分埋める。 */
+    fun fillGap(column: ColumnType, gap: TimelineItem.Gap) {
+        val type = column.timeline ?: return
+        sync.fillGap(type, gap)
+    }
+
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
         viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
             // 同じポストが複数のカラムに載っていることがあるので全てに反映する
@@ -112,6 +149,15 @@ class TimelineViewModel(
 
     private fun stateOf(column: ColumnType): FeedState<*> =
         column.timeline?.let { feeds.getValue(it).state.value } ?: notifications.state.value
+
+    private companion object {
+        const val TAG = "TimelineViewModel"
+        /** 通知一覧の最大行数。 */
+        const val MaxNotificationEntries = 400
+
+        /** グローバルもストリーミング・補完するか。流量が多いので通常は無効 (動作確認用のスイッチ)。 */
+        const val StreamGlobalTimeline = false
+    }
 
     private fun snapshot() = TimelineScreenState(
         selected = selected.value,

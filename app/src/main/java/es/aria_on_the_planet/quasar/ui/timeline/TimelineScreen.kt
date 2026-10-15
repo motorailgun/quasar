@@ -49,11 +49,13 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.Post
-import es.aria_on_the_planet.quasar.ui.feed.posts
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.post.openPost
@@ -72,6 +74,12 @@ fun TimelineScreen(
     val listStates = ColumnType.entries.associateWith { rememberLazyListState() }
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
+
+    // 画面が前面にある間だけストリーミングで自動更新する
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.stream() }
+    }
 
     val error = state.current.error
     LaunchedEffect(error) {
@@ -143,7 +151,7 @@ fun TimelineScreen(
                 )
 
                 else -> PostList(
-                    posts = state.timelines.getValue(timelineType).posts,
+                    items = state.timelines.getValue(timelineType).items,
                     modifier = Modifier.fillMaxSize(),
                     state = listStates.getValue(state.selected),
                     isLoadingMore = current.isLoadingMore,
@@ -152,6 +160,7 @@ fun TimelineScreen(
                     onPostClick = context::openPost,
                     onVote = onVote,
                     onMediaClick = onMediaClick,
+                    onGapClick = { gap -> viewModel.fillGap(state.selected, gap) },
                 )
             }
         }

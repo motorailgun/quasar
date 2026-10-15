@@ -10,6 +10,8 @@ data class Notification(
     val account: User,
     /** 対象のポスト (mention / reblog / favourite など)。種別によっては `null`。 */
     val post: Post?,
+    /** v2 のグループキー (Mastodon 4.3+)。ストリーミングで届いた通知を既存のグループへ合流させるのに使う。 */
+    val groupKey: String? = null,
 )
 
 /** https://docs.joinmastodon.org/entities/Notification/#type */

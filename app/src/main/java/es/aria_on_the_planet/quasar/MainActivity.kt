@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
                                 container.timelineRepository,
                                 container.statusRepository,
                                 container.notificationRepository,
+                                container.streamingClient,
                             ) }
                         },
                     )

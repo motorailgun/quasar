@@ -21,6 +21,7 @@ DI フレームワークは現時点では使わず、`AppContainer` (手動 DI)
 es.aria_on_the_planet.quasar
 ├── QuasarApplication.kt / MainActivity.kt
 ├── di/AppContainer.kt              手動 DI
+├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
 ├── data/
 │   ├── remote/
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
@@ -362,6 +363,44 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
+
+## 自動更新 (Streaming API)
+
+* `StreamingClient` (`data/streaming/`) が OkHttp の WebSocket で `wss://<configuration.urls.streaming>/api/v1/streaming`
+  に 1 本接続し、`user` (ホーム + 通知) と `public:local` を購読する。グローバル (`public`) は流量が多いので購読しない
+  (`TimelineViewModel.StreamGlobalTimeline` を `true` にすると購読・補完する。gap の動作確認などに使う)。
+  認証は `Authorization: Bearer` (4.2 以降は全ストリームで要ログイン。未ログインでは接続しない)。
+* 切断されたら 1 秒から倍々 (最大 60 秒) で再接続し続け、接続のたびに `StreamEvent.Connected` を流す。
+  メッセージの解釈は純粋関数 `parseStreamMessage` (payload は JSON 文字列なので二重デコード)。
+* 前面のみ: `TimelineScreen` が `repeatOnLifecycle(STARTED)` で `TimelineViewModel.stream()` を collect する。
+  gap の読み込みボタンは下方向に読むので下向き矢印。
+  背面に回る・別画面を開くと切断し、戻ると再接続して補完する。
+* 構成 (変更時はこの分担を保つ):
+  * 一覧の書き換えは純粋関数: `applyStreamEvent` (タイムライン / 通知)、`applyNewerPage` (補完、gap を挟むかの判断)、
+    `applyNotificationBackfill` (通知の補完、1 ページ埋まったら `null` = 読み直し)、`fillGap`。
+    `ui/feed/TimelineItem.kt` / `ui/notification/NotificationGrouping.kt`。
+  * 段取りは `TimelineSync` (`ui/timeline/TimelineSync.kt`): どのカラムに当てるか、`since_id` に何を使うか、読み込み前・
+    読み込み中のカラムを飛ばす、取得失敗は `onError` に報告して一覧はそのまま。取得は関数で受け取るので、偽物の取得関数で
+    テストする (`TimelineSyncTest`)。ストリームとカラムの対応は `streamChannelsFor` / `StreamChannel.timelineType`。
+  * `TimelineViewModel` は `TimelineSync` を組み立てて `stream()` / `fillGap()` から呼ぶだけ。
+* ポスト一覧の要素は `TimelineItem` (`PostItem` / `Gap`)。各イベントの反映 (gap は位置を保って素通し):
+  * `update` → `mergeNewerPosts` (ID 順の位置へ挿入、既知 ID は無視)、`delete` → `removePost` (ブーストも)、
+    `status.update` → `replaceEditedPost` (ブーストの外側は保つ)。
+  * `notification` → `prependNotification(isSingleNotification = true)`。ストリームの通知は v2 の `group_key` で既存グループへ
+    合流 (件数 +1、移動して先頭へ)。グループの最新通知 ID 以下なら取り込み済みとして無視。ユーザー単位の行への吸収・作り直し、
+    メンバーが複数人グループになったら行から外す (閾値未満なら単体に戻す) も行う。
+* 抜けの補完: `Connected` のたびに、各カラムの最新 ID 以降を `since_id` で取得して加える。
+  * ポスト (Home / Local): 1 ページ (40 件) 埋まったら間に未取得区間がありうるので、`mergeNewerPostsWithGap` で
+    「取得分 → gap (読み込みボタン) → 補完前の一覧」と並べる。gap の下端は補完に使った `since_id` (補完中にストリームの新着が
+    先頭に入っても位置がずれない)。ボタンで `max_id = gap.maxId`・`since_id = gap.sinceId` を取得し `fillGap` で上側から
+    40 件ずつ埋める (40 件未満なら gap を消す)。
+  * 通知: `prependNotificationGroups` (件数は総数で置き換え)。1 ページ埋まったら gap は作らず丸ごと読み直す。
+* 最大件数: ストリーム・補完で一覧が伸びたら (`PagedFeed.updateList` の後の `trim`) 古い側を捨てる。ポストは
+  `MaxTimelinePosts` = 400 件 (`trimTimeline`、gap は数えず末尾に残った gap も捨てる)、通知は 400 行。捨てたら次ページの
+  `max_id` を残った末尾から求め直すので、下へスクロールすれば読み直せる。読み進めて伸ばした分 (loadMore) は捨てない。
+* 表示: 先頭にいるときに先頭へ新着が入ったら `StickToTopEffect` で先頭へスクロールして見せる。読み進めている途中は
+  LazyColumn がキーで位置を保つ。項目の出入りは `Modifier.animateItem()`。
+* 未対応: グローバルの自動更新、背面での受信 (Web Push)、通知の gap、通知の削除イベント。
 
 ## 設定
 

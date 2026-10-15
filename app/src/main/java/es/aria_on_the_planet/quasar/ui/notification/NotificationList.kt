@@ -57,6 +57,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
+import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.post.relativeTime
@@ -81,19 +82,23 @@ fun NotificationList(
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     LoadMoreEffect(state, onLoadMore)
+    // 先頭にいるときにストリーミングの新着が入ったら見せる
+    StickToTopEffect(state, entries.firstOrNull()?.key)
     LazyColumn(modifier = modifier, state = state) {
         items(entries, key = { it.key }, contentType = { it.contentType }) { entry ->
-            when (entry) {
-                is NotificationEntry.AccountReactions -> AccountReactionsItem(entry, onUserClick = onUserClick, onPostClick = onPostClick)
-                is NotificationEntry.Single -> NotificationItem(
-                    group = entry.group,
-                    onUserClick = onUserClick,
-                onPostClick = onPostClick,
-                    onMediaClick = onMediaClick,
-                    onVote = onVote,
-                )
+            Column(Modifier.animateItem()) {
+                when (entry) {
+                    is NotificationEntry.AccountReactions -> AccountReactionsItem(entry, onUserClick = onUserClick, onPostClick = onPostClick)
+                    is NotificationEntry.Single -> NotificationItem(
+                        group = entry.group,
+                        onUserClick = onUserClick,
+                        onPostClick = onPostClick,
+                        onMediaClick = onMediaClick,
+                        onVote = onVote,
+                    )
+                }
+                HorizontalDivider()
             }
-            HorizontalDivider()
         }
         if (isLoadingMore) {
             item(key = "loading_more", contentType = "loading") {

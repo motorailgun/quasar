@@ -26,12 +26,17 @@ data class FeedState<T>(
  * @param T 表示する 1 件の型 (グルーピング等で [R] と異なりうる)。
  * @param nextMaxIdOf 取得したページから次ページの `max_id` を決める (ページ中で最も古い ID)。
  * @param append 現在の一覧に、取得した (より古い) ページを足した一覧を返す純粋関数。refresh では空の一覧に足す。
+ * @param trim [updateList] (ストリーム・補完による新しい側への追加) の後に一覧を最大件数に切り詰める純粋関数。
+ *   読み進めて伸ばした分 (loadMore) には適用しない。
+ * @param nextMaxIdOfItems 切り詰めで末尾が変わったときに、残った一覧から次ページの `max_id` を求め直す。
  * @param fetch `maxId` より古いものを返す。`null` なら最新から。
  */
 open class PagedFeed<R, T>(
     private val scope: CoroutineScope,
     private val nextMaxIdOf: (page: List<R>) -> String?,
     private val append: (current: List<T>, page: List<R>) -> List<T>,
+    private val trim: (List<T>) -> List<T> = { it },
+    private val nextMaxIdOfItems: (List<T>) -> String? = { null },
     private val fetch: suspend (maxId: String?) -> List<R>,
 ) {
     private val _state = MutableStateFlow(FeedState<T>())
@@ -63,6 +68,23 @@ open class PagedFeed<R, T>(
     /** 読み込み済みの項目を書き換える (投票結果の反映など)。 */
     fun updateItems(transform: (T) -> T) {
         _state.update { it.copy(items = it.items.map(transform)) }
+    }
+
+    /**
+     * 一覧全体を書き換える (ストリーミングの新着・削除の反映など)。[transform] は純粋関数にする。
+     * その後 [trim] で最大件数に切り詰め、末尾が捨てられたら次ページの `max_id` を残った一覧から求め直す
+     * (捨てた分は下へスクロールすれば読み直せる)。
+     */
+    fun updateList(transform: (List<T>) -> List<T>) {
+        _state.update { s ->
+            val items = transform(s.items)
+            val trimmed = trim(items)
+            if (trimmed.size == items.size) {
+                s.copy(items = items)
+            } else {
+                s.copy(items = trimmed, nextMaxId = nextMaxIdOfItems(trimmed) ?: s.nextMaxId, endReached = false)
+            }
+        }
     }
 
     fun loadMore() {

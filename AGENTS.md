@@ -196,7 +196,9 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 * `EmojiText(text: String, emojis: List<CustomEmoji>, isHtml: Boolean, ...)`
   * `isHtml = true` のとき Mastodon の HTML を `AnnotatedString.fromHtml` で変換 (リンク付き)。
   * `:shortcode:` を `emojis` と照合し、`InlineTextContent` + Coil の `AsyncImage` で画像に置換。
-  * 絵文字サイズは `fontSize` に追従 (em 単位)。
+  * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
+    (横長の絵文字は横長に表示)。API はサイズを返さないため、画像読み込み時に `EmojiAspectRatios` (URL ごとの
+    アプリ全体キャッシュ) へ記録し、記録されると再レイアウトする。未読み込みの間は正方形。比率は 1/4〜8 に丸める。
 * 変換処理 (`replaceEmojiShortcodes`, `simplifyMastodonHtml`) は純粋関数として分離し、ユニットテスト可能にする。
 
 ### PostCard (`ui/component/post/PostCard.kt`)

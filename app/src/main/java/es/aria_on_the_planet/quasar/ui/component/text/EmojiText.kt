@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.text
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -8,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -16,7 +18,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.TextUnit
 import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 
@@ -49,7 +51,10 @@ fun EmojiText(
         }
         base.replaceEmojiShortcodes(emojis)
     }
-    val inlineContent = remember(emojis) { emojiInlineContent(emojis) }
+    // 絵文字の高さは行の高さに合わせ、幅は読み込み済みの画像の縦横比から決める (未読み込みは正方形)
+    val height = emojiHeight(style)
+    val ratios = emojis.map { EmojiAspectRatios[it.url] ?: 1f }
+    val inlineContent = remember(emojis, ratios, height) { emojiInlineContent(emojis, ratios, height) }
     Text(
         text = annotated,
         modifier = modifier,
@@ -61,16 +66,29 @@ fun EmojiText(
     )
 }
 
-private fun emojiInlineContent(emojis: List<CustomEmoji>): Map<String, InlineTextContent> =
-    emojis.associate { emoji ->
+private fun emojiInlineContent(
+    emojis: List<CustomEmoji>,
+    ratios: List<Float>,
+    height: TextUnit,
+): Map<String, InlineTextContent> =
+    emojis.zip(ratios).associate { (emoji, ratio) ->
         EmojiInlineIdPrefix + emoji.shortcode to InlineTextContent(
             placeholder = Placeholder(
-                width = 1.2.em,
-                height = 1.2.em,
+                width = height * ratio,
+                height = height,
                 placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
             ),
         ) {
-            AsyncImage(model = emoji.url, contentDescription = ":${emoji.shortcode}:")
+            AsyncImage(
+                model = emoji.url,
+                contentDescription = ":${emoji.shortcode}:",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+                onSuccess = { state ->
+                    val size = state.painter.intrinsicSize
+                    EmojiAspectRatios.record(emoji.url, size.width, size.height)
+                },
+            )
         }
     }
 

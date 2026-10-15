@@ -2,6 +2,27 @@ package es.aria_on_the_planet.quasar.ui.component.post
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -346,7 +367,15 @@ fun PostActionRow(post: Post, modifier: Modifier = Modifier, onAction: OnPostAct
 /** アクション行のボタンの左右の余白 (押せる範囲)。 */
 private val ActionPaddingHorizontal = 6.dp
 
-/** アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタンになる。 */
+/**
+ * アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタンになる。
+ *
+ * アニメーションは Expressive の motionScheme (テーマの spring) に合わせる:
+ * 押している間はアイコンを縮め、タップでオンになったらアイコンを弾ませて後ろから粒を散らす ([actionBurst])。
+ * ストリーム等による状態の変化では弾ませない。
+ * 件数は増えたら上へ、減ったら下へ入れ替わる。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PostActionButton(
     icon: ImageVector,
@@ -356,17 +385,61 @@ private fun PostActionButton(
     activeColor: Color = MaterialTheme.colorScheme.primary,
     onClick: (() -> Unit)? = null,
 ) {
+    val motion = MaterialTheme.motionScheme
     val color by animateColorAsState(
         if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = motion.defaultEffectsSpec(),
         label = "postActionColor",
     )
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        if (pressed) PressedIconScale else 1f,
+        animationSpec = motion.fastSpatialSpec(),
+        label = "postActionPress",
+    )
+    // タップでオンになったときだけ弾ませ、粒を散らす
+    val popScale = remember { Animatable(1f) }
+    val burst = remember { Animatable(0f) }
+    var tapped by remember { mutableStateOf(false) }
+    LaunchedEffect(active) {
+        if (active && tapped) {
+            launch {
+                burst.snapTo(0f)
+                burst.animateTo(1f, tween(ActionBurstDurationMillis, easing = LinearEasing))
+            }
+            popScale.animateTo(PopIconScale, motion.fastSpatialSpec())
+            popScale.animateTo(1f, motion.defaultSpatialSpec())
+        } else {
+            burst.snapTo(0f)
+        }
+        tapped = false
+    }
+    val burstColors = listOf(activeColor, activeColor.copy(alpha = 0.55f))
+    val density = LocalDensity.current
+    val iconCenterX = with(density) { (ActionPaddingHorizontal + ActionIconSize / 2).toPx() }
     val activeState = stringResource(R.string.post_action_done)
     Row(
         modifier = Modifier
+            // 粒はボタンの外まで飛ぶので clip より外側で描く
+            .actionBurst(
+                progress = { burst.value },
+                centerOf = { size -> Offset(iconCenterX, size.height / 2) },
+                colors = burstColors,
+            )
             .clip(CircleShape)
             .then(
                 if (onClick != null) {
-                    Modifier.toggleable(value = active, role = Role.Switch, onValueChange = { onClick() })
+                    Modifier.toggleable(
+                        value = active,
+                        interactionSource = interactionSource,
+                        indication = ripple(),
+                        role = Role.Switch,
+                        onValueChange = {
+                            tapped = true
+                            onClick()
+                        },
+                    )
                 } else {
                     Modifier.semantics { if (active) stateDescription = activeState }
                 },
@@ -374,13 +447,46 @@ private fun PostActionButton(
             .padding(horizontal = ActionPaddingHorizontal, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = color)
+        Icon(
+            icon,
+            contentDescription = label,
+            modifier = Modifier
+                .size(ActionIconSize)
+                .graphicsLayer {
+                    val scale = pressScale * popScale.value
+                    scaleX = scale
+                    scaleY = scale
+                },
+            tint = color,
+        )
         if (count != null) {
             Spacer(Modifier.width(4.dp))
-            Text(text = count.toString(), style = MaterialTheme.typography.labelMedium, color = color)
+            AnimatedContent(
+                targetState = count,
+                transitionSpec = {
+                    // 増えたら下から上へ、減ったら上から下へ
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInVertically(motion.fastSpatialSpec()) { it * direction } + fadeIn(motion.fastEffectsSpec()))
+                        .togetherWith(
+                            slideOutVertically(motion.fastSpatialSpec()) { -it * direction } + fadeOut(motion.fastEffectsSpec()),
+                        )
+                        .using(SizeTransform(clip = false))
+                },
+                label = "postActionCount",
+            ) { value ->
+                Text(text = value.toString(), style = MaterialTheme.typography.labelMedium, color = color)
+            }
         }
     }
 }
+
+private val ActionIconSize = 18.dp
+
+/** 押している間のアイコンの縮小率。 */
+private const val PressedIconScale = 0.8f
+
+/** タップでオンになったときに弾ませる最大の拡大率。 */
+private const val PopIconScale = 1.3f
 
 internal fun relativeTime(instant: Instant, now: Instant = Instant.now()): String {
     val d = Duration.between(instant, now)

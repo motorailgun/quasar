@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -77,6 +78,8 @@ fun MediaViewerScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
 
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
+    // 表示中の画像を拡大している間は、ページ切り替えと上下スワイプで閉じる操作を止める (1 本指は画像の移動に使う)
+    var zoomed by remember { mutableStateOf(false) }
     SystemBarsVisibilityEffect(controlsVisible)
     val isPlaying by rememberIsPlaying(viewModel.playback.player)
     val uriHandler = LocalUriHandler.current
@@ -92,16 +95,23 @@ fun MediaViewerScreen(
     val showControls = controlsVisible && !dismissState.isActive
     DismissibleViewer(
         state = dismissState,
+        swipeEnabled = !zoomed,
         // 再生中は画面を消さない
         modifier = if (isPlaying) Modifier.keepScreenOn() else Modifier,
     ) {
         HorizontalPager(
             state = pagerState,
             key = { items[it].id },
+            userScrollEnabled = !zoomed,
         ) { page ->
             val media = items[page]
             when (media.type) {
-                MediaType.Image -> ImagePage(media, onTap = { controlsVisible = !controlsVisible })
+                MediaType.Image -> ImagePage(
+                    media = media,
+                    onTap = { controlsVisible = !controlsVisible },
+                    // 隣のページが合成・破棄されても上書きしないよう、表示中のページのものだけを使う
+                    onZoomedChange = { if (page == pagerState.currentPage) zoomed = it },
+                )
                 MediaType.Video, MediaType.Gifv, MediaType.Audio -> PlayerPage(
                     media = media,
                     playback = viewModel.playback,

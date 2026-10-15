@@ -511,7 +511,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
 * **操作**: お気に入り・ブースト・ブックマーク・リプライ・投稿・フォローは未実装 (表示のみ)。投票だけは送信できる
   (実機では未送信)。
-* **メディアビューア**: 保存 (MediaStore)、PiP、画像のピンチズーム、代替テキストの表示は未実装
+* **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
 * **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。

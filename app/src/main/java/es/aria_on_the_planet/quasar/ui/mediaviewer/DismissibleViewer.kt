@@ -174,12 +174,15 @@ data class DismissTarget(val bounds: Rect, val aspectRatio: Float)
  * * 予測型「戻る」([NavigationBackHandler]): ジェスチャの進み具合に合わせて縮み、確定したら閉じる。
  * * 閉じる: [DismissibleViewerState.dismiss] (閉じるボタンもこれを呼ぶ)。
  *
+ * @param swipeEnabled 上下スワイプで閉じる操作を受け付けるか (画像を拡大している間は `false`)。
+ *
  * 横方向のジェスチャ (HorizontalPager、シークバー) とはぶつからない。
  */
 @Composable
 fun DismissibleViewer(
     state: DismissibleViewerState,
     modifier: Modifier = Modifier,
+    swipeEnabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -216,7 +219,7 @@ fun DismissibleViewer(
             .draggable(
                 state = rememberDraggableState { delta -> state.dragOffset += delta },
                 orientation = Orientation.Vertical,
-                enabled = state.exitFraction == null,
+                enabled = swipeEnabled && state.exitFraction == null,
                 onDragStopped = { velocity ->
                     val height = state.containerBounds.height
                     val offset = rubberBand(state.dragOffset, height * MaxOffsetFraction)

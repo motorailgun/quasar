@@ -17,10 +17,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -42,32 +46,59 @@ import es.aria_on_the_planet.quasar.ui.component.player.PlaybackController
 /**
  * 画像。元サイズの画像 (url → 読めなければ remote_url) を画面に収まるように拡大縮小して出す。
  * 読み込み中は一覧で読み込み済みのはずの preview (と BlurHash) を同じ位置に出しておく。
+ * ピンチで拡大縮小でき ([zoomable])、ダブルタップで 130% に拡大 / 等倍に戻す。拡大しているかを [onZoomedChange] で
+ * 知らせる (親はページ切り替え等を止める)。1 回タップはダブルタップでないと分かってから (少し遅れて) [onTap]。
  */
 @Composable
-fun ImagePage(media: MediaAttachment, onTap: () -> Unit, modifier: Modifier = Modifier) {
+fun ImagePage(
+    media: MediaAttachment,
+    onTap: () -> Unit,
+    onZoomedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val urls = media.viewUrls
     var urlIndex by rememberSaveable(media.id) { mutableIntStateOf(0) }
     var loaded by remember(media.id) { mutableStateOf(false) }
     var failed by remember(media.id) { mutableStateOf(urls.isEmpty()) }
+    val zoom = rememberZoomState(media.id, contentAspectRatio = media.meta?.aspectRatio)
     val currentOnTap by rememberUpdatedState(onTap)
+    val scope = rememberCoroutineScope()
+    val currentOnZoomedChange by rememberUpdatedState(onZoomedChange)
+    LaunchedEffect(zoom) {
+        snapshotFlow { zoom.isZoomed }.collect { currentOnZoomedChange(it) }
+    }
+    // ページから外れたら (拡大中はページを切り替えられないが、念のため) 親の状態を戻す
+    DisposableEffect(zoom) { onDispose { currentOnZoomedChange(false) } }
     Box(
         modifier
             .fillMaxSize()
-            .pointerInput(Unit) { detectTapGestures(onTap = { currentOnTap() }) },
+            .pointerInput(zoom) {
+                detectTapGestures(
+                    onTap = { currentOnTap() },
+                    onDoubleTap = { position -> zoom.toggleZoom(position, scope) },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
-        if (!loaded) MediaPoster(media, ContentScale.Fit, Modifier.fillMaxSize())
-        urls.getOrNull(urlIndex)?.let { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = media.description,
-                contentScale = ContentScale.Fit,
-                onSuccess = { loaded = true },
-                onError = {
-                    if (urlIndex < urls.lastIndex) urlIndex++ else failed = true
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+        Box(Modifier.fillMaxSize().zoomable(zoom), contentAlignment = Alignment.Center) {
+            if (!loaded) MediaPoster(media, ContentScale.Fit, Modifier.fillMaxSize())
+            urls.getOrNull(urlIndex)?.let { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = media.description,
+                    contentScale = ContentScale.Fit,
+                    onSuccess = { success ->
+                        loaded = true
+                        // meta に無い・不正確なこともあるので、実際の画像の縦横比で移動範囲を決める
+                        val size = success.painter.intrinsicSize
+                        if (size.width > 0f && size.height > 0f) zoom.contentAspectRatio = size.width / size.height
+                    },
+                    onError = {
+                        if (urlIndex < urls.lastIndex) urlIndex++ else failed = true
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         if (failed && !loaded) {
             Icon(

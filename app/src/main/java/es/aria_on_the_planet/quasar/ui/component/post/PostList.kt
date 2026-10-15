@@ -23,6 +23,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.ui.feed.PostTranslationUi
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
@@ -39,6 +41,10 @@ import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
  * ポストの集合。タイムライン・プロフィールの投稿一覧などで再利用する。
  * 要素は [TimelineItem] (ポストか、未取得の区間の読み込みボタン)。
  * データ取得は行わず、末尾付近までスクロールされたら [onLoadMore]、読み込みボタンで [onGapClick] を呼ぶ。
+ *
+ * @param translationOf ポストの翻訳の状態 (`PostTranslations::of`)。`null` を返すポストには翻訳の UI を出さない。
+ * @param onTranslationToggle 翻訳する / 訳文と原文を切り替える。
+ * @param onPostShown ポストが表示されたとき (自動翻訳用)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -56,6 +62,9 @@ fun PostList(
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
     onGapClick: (TimelineItem.Gap) -> Unit = {},
+    translationOf: (Post) -> PostTranslationUi? = { null },
+    onTranslationToggle: (Post) -> Unit = {},
+    onPostShown: (Post) -> Unit = {},
     header: (LazyListScope.() -> Unit)? = null,
 ) {
     LoadMoreEffect(state, onLoadMore, LoadMoreThreshold)
@@ -71,15 +80,20 @@ fun PostList(
         items(items, key = { it.key }, contentType = { it::class }) { item ->
             Column(Modifier.animateItem()) {
                 when (item) {
-                    is TimelineItem.PostItem -> PostCard(
-                        post = item.post,
-                        mediaHeight = mediaHeight,
-                        onUserClick = onUserClick,
-                        onPostClick = onPostClick,
-                        onMediaClick = onMediaClick,
-                        onVote = onVote,
-                        onAction = onAction,
-                    )
+                    is TimelineItem.PostItem -> {
+                        LaunchedEffect(item.post.statusId) { onPostShown(item.post) }
+                        PostCard(
+                            post = item.post,
+                            mediaHeight = mediaHeight,
+                            onUserClick = onUserClick,
+                            onPostClick = onPostClick,
+                            onMediaClick = onMediaClick,
+                            onVote = onVote,
+                            onAction = onAction,
+                            translation = translationOf(item.post),
+                            onTranslationToggle = { onTranslationToggle(item.post) },
+                        )
+                    }
                     is TimelineItem.Gap -> GapRow(item, onClick = { onGapClick(item) })
                 }
                 HorizontalDivider()

@@ -5,6 +5,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
 import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
+import es.aria_on_the_planet.quasar.data.remote.dto.TranslationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
@@ -111,6 +112,23 @@ class MastodonApi(
     /** https://docs.joinmastodon.org/methods/instance/#v2 の `configuration.urls.streaming`。 */
     suspend fun streamingUrl(serverUrl: String): String? =
         get<InstanceDto>(serverUrl, null, "api/v2/instance") {}.configuration?.urls?.streaming
+
+    /** https://docs.joinmastodon.org/methods/instance/#v2 の `configuration.translation.enabled`。 */
+    suspend fun translationEnabled(serverUrl: String): Boolean =
+        get<InstanceDto>(serverUrl, null, "api/v2/instance") {}.configuration?.translation?.enabled == true
+
+    /** https://docs.joinmastodon.org/methods/instance/#translation_languages (4.2+)。翻訳元 → 翻訳先の一覧。 */
+    suspend fun translationLanguages(serverUrl: String): Map<String, List<String>> =
+        get(serverUrl, null, "api/v1/instance/translation_languages") {}
+
+    /**
+     * https://docs.joinmastodon.org/methods/statuses/#translate (要認証)。
+     * サーバーは公開・未収載のポストしか翻訳しない。
+     *
+     * @param lang 翻訳先の言語 (ISO 639)。
+     */
+    suspend fun translateStatus(serverUrl: String, accessToken: String, id: String, lang: String): TranslationDto =
+        post(serverUrl, accessToken, "api/v1/statuses/$id/translate") { add("lang", lang) }
 
     /** https://docs.joinmastodon.org/methods/accounts/#get */
     suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =

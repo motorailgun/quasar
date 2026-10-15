@@ -77,6 +77,7 @@ import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.feed.PostTranslationUi
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
 import java.time.Duration
@@ -96,6 +97,8 @@ object PostCardDefaults {
  * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (未ログイン時など)。
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
  *   返信関係が別の形で分かる場所では `false` にする。
+ * @param translation 翻訳の状態。`null` なら翻訳の UI を出さない (翻訳対象外・翻訳に対応していない画面)。
+ * @param onTranslationToggle 「Translate post」「Show original」等が押されたとき。
  */
 @Composable
 fun PostCard(
@@ -109,6 +112,8 @@ fun PostCard(
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
     showReplyIndicator: Boolean = true,
+    translation: PostTranslationUi? = null,
+    onTranslationToggle: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -139,10 +144,15 @@ fun PostCard(
             Column(Modifier.weight(1f)) {
                 AuthorLine(post, onAuthorClick = { onUserClick(post.author) })
                 Spacer(Modifier.size(4.dp))
+                // 訳文の表示中は、本文 (と CW) を訳に差し替えて上にラベルを出す
+                val translated = (translation as? PostTranslationUi.Shown)?.content
+                if (translated != null) {
+                    TranslatedLabel(translated, onShowOriginal = onTranslationToggle, Modifier.padding(bottom = 2.dp))
+                }
                 var expanded by rememberContentWarningExpanded(post)
                 post.contentWarning?.let { cw ->
                     ContentWarning(
-                        text = cw,
+                        text = translated?.contentWarning ?: cw,
                         emojis = post.emojis,
                         expanded = expanded,
                         onToggle = { expanded = !expanded },
@@ -153,11 +163,14 @@ fun PostCard(
                     Column {
                         // 長い本文は設定の行数で折りたたむ
                         CollapsiblePostText(
-                            html = post.text,
+                            html = translated?.html ?: post.text,
                             emojis = post.emojis,
                             stateKey = post.statusId,
                             maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
                         )
+                        if (translation != null) {
+                            TranslationFooter(translation, onToggle = onTranslationToggle, Modifier.padding(top = 4.dp))
+                        }
                         post.poll?.let { poll ->
                             PollView(
                                 poll = poll,

@@ -11,6 +11,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`) |
+| 翻訳 | ML Kit Translate (`com.google.mlkit:translate`、opt-in のオンデバイス翻訳のみ) + `kotlinx-coroutines-play-services` |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
@@ -30,8 +31,9 @@ es.aria_on_the_planet.quasar
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
+│   ├── translation/                翻訳 (TranslationRepository / OnDeviceTranslator / translationRequestFor / TranslatableHtml)
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository
-├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote)
+├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote, Translation)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -112,6 +114,7 @@ data class Post(
     val contentWarning: String?,   // spoiler_text (空なら null)
     val sensitive: Boolean,        // sensitive (メディアの閲覧注意)。CW とは独立
     val visibility: PostVisibility, // visibility (Public / Unlisted / Private / Direct)。未知の値は Public
+    val language: String?,         // language (ISO 639)。翻訳の対象判定に使う。null なら翻訳しない
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
@@ -200,6 +203,9 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` (要認証) |
 | ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` (要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
+| 翻訳が有効か | `GET /api/v2/instance` の `configuration.translation.enabled` |
+| 翻訳できる言語の組 | `GET /api/v1/instance/translation_languages` (4.2+。無ければ組を確かめない) |
+| 翻訳 | `POST /api/v1/statuses/:id/translate` (form `lang`, 要認証。公開・未収載のみ) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
 
@@ -292,6 +298,19 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * 失敗時の UI 通知 (スナックバー等) は無い (ログのみ)。
 * 押下時のアニメーション: 押している間の縮小・オン時の弾み (motionScheme の spring)、件数の上下スライド、オン時に
   アイコンの後ろから粒が散る `Modifier.actionBurst` (`ActionBurst.kt`、clip より外側で描く)。
+
+### 翻訳 (`ui/feed/PostTranslations.kt`、詳細は [docs/translation.md](docs/translation.md))
+* 対象と順序は純粋関数 `translationRequestFor(post, settings, environment)` (`data/translation/TranslationProviders.kt`)。
+  翻訳元は `Post.language` だけで決める (端末上で言語判定しない)。サーバー側翻訳 (ログイン中・有効・言語の組に対応・
+  公開 / 未収載) → オンデバイス (ML Kit。設定で opt-in かつ GMS あり) の順で試し、失敗したら次へ。
+* 設定は `TranslationSettings` (`domain/model/Translation.kt`、`AppContainer.translationSettings`)。既定は韓国語 → 英語、
+  オンデバイス無効、自動翻訳無効。設定画面は無いので既定値を書き換えて切り替える。GMS の有無は `OnDeviceTranslator.available`。
+* 状態は `PostTranslationController` (statusId ごと、`PostActionController` と同じく ViewModel が 1 つ持つ)。
+  `PostCard(translation, onTranslationToggle)` / `PostList(translationOf, onTranslationToggle, onPostShown)` で渡す。
+  自動翻訳は表示されたポストだけ (`onPostShown`)、同時 2 件まで。編集されたポストの古い訳は使わない。設定が変わったら全部捨てる。
+* オンデバイスは HTML を `<a>` 要素・タグ・`:shortcode:` で区切ってテキスト部分だけ訳し、HTML に組み立て直す
+  (`TranslatableHtml.kt`)。表示はサーバー側翻訳と同じく `EmojiText(isHtml = true)`。
+* 今はタイムラインのみ。Profile / Post 詳細 / 通知は `translation = null` (翻訳 UI なし)。
 
 ### PollView (`ui/component/poll/PollView.kt`)
 * `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。
@@ -461,6 +480,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * 今は既定値のみ。設定画面を作るときは永続化 (DataStore 等) して `displaySettings` を更新する。
   設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)。
 * 同様に通知の取得 API (`NotificationRepository.api`) も将来の設定項目候補。
+* 翻訳の設定は `TranslationSettings` (`AppContainer.translationSettings`)。ViewModel も読むので `DisplaySettings` とは別。
 
 ## テーマ / 色
 
@@ -489,7 +509,8 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 ### ロジックの置き場所とテスト
 * 一覧の組み立て・書き換えは純粋関数にし、ユニットテストを付ける。壊れやすい所は特に厚めに:
   `NotificationGroupingTest` (通知のグルーピング・合流)、`TimelineItemTest` (gap・新着・上限)、
-  `TimelineSyncTest` (ストリーム・補完の段取り)、`PostFeedTest` (ページング)。
+  `TimelineSyncTest` (ストリーム・補完の段取り)、`PostFeedTest` (ページング)、
+  `TranslationRequestTest` / `TranslatableHtmlTest` / `PostTranslationControllerTest` (翻訳)。
 * `android.util.Log` は JVM テストでは動かない (`isReturnDefaultValues` 未設定)。テスト対象のクラスではログを
   直接呼ばず、`TimelineSync(onError = ...)` のように外から受け取る。
 * 実データの JSON の形が怪しいときは、公開 API (`/api/v1/timelines/public` 等) から取ってきて、一時的なテストで
@@ -548,11 +569,14 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
-* **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。
+* **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines`、`NotificationRepository.api` (v1 / v2)、
+  `TranslationSettings` (オンデバイス翻訳のスイッチは GMS が無ければグレーアウト)。
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
 * **自動更新**: グローバルは購読しない、通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。
 * **プロフィール**: フォローボタン、投稿 / 返信 / メディアのタブ。
+* **翻訳**: タイムライン以外 (Profile / Post 詳細 / 通知) は未対応。実機では未確認 (サーバー側翻訳・ML Kit とも)。
+  GMS 無し (microG 等) でのモデル取得、投票の選択肢・代替テキストの翻訳も未対応。
 * **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
 * **ローカライズ**: 文字列は英語のみ。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

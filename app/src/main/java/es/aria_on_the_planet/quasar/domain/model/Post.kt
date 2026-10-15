@@ -28,6 +28,8 @@ data class Post(
     val sensitive: Boolean = false,
     /** 公開範囲。 */
     val visibility: PostVisibility = PostVisibility.Public,
+    /** 本文の言語 (ISO 639、`ko` / `zh-TW` 等)。不明なら `null`。翻訳の対象判定に使う (端末上では判定しない)。 */
+    val language: String? = null,
     /** ログイン中ユーザーがこのポストに対して行った操作。 */
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */

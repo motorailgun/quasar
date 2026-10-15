@@ -69,6 +69,7 @@ fun TimelineScreen(
     onLogout: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val translations by viewModel.translations.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     // カラムごとにスクロール位置を保持する
@@ -163,6 +164,9 @@ fun TimelineScreen(
                     onAction = onAction,
                     onMediaClick = onMediaClick,
                     onGapClick = { gap -> viewModel.fillGap(state.selected, gap) },
+                    translationOf = translations::of,
+                    onTranslationToggle = viewModel::toggleTranslation,
+                    onPostShown = viewModel::onPostShown,
                 )
             }
         }

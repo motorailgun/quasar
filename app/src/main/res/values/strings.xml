@@ -127,4 +127,13 @@
         <item quantity="other">%1$s boosted %2$d of your posts</item>
     </plurals>
     <string name="notification_unknown">Notification from %1$s</string>
+    <string name="translation_translate">Translate post</string>
+    <string name="translation_show_translation">Show translation</string>
+    <string name="translation_show_original">Show original</string>
+    <string name="translation_translated_from">Translated from %1$s</string>
+    <string name="translation_on_device">On device</string>
+    <string name="translation_translating">Translating…</string>
+    <string name="translation_downloading_model">Downloading %1$s translation model…</string>
+    <string name="translation_failed">Couldn\'t translate</string>
+    <string name="translation_retry">Retry</string>
 </resources>

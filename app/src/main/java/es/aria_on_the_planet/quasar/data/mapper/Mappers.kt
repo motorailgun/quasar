@@ -101,6 +101,7 @@ fun StatusDto.toDomain(): Post {
         contentWarning = body.spoilerText.takeIf { it.isNotBlank() },
         sensitive = body.sensitive,
         visibility = postVisibility(body.visibility),
+        language = body.language?.takeIf { it.isNotBlank() },
         application = body.application?.let { PostApplication(it.name, it.website?.takeIf(String::isNotBlank)) },
         viewer = PostViewerState(
             bookmarked = body.bookmarked == true,

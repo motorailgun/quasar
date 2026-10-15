@@ -35,6 +35,8 @@ class MainActivity : ComponentActivity() {
                                 container.statusRepository,
                                 container.notificationRepository,
                                 container.streamingClient,
+                                container.translationRepository,
+                                container.translationSettings,
                             ) }
                         },
                     )

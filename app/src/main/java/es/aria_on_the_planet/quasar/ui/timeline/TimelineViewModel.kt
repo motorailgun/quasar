@@ -25,7 +25,16 @@ import es.aria_on_the_planet.quasar.ui.notification.NotificationEntry
 import es.aria_on_the_planet.quasar.ui.notification.appendNotificationPage
 import es.aria_on_the_planet.quasar.ui.notification.mapGroups
 import es.aria_on_the_planet.quasar.ui.notification.nextNotificationMaxId
+import es.aria_on_the_planet.quasar.data.translation.ServerTranslationCapabilities
+import es.aria_on_the_planet.quasar.data.translation.TranslationEnvironment
+import es.aria_on_the_planet.quasar.data.translation.TranslationRepository
+import es.aria_on_the_planet.quasar.domain.model.TranslationSettings
+import es.aria_on_the_planet.quasar.ui.feed.PostTranslationController
+import es.aria_on_the_planet.quasar.ui.feed.PostTranslations
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -56,6 +65,8 @@ class TimelineViewModel(
     private val statusRepository: StatusRepository,
     private val notificationRepository: NotificationRepository,
     private val streamingClient: StreamingClient,
+    private val translationRepository: TranslationRepository,
+    translationSettings: StateFlow<TranslationSettings>,
 ) : ViewModel() {
 
     /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
@@ -162,6 +173,47 @@ class TimelineViewModel(
 
     /** ブースト・お気に入り・ブックマーク (またはその取り消し) を行う。 */
     fun performAction(post: Post, action: PostAction) = postActions.perform(post, action)
+
+    private val translationEnvironment = MutableStateFlow(
+        TranslationEnvironment(
+            loggedIn = session.accessToken != null,
+            onDeviceLanguages = translationRepository.onDevice.languages,
+        ),
+    )
+
+    private val postTranslations = PostTranslationController(
+        scope = viewModelScope,
+        settings = translationSettings,
+        environment = translationEnvironment,
+        translate = { request, provider, onDownloadingModel ->
+            translationRepository.translate(session, request, provider, onDownloadingModel)
+        },
+        onError = { message, error -> Log.w(TAG, message, error) },
+    )
+
+    /** ポストの翻訳の状態。PostList に `translations::of` で渡す。 */
+    val translations: StateFlow<PostTranslations> = postTranslations.translations
+
+    init {
+        // サーバー側翻訳が使えるか。取得できなければサーバー側翻訳は使わない (オンデバイスのみ)
+        viewModelScope.launch {
+            val server = try {
+                translationRepository.serverCapabilities(session)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to fetch translation capabilities", e)
+                ServerTranslationCapabilities.None
+            }
+            translationEnvironment.update { it.copy(server = server) }
+        }
+    }
+
+    /** 翻訳する / 訳文と原文を切り替える / 失敗したら再試行する。 */
+    fun toggleTranslation(post: Post) = postTranslations.toggle(post)
+
+    /** ポストが表示された (自動翻訳の設定なら訳し始める)。 */
+    fun onPostShown(post: Post) = postTranslations.onShown(post)
 
     private fun stateOf(column: ColumnType): FeedState<*> =
         column.timeline?.let { feeds.getValue(it).state.value } ?: notifications.state.value

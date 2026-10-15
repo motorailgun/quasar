@@ -123,6 +123,21 @@ data class InstanceDto(
 @Serializable
 data class InstanceConfigurationDto(
     val urls: InstanceUrlsDto? = null,
+    val translation: InstanceTranslationDto? = null,
+)
+
+@Serializable
+data class InstanceTranslationDto(
+    val enabled: Boolean = false,
+)
+
+/** https://docs.joinmastodon.org/entities/Translation/ のうち使う部分。 */
+@Serializable
+data class TranslationDto(
+    val content: String = "",
+    @SerialName("spoiler_text") val spoilerText: String = "",
+    @SerialName("detected_source_language") val detectedSourceLanguage: String? = null,
+    val provider: String? = null,
 )
 
 @Serializable
@@ -212,6 +227,8 @@ data class StatusDto(
     val poll: PollDto? = null,
     val quote: QuoteDto? = null,
     val application: ApplicationDto? = null,
+    /** 本文の言語 (ISO 639)。投稿時に指定されなかった等で `null` のことがある。 */
+    val language: String? = null,
     // 以下は認証時のみ返される
     val favourited: Boolean? = null,
     val reblogged: Boolean? = null,

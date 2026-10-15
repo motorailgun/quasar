@@ -3,6 +3,8 @@ package es.aria_on_the_planet.quasar.data.mapper
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ApplicationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
+import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
+import es.aria_on_the_planet.quasar.data.remote.dto.NotificationGroupDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MentionDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
@@ -17,6 +19,7 @@ import es.aria_on_the_planet.quasar.domain.model.QuoteState
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -204,5 +207,49 @@ class MappersTest {
         // 未対応・将来の種別
         assertEquals(NotificationType.Unknown, n("admin.sign_up", false).type)
         assertEquals(NotificationType.Unknown, n("added_to_collection", false).type)
+    }
+
+    @Test
+    fun mapsGroupedNotifications() {
+        val status = StatusDto(id = "s", createdAt = "2026-10-15T00:00:00Z", account = alice)
+        val groups = GroupedNotificationsResultsDto(
+            accounts = listOf(alice, bob),
+            statuses = listOf(status),
+            notificationGroups = listOf(
+                NotificationGroupDto(
+                    groupKey = "favourite-s-1", notificationsCount = 3, type = "favourite",
+                    mostRecentNotificationId = "30", pageMinId = "10", pageMaxId = "30",
+                    latestPageNotificationAt = "2026-10-15T02:00:00.000Z",
+                    sampleAccountIds = listOf("2", "1", "missing"), statusId = "s",
+                ),
+                NotificationGroupDto(
+                    groupKey = "ungrouped-5", type = "mention", mostRecentNotificationId = "5",
+                    sampleAccountIds = listOf("1"),
+                ),
+            ),
+        ).toDomain()
+        val fav = groups[0]
+        assertEquals(NotificationType.Favourite, fav.type)
+        assertEquals(3, fav.count)
+        // サンプルの順序を保ち、見つからない ID は捨てる
+        assertEquals(listOf("bob", "alice@remote.example"), fav.accounts.map { it.screenName })
+        assertEquals("s", fav.post!!.statusId)
+        assertEquals("10", fav.pageMinId)
+        assertEquals("2026-10-15T02:00:00Z", fav.latestAt.toString())
+        // page_min_id が無ければ most_recent_notification_id
+        assertEquals("5", groups[1].pageMinId)
+        assertNull(groups[1].post)
+        assertNull(groups[1].latestAt)
+    }
+
+    @Test
+    fun decodesNumericNotificationIds() {
+        // mstdn.maud.io (4.8.0-alpha) で実際に返った形: most_recent_notification_id が数値
+        val json = """{"accounts":[],"statuses":[],"notification_groups":[{"group_key":"ungrouped-5980585",
+            "notifications_count":1,"type":"mention","most_recent_notification_id":5980585,
+            "page_min_id":"5980585","page_max_id":"5980585","sample_account_ids":[]}]}"""
+        val decoded = Json { ignoreUnknownKeys = true }
+            .decodeFromString<GroupedNotificationsResultsDto>(json)
+        assertEquals("5980585", decoded.notificationGroups[0].mostRecentNotificationId)
     }
 }

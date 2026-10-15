@@ -89,6 +89,30 @@ data class NotificationDto(
     val status: StatusDto? = null,
 )
 
+/** https://docs.joinmastodon.org/methods/grouped_notifications/#GroupedNotificationsResults */
+@Serializable
+data class GroupedNotificationsResultsDto(
+    val accounts: List<AccountDto> = emptyList(),
+    val statuses: List<StatusDto> = emptyList(),
+    @SerialName("notification_groups") val notificationGroups: List<NotificationGroupDto> = emptyList(),
+)
+
+/** https://docs.joinmastodon.org/methods/grouped_notifications/#NotificationGroup */
+@Serializable
+data class NotificationGroupDto(
+    @SerialName("group_key") val groupKey: String,
+    @SerialName("notifications_count") val notificationsCount: Int = 1,
+    val type: String,
+    // ドキュメントでは String だが数値で返すサーバがある
+    @Serializable(with = StringOrNumberSerializer::class)
+    @SerialName("most_recent_notification_id") val mostRecentNotificationId: String,
+    @SerialName("page_min_id") val pageMinId: String? = null,
+    @SerialName("page_max_id") val pageMaxId: String? = null,
+    @SerialName("latest_page_notification_at") val latestPageNotificationAt: String? = null,
+    @SerialName("sample_account_ids") val sampleAccountIds: List<String> = emptyList(),
+    @SerialName("status_id") val statusId: String? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Context/ */
 @Serializable
 data class ContextDto(

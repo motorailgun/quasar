@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.data.remote
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
+import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
@@ -65,6 +66,17 @@ class MastodonApi(
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
     ): List<NotificationDto> = get(serverUrl, accessToken, "api/v1/notifications") {
+        maxId?.let { addQueryParameter("max_id", it) }
+        addQueryParameter("limit", limit.toString())
+    }
+
+    /** https://docs.joinmastodon.org/methods/grouped_notifications/#get-grouped (要認証、Mastodon 4.3+) */
+    suspend fun groupedNotifications(
+        serverUrl: String,
+        accessToken: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): GroupedNotificationsResultsDto = get(serverUrl, accessToken, "api/v2/notifications") {
         maxId?.let { addQueryParameter("max_id", it) }
         addQueryParameter("limit", limit.toString())
     }

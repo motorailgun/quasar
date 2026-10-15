@@ -15,18 +15,24 @@ data class FeedState<T>(
     val endReached: Boolean = false,
     val error: String? = null,
     val loaded: Boolean = false,
+    /** 次ページ取得に使う `max_id`。取得した生のページから決め、表示上の並び (再グルーピング等) には依存しない。 */
+    val nextMaxId: String? = null,
 )
 
 /**
  * `max_id` で古い方向へページングする一覧の状態管理。ポスト・通知など ID を持つ一覧で共通に使う。
  *
- * @param idOf 次ページの `max_id` と重複除去に使う ID。
+ * @param R API から取得する 1 件の型。
+ * @param T 表示する 1 件の型 (グルーピング等で [R] と異なりうる)。
+ * @param nextMaxIdOf 取得したページから次ページの `max_id` を決める (ページ中で最も古い ID)。
+ * @param append 現在の一覧に、取得した (より古い) ページを足した一覧を返す純粋関数。refresh では空の一覧に足す。
  * @param fetch `maxId` より古いものを返す。`null` なら最新から。
  */
-open class PagedFeed<T>(
+open class PagedFeed<R, T>(
     private val scope: CoroutineScope,
-    private val idOf: (T) -> String,
-    private val fetch: suspend (maxId: String?) -> List<T>,
+    private val nextMaxIdOf: (page: List<R>) -> String?,
+    private val append: (current: List<T>, page: List<R>) -> List<T>,
+    private val fetch: suspend (maxId: String?) -> List<R>,
 ) {
     private val _state = MutableStateFlow(FeedState<T>())
     val state: StateFlow<FeedState<T>> = _state.asStateFlow()
@@ -36,9 +42,15 @@ open class PagedFeed<T>(
         _state.update { it.copy(isRefreshing = true, error = null) }
         scope.launch {
             try {
-                val items = fetch(null)
+                val page = fetch(null)
                 _state.update {
-                    it.copy(items = items, isRefreshing = false, loaded = true, endReached = items.isEmpty())
+                    it.copy(
+                        items = append(emptyList(), page),
+                        isRefreshing = false,
+                        loaded = true,
+                        endReached = page.isEmpty(),
+                        nextMaxId = nextMaxIdOf(page),
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -56,17 +68,17 @@ open class PagedFeed<T>(
     fun loadMore() {
         val current = _state.value
         if (current.isRefreshing || current.isLoadingMore || current.endReached) return
-        val maxId = current.items.lastOrNull()?.let(idOf) ?: return
+        val maxId = current.nextMaxId ?: return
         _state.update { it.copy(isLoadingMore = true, error = null) }
         scope.launch {
             try {
-                val older = fetch(maxId)
+                val page = fetch(maxId)
                 _state.update { s ->
-                    val known = s.items.mapTo(HashSet(), idOf)
                     s.copy(
-                        items = s.items + older.filter { idOf(it) !in known },
+                        items = append(s.items, page),
                         isLoadingMore = false,
-                        endReached = older.isEmpty(),
+                        endReached = page.isEmpty(),
+                        nextMaxId = nextMaxIdOf(page) ?: s.nextMaxId,
                     )
                 }
             } catch (e: CancellationException) {
@@ -77,3 +89,30 @@ open class PagedFeed<T>(
         }
     }
 }
+
+/**
+ * 既存と同じキーの項目を捨てて (または [merge] で統合して) 末尾に足す、標準的な append。
+ */
+fun <T> appendDistinct(idOf: (T) -> String, merge: ((existing: T, older: T) -> T)? = null): (List<T>, List<T>) -> List<T> =
+    { items, older ->
+        val indexByKey = HashMap<String, Int>()
+        val result = items.toMutableList()
+        result.forEachIndexed { i, item -> indexByKey[idOf(item)] = i }
+        for (item in older) {
+            val key = idOf(item)
+            val existing = indexByKey[key]
+            if (existing == null) {
+                indexByKey[key] = result.size
+                result += item
+            } else if (merge != null) {
+                result[existing] = merge(result[existing], item)
+            }
+        }
+        result
+    }
+
+/**
+ * Mastodon の ID (数値の文字列) の大小比較。桁数 → 辞書順で比べる。
+ * ID は数値である保証は無いが、Mastodon は Snowflake 風の数値 ID なのでこれで順序が付く。
+ */
+val MastodonIdComparator: Comparator<String> = compareBy<String> { it.length }.thenBy { it }

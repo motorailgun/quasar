@@ -52,4 +52,42 @@ class PostFeedTest {
         assertEquals("boom", state.error)
         assertFalse(state.isLoadingMore)
     }
+
+    @Test
+    fun usesCursorFromRawPageNotDisplayOrder() {
+        // 表示用の並び替え (append) をしても、次ページは取得した生ページの最古 ID から取る
+        val requested = mutableListOf<String?>()
+        val feed = PagedFeed<String, String>(
+            scope = scope,
+            nextMaxIdOf = { page -> page.minWithOrNull(MastodonIdComparator) },
+            // 毎回新しいページを先頭に入れる (= 末尾が最古でなくなる) 並べ方
+            append = { current, page -> page + current },
+        ) { maxId ->
+            requested += maxId
+            when (maxId) {
+                null -> listOf("30", "20")
+                "20" -> listOf("10", "9")
+                else -> emptyList()
+            }
+        }
+        feed.refresh()
+        feed.loadMore()
+        feed.loadMore()
+        assertEquals(listOf(null, "20", "9"), requested)
+        assertEquals(listOf("10", "9", "30", "20"), feed.state.value.items)
+        assertTrue(feed.state.value.endReached)
+    }
+
+    @Test
+    fun appendDistinctMergesSameKey() {
+        val append = appendDistinct<Pair<String, Int>>(idOf = { it.first }, merge = { a, b -> a.first to a.second + b.second })
+        assertEquals(listOf("a" to 1, "b" to 5, "c" to 1), append(listOf("a" to 1, "b" to 2), listOf("b" to 3, "c" to 1)))
+        val dropping = appendDistinct<Pair<String, Int>>(idOf = { it.first })
+        assertEquals(listOf("a" to 1), dropping(listOf("a" to 1), listOf("a" to 9)))
+    }
+
+    @Test
+    fun mastodonIdsCompareNumerically() {
+        assertEquals("99", listOf("100", "99", "1000").minWithOrNull(MastodonIdComparator))
+    }
 }

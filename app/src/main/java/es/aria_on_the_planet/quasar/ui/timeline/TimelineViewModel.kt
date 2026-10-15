@@ -7,7 +7,7 @@ import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.data.session.Session
-import es.aria_on_the_planet.quasar.domain.model.Notification
+import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
@@ -15,6 +15,10 @@ import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 import es.aria_on_the_planet.quasar.ui.feed.submitVote
+import es.aria_on_the_planet.quasar.ui.notification.NotificationEntry
+import es.aria_on_the_planet.quasar.ui.notification.appendNotificationPage
+import es.aria_on_the_planet.quasar.ui.notification.mapGroups
+import es.aria_on_the_planet.quasar.ui.notification.nextNotificationMaxId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +37,7 @@ data class TimelineScreenState(
     val selected: ColumnType,
     val available: List<ColumnType>,
     val timelines: Map<TimelineType, PostFeedState>,
-    val notifications: FeedState<Notification>,
+    val notifications: FeedState<NotificationEntry>,
 ) {
     /** 選択中カラムの状態 (読み込み中・エラー表示の判定用)。 */
     val current: FeedState<*>
@@ -59,9 +63,12 @@ class TimelineViewModel(
         PostFeed(viewModelScope) { maxId -> repository.fetch(session, type, maxId) }
     }
 
-    private val notifications = PagedFeed<Notification>(viewModelScope, { it.id }) { maxId ->
-        notificationRepository.fetch(session, maxId)
-    }
+    // ページ境界で分かれたサーバ側グループの統合と、ユーザー単位のグルーピングは appendNotificationPage が行う
+    private val notifications = PagedFeed<NotificationGroup, NotificationEntry>(
+        scope = viewModelScope,
+        nextMaxIdOf = ::nextNotificationMaxId,
+        append = { current, page -> appendNotificationPage(current, page) },
+    ) { maxId -> notificationRepository.fetch(session, maxId) }
 
     private val selected = MutableStateFlow(available.first())
 
@@ -73,7 +80,7 @@ class TimelineViewModel(
             selected = values[0] as ColumnType,
             available = available,
             timelines = feeds.keys.zip(values.drop(2).map { it as PostFeedState }).toMap(),
-            notifications = values[1] as FeedState<Notification>,
+            notifications = values[1] as FeedState<NotificationEntry>,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, snapshot())
 
@@ -100,7 +107,7 @@ class TimelineViewModel(
         viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
             // 同じポストが複数のカラムに載っていることがあるので全てに反映する
             feeds.values.forEach { feed -> feed.updatePosts { it.withPoll(poll) } }
-            notifications.updateItems { n -> n.copy(post = n.post?.withPoll(poll)) }
+            notifications.updateItems { entry -> entry.mapGroups { it.copy(post = it.post?.withPoll(poll)) } }
         }
 
     private fun stateOf(column: ColumnType): FeedState<*> =

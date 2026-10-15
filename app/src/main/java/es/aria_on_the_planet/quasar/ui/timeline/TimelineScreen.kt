@@ -131,7 +131,7 @@ fun TimelineScreen(
                     CenteredMessage(stringResource(R.string.column_empty))
 
                 timelineType == null -> NotificationList(
-                    notifications = state.notifications.items,
+                    entries = state.notifications.items,
                     modifier = Modifier.fillMaxSize(),
                     state = listStates.getValue(state.selected),
                     isLoadingMore = current.isLoadingMore,

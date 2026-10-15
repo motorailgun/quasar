@@ -87,5 +87,25 @@
     <string name="notification_update">%1$s edited a post</string>
     <string name="notification_quote">%1$s quoted your post</string>
     <string name="notification_quoted_update">%1$s edited a post you quoted</string>
+    <plurals name="notification_favourite_group">
+        <item quantity="one">%1$s and %2$d other favourited your post</item>
+        <item quantity="other">%1$s and %2$d others favourited your post</item>
+    </plurals>
+    <plurals name="notification_reblog_group">
+        <item quantity="one">%1$s and %2$d other boosted your post</item>
+        <item quantity="other">%1$s and %2$d others boosted your post</item>
+    </plurals>
+    <plurals name="notification_follow_group">
+        <item quantity="one">%1$s and %2$d other followed you</item>
+        <item quantity="other">%1$s and %2$d others followed you</item>
+    </plurals>
+    <plurals name="notification_favourite_posts">
+        <item quantity="one">%1$s favourited %2$d of your posts</item>
+        <item quantity="other">%1$s favourited %2$d of your posts</item>
+    </plurals>
+    <plurals name="notification_reblog_posts">
+        <item quantity="one">%1$s boosted %2$d of your posts</item>
+        <item quantity="other">%1$s boosted %2$d of your posts</item>
+    </plurals>
     <string name="notification_unknown">Notification from %1$s</string>
 </resources>

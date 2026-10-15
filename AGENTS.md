@@ -180,7 +180,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
-| 通知 | `GET /api/v1/notifications` (要認証、max_id ページング) |
+| 通知 (グループ) | `GET /api/v2/notifications` (要認証、Mastodon 4.3+、既定) |
+| 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
 | ポスト | `GET /api/v1/statuses/:id` |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
@@ -188,9 +189,11 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
 
 ### PagedFeed / PostFeed (`ui/feed/`)
-`PagedFeed<T>` は max_id ページングの状態 (`FeedState<T>`: items / isRefreshing / isLoadingMore / endReached / error / loaded) と
-`refresh()` / `loadMore()` / `updateItems()` をまとめた汎用クラス。`PostFeed` はそのポスト版
-(`PostFeedState = FeedState<Post>`、`.posts` は `.items` の別名)。通知は `PagedFeed<Notification>` をそのまま使う。
+`PagedFeed<R, T>` は max_id ページングの状態 (`FeedState<T>`: items / isRefreshing / isLoadingMore / endReached / error /
+loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまとめた汎用クラス。`R` は API の 1 件、`T` は表示の
+1 件で、`append(current, page)` (純粋関数) で一覧を組み立て、`nextMaxIdOf(page)` で取得した生ページから次の `max_id` を
+決める。`appendDistinct` は重複を捨てる標準の append。`PostFeed` はそのポスト版 (`PostFeedState = FeedState<Post>`、
+`.posts` は `.items` の別名)。通知は `PagedFeed<NotificationGroup, NotificationEntry>`。
 
 ## 再利用 UI コンポーネント
 
@@ -216,7 +219,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
   添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
 * `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
-  塗りアイコン + 色付き (ブースト=tertiary, リアクション=primary, ブックマーク=secondary) で表示する。
+  塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),
+  ブックマーク=secondary) で表示する。
   現時点では表示のみで、操作 (favourite/reblog/bookmark API 呼び出し) は未実装。
 * `Post` 以外の状態を持たない (stateless)。
 
@@ -317,18 +321,46 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
   OAuth (`/api/v1/apps` + `/oauth/authorize`) は後続タスク。
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global。Home と通知はログイン時のみ。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
-* **通知カラム** (`ui/notification/`): グルーピングしない素朴な一覧。
+* **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
+  * 取得 API は `NotificationRepository.api` で切り替える。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
+    サーバが favourite / reblog / follow を「同じ種類・同じ対象・近い時間帯」でまとめる)。`Ungrouped` は v1 で、
+    各通知を 1 件のグループ (`Notification.asGroup()`) にする。将来は設定画面やサーバのバージョン確認で切り替える。
+    グルーピングの仕様はサーバ任せとし、クライアント側で独自にまとめることはしない。
+  * 一覧の行は `NotificationEntry` (`Single` = サーバ側グループ 1 つ / `AccountReactions` = 1 人のユーザーが複数ポストに
+    した同じ種類のリアクションをクライアント側でまとめたもの「〇〇 favourited 3 of your posts」)。
+  * 一覧の組み立ては純粋関数 `appendNotificationPage(current, page)` (`ui/notification/NotificationGrouping.kt`) が行い、
+    `PagedFeed(append = ...)` から呼ぶ。refresh は空の一覧に足す。手順:
+    1. ページ境界で分かれたサーバ側グループの続き (同じ `group_key`) は既存行の中で `NotificationGroup.mergeOlder` で統合
+       (件数は総数なので足さない、アカウントは和集合)。
+    2. 既存の行のうち下から 2 番目までを固定部分、最後の行 (分解) + 新しいページを再評価部分とする。
+    3. 再評価部分のリアクションのユーザーが固定部分にいれば、ユーザー単位の行へ吸収 (位置は変えない)、または単体の行と
+       合わせて閾値以上なら最も新しい位置に作り直す (他の単体の行は削除)。
+    4. 残りは再評価部分の中だけでまとめる。閾値 (`AccountGroupingThreshold` = 3 ポスト) 未満はまとめない。
+    * 対象は favourite / reblog (別々に数える) で、サーバ側グループが 1 人・1 件・ポスト付きのもの。複数人がまとまった
+      サーバ側グループには手を付けない。時間の窓は設けていない (同じユーザーなら古い分も同じ行に入る)。
+    * 変更時は `NotificationGroupingTest` を必ず更新する (キーの一意性・取りこぼし無しの不変条件テストあり)。
+  * 次ページの `max_id` は表示上の並びではなく、取得した生ページの最古 ID (`nextNotificationMaxId`、各グループの
+    `page_min_id` の最小) から決める (`FeedState.nextMaxId`)。並び替えで末尾が最古でなくなっても正しく辿れる。
+  * コンパクト表示ではアイコンを最大 6 つ並べ、「**A** and N others 〜」。行のタップは対象ポスト、個々のアイコンの
+    タップはそのユーザーのプロフィール (グループのアカウント一覧画面は作らない)。
   * リアクション (favourite / reblog) とフォロー (follow / follow_request) はコンパクト表示 (x_notifications.png 参考):
-    左に種別の塗りアイコン (お気に入り=primary, ブースト=tertiary, フォロー=secondary)、右に**した側**のアイコン →
+    左に種別の塗りアイコン (お気に入り=extendedColors.favourite, ブースト=extendedColors.reblog, フォロー=extendedColors.follow)、右に**した側**のアイコン →
     「**名前** 〜しました · 時刻」(名前は HTML エスケープして `<b>`) → 対象ポストの抜粋 (onSurfaceVariant・最大 3 行、
     CW があれば警告文)。メディアがあれば右端に 56dp のサムネイル (閲覧注意は BlurHash のみ)。タップで対象ポスト。
-  * それ以外 (mention / status / quote / update / poll 等) は「アイコン + 〜しました + 時刻」の見出しと PostCard。
-    mention では「mentioned you」と重複するので `PostCard(showReplyIndicator = false)`。
+  * mention は見出しを付けず PostCard だけ (本文に @ユーザー名 が入るため。Reply to も出さない)。
+  * それ以外 (status / quote / update / poll 等) は「アイコン + 〜しました + 時刻」の見出しと PostCard。
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
-  grouped notifications (v2) は未使用。
 * **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
+
+## テーマ / 色
+
+* `QuasarTheme` は dynamic color + `MaterialExpressiveTheme`。
+* アプリ独自の意味を持つ色は Material 3 の Custom colors として `MaterialTheme.extendedColors` (`ui/theme/ExtendedColors.kt`)
+  で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3) を dynamic color の primary に harmonize し、
+  ライト/ダークに応じた役割色 (color / onColor / container / onContainer) を MDC の `MaterialColors` で作る。
+  色を直接ハードコードせず、新しい意味の色が要るときはここに追加する。
 
 ## 開発メモ
 

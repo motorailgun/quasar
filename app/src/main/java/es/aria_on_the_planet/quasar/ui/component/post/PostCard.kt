@@ -48,6 +48,7 @@ import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.theme.extendedColors
 import java.time.Duration
 import java.time.Instant
 
@@ -294,14 +295,14 @@ fun PostActionRow(post: Post, modifier: Modifier = Modifier) {
             label = stringResource(R.string.post_boosts),
             count = post.boostsCount,
             active = viewer.reblogged,
-            activeColor = MaterialTheme.colorScheme.tertiary,
+            activeColor = MaterialTheme.extendedColors.reblog.color,
         )
         PostActionIndicator(
             icon = if (viewer.favourited) Icons.Filled.Star else Icons.Outlined.StarOutline,
             label = stringResource(R.string.post_reactions),
             count = post.reactionsCount,
             active = viewer.favourited,
-            activeColor = MaterialTheme.colorScheme.primary,
+            activeColor = MaterialTheme.extendedColors.favourite.color,
         )
         Spacer(Modifier.weight(1f))
         PostActionIndicator(

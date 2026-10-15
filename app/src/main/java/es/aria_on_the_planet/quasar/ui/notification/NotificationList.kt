@@ -4,6 +4,7 @@ import android.text.TextUtils
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,13 +44,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
-import es.aria_on_the_planet.quasar.domain.model.Notification
+import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -59,12 +61,16 @@ import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.post.relativeTime
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.theme.extendedColors
 
-/** 通知の一覧。グルーピングはせず 1 件ずつ並べる。 */
+/**
+ * 通知の一覧。サーバ側グループ ([NotificationEntry.Single]) と、ユーザー単位にまとめた行
+ * ([NotificationEntry.AccountReactions]) を並べる。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NotificationList(
-    notifications: List<Notification>,
+    entries: List<NotificationEntry>,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
     isLoadingMore: Boolean = false,
@@ -76,14 +82,17 @@ fun NotificationList(
 ) {
     LoadMoreEffect(state, onLoadMore)
     LazyColumn(modifier = modifier, state = state) {
-        items(notifications, key = { it.id }, contentType = { if (it.post != null) "with_post" else "account" }) {
-            NotificationItem(
-                notification = it,
-                onUserClick = onUserClick,
+        items(entries, key = { it.key }, contentType = { it.contentType }) { entry ->
+            when (entry) {
+                is NotificationEntry.AccountReactions -> AccountReactionsItem(entry, onUserClick = onUserClick, onPostClick = onPostClick)
+                is NotificationEntry.Single -> NotificationItem(
+                    group = entry.group,
+                    onUserClick = onUserClick,
                 onPostClick = onPostClick,
-                onMediaClick = onMediaClick,
-                onVote = onVote,
-            )
+                    onMediaClick = onMediaClick,
+                    onVote = onVote,
+                )
+            }
             HorizontalDivider()
         }
         if (isLoadingMore) {
@@ -108,20 +117,33 @@ fun NotificationList(
  */
 @Composable
 fun NotificationItem(
-    notification: Notification,
+    group: NotificationGroup,
     modifier: Modifier = Modifier,
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
-    if (notification.type.isCompact) {
-        CompactNotification(notification, modifier, onUserClick, onPostClick)
+    if (group.type.isCompact) {
+        CompactNotification(group, modifier, onUserClick, onPostClick)
+        return
+    }
+    // メンションは本文に @ユーザー名 が入るので、見出しを付けずポストだけを出す
+    if (group.type == NotificationType.Mention && group.post != null) {
+        PostCard(
+            post = group.post,
+            modifier = modifier,
+            onUserClick = onUserClick,
+            onPostClick = onPostClick,
+            onMediaClick = onMediaClick,
+            onVote = onVote,
+            showReplyIndicator = false,
+        )
         return
     }
     Column(modifier.fillMaxWidth()) {
-        NotificationHeader(notification, onUserClick)
-        val post = notification.post
+        NotificationHeader(group, onUserClick)
+        val post = group.post
         if (post != null) {
             PostCard(
                 post = post,
@@ -129,11 +151,10 @@ fun NotificationItem(
                 onPostClick = onPostClick,
                 onMediaClick = onMediaClick,
                 onVote = onVote,
-                // 「mentioned you」と重複するので Reply to は出さない
-                showReplyIndicator = notification.type != NotificationType.Mention,
+                showReplyIndicator = true,
             )
         } else {
-            AccountRow(notification.account, onUserClick)
+            group.accounts.firstOrNull()?.let { AccountRow(it, onUserClick) }
         }
     }
 }
@@ -149,6 +170,8 @@ private val NotificationType.isCompact: Boolean
 
 private val CompactTypeIconSize = 28.dp
 private val CompactAvatarSize = 32.dp
+/** コンパクト表示で並べるアイコンの最大数。 */
+private const val MaxCompactAvatars = 6
 private val ThumbnailSize = 56.dp
 
 /**
@@ -158,25 +181,95 @@ private val ThumbnailSize = 56.dp
  */
 @Composable
 private fun CompactNotification(
-    notification: Notification,
+    group: NotificationGroup,
     modifier: Modifier,
     onUserClick: (User) -> Unit,
     onPostClick: (Post) -> Unit,
 ) {
-    val account = notification.account
-    val post = notification.post
+    val post = group.post
+    val first = group.accounts.firstOrNull()
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { if (post != null) onPostClick(post) else onUserClick(account) }
+            .clickable { if (post != null) onPostClick(post) else first?.let(onUserClick) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         // PostCard のアイコン列 (40dp) に合わせて種別アイコンを置く
         Box(Modifier.width(40.dp), contentAlignment = Alignment.TopEnd) {
             Icon(
-                notification.type.filledIcon(),
+                group.type.filledIcon(),
                 contentDescription = null,
-                tint = notification.type.accentColor(),
+                tint = group.type.accentColor(),
+                modifier = Modifier.size(CompactTypeIconSize),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            // した側のアイコン列。個々のアイコンのタップでそのユーザーのプロフィール
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                group.accounts.take(MaxCompactAvatars).forEach { user ->
+                    UserIcon(
+                        user = user,
+                        size = CompactAvatarSize,
+                        modifier = Modifier.clickable { onUserClick(user) },
+                    )
+                }
+            }
+            Spacer(Modifier.size(8.dp))
+            // 名前だけ太字にするため HTML で組む (名前はエスケープ済み)
+            val boldName = first?.let { "<b>${TextUtils.htmlEncode(it.displayName.ifBlank { it.screenName })}</b>" }.orEmpty()
+            val time = group.latestAt?.let { " · " + relativeTime(it) }.orEmpty()
+            EmojiText(
+                text = group.type.groupMessage(boldName, others = group.count - 1) + time,
+                emojis = first?.emojis.orEmpty(),
+                isHtml = true,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (post != null) {
+                // 対象ポストは補足情報なので控えめに。CW があれば本文ではなく警告文を出す
+                val cw = post.contentWarning
+                EmojiText(
+                    text = cw ?: post.text,
+                    emojis = post.emojis,
+                    isHtml = cw == null,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        post?.mediaAttachments?.firstOrNull()?.let { media ->
+            Spacer(Modifier.width(12.dp))
+            MediaThumbnail(media, sensitive = post.sensitive)
+        }
+    }
+}
+
+/**
+ * 1 人のユーザーが複数のポストにしたリアクションをまとめた行 (「〇〇 favourited 3 of your posts」)。
+ * 見た目はコンパクト表示と同じで、抜粋とサムネイルは最も新しいポストのもの。行のタップでそのポストを開く。
+ */
+@Composable
+private fun AccountReactionsItem(
+    entry: NotificationEntry.AccountReactions,
+    onUserClick: (User) -> Unit,
+    onPostClick: (Post) -> Unit,
+) {
+    val account = entry.account
+    val post = entry.latestPost
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { if (post != null) onPostClick(post) else onUserClick(account) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Box(Modifier.width(40.dp), contentAlignment = Alignment.TopEnd) {
+            Icon(
+                entry.type.filledIcon(),
+                contentDescription = null,
+                tint = entry.type.accentColor(),
                 modifier = Modifier.size(CompactTypeIconSize),
             )
         }
@@ -188,16 +281,15 @@ private fun CompactNotification(
                 modifier = Modifier.clickable { onUserClick(account) },
             )
             Spacer(Modifier.size(8.dp))
-            // 名前だけ太字にするため HTML で組む (名前はエスケープ済み)
             val boldName = "<b>${TextUtils.htmlEncode(account.displayName.ifBlank { account.screenName })}</b>"
+            val time = entry.latestAt?.let { " · " + relativeTime(it) }.orEmpty()
             EmojiText(
-                text = notification.type.message(boldName) + " · " + relativeTime(notification.createdAt),
+                text = entry.type.multiplePostsMessage(boldName, entry.members.size) + time,
                 emojis = account.emojis,
                 isHtml = true,
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (post != null) {
-                // 対象ポストは補足情報なので控えめに。CW があれば本文ではなく警告文を出す
                 val cw = post.contentWarning
                 EmojiText(
                     text = cw ?: post.text,
@@ -246,9 +338,9 @@ private fun MediaThumbnail(media: MediaAttachment, sensitive: Boolean) {
 }
 
 @Composable
-private fun NotificationHeader(notification: Notification, onUserClick: (User) -> Unit) {
-    val account = notification.account
-    val name = account.displayName.ifBlank { account.screenName }
+private fun NotificationHeader(group: NotificationGroup, onUserClick: (User) -> Unit) {
+    val account = group.accounts.firstOrNull()
+    val name = account?.let { it.displayName.ifBlank { it.screenName } }.orEmpty()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -258,7 +350,7 @@ private fun NotificationHeader(notification: Notification, onUserClick: (User) -
         // PostCard のアイコン列 (40dp) に揃えてアイコンを右寄せで置く
         Box(Modifier.width(40.dp), contentAlignment = Alignment.CenterEnd) {
             Icon(
-                notification.type.icon(),
+                group.type.icon(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(18.dp),
@@ -266,22 +358,24 @@ private fun NotificationHeader(notification: Notification, onUserClick: (User) -
         }
         Spacer(Modifier.width(12.dp))
         EmojiText(
-            text = notification.type.message(name),
-            emojis = account.emojis,
+            text = group.type.message(name),
+            emojis = account?.emojis.orEmpty(),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.tertiary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .weight(1f)
-                .clickable { onUserClick(account) },
+                .clickable(enabled = account != null) { account?.let(onUserClick) },
         )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = relativeTime(notification.createdAt),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        group.latestAt?.let { at ->
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = relativeTime(at),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -324,11 +418,12 @@ private fun NotificationType.filledIcon(): ImageVector = when (this) {
     else -> icon()
 }
 
-/** 種別ごとのアクセント色 (アクション行の操作済み表示と同じ割り当て)。 */
+/** 種別ごとのアクセント色 (アクション行の操作済み表示と同じ Custom colors)。 */
 @Composable
 private fun NotificationType.accentColor(): Color = when (this) {
-    NotificationType.Favourite -> MaterialTheme.colorScheme.primary
-    NotificationType.Reblog -> MaterialTheme.colorScheme.tertiary
+    NotificationType.Favourite -> MaterialTheme.extendedColors.favourite.color
+    NotificationType.Reblog -> MaterialTheme.extendedColors.reblog.color
+    NotificationType.Follow, NotificationType.FollowRequest -> MaterialTheme.extendedColors.follow.color
     else -> MaterialTheme.colorScheme.secondary
 }
 
@@ -342,6 +437,32 @@ private fun NotificationType.icon(): ImageVector = when (this) {
     NotificationType.Update, NotificationType.QuotedUpdate -> Icons.Outlined.Edit
     NotificationType.Quote -> Icons.Outlined.FormatQuote
     NotificationType.Unknown -> Icons.Outlined.Notifications
+}
+
+/** ユーザー単位の行の説明文 (「〇〇 favourited N of your posts」)。 */
+@Composable
+private fun NotificationType.multiplePostsMessage(name: String, posts: Int): String = when (this) {
+    NotificationType.Reblog -> pluralStringResource(R.plurals.notification_reblog_posts, posts, name, posts)
+    else -> pluralStringResource(R.plurals.notification_favourite_posts, posts, name, posts)
+}
+
+private val NotificationEntry.contentType: String
+    get() = when (this) {
+        is NotificationEntry.AccountReactions -> "account_reactions"
+        is NotificationEntry.Single -> if (group.type.isCompact) "compact" else "post"
+    }
+
+/**
+ * グループの説明文。他に [others] 人いれば「A and N others 〜」。
+ * まとめられる種別 (favourite / reblog / follow) 以外は単体の文言を使う。
+ */
+@Composable
+private fun NotificationType.groupMessage(name: String, others: Int): String = when {
+    others <= 0 -> message(name)
+    this == NotificationType.Favourite -> pluralStringResource(R.plurals.notification_favourite_group, others, name, others)
+    this == NotificationType.Reblog -> pluralStringResource(R.plurals.notification_reblog_group, others, name, others)
+    this == NotificationType.Follow -> pluralStringResource(R.plurals.notification_follow_group, others, name, others)
+    else -> message(name)
 }
 
 @Composable

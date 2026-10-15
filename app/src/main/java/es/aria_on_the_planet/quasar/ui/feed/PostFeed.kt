@@ -14,7 +14,13 @@ val FeedState<Post>.posts: List<Post> get() = items
 class PostFeed(
     scope: CoroutineScope,
     fetch: suspend (maxId: String?) -> List<Post>,
-) : PagedFeed<Post>(scope, { it.id }, fetch) {
+) : PagedFeed<Post, Post>(
+    scope = scope,
+    // タイムラインは新しい順なので末尾が最も古い
+    nextMaxIdOf = { page -> page.lastOrNull()?.id },
+    append = appendDistinct(idOf = { it.id }),
+    fetch = fetch,
+) {
     /** 読み込み済みのポストを書き換える (投票結果の反映など)。 */
     fun updatePosts(transform: (Post) -> Post) = updateItems(transform)
 }

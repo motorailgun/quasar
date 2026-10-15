@@ -100,6 +100,8 @@ data class Post(
     val poll: Poll?,               // poll
     val quote: Quote?,             // quote (Quote / ShallowQuote の両方を QuoteDto で受ける)
     val application: PostApplication?, // application (name, website)。リモートのポストでは null
+    val contentWarning: String?,   // spoiler_text (空なら null)
+    val sensitive: Boolean,        // sensitive (メディアの閲覧注意)。CW とは独立
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
@@ -216,6 +218,14 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
+
+### Content Warning / NSFW
+* CW (`ContentWarning.kt`): `spoiler_text` があるポストは、本文の位置に警告文 (EmojiText) と、その下に primary 色の
+  「Show more >」を出す。タップで本文・投票・リンクプレビュー・引用を展開 (`>` は上向きに回り「Show less」)。
+  展開状態は `rememberContentWarningExpanded(post)` (statusId ごとの rememberSaveable)。PostCard / PostDetail / QuotedPost 共通。
+* NSFW: `sensitive` のポストのメディアは、初期状態でぼかし (BlurHash があればそれを表示し本体は読み込まない。無ければ
+  `Modifier.blur`) + 右上に目アイコン。アイコン (またはぼかし中のメディア自体) のタップで切り替え。状態はメディアごと。
+  `sensitive` でないポストでは目アイコンを出さない。CW とは独立 (CW で隠れるのは本文側のみで、メディアは sensitive に従う)。
 
 ### PollView (`ui/component/poll/PollView.kt`)
 * `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。

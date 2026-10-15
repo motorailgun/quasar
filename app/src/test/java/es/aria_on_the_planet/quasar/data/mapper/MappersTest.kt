@@ -159,4 +159,15 @@ class MappersTest {
         assertEquals("https://quasar.example", status(ApplicationDto("Quasar", "https://quasar.example")).application!!.website)
         assertNull(status(null).application)
     }
+
+    @Test
+    fun mapsContentWarningAndSensitive() {
+        fun status(spoiler: String, sensitive: Boolean) = StatusDto(
+            id = "1", createdAt = "2026-10-15T00:00:00Z", account = alice, spoilerText = spoiler, sensitive = sensitive,
+        ).toDomain()
+        assertEquals("NSFW", status("NSFW", true).contentWarning)
+        assertEquals(true, status("NSFW", true).sensitive)
+        assertNull(status(" ", false).contentWarning)
+        assertEquals(false, status("", false).sensitive)
+    }
 }

@@ -22,6 +22,10 @@ data class Post(
     val quote: Quote? = null,
     /** 投稿に使われたアプリ。他サーバからのポストでは通常 `null`。 */
     val application: PostApplication? = null,
+    /** Content Warning (spoiler_text)。無ければ `null`。カスタム絵文字は [emojis] を使う。 */
+    val contentWarning: String? = null,
+    /** メディアが閲覧注意 (NSFW) か。 */
+    val sensitive: Boolean = false,
     /** ログイン中ユーザーがこのポストに対して行った操作。 */
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */

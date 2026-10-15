@@ -137,6 +137,8 @@ data class StatusDto(
     @SerialName("created_at") val createdAt: String,
     val account: AccountDto,
     val content: String = "",
+    @SerialName("spoiler_text") val spoilerText: String = "",
+    val sensitive: Boolean = false,
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
     @SerialName("replies_count") val repliesCount: Int = 0,
     @SerialName("reblogs_count") val reblogsCount: Int = 0,

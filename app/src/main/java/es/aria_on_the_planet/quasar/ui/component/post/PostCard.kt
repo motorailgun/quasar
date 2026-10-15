@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,40 +99,60 @@ fun PostCard(
             Column(Modifier.weight(1f)) {
                 AuthorLine(post, onAuthorClick = { onUserClick(post.author) })
                 Spacer(Modifier.size(4.dp))
-                EmojiText(
-                    text = post.text,
-                    emojis = post.emojis,
-                    isHtml = true,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                post.poll?.let { poll ->
-                    PollView(
-                        poll = poll,
-                        onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                        modifier = Modifier.padding(top = 8.dp),
+                var expanded by rememberContentWarningExpanded(post)
+                post.contentWarning?.let { cw ->
+                    ContentWarning(
+                        text = cw,
+                        emojis = post.emojis,
+                        expanded = expanded,
+                        onToggle = { expanded = !expanded },
                     )
+                }
+                // CW で隠すのは本文・投票。メディアは CW とは独立に sensitive で制御する
+                AnimatedVisibility(visible = expanded) {
+                    Column {
+                        EmojiText(
+                            text = post.text,
+                            emojis = post.emojis,
+                            isHtml = true,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        post.poll?.let { poll ->
+                            PollView(
+                                poll = poll,
+                                onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
                 }
                 if (post.mediaAttachments.isNotEmpty()) {
                     MediaAttachments(
                         attachments = post.mediaAttachments,
                         height = mediaHeight,
+                        sensitive = post.sensitive,
                         onClick = onMediaClick,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                post.card?.let { card ->
-                    LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
-                }
-                post.quote?.let { quote ->
-                    QuotedPost(
-                        quote = quote,
-                        mediaHeight = mediaHeight * 0.75f,
-                        // 引用の高さは添付画像と同じ高さまで
-                        maxHeight = mediaHeight,
-                        onPostClick = onPostClick,
-                        onMediaClick = onMediaClick,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                // リンクプレビュー・引用も本文の一部として CW で隠す
+                AnimatedVisibility(visible = expanded) {
+                    Column {
+                        post.card?.let { card ->
+                            LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
+                        }
+                        post.quote?.let { quote ->
+                            QuotedPost(
+                                quote = quote,
+                                mediaHeight = mediaHeight * 0.75f,
+                                // 引用の高さは添付画像と同じ高さまで
+                                maxHeight = mediaHeight,
+                                onPostClick = onPostClick,
+                                onMediaClick = onMediaClick,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.size(8.dp))
                 PostActionRow(post)

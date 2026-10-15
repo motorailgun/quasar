@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
 import android.text.format.DateFormat
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -87,39 +90,59 @@ fun PostDetail(
             }
         }
         Spacer(Modifier.size(12.dp))
-        EmojiText(
-            text = post.text,
-            emojis = post.emojis,
-            isHtml = true,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        post.poll?.let { poll ->
-            PollView(
-                poll = poll,
-                onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                modifier = Modifier.padding(top = 12.dp),
+        var expanded by rememberContentWarningExpanded(post)
+        post.contentWarning?.let { cw ->
+            ContentWarning(
+                text = cw,
+                emojis = post.emojis,
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+                style = MaterialTheme.typography.bodyLarge,
             )
+        }
+        // CW で隠すのは本文・投票・リンクプレビュー・引用。メディアは sensitive で別に制御する
+        AnimatedVisibility(visible = expanded) {
+            Column {
+                EmojiText(
+                    text = post.text,
+                    emojis = post.emojis,
+                    isHtml = true,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                post.poll?.let { poll ->
+                    PollView(
+                        poll = poll,
+                        onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
         }
         if (post.mediaAttachments.isNotEmpty()) {
             MediaAttachments(
                 attachments = post.mediaAttachments,
                 height = mediaHeight,
+                sensitive = post.sensitive,
                 onClick = onMediaClick,
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
-        post.card?.let { card ->
-            LinkPreviewCard(card = card, modifier = Modifier.padding(top = 12.dp))
-        }
-        post.quote?.let { quote ->
-            QuotedPost(
-                quote = quote,
-                mediaHeight = mediaHeight * 0.75f,
-                maxHeight = mediaHeight,
-                onPostClick = onPostClick,
-                onMediaClick = onMediaClick,
-                modifier = Modifier.padding(top = 12.dp),
-            )
+        AnimatedVisibility(visible = expanded) {
+            Column {
+                post.card?.let { card ->
+                    LinkPreviewCard(card = card, modifier = Modifier.padding(top = 12.dp))
+                }
+                post.quote?.let { quote ->
+                    QuotedPost(
+                        quote = quote,
+                        mediaHeight = mediaHeight * 0.75f,
+                        maxHeight = mediaHeight,
+                        onPostClick = onPostClick,
+                        onMediaClick = onMediaClick,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
         }
         Spacer(Modifier.size(12.dp))
         val context = LocalContext.current

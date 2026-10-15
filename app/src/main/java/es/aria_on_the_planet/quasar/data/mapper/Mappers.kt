@@ -82,6 +82,8 @@ fun StatusDto.toDomain(): Post {
         card = body.card?.toDomain(),
         poll = body.poll?.toDomain(),
         quote = body.quote?.toDomain(),
+        contentWarning = body.spoilerText.takeIf { it.isNotBlank() },
+        sensitive = body.sensitive,
         application = body.application?.let { PostApplication(it.name, it.website?.takeIf(String::isNotBlank)) },
         viewer = PostViewerState(
             bookmarked = body.bookmarked == true,

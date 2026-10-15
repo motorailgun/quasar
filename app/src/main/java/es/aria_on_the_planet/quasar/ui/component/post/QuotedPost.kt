@@ -92,17 +92,29 @@ fun QuotedPost(
                         .onSizeChanged { bodyHeight = it.height },
                 ) {
                     QuoteHeader(post)
-                    if (post.text.isNotBlank()) {
-                        EmojiText(
-                            text = post.text,
+                    var expanded by rememberContentWarningExpanded(post)
+                    post.contentWarning?.let { cw ->
+                        ContentWarning(
+                            text = cw,
                             emojis = post.emojis,
-                            isHtml = true,
-                            style = MaterialTheme.typography.bodyMedium,
+                            expanded = expanded,
+                            onToggle = { expanded = !expanded },
                             modifier = Modifier.padding(top = 6.dp),
                         )
                     }
-                    // 引用内の投票は閲覧のみ (結果表示)
-                    post.poll?.let { PollView(poll = it, modifier = Modifier.padding(top = 8.dp)) }
+                    if (expanded) {
+                        if (post.text.isNotBlank()) {
+                            EmojiText(
+                                text = post.text,
+                                emojis = post.emojis,
+                                isHtml = true,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                        // 引用内の投票は閲覧のみ (結果表示)
+                        post.poll?.let { PollView(poll = it, modifier = Modifier.padding(top = 8.dp)) }
+                    }
                 }
             }
             // メディアは本文の高さ上限とは独立して常に表示する
@@ -110,6 +122,7 @@ fun QuotedPost(
                 MediaAttachments(
                     attachments = post.mediaAttachments,
                     height = mediaHeight,
+                    sensitive = post.sensitive,
                     onClick = onMediaClick,
                     modifier = Modifier.padding(top = 8.dp),
                 )

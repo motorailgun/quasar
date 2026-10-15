@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.media
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,20 +20,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.BrokenImage
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
@@ -41,12 +50,15 @@ import es.aria_on_the_planet.quasar.ui.component.modifier.horizontalFadingEdges
 /**
  * 添付メディアの並び。全アイテムを [height] で揃え、幅はアスペクト比から決める。
  * 合計幅が収まらない場合は横スクロールし、まだスクロールできる側の端をフェードさせる。
+ *
+ * @param sensitive 閲覧注意 (NSFW)。`true` なら各メディアを初期状態でぼかし、右上の目アイコンで切り替えられる。
  */
 @Composable
 fun MediaAttachments(
     attachments: List<MediaAttachment>,
     height: Dp,
     modifier: Modifier = Modifier,
+    sensitive: Boolean = false,
     onClick: (MediaAttachment) -> Unit = {},
 ) {
     if (attachments.isEmpty()) return
@@ -64,6 +76,7 @@ fun MediaAttachments(
                 MediaAttachmentItem(
                     attachment = attachment,
                     height = height,
+                    sensitive = sensitive,
                     onClick = { onClick(attachment) },
                 )
             }
@@ -71,32 +84,50 @@ fun MediaAttachments(
     }
 }
 
-/** 添付メディア 1 件。高さ固定で、幅はアスペクト比に従う。 */
+/**
+ * 添付メディア 1 件。高さ固定で、幅はアスペクト比に従う。
+ *
+ * @param sensitive `true` なら初期状態でぼかし、右上の目アイコン (またはメディア自体のタップ) で表示する。
+ *   `false` なら目アイコンは出さない。
+ */
 @Composable
 fun MediaAttachmentItem(
     attachment: MediaAttachment,
     height: Dp,
     modifier: Modifier = Modifier,
+    sensitive: Boolean = false,
     onClick: () -> Unit = {},
 ) {
+    var hidden by rememberSaveable(attachment.id, sensitive) { mutableStateOf(sensitive) }
     Box(
         modifier = modifier
             .height(height)
             .width(height * displayAspectRatio(attachment))
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable(onClick = onClick),
+            // ぼかし中のタップは表示に切り替えるだけにする
+            .clickable(onClick = { if (hidden) hidden = false else onClick() }),
         contentAlignment = Alignment.Center,
     ) {
         val placeholder = rememberBlurHashPainter(attachment.blurhash)
-        if (attachment.previewUrl != null) {
+        if (hidden && placeholder != null) {
+            // BlurHash があればそれをぼかし表示にする (本体の画像は読み込まない)
+            Image(
+                painter = placeholder,
+                contentDescription = stringResource(R.string.media_sensitive),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (attachment.previewUrl != null) {
             AsyncImage(
                 model = attachment.previewUrl,
-                contentDescription = attachment.description,
+                contentDescription = if (hidden) stringResource(R.string.media_sensitive) else attachment.description,
                 placeholder = placeholder,
                 error = placeholder,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (hidden) Modifier.blur(HiddenBlurRadius) else Modifier),
             )
         } else {
             Icon(
@@ -112,6 +143,35 @@ fun MediaAttachmentItem(
             MediaType.Audio -> if (attachment.previewUrl != null) PlayBadge()
             MediaType.Image, MediaType.Unknown -> Unit
         }
+        if (sensitive) {
+            SensitiveToggle(
+                hidden = hidden,
+                onToggle = { hidden = !hidden },
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+        }
+    }
+}
+
+/** 閲覧注意メディアのぼかし切り替え (右上の目アイコン)。 */
+@Composable
+private fun SensitiveToggle(hidden: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(6.dp)
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onToggle),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            // ぼかし中は「表示する」、表示中は「隠す」
+            imageVector = if (hidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+            contentDescription = stringResource(if (hidden) R.string.media_show else R.string.media_hide),
+            tint = Color.White,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -146,5 +206,6 @@ internal fun displayAspectRatio(attachment: MediaAttachment): Float =
     (attachment.meta?.aspectRatio ?: 1f).coerceIn(MinAspectRatio, MaxAspectRatio)
 
 private val FadingEdgeWidth = 12.dp
+private val HiddenBlurRadius = 32.dp
 private const val MinAspectRatio = 1f / 3f
 private const val MaxAspectRatio = 3f

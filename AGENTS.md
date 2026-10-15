@@ -50,6 +50,7 @@ es.aria_on_the_planet.quasar
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem、インライン再生) + MediaClick
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
+    │   ├── gesture/                ゴムの抵抗 (rubberBand) + 左右スワイプの pager (SwipePager)
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
@@ -433,6 +434,17 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
 * **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
+  * 左右スワイプでもカラムを切り替える (`SwipePager`、`ui/component/gesture/SwipePager.kt`)。ドラッグはゴムの抵抗付き
+    (`rubberBand`、メディアビューアの上下スワイプと同じ式) で、隣のカラムはその分だけ見える。離すと、見た目の移動量
+    (ページ幅の 15%) か弾く速さで隣か元のページを決め、`motionScheme.defaultSpatialSpec()` の spring で落ち着かせる
+    (初速を引き継ぐ。端のページを行き過ぎた分・端でのドラッグはページ全体を少しずらして描く)。判定は純粋関数 `swipeTargetPage`。
+  * foundation の `HorizontalPager` は使わない: `userScrollEnabled = false` でも内部の nested scroll 接続が、ページが
+    半端な位置にあるとき子 (メディアの横並び) から届く移動を先に横取りして 1:1 で動かすため、ゴムが効かなくなる。
+  * 子の横スクロールが使い切らなかった分は nested scroll (`dispatchRawDelta`) で届き、`scroll()` を通らない。
+    最初の 1 回で基準のページを求め直す (古い基準のままだと前回のページへ動いてしまう)。
+  * 切り替えボタンの幅は表示位置 (`SwipePagerState.position`、小数) から決め、指に追従する。
+  * 読み込み: スワイプで見え始めたカラム / 落ち着いたカラムだけ `ensureLoaded`。ボタンで遠くへ飛ぶ時に通過するカラムは
+    読まない。選択 (`viewModel.select`) はボタン押下時と `settledPage` の変化時。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
 
 ## 自動更新 (Streaming API)

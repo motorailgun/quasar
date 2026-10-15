@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.navigationevent.NavigationEventInfo
+import es.aria_on_the_planet.quasar.ui.component.gesture.rubberBand
 import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
@@ -253,16 +254,6 @@ internal fun lerp(from: LayerTransform, to: LayerTransform, fraction: Float) = L
     translationY = from.translationY + (to.translationY - from.translationY) * fraction,
 )
 
-/**
- * ゴムのような引っかかり。指の距離 [offset] に対して、動き始めは半分ほど動き、遠くなるほど動かなくなり、
- * どれだけ動かしても [maxOffset] を超えない。
- */
-fun rubberBand(offset: Float, maxOffset: Float): Float {
-    if (maxOffset <= 0f) return 0f
-    val distance = abs(offset)
-    return sign(offset) * maxOffset * (1f - 1f / (distance * RubberBandCoefficient / maxOffset + 1f))
-}
-
 /** 閉じる操作の進み具合 (0〜1)。見た目の移動量 [offset] が [maxOffset] に近づくと 1。 */
 fun dismissProgress(offset: Float, maxOffset: Float): Float =
     if (maxOffset <= 0f) 0f else (abs(offset) / maxOffset).coerceIn(0f, 1f)
@@ -303,8 +294,6 @@ fun fitSize(aspectRatio: Float, container: Size): Size =
 
 /** 見た目の移動量の上限 (画面高に対する割合)。 */
 private const val MaxOffsetFraction = 0.3f
-/** 指の距離に対する、動き始めの見た目の移動量の割合。小さいほど強く引っかかる。 */
-private const val RubberBandCoefficient = 0.55f
 /** 閉じるのに必要な見た目の移動量 (画面高に対する割合)。指で 1/4 画面ほど動かすと届く。 */
 private const val DismissDistanceFraction = 0.08f
 private const val DragShrink = 0.15f

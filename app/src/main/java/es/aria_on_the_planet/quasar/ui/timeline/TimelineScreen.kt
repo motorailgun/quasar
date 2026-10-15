@@ -1,6 +1,5 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
@@ -38,6 +38,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -61,6 +63,12 @@ import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
+import es.aria_on_the_planet.quasar.ui.feed.PostTranslations
+import es.aria_on_the_planet.quasar.ui.component.gesture.SwipePager
+import es.aria_on_the_planet.quasar.ui.component.gesture.SwipePagerState
+import es.aria_on_the_planet.quasar.ui.component.gesture.rememberSwipePagerState
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -74,7 +82,19 @@ fun TimelineScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     // カラムごとにスクロール位置を保持する
     val listStates = ColumnType.entries.associateWith { rememberLazyListState() }
-    val context = LocalContext.current
+    val pageSpring = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    // 左右スワイプでカラムを切り替える (ゴムの抵抗付き)
+    val pagerState = rememberSwipePagerState(
+        initialPage = state.available.indexOf(state.selected),
+        pageCount = state.available.size,
+        animationSpec = pageSpring,
+    )
+    val scope = rememberCoroutineScope()
+
+    // スワイプで切り替わったら選択に反映する (ボタンで選んだときは先に select 済み)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { viewModel.select(state.available[it]) }
+    }
 
     // 画面が前面にある間だけストリーミングで自動更新する
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -102,73 +122,110 @@ fun TimelineScreen(
                 )
                 TimelineSelector(
                     available = state.available,
-                    selected = state.selected,
-                    onSelect = viewModel::select,
+                    pagerState = pagerState,
+                    onSelect = { column ->
+                        viewModel.select(column)
+                        scope.launch {
+                            pagerState.animateScrollToPage(state.available.indexOf(column))
+                        }
+                    },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        val current = state.current
-        val pullState = rememberPullToRefreshState()
-        PullToRefreshBox(
-            isRefreshing = current.isRefreshing && current.items.isNotEmpty(),
-            onRefresh = { viewModel.refresh() },
-            state = pullState,
+        SwipePager(
+            state = pagerState,
             modifier = Modifier.fillMaxSize().padding(padding),
-            indicator = {
-                PullToRefreshDefaults.LoadingIndicator(
-                    state = pullState,
-                    isRefreshing = current.isRefreshing && current.items.isNotEmpty(),
-                    modifier = Modifier.align(Alignment.TopCenter),
-                )
-            },
-        ) {
-            val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
-            val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
-            val onMediaClick: (MediaClick) -> Unit = context::openMedia
-            val timelineType = state.selected.timeline
-            when {
-                current.items.isEmpty() && (current.isRefreshing || !current.loaded) ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
-
-                current.items.isEmpty() && current.error != null ->
-                    CenteredMessage(stringResource(R.string.timeline_error, current.error!!))
-
-                current.items.isEmpty() ->
-                    CenteredMessage(stringResource(R.string.column_empty))
-
-                timelineType == null -> NotificationList(
-                    entries = state.notifications.items,
-                    modifier = Modifier.fillMaxSize(),
-                    state = listStates.getValue(state.selected),
-                    isLoadingMore = current.isLoadingMore,
-                    onLoadMore = { viewModel.loadMore(state.selected) },
-                    onUserClick = context::openProfile,
-                    onPostClick = context::openPost,
-                    onMediaClick = onMediaClick,
-                    onVote = onVote,
-                    onAction = onAction,
-                )
-
-                else -> PostList(
-                    items = state.timelines.getValue(timelineType).items,
-                    modifier = Modifier.fillMaxSize(),
-                    state = listStates.getValue(state.selected),
-                    isLoadingMore = current.isLoadingMore,
-                    onLoadMore = { viewModel.loadMore(state.selected) },
-                    onUserClick = context::openProfile,
-                    onPostClick = context::openPost,
-                    onVote = onVote,
-                    onAction = onAction,
-                    onMediaClick = onMediaClick,
-                    onGapClick = { gap -> viewModel.fillGap(state.selected, gap) },
-                    translationOf = translations::of,
-                    onTranslationToggle = viewModel::toggleTranslation,
-                    onPostShown = viewModel::onPostShown,
-                )
+            key = { state.available[it] },
+        ) { page ->
+            val column = state.available[page]
+            // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
+            val shouldLoad = pagerState.isSwiping || pagerState.settledPage == page
+            LaunchedEffect(column, shouldLoad) {
+                if (shouldLoad) viewModel.ensureLoaded(column)
             }
+            ColumnPage(
+                column = column,
+                state = state,
+                translations = translations,
+                listState = listStates.getValue(column),
+                viewModel = viewModel,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ColumnPage(
+    column: ColumnType,
+    state: TimelineScreenState,
+    translations: PostTranslations,
+    listState: LazyListState,
+    viewModel: TimelineViewModel,
+) {
+    val context = LocalContext.current
+    val feed = state.feedOf(column)
+    val pullState = rememberPullToRefreshState()
+    val isRefreshing = feed.isRefreshing && feed.items.isNotEmpty()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { viewModel.refresh(column) },
+        state = pullState,
+        modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.LoadingIndicator(
+                state = pullState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
+    ) {
+        val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
+        val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
+        val onMediaClick: (MediaClick) -> Unit = context::openMedia
+        val timelineType = column.timeline
+        when {
+            feed.items.isEmpty() && (feed.isRefreshing || !feed.loaded) ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+
+            feed.items.isEmpty() && feed.error != null ->
+                CenteredMessage(stringResource(R.string.timeline_error, feed.error!!))
+
+            feed.items.isEmpty() ->
+                CenteredMessage(stringResource(R.string.column_empty))
+
+            timelineType == null -> NotificationList(
+                entries = state.notifications.items,
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                isLoadingMore = feed.isLoadingMore,
+                onLoadMore = { viewModel.loadMore(column) },
+                onUserClick = context::openProfile,
+                onPostClick = context::openPost,
+                onMediaClick = onMediaClick,
+                onVote = onVote,
+                onAction = onAction,
+            )
+
+            else -> PostList(
+                items = state.timelines.getValue(timelineType).items,
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                isLoadingMore = feed.isLoadingMore,
+                onLoadMore = { viewModel.loadMore(column) },
+                onUserClick = context::openProfile,
+                onPostClick = context::openPost,
+                onVote = onVote,
+                onAction = onAction,
+                onMediaClick = onMediaClick,
+                onGapClick = { gap -> viewModel.fillGap(column, gap) },
+                translationOf = translations::of,
+                onTranslationToggle = viewModel::toggleTranslation,
+                onPostShown = viewModel::onPostShown,
+            )
         }
     }
 }
@@ -177,18 +234,22 @@ fun TimelineScreen(
 @Composable
 private fun TimelineSelector(
     available: List<ColumnType>,
-    selected: ColumnType,
+    pagerState: SwipePagerState,
     onSelect: (ColumnType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // スワイプ中も指に合わせて幅が移るよう、ページの位置 (小数) から各ボタンの重みを決める
+    val position = pagerState.position
+    val selectedIndex = pagerState.targetPage
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         available.forEachIndexed { index, type ->
-            val checked = type == selected
+            val checked = index == selectedIndex
             // 4 カラムでは等幅にラベルが収まらないので、選択中のみラベルを出して幅を広げる
-            val weight by animateFloatAsState(if (checked) SelectedWeight else 1f, label = "columnWeight")
+            val closeness = (1f - abs(position - index)).coerceIn(0f, 1f)
+            val weight = 1f + (SelectedWeight - 1f) * closeness
             ToggleButton(
                 checked = checked,
                 onCheckedChange = { onSelect(type) },

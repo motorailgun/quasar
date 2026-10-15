@@ -6,6 +6,7 @@ import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
 import es.aria_on_the_planet.quasar.domain.model.MediaType
+import es.aria_on_the_planet.quasar.ui.component.gesture.rubberBand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

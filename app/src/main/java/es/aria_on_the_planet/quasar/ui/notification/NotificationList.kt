@@ -59,6 +59,7 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
 import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
+import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.post.relativeTime
@@ -81,6 +82,7 @@ fun NotificationList(
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
+    onAction: OnPostAction? = null,
 ) {
     LoadMoreEffect(state, onLoadMore)
     // 先頭にいるときにストリーミングの新着が入ったら見せる
@@ -96,6 +98,7 @@ fun NotificationList(
                         onPostClick = onPostClick,
                         onMediaClick = onMediaClick,
                         onVote = onVote,
+                        onAction = onAction,
                     )
                 }
                 HorizontalDivider()
@@ -129,6 +132,7 @@ fun NotificationItem(
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
+    onAction: OnPostAction? = null,
 ) {
     if (group.type.isCompact) {
         CompactNotification(group, modifier, onUserClick, onPostClick)
@@ -143,6 +147,7 @@ fun NotificationItem(
             onPostClick = onPostClick,
             onMediaClick = onMediaClick,
             onVote = onVote,
+            onAction = onAction,
             showReplyIndicator = false,
         )
         return
@@ -157,6 +162,7 @@ fun NotificationItem(
                 onPostClick = onPostClick,
                 onMediaClick = onMediaClick,
                 onVote = onVote,
+                onAction = onAction,
                 showReplyIndicator = true,
             )
         } else {

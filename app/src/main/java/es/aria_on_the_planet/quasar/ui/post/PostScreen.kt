@@ -32,6 +32,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
+import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
@@ -54,7 +55,8 @@ fun PostScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val thread = state.thread
-    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
+    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
+    val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
     val mainIndex = thread?.ancestors?.size ?: 0
 
     // 初回表示時は祖先ではなく本体のポストを先頭に出す
@@ -103,6 +105,7 @@ fun PostScreen(
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
                             onVote = onVote,
+                            onAction = onAction,
                             showReplyIndicator = false,
                         )
                     }
@@ -118,6 +121,7 @@ fun PostScreen(
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
                             onVote = onVote,
+                            onAction = onAction,
                         )
                         HorizontalDivider()
                     }
@@ -151,6 +155,7 @@ fun PostScreen(
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
                             onVote = onVote,
+                            onAction = onAction,
                             showReplyIndicator = false,
                         )
                     }

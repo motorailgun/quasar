@@ -12,6 +12,8 @@ import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostAction
+import es.aria_on_the_planet.quasar.ui.feed.PostActionController
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
@@ -56,8 +58,8 @@ class TimelineViewModel(
     private val streamingClient: StreamingClient,
 ) : ViewModel() {
 
-    /** 投票できるか (要ログイン)。 */
-    val canVote: Boolean = session.accessToken != null
+    /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
+    val canInteract: Boolean = session.accessToken != null
 
     /** Home と通知はログイン時のみ。 */
     private val available = ColumnType.entries.filter {
@@ -146,6 +148,20 @@ class TimelineViewModel(
             feeds.values.forEach { feed -> feed.updatePosts { it.withPoll(poll) } }
             notifications.updateItems { entry -> entry.mapGroups { it.copy(post = it.post?.withPoll(poll)) } }
         }
+
+    private val postActions = PostActionController(
+        scope = viewModelScope,
+        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        // 同じポストが複数のカラム・通知に載っていることがあるので全てに反映する
+        update = { transform ->
+            feeds.values.forEach { feed -> feed.updatePosts(transform) }
+            notifications.updateItems { entry -> entry.mapGroups { it.copy(post = it.post?.let(transform)) } }
+        },
+        onError = { message, error -> Log.w(TAG, message, error) },
+    )
+
+    /** ブースト・お気に入り・ブックマーク (またはその取り消し) を行う。 */
+    fun performAction(post: Post, action: PostAction) = postActions.perform(post, action)
 
     private fun stateOf(column: ColumnType): FeedState<*> =
         column.timeline?.let { feeds.getValue(it).state.value } ?: notifications.state.value

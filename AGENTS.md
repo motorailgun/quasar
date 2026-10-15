@@ -31,12 +31,13 @@ es.aria_on_the_planet.quasar
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository
-├── domain/model/                   UI が扱うモデル (User, Profile, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote)
+├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
     │   ├── text/EmojiText.kt       カスタム絵文字対応テキスト (Text のラッパー)
-    │   ├── post/PostCard.kt        ポスト 1 件
+    │   ├── post/PostCard.kt        ポスト 1 件 (+ PostActionRow)
+    │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
     │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
     │   ├── post/PostTime.kt        詳細日時のフォーマット
@@ -50,7 +51,7 @@ es.aria_on_the_planet.quasar
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
-    ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting
+    ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
     ├── timeline/                   タイムライン画面 + ViewModel
@@ -193,6 +194,9 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
 | ポスト | `GET /api/v1/statuses/:id` |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
+| ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` (要認証) |
+| お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` (要認証) |
+| ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` (要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
@@ -230,7 +234,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),
   ブックマーク=secondary) で表示する。
-  現時点では表示のみで、操作 (favourite/reblog/bookmark API 呼び出し) は未実装。
+  ブースト・お気に入り・ブックマークは押せる (`onAction`、未ログインなら `null` で表示のみ)。リプライは表示のみ。
 * `Post` 以外の状態を持たない (stateless)。
 
 ### PostList (`ui/component/post/PostList.kt`)
@@ -258,6 +262,22 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   `Modifier.blur`) + 右上に目アイコン。アイコン (またはぼかし中のメディア自体) のタップで切り替え。状態はメディアごと。
   `sensitive` でないポストでは目アイコンを出さない。CW とは独立 (CW で隠れるのは本文側のみで、メディアは sensitive に従う)。
 
+### ブースト・お気に入り・ブックマーク (`PostAction`)
+* ドメイン: `PostActionType` (Boost / Favourite / Bookmark) と `PostAction(type, undo)`。`type.toggleOn(post)` で
+  押されたときの状態から「する / 取り消す」を決める (済みなら取り消し)。
+* 流れ: `PostCard(onAction)` → `rememberPostActionHandler(perform, confirmation)` (`ui/component/post/PostActionHandler.kt`)
+  → `ViewModel.performAction(post, action)` → `PostActionController` (`ui/feed/PostActions.kt`) → `StatusRepository.perform`。
+  画面側は `rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }`。
+* **確認モーダルの差し込み口**: `PostActionConfirmation.confirm(post, action): PostAction?`。今は `PostActionConfirmation.None`
+  (そのまま送る)。ダイアログを出すときはここで表示して結果を待ち、`null` で取りやめ。操作を変えて返してもよい
+  (将来ブーストの公開範囲を選ばせる等)。ViewModel 側は確認の有無を知らない。
+* `PostActionController`: 見込みで反映 (`Post.withAction`) → 送信 → 応答の件数・状態で上書き (`Post.withInteractionsOf`)、
+  失敗なら巻き戻し (`withAction(action.inverse())`) + `onError`。同じポスト・同じ種類が送信中の間は次の操作を無視する。
+  反映は `statusId` 一致で、ブーストの外側・引用先も含めて、ViewModel が持つ全一覧 (全カラム + 通知、ピン留め、スレッド全体) に当てる。
+  `withAction` は既にその状態なら何もしない (重ねても件数がずれない)。テストは `PostActionTest` / `PostActionControllerTest`。
+* `reblog` の応答はブースト自体の Status (中身は `reblog`) だが、`toDomain` で中身の件数・状態が取り出される。
+* 失敗時の UI 通知 (スナックバー等) は無い (ログのみ)。非公開・DM のポストのブーストもボタンは押せ、サーバのエラーで巻き戻る。
+
 ### PollView (`ui/component/poll/PollView.kt`)
 * `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。
 * 結果表示: 終了済み・投票済み・`onVote == null` (未ログイン、引用内) のとき。割合バー (最多得票は primaryContainer +
@@ -267,7 +287,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * フッタ: 「N votes · 6 days left」/「Final results」(複数選択は「N people」)。
 * 投票処理は ViewModel の `suspend fun vote(post, choices)` (`ui/feed/PollVoting.kt` の `submitVote`)。
   viewModelScope 上で実行し、成功したら `Post.withPoll()` で各一覧 (引用先含む) の該当投票を差し替える。
-  画面側は `onVote = if (viewModel.canVote) viewModel::vote else null` で渡す。
+  画面側は `onVote = if (viewModel.canInteract) viewModel::vote else null` で渡す。
 
 ### QuotedPost (`ui/component/post/QuotedPost.kt`)
 * 角丸の OutlinedCard に、小さいアイコン (20dp) + 表示名 + @acct · 時刻 / 本文 / 投票 (結果のみ) / メディア (0.75 倍の高さ)。
@@ -509,8 +529,8 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
-* **操作**: お気に入り・ブースト・ブックマーク・リプライ・投稿・フォローは未実装 (表示のみ)。投票だけは送信できる
-  (実機では未送信)。
+* **操作**: リプライ・投稿・フォローは未実装。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
+  操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、非公開ポストのブーストボタン無効化は未対応。
 * **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
 * **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。

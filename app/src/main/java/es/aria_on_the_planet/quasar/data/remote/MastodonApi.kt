@@ -96,6 +96,18 @@ class MastodonApi(
             choices.forEach { add("choices[]", it.toString()) }
         }
 
+    /**
+     * ポストへの操作 (要認証)。[action] はパスの末尾で、以下のいずれか。いずれも更新後の Status を返す。
+     * * `reblog` / `unreblog` (https://docs.joinmastodon.org/methods/statuses/#boost)。
+     *   `reblog` はブースト自体の Status (中身は `reblog`) を、`unreblog` は元の Status を返す。
+     * * `favourite` / `unfavourite` (https://docs.joinmastodon.org/methods/statuses/#favourite)
+     * * `bookmark` / `unbookmark` (https://docs.joinmastodon.org/methods/statuses/#bookmark)
+     *
+     * 既にその状態でもエラーにはならない (冪等)。
+     */
+    suspend fun statusAction(serverUrl: String, accessToken: String, id: String, action: String): StatusDto =
+        post(serverUrl, accessToken, "api/v1/statuses/$id/$action") {}
+
     /** https://docs.joinmastodon.org/methods/instance/#v2 の `configuration.urls.streaming`。 */
     suspend fun streamingUrl(serverUrl: String): String? =
         get<InstanceDto>(serverUrl, null, "api/v2/instance") {}.configuration?.urls?.streaming

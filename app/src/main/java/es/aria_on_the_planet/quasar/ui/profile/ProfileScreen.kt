@@ -23,6 +23,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
+import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
@@ -41,7 +42,8 @@ fun ProfileScreen(
     val listState = rememberLazyListState()
     val profile = state.profile.profile
     val posts = state.posts
-    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
+    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
+    val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
 
     DetailScaffold(
         onBack = onBack,
@@ -68,6 +70,7 @@ fun ProfileScreen(
                 onPostClick = onPostClick,
                 onMediaClick = onMediaClick,
                 onVote = onVote,
+                onAction = onAction,
                 header = {
                     item(key = "profile_header", contentType = "profile_header") {
                         ProfileHeader(profile, followersYouFollow = state.extras.followersYouFollow)
@@ -81,6 +84,7 @@ fun ProfileScreen(
                                 onPostClick = onPostClick,
                                 onMediaClick = onMediaClick,
                                 onVote = onVote,
+                                onAction = onAction,
                             )
                         }
                     }

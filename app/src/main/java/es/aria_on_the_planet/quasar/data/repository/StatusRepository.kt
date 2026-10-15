@@ -4,6 +4,8 @@ import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Poll
+import es.aria_on_the_planet.quasar.domain.model.PostAction
+import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -35,7 +37,23 @@ class StatusRepository(
         val token = requireNotNull(session.accessToken) { "Voting requires login" }
         return api.votePoll(session.serverUrl, token, pollId, choices).toDomain()
     }
+
+    /**
+     * [statusId] のポストに [action] を行い、更新後のポストを返す。未認証では操作できない。
+     * ブーストの応答はブースト自体の Status だが、[toDomain] で中身の件数・状態が取り出される。
+     */
+    suspend fun perform(session: Session, statusId: String, action: PostAction): Post {
+        val token = requireNotNull(session.accessToken) { "Post actions require login" }
+        return api.statusAction(session.serverUrl, token, statusId, action.endpoint).toDomain()
+    }
 }
+
+private val PostAction.endpoint: String
+    get() = when (type) {
+        PostActionType.Boost -> if (undo) "unreblog" else "reblog"
+        PostActionType.Favourite -> if (undo) "unfavourite" else "favourite"
+        PostActionType.Bookmark -> if (undo) "unbookmark" else "bookmark"
+    }
 
 /** [poll] と同じ ID の投票を、引用先も含めて差し替える。 */
 fun Post.withPoll(poll: Poll): Post {

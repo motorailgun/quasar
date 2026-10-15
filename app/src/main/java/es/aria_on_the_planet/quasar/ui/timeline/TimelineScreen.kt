@@ -56,6 +56,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
+import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
@@ -123,7 +124,8 @@ fun TimelineScreen(
                 )
             },
         ) {
-            val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
+            val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
+            val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
             val onMediaClick: (MediaClick) -> Unit = context::openMedia
             val timelineType = state.selected.timeline
             when {
@@ -146,6 +148,7 @@ fun TimelineScreen(
                     onPostClick = context::openPost,
                     onMediaClick = onMediaClick,
                     onVote = onVote,
+                    onAction = onAction,
                 )
 
                 else -> PostList(
@@ -157,6 +160,7 @@ fun TimelineScreen(
                     onUserClick = context::openProfile,
                     onPostClick = context::openPost,
                     onVote = onVote,
+                    onAction = onAction,
                     onMediaClick = onMediaClick,
                     onGapClick = { gap -> viewModel.fillGap(state.selected, gap) },
                 )

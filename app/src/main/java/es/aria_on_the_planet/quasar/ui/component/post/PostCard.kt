@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material.icons.filled.Bookmark
@@ -33,7 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,6 +48,7 @@ import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
@@ -63,6 +69,7 @@ object PostCardDefaults {
  * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
  * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
  * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (未ログイン時など)。
+ * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (未ログイン時など)。
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
  *   返信関係が別の形で分かる場所では `false` にする。
  */
@@ -76,6 +83,7 @@ fun PostCard(
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
+    onAction: OnPostAction? = null,
     showReplyIndicator: Boolean = true,
 ) {
     Column(
@@ -165,7 +173,7 @@ fun PostCard(
                     }
                 }
                 Spacer(Modifier.size(8.dp))
-                PostActionRow(post)
+                PostActionRow(post, onAction = onAction)
             }
         }
     }
@@ -279,56 +287,91 @@ private fun PinnedLabel(modifier: Modifier = Modifier) {
     }
 }
 
-/** リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。 */
+/**
+ * リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。
+ * [onAction] があればブースト・お気に入り・ブックマークを押せる (リプライは未実装で表示のみ)。
+ */
 @Composable
-fun PostActionRow(post: Post, modifier: Modifier = Modifier) {
+fun PostActionRow(post: Post, modifier: Modifier = Modifier, onAction: OnPostAction? = null) {
     val viewer = post.viewer
     Row(
-        modifier = modifier.fillMaxWidth(),
+        // 押せる範囲を広げた分 (左右の余白) だけ外にはみ出させ、アイコンの位置は余白なしのときと揃える
+        modifier = modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val extra = (ActionPaddingHorizontal * 2).roundToPx()
+                val placeable = measurable.measure(constraints.copy(
+                    minWidth = constraints.minWidth + extra,
+                    maxWidth = constraints.maxWidth + extra,
+                ))
+                layout(constraints.maxWidth, placeable.height) {
+                    placeable.place(-ActionPaddingHorizontal.roundToPx(), 0)
+                }
+            },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp - ActionPaddingHorizontal * 2),
     ) {
-        PostActionIndicator(
+        PostActionButton(
             icon = Icons.AutoMirrored.Outlined.Reply,
             label = stringResource(R.string.post_replies),
             count = post.repliesCount,
         )
-        PostActionIndicator(
+        PostActionButton(
             icon = if (viewer.reblogged) Icons.Filled.Repeat else Icons.Outlined.Repeat,
             label = stringResource(R.string.post_boosts),
             count = post.boostsCount,
             active = viewer.reblogged,
             activeColor = MaterialTheme.extendedColors.reblog.color,
+            onClick = onAction?.let { { it(post, PostActionType.Boost) } },
         )
-        PostActionIndicator(
+        PostActionButton(
             icon = if (viewer.favourited) Icons.Filled.Star else Icons.Outlined.StarOutline,
             label = stringResource(R.string.post_reactions),
             count = post.reactionsCount,
             active = viewer.favourited,
             activeColor = MaterialTheme.extendedColors.favourite.color,
+            onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
         )
         Spacer(Modifier.weight(1f))
-        PostActionIndicator(
+        PostActionButton(
             icon = if (viewer.bookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
             label = stringResource(R.string.post_bookmark),
             active = viewer.bookmarked,
             activeColor = MaterialTheme.colorScheme.secondary,
+            onClick = onAction?.let { { it(post, PostActionType.Bookmark) } },
         )
     }
 }
 
+/** アクション行のボタンの左右の余白 (押せる範囲)。 */
+private val ActionPaddingHorizontal = 6.dp
+
+/** アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタンになる。 */
 @Composable
-private fun PostActionIndicator(
+private fun PostActionButton(
     icon: ImageVector,
     label: String,
     count: Int? = null,
     active: Boolean = false,
     activeColor: Color = MaterialTheme.colorScheme.primary,
+    onClick: (() -> Unit)? = null,
 ) {
-    val color = if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val color by animateColorAsState(
+        if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "postActionColor",
+    )
     val activeState = stringResource(R.string.post_action_done)
     Row(
-        modifier = Modifier.semantics { if (active) stateDescription = activeState },
+        modifier = Modifier
+            .clip(CircleShape)
+            .then(
+                if (onClick != null) {
+                    Modifier.toggleable(value = active, role = Role.Switch, onValueChange = { onClick() })
+                } else {
+                    Modifier.semantics { if (active) stateDescription = activeState }
+                },
+            )
+            .padding(horizontal = ActionPaddingHorizontal, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = color)

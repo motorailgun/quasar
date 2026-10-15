@@ -8,6 +8,8 @@ import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostAction
+import es.aria_on_the_planet.quasar.ui.feed.PostActionController
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
@@ -48,8 +50,8 @@ class ProfileViewModel(
     private val statusRepository: StatusRepository,
 ) : ViewModel() {
 
-    /** 投票できるか (要ログイン)。 */
-    val canVote: Boolean = session.accessToken != null
+    /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
+    val canInteract: Boolean = session.accessToken != null
 
     private val profile = MutableStateFlow(ProfileState())
     private val extras = MutableStateFlow(ProfileExtras())
@@ -83,6 +85,19 @@ class ProfileViewModel(
             posts.updatePosts { it.withPoll(poll) }
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map { it.withPoll(poll) }) }
         }
+
+    private val postActions = PostActionController(
+        scope = viewModelScope,
+        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        update = { transform ->
+            posts.updatePosts(transform)
+            extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map(transform)) }
+        },
+        onError = { message, error -> Log.w(TAG, message, error) },
+    )
+
+    /** ブースト・お気に入り・ブックマーク (またはその取り消し) を行う。 */
+    fun performAction(post: Post, action: PostAction) = postActions.perform(post, action)
 
     private fun loadProfile() {
         if (profile.value.isLoading) return

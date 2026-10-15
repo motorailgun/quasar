@@ -10,6 +10,7 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.layout.CollapsibleContent
+import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 
 /** 画面高に対して、折りたたみ時に見せるピン留めセクションの割合。 */
@@ -24,6 +25,7 @@ fun PinnedPosts(
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
+    onAction: OnPostAction? = null,
 ) {
     if (posts.isEmpty()) return
     val windowHeight = LocalWindowInfo.current.containerSize.height
@@ -39,6 +41,7 @@ fun PinnedPosts(
                         onPostClick = onPostClick,
                         onMediaClick = onMediaClick,
                         onVote = onVote,
+                        onAction = onAction,
                     )
                     if (index != posts.lastIndex) HorizontalDivider()
                 }

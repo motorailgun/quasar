@@ -21,6 +21,10 @@ data class Post(
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */
     val boostedBy: User? = null,
+    /** 本文を持つ Status の ID。ブーストの場合は中身の ID で、スレッド表示などに使う。 */
+    val statusId: String = id,
+    /** リプライ先の Status ID。リプライでなければ `null`。 */
+    val inReplyToId: String? = null,
 )
 
 /** ログイン中ユーザーから見たポストの状態。未認証時はすべて `false`。 */

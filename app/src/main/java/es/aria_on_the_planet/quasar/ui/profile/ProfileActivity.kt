@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
 
 /** アカウントのプロフィール画面。[openProfile] で起動する。 */
@@ -39,6 +40,7 @@ class ProfileActivity : ComponentActivity() {
                     onBack = ::finish,
                     // 同じアカウントのポスト (自分の投稿) からは遷移しない
                     onUserClick = { user -> if (user.inServerId != accountId) openProfile(user) },
+                    onPostClick = ::openPost,
                     onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
                 )
             }

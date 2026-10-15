@@ -27,7 +27,7 @@ es.aria_on_the_planet.quasar
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
-│   └── repository/                 TimelineRepository, AccountRepository
+│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
@@ -35,6 +35,9 @@ es.aria_on_the_planet.quasar
     │   ├── text/EmojiText.kt       カスタム絵文字対応テキスト (Text のラッパー)
     │   ├── post/PostCard.kt        ポスト 1 件
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
+    │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
+    │   ├── post/PostTime.kt        詳細日時のフォーマット
+    │   ├── scaffold/DetailScaffold.kt 詳細画面共通の骨組み (戻る付きトップバー + スクロールでタイトル切替 + PTR)
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
@@ -43,7 +46,8 @@ es.aria_on_the_planet.quasar
     ├── feed/PostFeed.kt            max_id ページングするポスト一覧の状態管理 (ViewModel から使う)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
     ├── timeline/                   タイムライン画面 + ViewModel
-    └── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
+    ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
+    └── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -93,6 +97,8 @@ data class Post(
     val card: PreviewCard?,        // 本文中の URL のリンクプレビュー
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
+    val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
+    val inReplyToId: String?,      // in_reply_to_id (中身の値)
 )
 
 /** ログイン中ユーザーから見た状態。API では認証時のみ返るため、未認証時はすべて false。 */
@@ -154,6 +160,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
+| ポスト | `GET /api/v1/statuses/:id` |
+| スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
 
@@ -229,8 +237,22 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
   * 未実装: フォローボタン、投稿/返信/メディアのタブ切り替え、familiar followers の一覧画面。
   * 注: API の Profile エンティティ (`/api/v1/profile`) はログイン中ユーザー自身の編集用 (raw な値) で、
     他人のプロフィール表示には Account を使う。ドメインの `Profile` は表示用で、API の Profile とは別物。
+* **Post** (`PostActivity`): `Context.openPost(post)` で起動する (extra は `post.statusId`)。
+  * 構成: 祖先 (古い順、PostCard をアイコン位置の縦線で連結) / 本体 (`PostDetail`) / リプライ一覧。
+    初回表示時は本体ポストまでスクロールする。
+  * `PostDetail`: PostCard の全要素 + 大きめの本文・メディア高さ 240dp + 詳細日時 + 区切り線付きアクション行。
+    詳細日時は `yyyy MM/dd HH:mm:ss` (システム設定が 12 時間なら `yyyy MM/dd h:mm:ss a`)。
+  * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
+    直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
+  * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。
+* **DetailScaffold** (`ui/component/scaffold/`): Profile と Post で共通の骨組み。戻る付き TopAppBar、
+  pull-to-refresh、`revealTitleAfterIndex` 番目のアイテムが画面外に出たら `title` → `revealedTitle` に切り替え。
+  補助として `DetailTitle` (名前 + 補足の 2 段)、`DetailLoading`、`DetailMessage` を持つ。
 * 遷移: `PostCard` のアイコン・表示名 (+ screenName)・「〜 boosted」ラベルのタップで `onUserClick`。
   タイムラインとプロフィールの両方から `openProfile` する (プロフィール中の本人の投稿からは遷移しない)。
+  ポスト本体のタップ (`onPostClick`) はタイムライン・プロフィール (ピン留め含む)・ポスト詳細から `openPost` する。
+* 既知の挙動: Compose はテキスト内リンクのタッチ判定を最小 48dp に広げるため、本文先頭のリンクの直上
+  (投稿者行・時刻) をタップするとリンクが開くことがある。
 
 * **Login (暫定)**: サーバ URL とアクセストークン (任意) を入力。トークンなしでは Home を無効化。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) は後続タスク。

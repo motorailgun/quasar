@@ -167,7 +167,7 @@ private fun AuthorLine(post: Post, onAuthorClick: () -> Unit) {
 }
 
 @Composable
-private fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
+internal fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(
             Icons.Outlined.Repeat,
@@ -207,10 +207,10 @@ private fun PinnedLabel(modifier: Modifier = Modifier) {
 
 /** リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。 */
 @Composable
-private fun PostActionRow(post: Post) {
+fun PostActionRow(post: Post, modifier: Modifier = Modifier) {
     val viewer = post.viewer
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {

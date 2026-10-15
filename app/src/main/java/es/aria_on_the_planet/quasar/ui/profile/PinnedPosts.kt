@@ -21,6 +21,7 @@ fun PinnedPosts(
     posts: List<Post>,
     modifier: Modifier = Modifier,
     onUserClick: (User) -> Unit = {},
+    onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
 ) {
     if (posts.isEmpty()) return
@@ -30,7 +31,13 @@ fun PinnedPosts(
         CollapsibleContent(collapsedMaxHeight = collapsedMaxHeight) {
             Column {
                 posts.forEachIndexed { index, post ->
-                    PostCard(post = post, pinned = true, onUserClick = onUserClick, onMediaClick = onMediaClick)
+                    PostCard(
+                        post = post,
+                        pinned = true,
+                        onUserClick = onUserClick,
+                        onPostClick = onPostClick,
+                        onMediaClick = onMediaClick,
+                    )
                     if (index != posts.lastIndex) HorizontalDivider()
                 }
             }

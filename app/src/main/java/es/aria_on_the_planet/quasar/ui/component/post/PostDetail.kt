@@ -1,0 +1,111 @@
+package es.aria_on_the_planet.quasar.ui.component.post
+
+import android.text.format.DateFormat
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
+import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
+import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+
+object PostDetailDefaults {
+    val MediaHeight: Dp = 240.dp
+}
+
+/**
+ * ポスト詳細画面の主役となるポスト。[PostCard] と同じ要素を、本文を大きく・詳細な投稿日時付きで表示する。
+ */
+@Composable
+fun PostDetail(
+    post: Post,
+    modifier: Modifier = Modifier,
+    mediaHeight: Dp = PostDetailDefaults.MediaHeight,
+    onUserClick: (User) -> Unit = {},
+    onMediaClick: (MediaAttachment) -> Unit = {},
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        post.boostedBy?.let { booster ->
+            BoostedByLabel(
+                booster,
+                Modifier
+                    .padding(bottom = 8.dp)
+                    .clickable { onUserClick(booster) },
+            )
+        }
+        Row(
+            modifier = Modifier.clickable { onUserClick(post.author) },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            UserIcon(user = post.author)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                EmojiText(
+                    text = post.author.displayName.ifBlank { post.author.screenName },
+                    emojis = post.author.emojis,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "@${post.author.fullScreenName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.size(12.dp))
+        EmojiText(
+            text = post.text,
+            emojis = post.emojis,
+            isHtml = true,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        if (post.mediaAttachments.isNotEmpty()) {
+            MediaAttachments(
+                attachments = post.mediaAttachments,
+                height = mediaHeight,
+                onClick = onMediaClick,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        post.card?.let { card ->
+            LinkPreviewCard(card = card, modifier = Modifier.padding(top = 12.dp))
+        }
+        Spacer(Modifier.size(12.dp))
+        val context = LocalContext.current
+        // ロケールや 12/24 時間設定の変更で再計算されるよう Configuration を読む
+        LocalConfiguration.current
+        Text(
+            text = formatDetailedTime(post.createdAt, is24Hour = DateFormat.is24HourFormat(context)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        PostActionRow(post)
+    }
+}

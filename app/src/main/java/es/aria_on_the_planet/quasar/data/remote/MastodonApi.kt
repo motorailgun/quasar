@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.remote
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
+import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,18 @@ class MastodonApi(
         maxId?.let { addQueryParameter("max_id", it) }
         addQueryParameter("limit", limit.toString())
     }
+
+    /** https://docs.joinmastodon.org/methods/statuses/#get */
+    suspend fun status(serverUrl: String, accessToken: String?, id: String): StatusDto =
+        get(serverUrl, accessToken, "api/v1/statuses/$id") {}
+
+    /**
+     * https://docs.joinmastodon.org/methods/statuses/#context
+     *
+     * 未認証では祖先 40 件・子孫 60 件・深さ 20 までに制限される。
+     */
+    suspend fun statusContext(serverUrl: String, accessToken: String?, id: String): ContextDto =
+        get(serverUrl, accessToken, "api/v1/statuses/$id/context") {}
 
     /** https://docs.joinmastodon.org/methods/accounts/#get */
     suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =

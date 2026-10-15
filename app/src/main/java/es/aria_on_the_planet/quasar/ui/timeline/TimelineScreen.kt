@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
+import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -123,6 +124,7 @@ fun TimelineScreen(
                     isLoadingMore = timeline.isLoadingMore,
                     onLoadMore = { viewModel.loadMore(state.selected) },
                     onUserClick = context::openProfile,
+                    onPostClick = context::openPost,
                     // メディアビューアができるまではブラウザで開く
                     onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
                 )

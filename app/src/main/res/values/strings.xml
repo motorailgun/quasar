@@ -35,4 +35,7 @@
         <item quantity="one">Followed by %1$s, %2$s, and %3$d other you follow</item>
         <item quantity="other">Followed by %1$s, %2$s, and %3$d others you follow</item>
     </plurals>
+    <string name="post_title">Post</string>
+    <string name="post_no_replies">No replies yet</string>
+    <string name="post_error">Failed to load post: %1$s</string>
 </resources>

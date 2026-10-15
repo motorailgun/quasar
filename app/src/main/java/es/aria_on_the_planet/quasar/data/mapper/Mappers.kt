@@ -79,6 +79,8 @@ fun StatusDto.toDomain(): Post {
             favourited = body.favourited == true,
         ),
         boostedBy = if (boosted != null) account.toDomain() else null,
+        statusId = body.id,
+        inReplyToId = body.inReplyToId,
     )
 }
 

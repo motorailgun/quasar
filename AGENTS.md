@@ -414,6 +414,11 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
 * **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
+  * カラムは `HorizontalPager` で、左右スワイプでも切り替わる (ページごとに PTR・LazyListState を持つ)。吸着とボタンでの
+    切り替えは `motionScheme.defaultSpatialSpec()` の spring。切り替えボタンの幅はページ位置 (小数) から決め、指に追従する。
+  * 読み込み: 指で引き出し始めたカラム / 落ち着いたカラムだけ `ensureLoaded`。ボタンで遠くへ飛ぶ時に通過するカラムは読まない。
+    選択 (`viewModel.select`) はボタン押下時と `settledPage` の変化時。
+  * ドラッグにゴムの抵抗を付けた版は `timeline-swipe-rubber-band` ブランチにある (60fps 出ていないように見えたので保留)。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
 
 ## 自動更新 (Streaming API)

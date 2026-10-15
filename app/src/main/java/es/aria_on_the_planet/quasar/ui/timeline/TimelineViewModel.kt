@@ -47,7 +47,11 @@ data class TimelineScreenState(
 ) {
     /** 選択中カラムの状態 (読み込み中・エラー表示の判定用)。 */
     val current: FeedState<*>
-        get() = selected.timeline?.let { timelines.getValue(it) } ?: notifications
+        get() = feedOf(selected)
+
+    /** カラムの状態。 */
+    fun feedOf(column: ColumnType): FeedState<*> =
+        column.timeline?.let { timelines.getValue(it) } ?: notifications
 }
 
 class TimelineViewModel(
@@ -100,7 +104,13 @@ class TimelineViewModel(
 
     fun select(column: ColumnType) {
         selected.value = column
-        if (!stateOf(column).loaded) refresh(column)
+        ensureLoaded(column)
+    }
+
+    /** まだ一度も読み込んでいなければ読み込む (スワイプで隣のカラムが見え始めたとき等)。 */
+    fun ensureLoaded(column: ColumnType) {
+        val state = stateOf(column)
+        if (!state.loaded && !state.isRefreshing) refresh(column)
     }
 
     fun refresh(column: ColumnType = selected.value) {

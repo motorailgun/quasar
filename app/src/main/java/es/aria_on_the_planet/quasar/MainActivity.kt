@@ -10,7 +10,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.ui.login.LoginScreen
-import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
+import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
 
@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as QuasarApplication).container
         setContent {
-            QuasarTheme {
+            QuasarAppContent(container) {
                 val session by container.sessionStore.session.collectAsStateWithLifecycle()
                 val current = session
                 if (current == null) {

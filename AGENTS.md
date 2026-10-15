@@ -44,7 +44,7 @@ es.aria_on_the_planet.quasar
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
-    │   ├── layout/CollapsibleContent.kt 高さ超過時に折りたたみ + フェード + 展開ボタン
+    │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
@@ -232,6 +232,15 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
 
+### 折りたたみ (`ui/component/layout/`)
+* 開閉状態は `rememberExpandedState(key)` (statusId 等のキー付き rememberSaveable) で持ち、CW・長文・ピン留めで共通。
+* 「上限を超えたら切ってフェード + 開閉ボタン」は `CollapsibleContent(collapsedMaxHeight, expanded, toggle)` に一本化。
+  ボタンは差し替え式で、`ShowMoreToggle` (「Show more >」、CW・長文) と `ChevronToggle` (中央の `>` ボタン、ピン留め)。
+* 長文 (`CollapsiblePostText`): PostCard の本文を `LocalDisplaySettings.current.longPostMaxLines` 行 (既定 8) で折りたたむ。
+  本文は行の高さ固定 (カスタム絵文字も行の高さに揃えている) なので、N 行 = 行の高さ × N として `CollapsibleContent`
+  に渡す。Post 画面の本体 (`PostDetail`) は全文を読む場所なので折りたたまない。
+* CW は本文側を丸ごと差し替える (切るのではない) ので `CollapsibleContent` には乗せず、状態とボタンだけ共有する。
+
 ### Content Warning / NSFW
 * CW (`ContentWarning.kt`): `spoiler_text` があるポストは、本文の位置に警告文 (EmojiText) と、その下に primary 色の
   「Show more >」を出す。タップで本文・投票・リンクプレビュー・引用を展開 (`>` は上向きに回り「Show less」)。
@@ -353,6 +362,14 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
+
+## 設定
+
+* 表示設定は `DisplaySettings` (`ui/settings/`) にまとめ、`AppContainer.displaySettings` (StateFlow) から
+  `QuasarAppContent` が `LocalDisplaySettings` として提供する。各 Activity の setContent は `QuasarAppContent(container)` で包む。
+* 今は既定値のみ。設定画面を作るときは永続化 (DataStore 等) して `displaySettings` を更新する。
+  設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)。
+* 同様に通知の取得 API (`NotificationRepository.api`) も将来の設定項目候補。
 
 ## テーマ / 色
 

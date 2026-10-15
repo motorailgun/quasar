@@ -13,7 +13,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
-import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
+import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 
 /** ポスト 1 件とそのスレッド (祖先・リプライツリー) の画面。[openPost] で起動する。 */
 class PostActivity : ComponentActivity() {
@@ -28,7 +28,7 @@ class PostActivity : ComponentActivity() {
             return
         }
         setContent {
-            QuasarTheme {
+            QuasarAppContent(container) {
                 val viewModel: PostViewModel = viewModel(
                     factory = viewModelFactory {
                         initializer { PostViewModel(session, statusId, container.statusRepository) }

@@ -15,6 +15,7 @@ import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +39,7 @@ fun EmojiText(
     color: Color = Color.Unspecified,
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
+    onTextLayout: (TextLayoutResult) -> Unit = {},
 ) {
     val linkColor = MaterialTheme.colorScheme.primary
     val annotated = remember(text, emojis, isHtml, linkColor) {
@@ -63,6 +65,7 @@ fun EmojiText(
         maxLines = maxLines,
         overflow = overflow,
         inlineContent = inlineContent,
+        onTextLayout = onTextLayout,
     )
 }
 

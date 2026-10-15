@@ -70,8 +70,8 @@
     <string name="quote_muted">Hidden because you muted this account.</string>
     <string name="quote_unavailable">This post is unavailable.</string>
     <string name="quote_nested">Quoted another post</string>
-    <string name="cw_show_more">Show more</string>
-    <string name="cw_show_less">Show less</string>
+    <string name="show_more">Show more</string>
+    <string name="show_less">Show less</string>
     <string name="media_sensitive">Sensitive media</string>
     <string name="media_show">Show media</string>
     <string name="media_hide">Hide media</string>

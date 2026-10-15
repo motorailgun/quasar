@@ -7,6 +7,8 @@ import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SessionStore
+import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 
@@ -22,6 +24,9 @@ class AppContainer(context: Context) {
     private val api = MastodonApi(okHttpClient, json)
 
     val sessionStore = SessionStore(context)
+
+    /** 表示設定。今は既定値固定で、設定画面を作ったら永続化した値で更新する。 */
+    val displaySettings = MutableStateFlow(DisplaySettings())
     val timelineRepository = TimelineRepository(api)
     val accountRepository = AccountRepository(api)
     val statusRepository = StatusRepository(api)

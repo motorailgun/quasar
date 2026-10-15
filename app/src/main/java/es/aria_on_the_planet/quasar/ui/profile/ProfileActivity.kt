@@ -13,7 +13,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.post.openPost
-import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
+import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 
 /** アカウントのプロフィール画面。[openProfile] で起動する。 */
 class ProfileActivity : ComponentActivity() {
@@ -28,7 +28,7 @@ class ProfileActivity : ComponentActivity() {
             return
         }
         setContent {
-            QuasarTheme {
+            QuasarAppContent(container) {
                 val viewModel: ProfileViewModel = viewModel(
                     factory = viewModelFactory {
                         initializer { ProfileViewModel(session, accountId, container.accountRepository, container.statusRepository) }

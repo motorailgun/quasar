@@ -48,6 +48,7 @@ import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
 import java.time.Duration
 import java.time.Instant
@@ -118,11 +119,12 @@ fun PostCard(
                 // CW で隠すのは本文・投票。メディアは CW とは独立に sensitive で制御する
                 AnimatedVisibility(visible = expanded) {
                     Column {
-                        EmojiText(
-                            text = post.text,
+                        // 長い本文は設定の行数で折りたたむ
+                        CollapsiblePostText(
+                            html = post.text,
                             emojis = post.emojis,
-                            isHtml = true,
-                            style = MaterialTheme.typography.bodyMedium,
+                            stateKey = post.statusId,
+                            maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
                         )
                         post.poll?.let { poll ->
                             PollView(

@@ -18,6 +18,7 @@ import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.PollOption
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostApplication
 import es.aria_on_the_planet.quasar.domain.model.PreviewCard
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
@@ -81,6 +82,7 @@ fun StatusDto.toDomain(): Post {
         card = body.card?.toDomain(),
         poll = body.poll?.toDomain(),
         quote = body.quote?.toDomain(),
+        application = body.application?.let { PostApplication(it.name, it.website?.takeIf(String::isNotBlank)) },
         viewer = PostViewerState(
             bookmarked = body.bookmarked == true,
             reblogged = body.reblogged == true,

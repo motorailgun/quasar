@@ -32,6 +32,13 @@ data class AccountDto(
     val fields: List<FieldDto> = emptyList(),
 )
 
+/** Status.application: https://docs.joinmastodon.org/entities/Status/#application */
+@Serializable
+data class ApplicationDto(
+    val name: String,
+    val website: String? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Poll/ */
 @Serializable
 data class PollDto(
@@ -140,6 +147,7 @@ data class StatusDto(
     val card: PreviewCardDto? = null,
     val poll: PollDto? = null,
     val quote: QuoteDto? = null,
+    val application: ApplicationDto? = null,
     // 以下は認証時のみ返される
     val favourited: Boolean? = null,
     val reblogged: Boolean? = null,

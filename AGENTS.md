@@ -99,6 +99,7 @@ data class Post(
     val card: PreviewCard?,        // 本文中の URL のリンクプレビュー
     val poll: Poll?,               // poll
     val quote: Quote?,             // quote (Quote / ShallowQuote の両方を QuoteDto で受ける)
+    val application: PostApplication?, // application (name, website)。リモートのポストでは null
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
@@ -279,6 +280,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
     初回表示時は本体ポストまでスクロールする。
   * `PostDetail`: PostCard の全要素 + 大きめの本文・メディア高さ 240dp + 詳細日時 + 区切り線付きアクション行。
     詳細日時は `yyyy MM/dd HH:mm:ss` (システム設定が 12 時間なら `yyyy MM/dd h:mm:ss a`)。
+    日時の隣に投稿アプリ (`Status.application`) を「日時 · アプリ名」で出し、`website` があればリンクにする。
+    application は他サーバからのポストでは返らないため、表示されるのは主にローカルユーザーのポスト。
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。

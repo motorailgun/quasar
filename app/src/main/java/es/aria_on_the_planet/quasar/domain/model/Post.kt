@@ -20,6 +20,8 @@ data class Post(
     val poll: Poll? = null,
     /** 引用しているポスト。 */
     val quote: Quote? = null,
+    /** 投稿に使われたアプリ。他サーバからのポストでは通常 `null`。 */
+    val application: PostApplication? = null,
     /** ログイン中ユーザーがこのポストに対して行った操作。 */
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */
@@ -28,6 +30,12 @@ data class Post(
     val statusId: String = id,
     /** リプライ先の Status ID。リプライでなければ `null`。 */
     val inReplyToId: String? = null,
+)
+
+/** 投稿に使われたアプリ (User Agent)。 */
+data class PostApplication(
+    val name: String,
+    val website: String?,
 )
 
 /** ログイン中ユーザーから見たポストの状態。未認証時はすべて `false`。 */

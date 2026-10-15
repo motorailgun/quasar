@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.mapper
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
+import es.aria_on_the_planet.quasar.data.remote.dto.ApplicationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
@@ -147,5 +148,15 @@ class MappersTest {
         assertNull(shallow.post)
         assertEquals(QuoteState.Unauthorized, QuoteDto(state = "something_new").toDomain().state)
         assertEquals(QuoteState.Pending, QuoteDto(state = "pending").toDomain().state)
+    }
+
+    @Test
+    fun mapsApplication() {
+        fun status(app: ApplicationDto?) =
+            StatusDto(id = "1", createdAt = "2026-10-15T00:00:00Z", account = alice, application = app).toDomain()
+        assertEquals("Web", status(ApplicationDto("Web", null)).application!!.name)
+        assertNull(status(ApplicationDto("Web", "")).application!!.website)
+        assertEquals("https://quasar.example", status(ApplicationDto("Quasar", "https://quasar.example")).application!!.website)
+        assertNull(status(null).application)
     }
 }

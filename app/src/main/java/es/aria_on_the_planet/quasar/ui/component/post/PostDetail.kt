@@ -17,7 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
@@ -120,8 +125,23 @@ fun PostDetail(
         val context = LocalContext.current
         // ロケールや 12/24 時間設定の変更で再計算されるよう Configuration を読む
         LocalConfiguration.current
+        val linkColor = MaterialTheme.colorScheme.primary
+        val time = formatDetailedTime(post.createdAt, is24Hour = DateFormat.is24HourFormat(context))
         Text(
-            text = formatDetailedTime(post.createdAt, is24Hour = DateFormat.is24HourFormat(context)),
+            // 日時 · 投稿に使ったアプリ (website があればリンク)
+            text = buildAnnotatedString {
+                append(time)
+                post.application?.let { app ->
+                    append(" · ")
+                    if (app.website != null) {
+                        withLink(LinkAnnotation.Url(app.website, TextLinkStyles(SpanStyle(color = linkColor)))) {
+                            append(app.name)
+                        }
+                    } else {
+                        append(app.name)
+                    }
+                }
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

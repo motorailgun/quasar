@@ -9,9 +9,19 @@ data class Post(
     /** 本文 (HTML)。カスタム絵文字を含みうる。 */
     val text: String,
     val createdAt: Instant,
+    val repliesCount: Int,
     val boostsCount: Int,
     val reactionsCount: Int,
     val emojis: List<CustomEmoji>,
+    /** ログイン中ユーザーがこのポストに対して行った操作。 */
+    val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */
     val boostedBy: User? = null,
+)
+
+/** ログイン中ユーザーから見たポストの状態。未認証時はすべて `false`。 */
+data class PostViewerState(
+    val bookmarked: Boolean = false,
+    val reblogged: Boolean = false,
+    val favourited: Boolean = false,
 )

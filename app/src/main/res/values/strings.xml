@@ -9,7 +9,10 @@
     <string name="timeline_local">Local</string>
     <string name="timeline_global">Global</string>
     <string name="timeline_error">Failed to load: %1$s</string>
+    <string name="post_replies">Replies</string>
     <string name="post_boosts">Boosts</string>
+    <string name="post_bookmark">Bookmark</string>
+    <string name="post_action_done">Done</string>
     <string name="post_reactions">Favourites</string>
     <string name="post_boosted_by">%1$s boosted</string>
 </resources>

@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Reply
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -22,8 +27,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -67,10 +75,7 @@ fun PostCard(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.size(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Counter(Icons.Outlined.Repeat, stringResource(R.string.post_boosts), post.boostsCount)
-                    Counter(Icons.Outlined.StarOutline, stringResource(R.string.post_reactions), post.reactionsCount)
-                }
+                PostActionRow(post)
             }
         }
     }
@@ -138,21 +143,63 @@ private fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
     }
 }
 
+/** リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。 */
 @Composable
-private fun Counter(icon: ImageVector, label: String, count: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            icon,
-            contentDescription = label,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun PostActionRow(post: Post) {
+    val viewer = post.viewer
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        PostActionIndicator(
+            icon = Icons.AutoMirrored.Outlined.Reply,
+            label = stringResource(R.string.post_replies),
+            count = post.repliesCount,
         )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        PostActionIndicator(
+            icon = if (viewer.reblogged) Icons.Filled.Repeat else Icons.Outlined.Repeat,
+            label = stringResource(R.string.post_boosts),
+            count = post.boostsCount,
+            active = viewer.reblogged,
+            activeColor = MaterialTheme.colorScheme.tertiary,
         )
+        PostActionIndicator(
+            icon = if (viewer.favourited) Icons.Filled.Star else Icons.Outlined.StarOutline,
+            label = stringResource(R.string.post_reactions),
+            count = post.reactionsCount,
+            active = viewer.favourited,
+            activeColor = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.weight(1f))
+        PostActionIndicator(
+            icon = if (viewer.bookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            label = stringResource(R.string.post_bookmark),
+            active = viewer.bookmarked,
+            activeColor = MaterialTheme.colorScheme.secondary,
+        )
+    }
+}
+
+@Composable
+private fun PostActionIndicator(
+    icon: ImageVector,
+    label: String,
+    count: Int? = null,
+    active: Boolean = false,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+) {
+    val color = if (active) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val activeState = stringResource(R.string.post_action_done)
+    Row(
+        modifier = Modifier.semantics { if (active) stateDescription = activeState },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = color)
+        if (count != null) {
+            Spacer(Modifier.width(4.dp))
+            Text(text = count.toString(), style = MaterialTheme.typography.labelMedium, color = color)
+        }
     }
 }
 

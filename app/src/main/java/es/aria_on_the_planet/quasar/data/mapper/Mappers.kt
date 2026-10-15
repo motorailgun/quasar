@@ -5,6 +5,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import es.aria_on_the_planet.quasar.domain.model.User
 import java.net.URI
 import java.time.Instant
@@ -33,9 +34,15 @@ fun StatusDto.toDomain(): Post {
         author = body.account.toDomain(),
         text = body.content,
         createdAt = Instant.parse(body.createdAt),
+        repliesCount = body.repliesCount,
         boostsCount = body.reblogsCount,
         reactionsCount = body.favouritesCount,
         emojis = body.emojis.map { it.toDomain() },
+        viewer = PostViewerState(
+            bookmarked = body.bookmarked == true,
+            reblogged = body.reblogged == true,
+            favourited = body.favourited == true,
+        ),
         boostedBy = if (boosted != null) account.toDomain() else null,
     )
 }

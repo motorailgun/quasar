@@ -61,10 +61,19 @@ data class Post(
     val author: User,              // ユーザー 1 : ポスト N
     val text: String,              // 本文 (HTML)
     val createdAt: Instant,
+    val repliesCount: Int,         // replies_count
     val boostsCount: Int,          // reblogs_count
     val reactionsCount: Int,       // favourites_count (将来絵文字リアクション対応時に拡張)
     val emojis: List<CustomEmoji>,
+    val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
+)
+
+/** ログイン中ユーザーから見た状態。API では認証時のみ返るため、未認証時はすべて false。 */
+data class PostViewerState(
+    val bookmarked: Boolean,       // bookmarked
+    val reblogged: Boolean,        // reblogged
+    val favourited: Boolean,       // favourited
 )
 
 enum class TimelineType { Home, Local, Global }
@@ -72,6 +81,7 @@ enum class TimelineType { Home, Local, Global }
 data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイムライン 1 : ポスト N
 ```
 
+* 件数・`viewer` フラグはブーストの場合も中身 (`reblog`) の値を使う。
 * ブースト (`reblog != null`) は中身のポストを `Post` とし、`boostedBy` にブーストしたユーザーを入れる。
   ページングには元の Status ID が必要なので、`Post.id` は外側の Status ID を使い、表示用 ID と区別しない。
 * `User` は `inServerId + serverUrl` で一意。
@@ -101,7 +111,10 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。
 
 * `PostCard(post: Post, modifier, onUserClick, onPostClick)`
-* 構成: (ブースト表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / ブースト数・リアクション数
+* 構成: (ブースト表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / アクション行
+* アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
+  塗りアイコン + 色付き (ブースト=tertiary, リアクション=primary, ブックマーク=secondary) で表示する。
+  現時点では表示のみで、操作 (favourite/reblog/bookmark API 呼び出し) は未実装。
 * `Post` 以外の状態を持たない (stateless)。
 
 ### PostList (`ui/component/post/PostList.kt`)

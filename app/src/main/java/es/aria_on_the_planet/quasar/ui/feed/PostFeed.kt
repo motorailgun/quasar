@@ -48,6 +48,11 @@ class PostFeed(
         }
     }
 
+    /** 読み込み済みのポストを書き換える (投票結果の反映など)。 */
+    fun updatePosts(transform: (Post) -> Post) {
+        _state.update { it.copy(posts = it.posts.map(transform)) }
+    }
+
     fun loadMore() {
         val current = _state.value
         if (current.isRefreshing || current.isLoadingMore || current.endReached) return

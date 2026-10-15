@@ -125,6 +125,7 @@ fun TimelineScreen(
                     onLoadMore = { viewModel.loadMore(state.selected) },
                     onUserClick = context::openProfile,
                     onPostClick = context::openPost,
+                    onVote = if (viewModel.canVote) viewModel::vote else null,
                     // メディアビューアができるまではブラウザで開く
                     onMediaClick = { media -> runCatching { uriHandler.openUri(media.url) } },
                 )

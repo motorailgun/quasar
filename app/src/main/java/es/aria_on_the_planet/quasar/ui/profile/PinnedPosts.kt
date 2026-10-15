@@ -23,6 +23,7 @@ fun PinnedPosts(
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
+    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     if (posts.isEmpty()) return
     val windowHeight = LocalWindowInfo.current.containerSize.height
@@ -37,6 +38,7 @@ fun PinnedPosts(
                         onUserClick = onUserClick,
                         onPostClick = onPostClick,
                         onMediaClick = onMediaClick,
+                        onVote = onVote,
                     )
                     if (index != posts.lastIndex) HorizontalDivider()
                 }

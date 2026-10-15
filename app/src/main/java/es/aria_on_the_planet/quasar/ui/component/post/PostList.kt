@@ -44,6 +44,7 @@ fun PostList(
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
+    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     header: (LazyListScope.() -> Unit)? = null,
 ) {
     val currentOnLoadMore by rememberUpdatedState(onLoadMore)
@@ -73,6 +74,7 @@ fun PostList(
                 onUserClick = onUserClick,
                 onPostClick = onPostClick,
                 onMediaClick = onMediaClick,
+                onVote = onVote,
             )
             HorizontalDivider()
         }

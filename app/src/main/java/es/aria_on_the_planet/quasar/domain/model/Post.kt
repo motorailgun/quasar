@@ -17,6 +17,9 @@ data class Post(
     val mediaAttachments: List<MediaAttachment> = emptyList(),
     /** 本文中の URL のリンクプレビュー。 */
     val card: PreviewCard? = null,
+    val poll: Poll? = null,
+    /** 引用しているポスト。 */
+    val quote: Quote? = null,
     /** ログイン中ユーザーがこのポストに対して行った操作。 */
     val viewer: PostViewerState = PostViewerState(),
     /** ブーストされたポストの場合、ブーストしたユーザー。 */

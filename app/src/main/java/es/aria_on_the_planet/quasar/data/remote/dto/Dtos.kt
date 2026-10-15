@@ -32,6 +32,38 @@ data class AccountDto(
     val fields: List<FieldDto> = emptyList(),
 )
 
+/** https://docs.joinmastodon.org/entities/Poll/ */
+@Serializable
+data class PollDto(
+    val id: String,
+    @SerialName("expires_at") val expiresAt: String? = null,
+    val expired: Boolean = false,
+    val multiple: Boolean = false,
+    @SerialName("votes_count") val votesCount: Int = 0,
+    @SerialName("voters_count") val votersCount: Int? = null,
+    val options: List<PollOptionDto> = emptyList(),
+    val emojis: List<CustomEmojiDto> = emptyList(),
+    val voted: Boolean? = null,
+    @SerialName("own_votes") val ownVotes: List<Int>? = null,
+)
+
+@Serializable
+data class PollOptionDto(
+    val title: String,
+    @SerialName("votes_count") val votesCount: Int? = null,
+)
+
+/**
+ * https://docs.joinmastodon.org/entities/Quote/ と https://docs.joinmastodon.org/entities/ShallowQuote/ の両方を受ける。
+ * Quote は `quoted_status`、ShallowQuote は `quoted_status_id` を持つ。
+ */
+@Serializable
+data class QuoteDto(
+    val state: String,
+    @SerialName("quoted_status") val quotedStatus: StatusDto? = null,
+    @SerialName("quoted_status_id") val quotedStatusId: String? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Context/ */
 @Serializable
 data class ContextDto(
@@ -106,6 +138,8 @@ data class StatusDto(
     val reblog: StatusDto? = null,
     @SerialName("media_attachments") val mediaAttachments: List<MediaAttachmentDto> = emptyList(),
     val card: PreviewCardDto? = null,
+    val poll: PollDto? = null,
+    val quote: QuoteDto? = null,
     // 以下は認証時のみ返される
     val favourited: Boolean? = null,
     val reblogged: Boolean? = null,

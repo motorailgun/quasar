@@ -28,7 +28,7 @@ es.aria_on_the_planet.quasar
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository
-├── domain/model/                   UI が扱うモデル (User, Profile, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment)
+├── domain/model/                   UI が扱うモデル (User, Profile, Post, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -37,6 +37,8 @@ es.aria_on_the_planet.quasar
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
     │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
     │   ├── post/PostTime.kt        詳細日時のフォーマット
+    │   ├── post/QuotedPost.kt      引用ポストの縮小表示 / 表示不可時のプレースホルダ
+    │   ├── poll/PollView.kt        投票 (選択肢 / 結果) + PollMath.kt (割合・残り時間)
     │   ├── scaffold/DetailScaffold.kt 詳細画面共通の骨組み (戻る付きトップバー + スクロールでタイトル切替 + PTR)
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem)
@@ -95,6 +97,8 @@ data class Post(
     val emojis: List<CustomEmoji>,
     val mediaAttachments: List<MediaAttachment>,  // media_attachments (0〜15 件)
     val card: PreviewCard?,        // 本文中の URL のリンクプレビュー
+    val poll: Poll?,               // poll
+    val quote: Quote?,             // quote (Quote / ShallowQuote の両方を QuoteDto で受ける)
     val viewer: PostViewerState,   // 自分がこのポストに行った操作
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
@@ -115,6 +119,17 @@ data class PreviewCard(
     val imageUrl: String?,         // image
     val blurhash: String?,
 )
+
+data class Poll(
+    val id: String, val expiresAt: Instant?, val expired: Boolean, val multiple: Boolean,
+    val votesCount: Int, val votersCount: Int?, val options: List<PollOption>, val emojis: List<CustomEmoji>,
+    val voted: Boolean, val ownVotes: List<Int>,   // voted / own_votes は認証時のみ。未認証は false / 空
+)
+data class PollOption(val title: String, val votesCount: Int? /* 結果非公開中は null */)
+
+data class Quote(val state: QuoteState, val post: Post?)   // post は accepted 等で quoted_status がある時のみ
+enum class QuoteState { Pending, Accepted, Rejected, Revoked, Deleted, Unauthorized, BlockedAccount, BlockedDomain, MutedAccount }
+// 未知の state は Unauthorized 扱い (API ドキュメントの指示)
 
 enum class MediaType { Image, Video, Gifv, Audio, Unknown }
 
@@ -161,6 +176,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
 | ポスト | `GET /api/v1/statuses/:id` |
+| 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
@@ -184,8 +200,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。
 
 * `PostCard(post: Post, modifier, mediaHeight: Dp = PostCardDefaults.MediaHeight, onUserClick, onPostClick, onMediaClick)`
-* 構成: (ブースト表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) /
-  添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / アクション行
+* 構成: (ブースト表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / 投票 (PollView) /
+  添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
 * `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=tertiary, リアクション=primary, ブックマーク=secondary) で表示する。
@@ -199,6 +215,27 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
+
+### PollView (`ui/component/poll/PollView.kt`)
+* `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。
+* 結果表示: 終了済み・投票済み・`onVote == null` (未ログイン、引用内) のとき。割合バー (最多得票は primaryContainer +
+  太字、0% でも細いバーを出す)・右端に割合 (10% 未満は小数 1 桁)・自分の選択にチェック。複数選択の分母は voters_count。
+* 投票: 枠線のピル型ボタンを中央寄せで並べる。単一選択はタップで即投票、複数選択はトグルで選んで「Vote」。
+  投票中はボタン無効、失敗時はエラー文言。
+* フッタ: 「N votes · 6 days left」/「Final results」(複数選択は「N people」)。
+* 投票処理は ViewModel の `suspend fun vote(post, choices)` (`ui/feed/PollVoting.kt` の `submitVote`)。
+  viewModelScope 上で実行し、成功したら `Post.withPoll()` で各一覧 (引用先含む) の該当投票を差し替える。
+  画面側は `onVote = if (viewModel.canVote) viewModel::vote else null` で渡す。
+
+### QuotedPost (`ui/component/post/QuotedPost.kt`)
+* 角丸の OutlinedCard に、小さいアイコン (20dp) + 表示名 + @acct · 時刻 / 本文 / 投票 (結果のみ) / メディア (0.75 倍の高さ)。
+  タップで引用元のポスト詳細を開く。カード (リンクプレビュー) とアクション行は出さない。
+* 本文側 (ヘッダ・本文・投票) の高さは呼び出し側の `mediaHeight` (添付画像と同じ高さ) を上限とし、超える分は
+  下端フェードで切る。メディアはこの上限とは独立して、本文の下に常に全体を表示する。
+* 引用の引用はさらに入れ子にせず、プレースホルダ 1 行。
+* 表示不可 (pending / deleted / blocked / muted / その他) は状態に応じた文言のプレースホルダ。
+* 本文の引用フォールバック「RE: <リンク>」は `simplifyMastodonHtml` で除去する
+  (Mastodon は `<p class="quote-inline">`、Misskey 由来は `<br><br><span class="quote-inline">`)。
 
 ### LinkPreviewCard (`ui/component/card/LinkPreviewCard.kt`)
 * `LinkPreviewCard(card: PreviewCard, modifier, onClick: ((PreviewCard) -> Unit)? = null)`

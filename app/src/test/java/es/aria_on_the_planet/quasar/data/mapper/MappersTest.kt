@@ -5,7 +5,11 @@ import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
+import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
+import es.aria_on_the_planet.quasar.data.remote.dto.PollOptionDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
+import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
+import es.aria_on_the_planet.quasar.domain.model.QuoteState
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
@@ -115,5 +119,33 @@ class MappersTest {
 
         val withHeader = alice.copy(header = "https://remote.example/h.png").toProfile()
         assertEquals("https://remote.example/h.png", withHeader.headerUrl)
+    }
+
+    @Test
+    fun mapsPollAndQuote() {
+        val quoted = StatusDto(id = "q", createdAt = "2026-10-11T00:00:00Z", account = bob, content = "<p>quoted</p>")
+        val post = StatusDto(
+            id = "10", createdAt = "2026-10-15T00:00:00Z", account = alice,
+            poll = PollDto(
+                id = "p", expiresAt = "2026-10-21T00:00:00.000Z", multiple = true, votesCount = 3, votersCount = 2,
+                options = listOf(PollOptionDto("A", 2), PollOptionDto("B", null)), ownVotes = listOf(0), voted = true,
+            ),
+            quote = QuoteDto(state = "accepted", quotedStatus = quoted),
+        ).toDomain()
+        val poll = post.poll!!
+        assertEquals(true, poll.multiple)
+        assertEquals(2, poll.votersCount)
+        assertEquals(listOf(2, null), poll.options.map { it.votesCount })
+        assertEquals(listOf(0), poll.ownVotes)
+        assertEquals(true, poll.voted)
+        assertEquals("2026-10-21T00:00:00Z", poll.expiresAt.toString())
+        assertEquals(QuoteState.Accepted, post.quote!!.state)
+        assertEquals("q", post.quote!!.post!!.statusId)
+
+        // ShallowQuote (quoted_status_id のみ) と未知の state
+        val shallow = QuoteDto(state = "accepted", quotedStatusId = "q").toDomain()
+        assertNull(shallow.post)
+        assertEquals(QuoteState.Unauthorized, QuoteDto(state = "something_new").toDomain().state)
+        assertEquals(QuoteState.Pending, QuoteDto(state = "pending").toDomain().state)
     }
 }

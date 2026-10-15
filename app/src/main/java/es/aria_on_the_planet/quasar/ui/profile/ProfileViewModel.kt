@@ -4,12 +4,15 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.repository.StatusRepository
+import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.feed.submitVote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -42,7 +45,11 @@ class ProfileViewModel(
     private val session: Session,
     private val accountId: String,
     private val repository: AccountRepository,
+    private val statusRepository: StatusRepository,
 ) : ViewModel() {
+
+    /** 投票できるか (要ログイン)。 */
+    val canVote: Boolean = session.accessToken != null
 
     private val profile = MutableStateFlow(ProfileState())
     private val extras = MutableStateFlow(ProfileExtras())
@@ -70,6 +77,12 @@ class ProfileViewModel(
     }
 
     fun loadMore() = posts.loadMore()
+
+    suspend fun vote(post: Post, choices: List<Int>): Boolean =
+        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+            posts.updatePosts { it.withPoll(poll) }
+            extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map { it.withPoll(poll) }) }
+        }
 
     private fun loadProfile() {
         if (profile.value.isLoading) return

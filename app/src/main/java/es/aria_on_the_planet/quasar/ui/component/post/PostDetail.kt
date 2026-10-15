@@ -25,6 +25,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
+import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 
 object PostDetailDefaults {
@@ -40,7 +41,9 @@ fun PostDetail(
     modifier: Modifier = Modifier,
     mediaHeight: Dp = PostDetailDefaults.MediaHeight,
     onUserClick: (User) -> Unit = {},
+    onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
+    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     Column(
         modifier = modifier
@@ -85,6 +88,13 @@ fun PostDetail(
             isHtml = true,
             style = MaterialTheme.typography.bodyLarge,
         )
+        post.poll?.let { poll ->
+            PollView(
+                poll = poll,
+                onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
         if (post.mediaAttachments.isNotEmpty()) {
             MediaAttachments(
                 attachments = post.mediaAttachments,
@@ -95,6 +105,16 @@ fun PostDetail(
         }
         post.card?.let { card ->
             LinkPreviewCard(card = card, modifier = Modifier.padding(top = 12.dp))
+        }
+        post.quote?.let { quote ->
+            QuotedPost(
+                quote = quote,
+                mediaHeight = mediaHeight * 0.75f,
+                maxHeight = mediaHeight,
+                onPostClick = onPostClick,
+                onMediaClick = onMediaClick,
+                modifier = Modifier.padding(top = 12.dp),
+            )
         }
         Spacer(Modifier.size(12.dp))
         val context = LocalContext.current

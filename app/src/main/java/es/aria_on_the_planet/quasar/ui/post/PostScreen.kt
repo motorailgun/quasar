@@ -54,6 +54,7 @@ fun PostScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val thread = state.thread
+    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
     val mainIndex = thread?.ancestors?.size ?: 0
 
     // 初回表示時は祖先ではなく本体のポストを先頭に出す
@@ -101,6 +102,7 @@ fun PostScreen(
                             onUserClick = onUserClick,
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
+                            onVote = onVote,
                         )
                     }
                     item(key = "main", contentType = "main") {
@@ -112,7 +114,9 @@ fun PostScreen(
                                 Modifier
                             },
                             onUserClick = onUserClick,
+                            onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
+                            onVote = onVote,
                         )
                         HorizontalDivider()
                     }
@@ -145,6 +149,7 @@ fun PostScreen(
                             onUserClick = onUserClick,
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
+                            onVote = onVote,
                         )
                     }
                 }

@@ -31,7 +31,7 @@ class ProfileActivity : ComponentActivity() {
             QuasarTheme {
                 val viewModel: ProfileViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { ProfileViewModel(session, accountId, container.accountRepository) }
+                        initializer { ProfileViewModel(session, accountId, container.accountRepository, container.statusRepository) }
                     },
                 )
                 val uriHandler = LocalUriHandler.current

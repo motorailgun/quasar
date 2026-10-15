@@ -2,11 +2,15 @@ package es.aria_on_the_planet.quasar.ui.timeline
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
+import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.feed.submitVote
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +28,11 @@ data class TimelineScreenState(
 class TimelineViewModel(
     private val session: Session,
     private val repository: TimelineRepository,
+    private val statusRepository: StatusRepository,
 ) : ViewModel() {
+
+    /** 投票できるか (要ログイン)。 */
+    val canVote: Boolean = session.accessToken != null
 
     private val available = TimelineType.entries.filter {
         it != TimelineType.Home || session.accessToken != null
@@ -59,6 +67,12 @@ class TimelineViewModel(
     fun refresh(type: TimelineType = selected.value) = feeds.getValue(type).refresh()
 
     fun loadMore(type: TimelineType = selected.value) = feeds.getValue(type).loadMore()
+
+    suspend fun vote(post: Post, choices: List<Int>): Boolean =
+        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+            // 同じポストが複数のタイムラインに載っていることがあるので全てに反映する
+            feeds.values.forEach { feed -> feed.updatePosts { it.withPoll(poll) } }
+        }
 
     private fun snapshot() = TimelineScreenState(
         selected = selected.value,

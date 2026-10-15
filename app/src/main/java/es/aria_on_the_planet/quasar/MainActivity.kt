@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
                     val viewModel: TimelineViewModel = viewModel(
                         key = "${current.serverUrl}|${current.accessToken.hashCode()}",
                         factory = viewModelFactory {
-                            initializer { TimelineViewModel(current, container.timelineRepository) }
+                            initializer { TimelineViewModel(current, container.timelineRepository, container.statusRepository) }
                         },
                     )
                     TimelineScreen(viewModel = viewModel, onLogout = container.sessionStore::clear)

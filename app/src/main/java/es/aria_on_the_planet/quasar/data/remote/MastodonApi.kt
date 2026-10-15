@@ -3,12 +3,15 @@ package es.aria_on_the_planet.quasar.data.remote
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
+import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
+import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.RequestBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
@@ -54,6 +57,12 @@ class MastodonApi(
     suspend fun statusContext(serverUrl: String, accessToken: String?, id: String): ContextDto =
         get(serverUrl, accessToken, "api/v1/statuses/$id/context") {}
 
+    /** https://docs.joinmastodon.org/methods/polls/#vote (要認証) */
+    suspend fun votePoll(serverUrl: String, accessToken: String, pollId: String, choices: List<Int>): PollDto =
+        post(serverUrl, accessToken, "api/v1/polls/$pollId/votes") {
+            choices.forEach { add("choices[]", it.toString()) }
+        }
+
     /** https://docs.joinmastodon.org/methods/accounts/#get */
     suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =
         get(serverUrl, accessToken, "api/v1/accounts/$id") {}
@@ -97,23 +106,38 @@ class MastodonApi(
         accessToken: String?,
         path: String,
         crossinline query: HttpUrl.Builder.() -> Unit,
-    ): T = withContext(Dispatchers.IO) {
+    ): T {
         val url = serverUrl.toHttpUrl().newBuilder()
             .addPathSegments(path)
             .apply(query)
             .build()
-        val request = Request.Builder()
-            .url(url)
-            .apply { accessToken?.let { header("Authorization", "Bearer $it") } }
-            .build()
-        client.newCall(request).execute().use { response ->
-            val body = response.body.string()
-            if (!response.isSuccessful) {
-                throw MastodonApiException(response.code, "HTTP ${response.code}: $body")
-            }
-            json.decodeFromString<T>(body)
-        }
+        return execute(Request.Builder().url(url), accessToken)
     }
+
+    private suspend inline fun <reified T> post(
+        serverUrl: String,
+        accessToken: String?,
+        path: String,
+        crossinline form: FormBody.Builder.() -> Unit,
+    ): T {
+        val url = serverUrl.toHttpUrl().newBuilder().addPathSegments(path).build()
+        val body: RequestBody = FormBody.Builder().apply(form).build()
+        return execute(Request.Builder().url(url).post(body), accessToken)
+    }
+
+    private suspend inline fun <reified T> execute(builder: Request.Builder, accessToken: String?): T =
+        withContext(Dispatchers.IO) {
+            val request = builder
+                .apply { accessToken?.let { header("Authorization", "Bearer $it") } }
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body.string()
+                if (!response.isSuccessful) {
+                    throw MastodonApiException(response.code, "HTTP ${response.code}: $body")
+                }
+                json.decodeFromString<T>(body)
+            }
+        }
 
     companion object {
         const val DEFAULT_LIMIT = 40

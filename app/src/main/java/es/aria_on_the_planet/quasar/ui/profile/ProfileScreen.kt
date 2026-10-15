@@ -41,6 +41,7 @@ fun ProfileScreen(
     val listState = rememberLazyListState()
     val profile = state.profile.profile
     val posts = state.posts
+    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canVote) viewModel::vote else null
 
     DetailScaffold(
         onBack = onBack,
@@ -66,6 +67,7 @@ fun ProfileScreen(
                 onUserClick = onUserClick,
                 onPostClick = onPostClick,
                 onMediaClick = onMediaClick,
+                onVote = onVote,
                 header = {
                     item(key = "profile_header", contentType = "profile_header") {
                         ProfileHeader(profile, followersYouFollow = state.extras.followersYouFollow)
@@ -78,6 +80,7 @@ fun ProfileScreen(
                                 onUserClick = onUserClick,
                                 onPostClick = onPostClick,
                                 onMediaClick = onMediaClick,
+                                onVote = onVote,
                             )
                         }
                     }

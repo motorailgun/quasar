@@ -35,4 +35,14 @@ class EmojiAnnotatedStringTest {
             simplifyMastodonHtml(html),
         )
     }
+
+    @Test
+    fun removesQuoteInlineFallback() {
+        val html = """<p class="quote-inline">RE: <a href="https://e/@a/1"><span class="invisible">https://</span><span class="ellipsis">e/@a/1</span></a></p><p>body</p>"""
+        assertEquals("<p>body</p>", simplifyMastodonHtml(html))
+
+        // Misskey 由来
+        val misskey = """本文<br><br><span class="quote-inline">RE: <a href="https://m/notes/1">https://m/notes/1</a></span>"""
+        assertEquals("本文", simplifyMastodonHtml(misskey))
+    }
 }

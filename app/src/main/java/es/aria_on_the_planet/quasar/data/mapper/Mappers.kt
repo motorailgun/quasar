@@ -6,17 +6,23 @@ import es.aria_on_the_planet.quasar.data.remote.dto.FieldDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaMetaDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
+import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
+import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
 import es.aria_on_the_planet.quasar.domain.model.MediaType
+import es.aria_on_the_planet.quasar.domain.model.Poll
+import es.aria_on_the_planet.quasar.domain.model.PollOption
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PreviewCard
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
+import es.aria_on_the_planet.quasar.domain.model.Quote
+import es.aria_on_the_planet.quasar.domain.model.QuoteState
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import es.aria_on_the_planet.quasar.domain.model.User
 import java.net.URI
@@ -73,6 +79,8 @@ fun StatusDto.toDomain(): Post {
         emojis = body.emojis.map { it.toDomain() },
         mediaAttachments = body.mediaAttachments.map { it.toDomain() },
         card = body.card?.toDomain(),
+        poll = body.poll?.toDomain(),
+        quote = body.quote?.toDomain(),
         viewer = PostViewerState(
             bookmarked = body.bookmarked == true,
             reblogged = body.reblogged == true,
@@ -83,6 +91,35 @@ fun StatusDto.toDomain(): Post {
         inReplyToId = body.inReplyToId,
     )
 }
+
+fun PollDto.toDomain() = Poll(
+    id = id,
+    expiresAt = expiresAt?.let { parseInstantOrNull(it) },
+    expired = expired,
+    multiple = multiple,
+    votesCount = votesCount,
+    votersCount = votersCount,
+    options = options.map { PollOption(it.title, it.votesCount) },
+    emojis = emojis.map { it.toDomain() },
+    voted = voted == true,
+    ownVotes = ownVotes.orEmpty(),
+)
+
+fun QuoteDto.toDomain() = Quote(
+    state = when (state) {
+        "pending" -> QuoteState.Pending
+        "accepted" -> QuoteState.Accepted
+        "rejected" -> QuoteState.Rejected
+        "revoked" -> QuoteState.Revoked
+        "deleted" -> QuoteState.Deleted
+        "blocked_account" -> QuoteState.BlockedAccount
+        "blocked_domain" -> QuoteState.BlockedDomain
+        "muted_account" -> QuoteState.MutedAccount
+        // 未知の値は unauthorized として扱う (API ドキュメントの指示)
+        else -> QuoteState.Unauthorized
+    },
+    post = quotedStatus?.toDomain(),
+)
 
 fun PreviewCardDto.toDomain() = PreviewCard(
     url = url,

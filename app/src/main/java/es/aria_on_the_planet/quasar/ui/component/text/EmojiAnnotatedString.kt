@@ -30,10 +30,22 @@ internal fun AnnotatedString.replaceEmojiShortcodes(emojis: List<CustomEmoji>): 
     }
 }
 
+/**
+ * 引用に対応していないクライアント向けの「RE: <リンク>」。引用は別途表示するので取り除く。
+ * Mastodon は `<p class="quote-inline">`、Misskey 由来は `<br><br><span class="quote-inline">` で来る。
+ */
+private val QuoteInlineRegex = Regex(
+    """(?:<br\s*/?>\s*)*<(p|span) class="quote-inline">.*?</\1>""",
+    RegexOption.DOT_MATCHES_ALL,
+)
 private val InvisibleSpanRegex = Regex("""<span class="invisible">[^<]*</span>""")
 private val EllipsisSpanRegex = Regex("""<span class="ellipsis">([^<]*)</span>""")
 
-/** Mastodon が URL 短縮表示用に付ける invisible / ellipsis span を表示用に整形する。 */
+/**
+ * Mastodon の HTML を表示用に整形する。
+ * URL 短縮表示用の invisible / ellipsis span の処理と、引用のフォールバック段落の除去を行う。
+ */
 internal fun simplifyMastodonHtml(html: String): String = html
+    .replace(QuoteInlineRegex, "")
     .replace(InvisibleSpanRegex, "")
     .replace(EllipsisSpanRegex, "$1…")

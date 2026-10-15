@@ -38,4 +38,34 @@
     <string name="post_title">Post</string>
     <string name="post_no_replies">No replies yet</string>
     <string name="post_error">Failed to load post: %1$s</string>
+    <string name="poll_vote">Vote</string>
+    <string name="poll_vote_failed">Couldn\'t submit your vote</string>
+    <string name="poll_final_results">Final results</string>
+    <string name="poll_your_choice">Your choice</string>
+    <plurals name="poll_votes">
+        <item quantity="one">%d vote</item>
+        <item quantity="other">%d votes</item>
+    </plurals>
+    <plurals name="poll_voters">
+        <item quantity="one">%d person</item>
+        <item quantity="other">%d people</item>
+    </plurals>
+    <plurals name="poll_days_left">
+        <item quantity="one">%d day left</item>
+        <item quantity="other">%d days left</item>
+    </plurals>
+    <plurals name="poll_hours_left">
+        <item quantity="one">%d hour left</item>
+        <item quantity="other">%d hours left</item>
+    </plurals>
+    <plurals name="poll_minutes_left">
+        <item quantity="one">%d minute left</item>
+        <item quantity="other">%d minutes left</item>
+    </plurals>
+    <string name="quote_pending">This quote is awaiting approval from the author.</string>
+    <string name="quote_deleted">This post has been deleted.</string>
+    <string name="quote_blocked">Hidden because you blocked this account or server.</string>
+    <string name="quote_muted">Hidden because you muted this account.</string>
+    <string name="quote_unavailable">This post is unavailable.</string>
+    <string name="quote_nested">Quoted another post</string>
 </resources>

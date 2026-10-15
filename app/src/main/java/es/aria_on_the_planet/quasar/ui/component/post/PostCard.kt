@@ -43,6 +43,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
+import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import java.time.Duration
 import java.time.Instant
@@ -56,6 +57,7 @@ object PostCardDefaults {
  *
  * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
  * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
+ * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (未ログイン時など)。
  */
 @Composable
 fun PostCard(
@@ -66,6 +68,7 @@ fun PostCard(
     onUserClick: (User) -> Unit = {},
     onPostClick: (Post) -> Unit = {},
     onMediaClick: (MediaAttachment) -> Unit = {},
+    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
 ) {
     Column(
         modifier = modifier
@@ -99,6 +102,13 @@ fun PostCard(
                     isHtml = true,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                post.poll?.let { poll ->
+                    PollView(
+                        poll = poll,
+                        onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
                 if (post.mediaAttachments.isNotEmpty()) {
                     MediaAttachments(
                         attachments = post.mediaAttachments,
@@ -109,6 +119,17 @@ fun PostCard(
                 }
                 post.card?.let { card ->
                     LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
+                }
+                post.quote?.let { quote ->
+                    QuotedPost(
+                        quote = quote,
+                        mediaHeight = mediaHeight * 0.75f,
+                        // 引用の高さは添付画像と同じ高さまで
+                        maxHeight = mediaHeight,
+                        onPostClick = onPostClick,
+                        onMediaClick = onMediaClick,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
                 Spacer(Modifier.size(8.dp))
                 PostActionRow(post)
@@ -265,7 +286,7 @@ private fun PostActionIndicator(
     }
 }
 
-private fun relativeTime(instant: Instant, now: Instant = Instant.now()): String {
+internal fun relativeTime(instant: Instant, now: Instant = Instant.now()): String {
     val d = Duration.between(instant, now)
     return when {
         d.toMinutes() < 1 -> "${d.seconds.coerceAtLeast(0)}s"

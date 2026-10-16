@@ -6,13 +6,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 
-/** 投稿画面。[openComposer] で起動する。要ログイン。 */
+/**
+ * 単独の投稿画面。[openComposer] で起動する。要ログイン。
+ * 下書きはクイック投稿バーと共有する ([DraftStore])。メイン画面ではバーから同じ画面内でフル画面に広げるので、
+ * これはそれ以外の入口 (今後のリプライ等) 用。
+ */
 class ComposerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -23,24 +26,21 @@ class ComposerActivity : ComponentActivity() {
             finish()
             return
         }
+        container.draftStore.open(session)
         setContent {
             QuasarAppContent(container, inlinePlayback = false) {
-                val viewModel: ComposerViewModel = viewModel(
-                    factory = viewModelFactory {
-                        initializer {
-                            ComposerViewModel(
-                                session,
-                                container.accountRepository,
-                                container.instanceRepository,
-                                container.emojiRepository,
-                                container.statusRepository,
-                                container.mediaRepository,
-                                container::uploadSource,
-                            )
-                        }
-                    },
-                )
-                ComposerScreen(viewModel = viewModel, onClose = ::finish)
+                val draft by container.draftStore.current.collectAsStateWithLifecycle()
+                draft?.let {
+                    ComposerScreen(
+                        session = it,
+                        onClose = ::finish,
+                        onFinish = {
+                            container.draftStore.finish()
+                            finish()
+                        },
+                        keepDraftOnClose = false,
+                    )
+                }
             }
         }
     }

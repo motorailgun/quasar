@@ -2,8 +2,6 @@ package es.aria_on_the_planet.quasar.ui.composer
 
 import android.net.Uri
 import android.util.Log
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
@@ -20,7 +18,9 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.ComposerState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,14 +35,22 @@ data class ComposerScreenState(
     val emojis: List<CustomEmoji> = emptyList(),
     val limits: ComposeLimits = ComposeLimits(),
     val sending: Boolean = false,
-    /** 送信失敗の内容。表示したら [ComposerViewModel.errorShown] で消す。 */
+    /** 送信失敗の内容。表示したら [ComposerSession.errorShown] で消す。 */
     val error: String? = null,
     /** 投稿できた (画面を閉じる)。 */
     val posted: Boolean = false,
 )
 
-class ComposerViewModel(
+/**
+ * 書きかけの投稿 1 つ分 (入力内容・添付のアップロード・送信)。画面からは独立していて、クイック投稿バーと
+ * フルの投稿画面が同じものを共有する (バーから引き上げても、アップロード中の添付ごと続きを書ける)。
+ *
+ * [DraftStore] が作って持ち、投稿・破棄したら [close] して新しいものに替える。処理は [scope] 上で動くので、
+ * 画面を切り替えても止まらない。
+ */
+class ComposerSession(
     private val session: Session,
+    private val scope: CoroutineScope,
     private val accountRepository: AccountRepository,
     private val instanceRepository: InstanceRepository,
     private val emojiRepository: EmojiRepository,
@@ -50,12 +58,12 @@ class ComposerViewModel(
     private val mediaRepository: MediaRepository,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
-) : ViewModel() {
-    /** 入力内容。画面回転で消えないよう ViewModel が持つ。 */
+) {
+    /** 入力内容。 */
     val composer = ComposerState()
 
     private val uploads = AttachmentUploads(
-        scope = viewModelScope,
+        scope = scope,
         attachments = { composer.attachments },
         setAttachments = { composer.attachments = it },
         limits = { _state.value.limits },
@@ -82,16 +90,16 @@ class ComposerViewModel(
     private var lastAttempt: Pair<PostDraft, String>? = null
 
     init {
-        viewModelScope.launch {
+        scope.launch {
             // 取得できなければ既定値のまま (最終的な判定はサーバが行う)
             runCatchingLogged("instance") { instanceRepository.instance(session.serverUrl) }
                 ?.let { info -> _state.update { it.copy(limits = info.composeLimits) } }
         }
-        viewModelScope.launch {
+        scope.launch {
             runCatchingLogged("emojis") { emojiRepository.pickerEmojis(session.serverUrl) }
                 ?.let { emojis -> _state.update { it.copy(emojis = emojis) } }
         }
-        viewModelScope.launch {
+        scope.launch {
             val visibilityBefore = composer.visibility
             val sensitiveBefore = composer.sensitive
             runCatchingLogged("account") { accountRepository.fetchMe(session) }?.let { me ->
@@ -110,7 +118,7 @@ class ComposerViewModel(
         val key = lastAttempt?.takeIf { it.first == draft }?.second ?: UUID.randomUUID().toString()
         lastAttempt = draft to key
         _state.update { it.copy(sending = true, error = null) }
-        viewModelScope.launch {
+        scope.launch {
             try {
                 statusRepository.publish(session, draft, key)
                 _state.update { it.copy(sending = false, posted = true) }
@@ -128,7 +136,7 @@ class ComposerViewModel(
         val attached = composer.attachments.mapNotNullTo(HashSet()) { it.previewUri }
         val added = uris.filter { it.toString() !in attached }
         if (added.isEmpty()) return
-        viewModelScope.launch {
+        scope.launch {
             val sources = runCatchingLogged("media") {
                 withContext(Dispatchers.IO) { added.map(openUploadSource) }
             } ?: return@launch
@@ -152,6 +160,11 @@ class ComposerViewModel(
         _state.update { it.copy(error = null) }
     }
 
+    /** アップロード等を止める。以後は使わない。 */
+    fun close() {
+        scope.cancel()
+    }
+
     /** Mastodon のエラー応答 (`{"error": "..."}`) ならその文言、それ以外は例外のメッセージ。 */
     private fun Exception.userMessage(): String =
         (this as? MastodonApiException)?.message?.let { ErrorField.find(it)?.groupValues?.get(1) }
@@ -168,7 +181,7 @@ class ComposerViewModel(
     }
 
     private companion object {
-        const val TAG = "ComposerViewModel"
+        const val TAG = "ComposerSession"
         val ErrorField = Regex(""""error"\s*:\s*"((?:[^"\\]|\\.)*)"""")
     }
 }

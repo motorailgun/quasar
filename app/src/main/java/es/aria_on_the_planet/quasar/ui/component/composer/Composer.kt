@@ -26,7 +26,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
@@ -211,14 +210,7 @@ fun Composer(
         EmojiPickerSheet(
             emojis = emojis,
             // 選んだ絵文字は直前に入力していた欄のカーソル位置へ入れる (シートは開いたままで、続けて選べる)
-            onSelect = { emoji ->
-                val field = targetField
-                val (text, cursor) = insertEmojiAtCursor(field.text, field.selection, emoji.shortcode)
-                field.edit {
-                    replace(0, length, text)
-                    selection = TextRange(cursor)
-                }
-            },
+            onSelect = { emoji -> targetField.insertEmoji(emoji) },
             onDismiss = {
                 pickerOpen = false
                 // 入力していた欄へ戻し、続けて打てるようにする

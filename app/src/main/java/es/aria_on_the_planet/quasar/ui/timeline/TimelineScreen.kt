@@ -1,6 +1,18 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +29,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
@@ -25,7 +36,6 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -44,19 +54,27 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,7 +83,9 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
-import es.aria_on_the_planet.quasar.ui.composer.openComposer
+import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
+import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
+import es.aria_on_the_planet.quasar.ui.composer.QuickPostBar
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
@@ -79,6 +99,8 @@ import kotlin.math.abs
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     onLogout: () -> Unit,
+    composer: ComposerSession? = null,
+    onDraftFinished: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -106,64 +128,129 @@ fun TimelineScreen(
         if (error != null && state.current.items.isNotEmpty()) snackbarHostState.showSnackbar(error)
     }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.app_name)) },
-                    actions = {
-                        IconButton(onClick = onLogout) {
-                            Icon(Icons.AutoMirrored.Outlined.Logout, stringResource(R.string.logout))
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-                TimelineSelector(
-                    available = state.available,
-                    pagerState = pagerState,
-                    onSelect = { column ->
-                        viewModel.select(column)
-                        scope.launch {
-                            pagerState.animateScrollToPage(state.available.indexOf(column), animationSpec = pageSpring)
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+    // クイック投稿バー: 下に浮かべ、後ろの一覧をぼかす。ピルを引き上げると同じ画面内でフルの投稿画面に広がる
+    var composerExpanded by rememberSaveable { mutableStateOf(false) }
+    val hazeState = rememberHazeState()
+    var barHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    if (composer != null) {
+        val draftState by composer.state.collectAsStateWithLifecycle()
+        // バーから投稿した (フル画面からの投稿はフル画面が onFinish で知らせる)
+        LaunchedEffect(draftState.posted) {
+            if (draftState.posted && !composerExpanded) onDraftFinished()
+        }
+        val postError = draftState.error?.takeUnless { composerExpanded }
+            ?.let { stringResource(R.string.composer_post_failed, it) }
+        LaunchedEffect(postError) {
+            if (postError != null) {
+                snackbarHostState.showSnackbar(postError)
+                composer.errorShown()
             }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (viewModel.canInteract) {
-                val context = LocalContext.current
-                FloatingActionButton(onClick = context::openComposer) {
-                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.compose))
+        }
+    }
+    // 一覧の下端はバー (と下の余白・ナビゲーションバー) の分だけ空け、最後の項目がバーに隠れないようにする
+    val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+        if (composer != null) barHeight + BarMargin * 2 else 0.dp
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                Column {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.app_name)) },
+                        actions = {
+                            IconButton(onClick = onLogout) {
+                                Icon(Icons.AutoMirrored.Outlined.Logout, stringResource(R.string.logout))
+                            }
+                        },
+                        scrollBehavior = scrollBehavior,
+                    )
+                    TimelineSelector(
+                        available = state.available,
+                        pagerState = pagerState,
+                        onSelect = { column ->
+                            viewModel.select(column)
+                            scope.launch {
+                                pagerState.animateScrollToPage(state.available.indexOf(column), animationSpec = pageSpring)
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            },
+        ) { padding ->
+            Box(Modifier.fillMaxSize()) {
+                HorizontalPager(
+                    state = pagerState,
+                    // 下端はバーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = padding.calculateTopPadding())
+                        .hazeSource(hazeState),
+                    key = { state.available[it] },
+                    // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
+                    flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),
+                ) { page ->
+                    val column = state.available[page]
+                    // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
+                    val shouldLoad = dragging || pagerState.settledPage == page
+                    LaunchedEffect(column, shouldLoad) {
+                        if (shouldLoad) viewModel.ensureLoaded(column)
+                    }
+                    ColumnPage(
+                        column = column,
+                        state = state,
+                        listState = listStates.getValue(column),
+                        viewModel = viewModel,
+                        bottomPadding = bottomPadding,
+                    )
+                }
+                Column(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        // キーボードが出ているときはその上に乗せる
+                        .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                        .padding(horizontal = BarMargin, vertical = BarMargin),
+                ) {
+                    SnackbarHost(snackbarHostState)
+                    if (composer != null) {
+                        QuickPostBar(
+                            session = composer,
+                            hazeState = hazeState,
+                            onExpand = { composerExpanded = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                        )
+                    }
                 }
             }
-        },
-    ) { padding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            key = { state.available[it] },
-            // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
-            flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),
-        ) { page ->
-            val column = state.available[page]
-            // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
-            val shouldLoad = dragging || pagerState.settledPage == page
-            LaunchedEffect(column, shouldLoad) {
-                if (shouldLoad) viewModel.ensureLoaded(column)
+        }
+
+        // バーが下から伸びるようにフルの投稿画面を出す (下書きは共有、閉じるとバーに戻る)
+        AnimatedVisibility(
+            visible = composerExpanded && composer != null,
+            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+        ) {
+            composer?.let {
+                ComposerScreen(
+                    session = it,
+                    onClose = { composerExpanded = false },
+                    onFinish = {
+                        composerExpanded = false
+                        onDraftFinished()
+                    },
+                    keepDraftOnClose = true,
+                )
             }
-            ColumnPage(
-                column = column,
-                state = state,
-                listState = listStates.getValue(column),
-                viewModel = viewModel,
-            )
         }
     }
 }
+
+private val BarMargin = 12.dp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -172,6 +259,7 @@ private fun ColumnPage(
     state: TimelineScreenState,
     listState: LazyListState,
     viewModel: TimelineViewModel,
+    bottomPadding: Dp,
 ) {
     val context = LocalContext.current
     val feed = state.feedOf(column)
@@ -208,6 +296,7 @@ private fun ColumnPage(
                 entries = state.notifications.items,
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
+                contentPadding = PaddingValues(bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
                 onUserClick = context::openProfile,
@@ -221,6 +310,7 @@ private fun ColumnPage(
                 items = state.timelines.getValue(timelineType).items,
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
+                contentPadding = PaddingValues(bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
                 onUserClick = context::openProfile,

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,7 +39,17 @@ class MainActivity : ComponentActivity() {
                             ) }
                         },
                     )
-                    TimelineScreen(viewModel = viewModel, onLogout = container.sessionStore::clear)
+                    // 書きかけの投稿 (クイック投稿バー)。投稿できるのはトークンがあるときだけ
+                    val draft by container.draftStore.current.collectAsStateWithLifecycle()
+                    LaunchedEffect(current) {
+                        if (current.accessToken != null) container.draftStore.open(current)
+                    }
+                    TimelineScreen(
+                        viewModel = viewModel,
+                        onLogout = container.sessionStore::clear,
+                        composer = draft.takeIf { current.accessToken != null },
+                        onDraftFinished = container.draftStore::finish,
+                    )
                 }
             }
         }

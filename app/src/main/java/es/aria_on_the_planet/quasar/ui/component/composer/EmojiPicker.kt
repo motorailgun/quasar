@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
@@ -41,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -155,6 +157,18 @@ private fun EmojiCell(emoji: CustomEmoji, onClick: () -> Unit) {
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(EmojiSize),
         )
+    }
+}
+
+/**
+ * カーソル位置 (範囲選択中はその範囲) に `:shortcode:` を入れ、後ろにカーソルを置く (ピッカーで選んだとき)。
+ * 前後の空白は [insertEmojiAtCursor] が補う。
+ */
+fun TextFieldState.insertEmoji(emoji: CustomEmoji) {
+    val (text, cursor) = insertEmojiAtCursor(this.text, selection, emoji.shortcode)
+    edit {
+        replace(0, length, text)
+        selection = TextRange(cursor)
     }
 }
 

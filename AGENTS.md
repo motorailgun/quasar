@@ -64,7 +64,8 @@ es.aria_on_the_planet.quasar
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
     ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
-    └── composer/                   投稿画面 (ComposerActivity / Screen / ViewModel / AttachmentUploads)
+    └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / ComposerActivity / QuickPostBar /
+                                    AttachmentUploads / MediaPickerHost)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -435,7 +436,26 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 ## 投稿 (`ui/composer/`, `ui/component/composer/`)
 
-* 画面: `Context.openComposer()` → `ComposerActivity` (要ログイン)。タイムラインの FAB (ログイン時のみ) から開く。
+* **入口**: メイン画面下のクイック投稿バー (`QuickPostBar`、ログイン時のみ。FAB は廃止)。ピルを上へ引っ張ると
+  (または投票・CW のチップ / 添付の ALT のタップ)、同じ画面内でフルの投稿画面 (`ComposerScreen`) が下から伸びて開く。
+  `ComposerActivity` (`Context.openComposer()`) は他の入口 (今後のリプライ等) 用に残している。
+* **下書きの共有**: 書きかけの投稿は `ComposerSession` (入力 `ComposerState`・添付のアップロード・送信・上限・アカウント・絵文字)。
+  `DraftStore` (`AppContainer.draftStore`) がアプリ全体で 1 つ持ち、バー・フル画面・`ComposerActivity` が同じものを使う。
+  session は自分のコルーチンの範囲 (`SupervisorJob` + Main) で動くので、画面を切り替えてもアップロードは止まらない。
+  投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。アカウントが変わったら作り直す。プロセスが終わると消える (保存しない)。
+  * フル画面 (バーから): × / 戻るはバーに戻るだけ (下書きは残るので確認しない)。`ComposerActivity`: 入力があれば破棄の確認。
+* **クイック投稿バー** (`ui/composer/QuickPostBar.kt`): 浮かぶ角丸の面で、後ろの一覧を Haze (`dev.chrisbanes.haze:haze-blur`) で
+  ぼかす (一覧の `HorizontalPager` に `hazeSource`、バーに `hazeBlur(HazeInput.Sources(state))`)。
+  * **ぼかしには `backgroundColor` (surface) が必須**: 一覧そのものは背景が透明 (Scaffold が塗っている) なので、下地が無いと
+    ぼかした結果が透けて後ろの実物がくっきり見える。
+  * 内容: ピル (引っ張る / タップで広げる) / 絵文字の候補 / 添付 (64dp) / 投票・CW のチップ (フル画面で編集) /
+    アイコン + 本文 (最大 5 行) + 送信 / フォーカス中か入力があるときだけ「残り文字数・公開範囲 (アイコン)・絵文字・メディア」。
+  * 引っ張る: ピルの縦ドラッグでバーが伸び、96dp を超えるか上へ速く払うと広げる。足りなければ戻る。
+  * 一覧はバーの後ろまで描き (ぼかしの元)、下端の余白は `contentPadding` (ナビゲーションバー + バーの高さ + 余白) で取る。
+    バーはキーボードの上に乗る (`WindowInsets.ime ∪ navigationBars`)。スナックバーはバーの上。
+  * 入力中の「戻る」はフォーカスを外すだけ。バーからの投稿の結果・エラーはタイムラインのスナックバー。
+  * メディアのピッカー (`rememberMediaPicker`、埋め込み / OS 標準) と絵文字の挿入 (`TextFieldState.insertEmoji`) はフル画面と共通。
+* 画面 (フル): 下記は `ComposerScreen` の説明。
   X の投稿画面 (`x_posting.jpg`) を参考に、トップバー (× / Post)・アイコン + 本文・下端のツールバー
   (左端に残り文字数、右寄せで公開範囲 / 絵文字 / メディア / 投票 / CW)。
   アイコンの色はオン = primary、オフ = primary を背景色へ寄せた色、選べない (メディアと投票の排他等) = 標準の無効色
@@ -448,7 +468,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   `ContentWarningField` / `VisibilityButton` (メニューで選ぶ。`compact` でアイコンのみ) / `ComposerToolbar` (スロット) +
   `AttachMediaButton` / `PollButton` / `ContentWarningButton` / `CharacterCounter` / `AttachmentStrip` + `SensitiveMediaToggle` / `PollEditor`。
   `Composer` はそれらを X の配置で並べた全体のラッパー (高さいっぱいを使う前提。別の配置では部品を直接使う)。
-* 状態は `ComposerState` (`TextFieldState` + snapshot state)。投稿画面では ViewModel が持ち、それ以外は `rememberComposerState()`
+* 状態は `ComposerState` (`TextFieldState` + snapshot state)。バー・フル画面では `ComposerSession` が持ち (共有)、単独で使うときは `rememberComposerState()`
   (`rememberSaveable`。添付は保存しない)。`toDraft()` で `PostDraft` にする。
 * ドメイン: `PostDraft` / `PollDraft` / `DraftAttachment` (+ `UploadState`)。送信可否は純粋関数 `PostDraft.problems(limits)`
   (空・文字数超過・メディアと投票の併用・未アップロード・選択肢の数/空/長さ)。メディアと投票は同時に付けられない (Mastodon の制約)
@@ -515,7 +535,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   `DraftMappersTest`。
 * **未実装**: リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、
   メンション・ハッシュタグの補完、
-  言語の指定、予約投稿、クイック投稿バー。
+  言語の指定、予約投稿。
 
 ## 自動更新 (Streaming API)
 

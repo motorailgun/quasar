@@ -14,6 +14,8 @@ import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SessionStore
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
+import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
+import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -46,5 +48,19 @@ class AppContainer(context: Context) {
 
     /** 端末のファイル (Photo Picker の結果等) をアップロード元にする。問い合わせを伴うので IO スレッドで呼ぶ。 */
     fun uploadSource(uri: Uri): UploadSource = ContentUriUploadSource(contentResolver, uri)
+
+    /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
+    val draftStore = DraftStore { session, scope ->
+        ComposerSession(
+            session = session,
+            scope = scope,
+            accountRepository = accountRepository,
+            instanceRepository = instanceRepository,
+            emojiRepository = emojiRepository,
+            statusRepository = statusRepository,
+            mediaRepository = mediaRepository,
+            openUploadSource = ::uploadSource,
+        )
+    }
     val streamingClient = StreamingClient(okHttpClient, json, instanceRepository)
 }

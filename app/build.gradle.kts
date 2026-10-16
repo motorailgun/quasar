@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.coil.video)
     // 投稿画面に埋め込む Photo Picker (Android 14 + SDK 拡張 15 以上。それ以外は OS 標準の Photo Picker)
     implementation(libs.androidx.photopicker.compose)
+    // クイック投稿バーの背景ブラー (後ろの一覧をぼかす)
+    implementation(libs.haze.blur)
     // メディアの再生 (インライン / メディアビューア)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.datasource.okhttp)

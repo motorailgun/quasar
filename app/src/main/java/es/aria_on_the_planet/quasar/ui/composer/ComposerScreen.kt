@@ -1,9 +1,5 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
-import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,9 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
@@ -47,21 +41,27 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
-import es.aria_on_the_planet.quasar.ui.component.composer.MediaPickerSheet
-import es.aria_on_the_planet.quasar.ui.component.composer.isEmbeddedPhotoPickerAvailable
 
 /**
- * 投稿画面。トップバーの Post で送信し、成功したら [onClose] する。
- * 入力があるときの「戻る」/ × は破棄の確認を挟む。
+ * フルの投稿画面。トップバーの Post で送信する。
+ *
+ * @param session 書きかけの投稿 ([DraftStore] から受け取る。クイック投稿バーと共有)。
+ * @param onClose 下書きを残したまま閉じる。
+ * @param onFinish 投稿した・破棄した (下書きを終えて閉じる)。呼び出し側は [DraftStore.finish] する。
+ * @param keepDraftOnClose `true` なら × / 戻るはそのまま [onClose] (クイック投稿バーに下書きが残るので確認は要らない)。
+ *   `false` なら入力があるときは破棄の確認を出す (単独の `ComposerActivity`)。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ComposerScreen(
-    viewModel: ComposerViewModel,
+    session: ComposerSession,
     onClose: () -> Unit,
+    onFinish: () -> Unit,
+    keepDraftOnClose: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val composer = viewModel.composer
+    val state by session.state.collectAsStateWithLifecycle()
+    val composer = session.composer
     val limits = state.limits
     val canSubmit by remember(composer, limits) {
         derivedStateOf { composer.toDraft().problems(limits).isEmpty() }
@@ -71,52 +71,29 @@ fun ComposerScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.posted) {
-        if (state.posted) onClose()
+        if (state.posted) onFinish()
     }
     val errorText = state.error?.let { stringResource(R.string.composer_post_failed, it) }
     LaunchedEffect(errorText) {
         if (errorText != null) {
             snackbarHostState.showSnackbar(errorText)
-            viewModel.errorShown()
+            session.errorShown()
         }
     }
 
-    // 端末のメディアは Photo Picker で選ぶ (権限は要らない)。複数選択は 2 枚以上でしか使えないので、残り 1 枚なら単一選択
-    val remaining = limits.maxMediaAttachments - composer.attachments.size
-    val pickMultiple = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(maxItems = remaining.coerceAtLeast(2)),
-    ) { uris -> viewModel.addMedia(uris) }
-    val pickSingle = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.addMedia(listOf(uri))
-    }
-    // 使える端末では埋め込みのピッカーをシートで開く (最初は半分の高さ)。開けなかったら以後は OS 標準のピッカー
-    var mediaSheetOpen by rememberSaveable { mutableStateOf(false) }
-    var embeddedPickerFailed by rememberSaveable { mutableStateOf(false) }
-    val keyboard = LocalSoftwareKeyboardController.current
-    val openSystemMediaPicker = {
-        val request = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-        // 動画は単独でしか付けられないので、既に画像があれば画像だけ選ばせる
-        val imagesOnly = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-        val input = if (composer.attachments.isEmpty()) request else imagesOnly
-        if (remaining >= 2) pickMultiple.launch(input) else if (remaining == 1) pickSingle.launch(input)
-    }
-    val openMediaPicker = {
-        if (isEmbeddedPhotoPickerAvailable() && !embeddedPickerFailed) {
-            keyboard?.hide()
-            mediaSheetOpen = true
-        } else {
-            openSystemMediaPicker()
-        }
-    }
+    val openMediaPicker = rememberMediaPicker(session)
 
-    val requestClose = { if (isEmpty) onClose() else confirmingDiscard = true }
+    val requestClose = {
+        if (keepDraftOnClose || isEmpty) onClose() else confirmingDiscard = true
+    }
     NavigationBackHandler(
         state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
-        isBackEnabled = !isEmpty && !state.sending,
-        onBackCompleted = { confirmingDiscard = true },
+        isBackEnabled = (keepDraftOnClose || !isEmpty) && !state.sending,
+        onBackCompleted = requestClose,
     )
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = {},
@@ -127,7 +104,7 @@ fun ComposerScreen(
                 },
                 actions = {
                     Button(
-                        onClick = viewModel::submit,
+                        onClick = session::submit,
                         enabled = canSubmit && !state.sending,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
@@ -155,32 +132,15 @@ fun ComposerScreen(
             enabled = !state.sending,
             autoFocus = true,
             onAttachMedia = openMediaPicker,
-            onRemoveAttachment = { viewModel.removeAttachment(it.localId) },
-            onRetryAttachment = { viewModel.retryAttachment(it.localId) },
+            onRemoveAttachment = { session.removeAttachment(it.localId) },
+            onRetryAttachment = { session.retryAttachment(it.localId) },
             onAttachmentDescriptionChange = { attachment, description ->
-                viewModel.setAttachmentDescription(attachment.localId, description)
+                session.setAttachmentDescription(attachment.localId, description)
             },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding),
-        )
-    }
-
-    if (mediaSheetOpen && isEmbeddedPhotoPickerAvailable()) {
-        MediaPickerSheet(
-            // 埋め込みのピッカーで選んだもの (content:// の URI) を選択済みとして渡す
-            selected = remember { composer.attachments.mapNotNull { it.previewUri?.toUri() }.toSet() },
-            maxItems = limits.maxMediaAttachments,
-            onSelect = viewModel::addMedia,
-            onDeselect = viewModel::removeMedia,
-            onDismiss = { mediaSheetOpen = false },
-            onError = { error ->
-                Log.w("ComposerScreen", "Embedded photo picker failed; falling back to the system picker", error)
-                mediaSheetOpen = false
-                embeddedPickerFailed = true
-                openSystemMediaPicker()
-            },
         )
     }
 
@@ -190,7 +150,7 @@ fun ComposerScreen(
             title = { Text(stringResource(R.string.composer_discard_title)) },
             text = { Text(stringResource(R.string.composer_discard_message)) },
             confirmButton = {
-                TextButton(onClick = onClose) { Text(stringResource(R.string.composer_discard)) }
+                TextButton(onClick = onFinish) { Text(stringResource(R.string.composer_discard)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmingDiscard = false }) {

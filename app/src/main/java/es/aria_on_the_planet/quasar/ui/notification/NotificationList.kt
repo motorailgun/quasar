@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,6 +78,7 @@ fun NotificationList(
     entries: List<NotificationEntry>,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
+    contentPadding: PaddingValues = PaddingValues(),
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
     onUserClick: (User) -> Unit = {},
@@ -88,7 +90,7 @@ fun NotificationList(
     LoadMoreEffect(state, onLoadMore)
     // 先頭にいるときにストリーミングの新着が入ったら見せる
     StickToTopEffect(state, entries.firstOrNull()?.key)
-    LazyColumn(modifier = modifier, state = state) {
+    LazyColumn(modifier = modifier, state = state, contentPadding = contentPadding) {
         items(entries, key = { it.key }, contentType = { it.contentType }) { entry ->
             Column(Modifier.animateItem()) {
                 when (entry) {

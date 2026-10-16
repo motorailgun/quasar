@@ -39,6 +39,7 @@ fun CustomEmojiDto.toDomain() = CustomEmoji(
     shortcode = shortcode,
     url = url,
     staticUrl = staticUrl,
+    category = category,
 )
 
 fun AccountDto.toDomain() = User(

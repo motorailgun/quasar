@@ -115,6 +115,7 @@ fun ComposerScreen(
             state = composer,
             account = state.account,
             limits = limits,
+            emojis = state.emojis,
             enabled = !state.sending,
             autoFocus = true,
             modifier = Modifier

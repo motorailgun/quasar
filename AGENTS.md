@@ -30,7 +30,7 @@ es.aria_on_the_planet.quasar
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
-│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository
+│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
 │                                   PostDraft, ComposeLimits, PostLength)
 └── ui/
@@ -52,7 +52,7 @@ es.aria_on_the_planet.quasar
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
-    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon)
+    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
@@ -206,6 +206,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 | 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き、要認証) |
 | ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (要認証。`source.privacy` が既定の公開範囲) |
+| カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (認証不要。`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
@@ -454,11 +455,22 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   `InstanceRepository` はサーバごとにプロセス内で 1 回だけ取得し (失敗はキャッシュしない)、ストリーミング URL もここから取る。
 * 公開範囲・閲覧注意の初期値は `AccountRepository.fetchMe` (`verify_credentials` の `source`、セッションごとにキャッシュ)。
   取得前にユーザーが変えていたら上書きしない。
+* **カスタム絵文字の補完**: カーソル直前の `:sho` (2 文字以上) で、ツールバー直上に候補の帯 (`EmojiSuggestionStrip`) を出す。
+  タップで `:shortcode: ` に置き換える。フォーカスのある欄 (本文 / CW) が対象。
+  * 純粋関数 (`Autocomplete.kt`、テストは `AutocompleteTest`): `findAutocompleteQuery` (検出。全角 `：` も可、`12:30` や
+    英数字・かな直後の `:` では出さない)、`rankEmojis` (前方一致 → 部分一致、短い順)、`insertEmoji`、`findEmojiShortcodes`。
+    `AutocompleteQuery` は引き金の文字を持つので、メンション・ハッシュタグの補完も同じ形に載せる想定。
+  * 状態は `rememberEmojiSuggestions(field, emojis)` (`derivedStateOf` で `TextFieldState` に追従)。
+  * 入力中の実在する `:shortcode:` は `OutputTransformation` (`EmojiShortcodeHighlight`、`TextFieldBuffer.addStyle`) で
+    primary 色 + SemiBold にする (本文は変えない)。判定はサーバ (`CustomEmoji::SCAN_RE`) と同じ前後条件で、Ruby の
+    `[[:alnum:]]` に合わせ、かな・漢字の直後も絵文字にならない。
+  * `BasicTextField(TextFieldState)` は `InlineTextContent` 非対応のため、入力欄内で画像にはしない。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
 * **未実装**: メディアの選択・アップロード・代替テキストの編集 (`AttachmentStrip` はレイアウトと Preview のみ。追加ボタンは何もしない)、
-  リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、カスタム絵文字・メンションの補完、
+  リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、絵文字ピッカー (次の予定。
+  `CustomEmoji.category` は取得済み)、メンション・ハッシュタグの補完、
   言語の指定、予約投稿、クイック投稿バー。
 
 ## 自動更新 (Streaming API)

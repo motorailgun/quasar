@@ -5,4 +5,6 @@ data class CustomEmoji(
     val shortcode: String,
     val url: String,
     val staticUrl: String,
+    /** サーバでの分類 (ピッカー用)。ポスト等に付いてくる絵文字では `null`。 */
+    val category: String? = null,
 )

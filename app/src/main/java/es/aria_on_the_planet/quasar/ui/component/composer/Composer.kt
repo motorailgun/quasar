@@ -14,12 +14,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
+import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.characterCount
@@ -40,6 +44,7 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  *
  * @param account 投稿するアカウント。取得前は `null` (アイコンはプレースホルダ)。
  * @param onAttachMedia メディア追加ボタン。NOTE: 端末のメディア選択は未実装。
+ * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯) と、入力中の `:shortcode:` の強調に使う。
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
  */
 @Composable
@@ -48,6 +53,7 @@ fun Composer(
     account: User?,
     limits: ComposeLimits,
     modifier: Modifier = Modifier,
+    emojis: List<CustomEmoji> = emptyList(),
     enabled: Boolean = true,
     autoFocus: Boolean = false,
     onAttachMedia: () -> Unit = {},
@@ -60,6 +66,10 @@ fun Composer(
     val characterCount by remember(state, limits) { derivedStateOf { state.toDraft().characterCount(limits) } }
     val poll = state.poll
     val attachments = state.attachments
+    // 補完はフォーカスのある方の欄 (本文 / CW) に対して出す
+    var activeField by remember(state) { mutableStateOf(state.text) }
+    val suggestions by rememberEmojiSuggestions(activeField, emojis)
+    val highlight = rememberEmojiShortcodeHighlight(emojis)
 
     Column(modifier) {
         Row(
@@ -71,13 +81,22 @@ fun Composer(
             ComposerAccountIcon(account)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f).animateContentSize()) {
-                ContentWarningField(state.contentWarning, visible = state.contentWarningEnabled)
+                ContentWarningField(
+                    state = state.contentWarning,
+                    visible = state.contentWarningEnabled,
+                    outputTransformation = highlight,
+                    modifier = Modifier.onFocusChanged { if (it.hasFocus) activeField = state.contentWarning },
+                )
                 ComposerTextField(
                     state = state.text,
                     enabled = enabled,
                     minHeight = TextMinHeight,
+                    outputTransformation = highlight,
                     // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
-                    modifier = Modifier.focusRequester(focusRequester).padding(top = 8.dp),
+                    modifier = Modifier
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { if (it.isFocused) activeField = state.text }
+                        .padding(top = 8.dp),
                 )
                 AttachmentStrip(
                     attachments = attachments,
@@ -103,6 +122,7 @@ fun Composer(
                 }
             }
         }
+        EmojiSuggestionStrip(suggestions)
         ComposerToolbar(
             modifier = Modifier.fillMaxWidth(),
             leading = { CharacterCounter(used = characterCount, max = limits.maxCharacters) },

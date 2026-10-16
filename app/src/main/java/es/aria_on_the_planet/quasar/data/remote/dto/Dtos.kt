@@ -9,6 +9,9 @@ data class CustomEmojiDto(
     val shortcode: String,
     val url: String,
     @SerialName("static_url") val staticUrl: String,
+    /** `GET /api/v1/custom_emojis` のときだけ意味がある (ピッカー・補完に出すか)。 */
+    @SerialName("visible_in_picker") val visibleInPicker: Boolean = true,
+    val category: String? = null,
 )
 
 /** https://docs.joinmastodon.org/entities/Account/ */

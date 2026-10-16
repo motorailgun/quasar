@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
+import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.problems
@@ -23,6 +25,8 @@ import java.util.UUID
 
 data class ComposerScreenState(
     val account: User? = null,
+    /** 補完・強調に使うサーバのカスタム絵文字。取得前・失敗時は空 (補完が出ないだけ)。 */
+    val emojis: List<CustomEmoji> = emptyList(),
     val limits: ComposeLimits = ComposeLimits(),
     val sending: Boolean = false,
     /** 送信失敗の内容。表示したら [ComposerViewModel.errorShown] で消す。 */
@@ -35,6 +39,7 @@ class ComposerViewModel(
     private val session: Session,
     private val accountRepository: AccountRepository,
     private val instanceRepository: InstanceRepository,
+    private val emojiRepository: EmojiRepository,
     private val statusRepository: StatusRepository,
 ) : ViewModel() {
     /** 入力内容。画面回転で消えないよう ViewModel が持つ。 */
@@ -51,6 +56,10 @@ class ComposerViewModel(
             // 取得できなければ既定値のまま (最終的な判定はサーバが行う)
             runCatchingLogged("instance") { instanceRepository.instance(session.serverUrl) }
                 ?.let { info -> _state.update { it.copy(limits = info.composeLimits) } }
+        }
+        viewModelScope.launch {
+            runCatchingLogged("emojis") { emojiRepository.pickerEmojis(session.serverUrl) }
+                ?.let { emojis -> _state.update { it.copy(emojis = emojis) } }
         }
         viewModelScope.launch {
             val visibilityBefore = composer.visibility

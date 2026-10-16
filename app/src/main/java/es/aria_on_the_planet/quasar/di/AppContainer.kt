@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.di
 import android.content.Context
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
 import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
@@ -34,5 +35,6 @@ class AppContainer(context: Context) {
     val statusRepository = StatusRepository(api)
     val notificationRepository = NotificationRepository(api)
     val instanceRepository = InstanceRepository(api)
+    val emojiRepository = EmojiRepository(api)
     val streamingClient = StreamingClient(okHttpClient, json, instanceRepository)
 }

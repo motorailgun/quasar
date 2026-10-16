@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.data.remote
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
+import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
 import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
@@ -122,6 +123,10 @@ class MastodonApi(
     ): StatusDto = post(serverUrl, accessToken, "api/v1/statuses", headers = mapOf("Idempotency-Key" to idempotencyKey)) {
         params.forEach { (name, value) -> add(name, value) }
     }
+
+    /** サーバのカスタム絵文字 (認証不要)。https://docs.joinmastodon.org/methods/custom_emojis/ */
+    suspend fun customEmojis(serverUrl: String): List<CustomEmojiDto> =
+        get(serverUrl, null, "api/v1/custom_emojis") {}
 
     /** https://docs.joinmastodon.org/methods/instance/#v2 (認証不要) */
     suspend fun instance(serverUrl: String): InstanceDto =

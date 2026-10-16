@@ -32,6 +32,7 @@ class ComposerActivity : ComponentActivity() {
                                 session,
                                 container.accountRepository,
                                 container.instanceRepository,
+                                container.emojiRepository,
                                 container.statusRepository,
                             )
                         }

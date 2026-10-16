@@ -186,6 +186,7 @@
     <string name="emoji_picker_uncategorized">Custom</string>
     <string name="emoji_picker_empty">No emoji found</string>
     <string name="quick_post_expand">Open full editor</string>
+    <string name="quick_post_start_typing">Start writing a post</string>
     <string name="quick_post_has_poll">Poll</string>
     <string name="quick_post_has_cw">Content warning</string>
 </resources>

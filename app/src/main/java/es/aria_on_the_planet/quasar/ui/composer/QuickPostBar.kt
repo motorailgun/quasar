@@ -5,6 +5,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -30,6 +31,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -94,6 +96,7 @@ import kotlinx.coroutines.launch
  * (残り)  [公開範囲][絵文字][メディア]   ← フォーカス中か入力があるときだけ
  * ```
  *
+ * 入力していない間はバー全体がタップ領域で、どこを押しても本文の入力を始める (ボタンはそれぞれの操作)。
  * 下書きは [session] (フル画面と共有)。CW と投票はフル画面で編集し、付いているときはチップで示す (タップで広げる)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -144,11 +147,23 @@ fun QuickPostBar(
             colorEffects(listOf(HazeColorEffect.tint(tint)))
         }
     }
+    val startTyping = stringResource(R.string.quick_post_start_typing)
     Column(
         modifier
             .clip(shape)
             .hazeBlur(input = HazeInput.Sources(hazeState), style = blurStyle)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+            // 入力していない間はどこを押しても入力を始める (本文欄だけでは当たり判定が小さい)。
+            // 子のボタン等が受けたタップはそちらが優先され、押せないもの (空の送信ボタン等) はここに回る
+            .clickable(
+                enabled = enabled && !focused,
+                onClickLabel = startTyping,
+                interactionSource = null,
+                indication = null,
+            ) {
+                focusRequester.requestFocus()
+                keyboard?.show()
+            }
             .animateContentSize(),
     ) {
         ExpandHandle(onExpand = onExpand)
@@ -188,13 +203,7 @@ fun QuickPostBar(
                     .onFocusChanged { focused = it.isFocused },
             )
             Spacer(Modifier.width(8.dp))
-            FilledIconButton(onClick = session::submit, enabled = canSubmit && enabled) {
-                if (state.sending) {
-                    LoadingIndicator(Modifier.size(24.dp))
-                } else {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.composer_post))
-                }
-            }
+            SendButton(enabled = canSubmit && enabled, sending = state.sending, onClick = session::submit)
         }
         AnimatedVisibility(focused || !isEmpty) {
             ComposerToolbar(leading = { CharacterCounter(used = characterCount, max = limits.maxCharacters) }) {
@@ -236,7 +245,7 @@ fun QuickPostBar(
 
 /**
  * 上端のピル。上へ引っ張ると指に合わせてバーが伸び、[ExpandDistance] を超えるか上へ素早く払うと [onExpand]。
- * 足りなければ元の高さへ戻る。タップでも広げる。
+ * 足りなければ元の高さへ戻る。タップは受けない (バー全体のタップ = 入力開始に回る)。
  */
 @Composable
 private fun ExpandHandle(onExpand: () -> Unit) {
@@ -272,6 +281,36 @@ private fun ExpandHandle(onExpand: () -> Unit) {
     }
     // 引っ張った分だけバーを伸ばす
     Spacer(Modifier.height(with(density) { drag.toDp() }))
+}
+
+/**
+ * 送信ボタン。押せない間は同じ見た目のただのアイコンにする: Material のボタンは無効でもタップを受け止めるので、
+ * そのままだとバー全体のタップ (入力開始) に回らない。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SendButton(enabled: Boolean, sending: Boolean, onClick: () -> Unit) {
+    val description = stringResource(R.string.composer_post)
+    if (enabled || sending) {
+        FilledIconButton(onClick = onClick, enabled = enabled) {
+            if (sending) {
+                LoadingIndicator(Modifier.size(24.dp))
+            } else {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = description)
+            }
+        }
+    } else {
+        val colors = IconButtonDefaults.filledIconButtonColors()
+        // IconButton と同じ大きさ (48dp の枠に 40dp の円)
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(40.dp).background(colors.disabledContainerColor, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = description, tint = colors.disabledContentColor)
+            }
+        }
+    }
 }
 
 /** フル画面でしか編集できないもの (投票・CW) が付いていることを示すチップ。タップでフル画面へ。 */

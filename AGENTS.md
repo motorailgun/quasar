@@ -457,6 +457,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `only_media=true` で絞り込んだポストの一覧 (別の `PostFeed`。初めて開いたときに読む) を同じ `PostList` で出すだけ。
     ピン留めは Posts のみ。投票・ブースト等の反映は両方の一覧に当てる。
   * フォロー数・フォロワー数のタップで `openFollowList(accountId, tab)`。
+  * アイコン・ヘッダ画像のタップでメディアビューア (`openMediaViewer(MediaViewerArgs.singleImage(...))`、1 枚ずつで左右スワイプ無し)。
+    ID は合成 (`avatar:<id>` / `header:<id>`)、読み込み中は static の URL を出す。開く前にピン留めポストのインライン再生を止める。
   * 未実装: 返信のタブ、familiar followers の一覧画面、プロフィール編集。
 * **フォロー / フォロワー一覧** (`FollowListActivity`): `Context.openFollowList(accountId, tab)` で起動 (extra は ID とタブ)。
   トップバー (表示名 + @acct) の下に `ConnectedTabRow` (Following / Followers) + `HorizontalPager` (スワイプでも切り替え)。

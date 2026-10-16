@@ -111,6 +111,7 @@ fun MediaViewerScreen(
                     onTap = { controlsVisible = !controlsVisible },
                     // 隣のページが合成・破棄されても上書きしないよう、表示中のページのものだけを使う
                     onZoomedChange = { if (page == pagerState.currentPage) zoomed = it },
+                    onLoaded = { aspectRatio -> viewModel.onImageLoaded(media, aspectRatio) },
                 )
                 MediaType.Video, MediaType.Gifv, MediaType.Audio -> PlayerPage(
                     media = media,

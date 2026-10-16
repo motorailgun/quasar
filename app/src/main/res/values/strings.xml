@@ -35,6 +35,8 @@
     <string name="profile_locked">Locked account</string>
     <string name="profile_bot">Bot</string>
     <string name="profile_verified">Verified</string>
+    <string name="profile_view_avatar">View profile picture</string>
+    <string name="profile_view_header">View header image</string>
     <string name="profile_no_posts">No posts yet</string>
     <string name="profile_error">Failed to load profile: %1$s</string>
     <string name="expand">Show more</string>

@@ -56,6 +56,7 @@ import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
 import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTabRow
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import kotlinx.coroutines.launch
 
 /**
@@ -73,6 +74,7 @@ fun ProfileScreen(
     onMediaClick: (MediaClick) -> Unit,
     onFollowingClick: () -> Unit,
     onFollowersClick: () -> Unit,
+    onOpenImage: (MediaViewerArgs) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val profile = state.profile.profile
@@ -131,6 +133,7 @@ fun ProfileScreen(
                         relationship = (state.button as? ProfileButtonState.Follow)?.relationship,
                         onFollowingClick = onFollowingClick,
                         onFollowersClick = onFollowersClick,
+                        onOpenImage = onOpenImage,
                         actions = {
                             ProfileActionButton(
                                 state = state.button,

@@ -42,6 +42,17 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.toSize
+import es.aria_on_the_planet.quasar.ui.component.player.LocalInlinePlayback
+import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Profile
@@ -67,6 +78,7 @@ private val AvatarRing = 4.dp
  * @param relationship 相手との関係。@acct の横に「Follows you」等を出す。未ログイン・取得前は `null`。
  * @param actions アイコンの右 (ヘッダ画像の下) に置くボタン (フォロー / プロフィール編集)。
  * @param onFollowingClick / [onFollowersClick] 統計のフォロー数・フォロワー数のタップ (一覧を開く)。
+ * @param onOpenImage アイコン・ヘッダ画像のタップ (メディアビューアを開く)。`null` ならタップできない。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -77,9 +89,22 @@ fun ProfileHeader(
     relationship: Relationship? = null,
     onFollowingClick: () -> Unit = {},
     onFollowersClick: () -> Unit = {},
+    onOpenImage: ((MediaViewerArgs) -> Unit)? = null,
     actions: @Composable () -> Unit = {},
 ) {
     val user = profile.user
+    val windowSize = LocalWindowInfo.current.containerSize
+    val inlinePlayback = LocalInlinePlayback.current
+    // 閉じるときに縮んで戻る先。タップの時点の位置を渡す
+    var headerBounds by remember { mutableStateOf<Rect?>(null) }
+    var avatarBounds by remember { mutableStateOf<Rect?>(null) }
+    val openImage: ((id: String, url: String, staticUrl: String?, bounds: Rect?) -> Unit)? = onOpenImage?.let { open ->
+        { id, url, staticUrl, bounds ->
+            // ビューアは透過 Activity で ON_STOP が来ないので、ピン留めポストのインライン再生はここで止める
+            inlinePlayback?.stopActive()
+            open(MediaViewerArgs.singleImage(id, url, staticUrl, bounds, windowSize))
+        }
+    }
     Column(modifier.fillMaxWidth()) {
         Box {
             Box(
@@ -88,14 +113,26 @@ fun ProfileHeader(
                     .height(HeaderHeight)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
-                if (profile.headerUrl != null) {
+                val headerUrl = profile.headerUrl
+                if (headerUrl != null) {
                     RemoteImage(
-                        url = profile.headerUrl,
+                        url = headerUrl,
                         staticUrl = profile.headerStaticUrl,
                         kind = ImageKind.Other,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { headerBounds = Rect(it.positionInWindow(), it.size.toSize()) }
+                            .then(
+                                if (openImage != null) {
+                                    Modifier.clickable(onClickLabel = stringResource(R.string.profile_view_header)) {
+                                        openImage("header:${user.inServerId}", headerUrl, profile.headerStaticUrl, headerBounds)
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                 }
             }
@@ -106,7 +143,21 @@ fun ProfileHeader(
                     .background(MaterialTheme.colorScheme.surface, MaterialShapes.Cookie9Sided.toShape())
                     .padding(AvatarRing),
             ) {
-                UserIcon(user = user, size = AvatarSize)
+                UserIcon(
+                    user = user,
+                    size = AvatarSize,
+                    modifier = Modifier
+                        .onGloballyPositioned { avatarBounds = Rect(it.positionInWindow(), it.size.toSize()) }
+                        .then(
+                            if (openImage != null && user.iconUrl.isNotBlank()) {
+                                Modifier.clickable(onClickLabel = stringResource(R.string.profile_view_avatar)) {
+                                    openImage("avatar:${user.inServerId}", user.iconUrl, user.iconStaticUrl, avatarBounds)
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
             }
             // X と同じく、アイコンの右・ヘッダ画像の下 (下端をアイコンに揃える)
             Box(

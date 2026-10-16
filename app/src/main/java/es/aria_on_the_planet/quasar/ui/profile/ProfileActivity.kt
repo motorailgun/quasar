@@ -13,6 +13,7 @@ import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.follows.openFollowList
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMediaViewer
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
@@ -45,6 +46,7 @@ class ProfileActivity : ComponentActivity() {
                     onMediaClick = ::openMedia,
                     onFollowingClick = { openFollowList(accountId, FollowListTab.Following) },
                     onFollowersClick = { openFollowList(accountId, FollowListTab.Followers) },
+                    onOpenImage = ::openMediaViewer,
                 )
             }
         }

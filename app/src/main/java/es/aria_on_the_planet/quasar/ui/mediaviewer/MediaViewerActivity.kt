@@ -72,5 +72,10 @@ fun Context.openMedia(click: MediaClick) {
         }
         return
     }
-    startActivity(MediaViewerActivity.newIntent(this, MediaViewerArgs.from(click)))
+    openMediaViewer(MediaViewerArgs.from(click))
+}
+
+/** メディアビューアを開く。ポストの添付以外 (プロフィールのアイコン等) はこちらを直接使う。 */
+fun Context.openMediaViewer(args: MediaViewerArgs) {
+    startActivity(MediaViewerActivity.newIntent(this, args))
 }

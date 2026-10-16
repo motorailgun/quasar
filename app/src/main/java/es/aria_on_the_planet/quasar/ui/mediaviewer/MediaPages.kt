@@ -49,6 +49,7 @@ import es.aria_on_the_planet.quasar.ui.component.player.PlaybackController
  * 読み込み中は一覧で読み込み済みのはずの preview (と BlurHash) を同じ位置に出しておく。
  * ピンチで拡大縮小でき ([zoomable])、ダブルタップで 130% に拡大 / 等倍に戻す。拡大しているかを [onZoomedChange] で
  * 知らせる (親はページ切り替え等を止める)。1 回タップはダブルタップでないと分かってから (少し遅れて) [onTap]。
+ * 読み込めたら実際の縦横比 (幅 / 高さ) を [onLoaded] で知らせる。
  */
 @Composable
 fun ImagePage(
@@ -56,6 +57,7 @@ fun ImagePage(
     onTap: () -> Unit,
     onZoomedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onLoaded: (aspectRatio: Float) -> Unit = {},
 ) {
     val urls = media.viewUrls
     var urlIndex by rememberSaveable(media.id) { mutableIntStateOf(0) }
@@ -92,7 +94,10 @@ fun ImagePage(
                     onLoaded = { size ->
                         loaded = true
                         // meta に無い・不正確なこともあるので、実際の画像の縦横比で移動範囲を決める
-                        if (size.width > 0f && size.height > 0f) zoom.contentAspectRatio = size.width / size.height
+                        if (size.width > 0f && size.height > 0f) {
+                            zoom.contentAspectRatio = size.width / size.height
+                            onLoaded(size.width / size.height)
+                        }
                     },
                     onError = {
                         if (urlIndex < urls.lastIndex) urlIndex++ else failed = true

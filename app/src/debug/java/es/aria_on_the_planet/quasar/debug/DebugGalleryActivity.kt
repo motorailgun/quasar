@@ -28,6 +28,7 @@ import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMediaViewer
 import es.aria_on_the_planet.quasar.ui.profile.ProfileHeader
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 
@@ -123,7 +124,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                     items = fixture.posts.map(TimelineItem::PostItem),
                     state = listState,
                     onMediaClick = context::openMedia,
-                    header = { item(key = "header") { ProfileHeader(profile = fixture.profile) } },
+                    header = { item(key = "header") { ProfileHeader(profile = fixture.profile, onOpenImage = context::openMediaViewer) } },
                 )
             }
 

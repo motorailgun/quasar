@@ -26,6 +26,13 @@ class MediaViewerViewModel(
     /** 最初のページだけ、インライン再生の続きから始める。 */
     private var pendingStart: Pair<Int, Long>? = args.initialIndex to args.startPositionMs
 
+    /** ビューアで読み込んだ画像の実際の縦横比 (メディア ID ごと)。`meta` が無いメディアの戻り先に使う。 */
+    private val loadedAspectRatios = mutableMapOf<String, Float>()
+
+    fun onImageLoaded(media: MediaAttachment, aspectRatio: Float) {
+        loadedAspectRatios[media.id] = aspectRatio
+    }
+
     fun showPage(index: Int) {
         val media = items.getOrNull(index) ?: return
         // 離れるページが video / gifv なら、そのミュート状態を次へ引き継ぐ
@@ -54,7 +61,8 @@ class MediaViewerViewModel(
         if (windowSize.width != args.sourceWindowWidth || windowSize.height != args.sourceWindowHeight) return null
         val media = items.getOrNull(index) ?: return null
         val bounds = args.sourceBounds[media.id]?.toRect() ?: return null
-        val aspectRatio = media.meta?.aspectRatio ?: return null
+        // meta が無いもの (プロフィールのアイコン等) は、ビューアで読み込んだ画像の縦横比を使う
+        val aspectRatio = media.meta?.aspectRatio ?: loadedAspectRatios[media.id] ?: return null
         return DismissTarget(bounds, aspectRatio)
     }
 

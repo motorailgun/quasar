@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.mediaviewer
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.IntSize
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
@@ -47,6 +48,28 @@ data class MediaViewerArgs(
                 sourceWindowHeight = click.sourceWindowSize.height,
             )
         }
+
+        /**
+         * ポストに付いていない画像 1 枚 (プロフィールのアイコン・ヘッダ画像)。
+         *
+         * @param id 添付メディアの ID と衝突しない合成 ID (戻り先の位置の対応付けにだけ使う)。
+         * @param staticUrl 読み込み中に出しておく静止画 (元の画面で表示済みのはずなので、すぐ出る)。
+         * @param sourceBounds 元の画面での画像の位置 (ウィンドウ上の px)。閉じるときに縮んで戻る先。
+         */
+        fun singleImage(
+            id: String,
+            url: String,
+            staticUrl: String?,
+            sourceBounds: Rect?,
+            sourceWindowSize: IntSize,
+        ) = MediaViewerArgs(
+            items = listOf(ViewerMedia(id = id, type = MediaType.Image, url = url, previewUrl = staticUrl ?: url)),
+            initialIndex = 0,
+            artworkUrl = null,
+            sourceBounds = sourceBounds?.let { mapOf(id to ViewerRect(it.left, it.top, it.right, it.bottom)) }.orEmpty(),
+            sourceWindowWidth = sourceWindowSize.width,
+            sourceWindowHeight = sourceWindowSize.height,
+        )
     }
 }
 

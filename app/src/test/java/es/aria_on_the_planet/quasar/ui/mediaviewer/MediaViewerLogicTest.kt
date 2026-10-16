@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.ui.mediaviewer
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.IntSize
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
@@ -99,6 +100,32 @@ class MediaViewerLogicTest {
         val decoded = MediaViewerArgs.decode(args.encode())!!
         assertEquals(args, decoded)
         assertEquals(listOf(media, unknown), decoded.items.map { it.toAttachment() })
+    }
+
+    @Test
+    fun singleImageUsesStaticAsPreviewAndKeepsBounds() {
+        val args = MediaViewerArgs.singleImage(
+            id = "avatar:1", url = "https://e/a.gif", staticUrl = "https://e/a.png",
+            sourceBounds = Rect(1f, 2f, 3f, 4f), sourceWindowSize = IntSize(1080, 2376),
+        )
+        val media = args.items.single().toAttachment()
+        assertEquals(MediaType.Image, media.type)
+        assertEquals(listOf("https://e/a.gif"), media.viewUrls)
+        assertEquals("https://e/a.png", media.previewUrl)
+        assertEquals(mapOf("avatar:1" to ViewerRect(1f, 2f, 3f, 4f)), args.sourceBounds)
+        assertEquals(args, MediaViewerArgs.decode(args.encode()))
+        assertTrue(MediaViewerArgs.singleImage("h", "https://e/h.png", null, null, IntSize.Zero).sourceBounds.isEmpty())
+    }
+
+    @Test
+    fun dismissTargetFallsBackToLoadedAspectRatio() {
+        val args = MediaViewerArgs.singleImage("avatar:1", "https://e/a.png", null, Rect(0f, 0f, 100f, 100f), IntSize(1080, 2376))
+        val viewModel = MediaViewerViewModel(args) { error("no player") }
+        val window = IntSize(1080, 2376)
+        assertNull(viewModel.dismissTarget(0, window))
+        viewModel.onImageLoaded(viewModel.items[0], 1f)
+        assertEquals(DismissTarget(Rect(0f, 0f, 100f, 100f), 1f), viewModel.dismissTarget(0, window))
+        assertNull(viewModel.dismissTarget(0, IntSize(2376, 1080)))
     }
 
     @Test

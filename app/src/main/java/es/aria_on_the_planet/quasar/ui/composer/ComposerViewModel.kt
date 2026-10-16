@@ -123,18 +123,26 @@ class ComposerViewModel(
         }
     }
 
-    /** Photo Picker で選ばれたメディアを添付し、アップロードを始める。 */
+    /** Photo Picker で選ばれたメディアを添付し、アップロードを始める。既に添付しているものは無視する。 */
     fun addMedia(uris: List<Uri>) {
-        if (uris.isEmpty()) return
+        val attached = composer.attachments.mapNotNullTo(HashSet()) { it.previewUri }
+        val added = uris.filter { it.toString() !in attached }
+        if (added.isEmpty()) return
         viewModelScope.launch {
             val sources = runCatchingLogged("media") {
-                withContext(Dispatchers.IO) { uris.map(openUploadSource) }
+                withContext(Dispatchers.IO) { added.map(openUploadSource) }
             } ?: return@launch
             uploads.add(sources)
         }
     }
 
     fun removeAttachment(localId: String) = uploads.remove(localId)
+
+    /** 埋め込みの Photo Picker で選択が外されたメディアを添付から外す。 */
+    fun removeMedia(uris: List<Uri>) {
+        val removed = uris.mapTo(HashSet()) { it.toString() }
+        composer.attachments.filter { it.previewUri in removed }.forEach { uploads.remove(it.localId) }
+    }
 
     fun retryAttachment(localId: String) = uploads.retry(localId)
 

@@ -480,8 +480,25 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
     かなのまま (`KeyboardType.Uri` でも同じ)。その場合はユーザーが英字に切り替える必要がある。
   * 未実装: 最近使った絵文字、長押しでのショートコード表示、アニメーション版の表示。
 * **メディアの添付**:
-  * 選ぶのは Photo Picker (`PickMultipleVisualMedia` / 残り 1 枚なら `PickVisualMedia`)。**権限は宣言しない** (minSdk 33 で OS 標準。
-    `READ_MEDIA_*` は使わない)。既に画像があれば画像だけを選ばせる。返る `content://` は一時的な許可なので、選んだらすぐ送る。
+  * 選ぶのは Photo Picker。**権限は宣言しない** (`READ_MEDIA_*` は使わない)。返る `content://` は一時的な許可なので、選んだらすぐ送る。
+    * 埋め込み版 (`MediaPickerSheet`、`androidx.photopicker:photopicker-compose`。**alpha**): Android 14 + SDK 拡張 15 以上
+      (`isEmbeddedPhotoPickerAvailable()`) で使う。`ModalBottomSheet` に載せ、最初は半分の高さ (ピッカーは簡易表示)、
+      引き上げると全体表示 (タブ・Done バー付き) に切り替える (`isExpanded` をシートの状態に合わせる)。
+      選択はその場で反映 (選ぶ → `addMedia`、外す → `removeMedia`。URI は `DraftAttachment.previewUri` で対応付け)。
+      添付済みのものは `initialMediaSelection` で選択済みとして出す。Done (`onSelectionComplete`) で閉じる。
+      半分の高さでは Done バーが画面外なので、閉じるのは下へのスワイプか外側のタップ (選択は反映済みなので問題ない)。
+      セッションのエラー時は以後 OS 標準のピッカーに切り替える。alpha の API 変更はこのファイルで吸収する。
+      見た目はピッカー側 (別プロセス) が描くので、アプリから変えられるのはアクセントカラーとダーク / ライトのみ。
+      * アクセント: ピッカーはアクセントの上の文字色を輝度で決める (0.6 以上で黒、未満で白。AOSP の `AccentColorHelper`)。
+        受け付けるのは輝度 0.05〜0.9。アクセントには primary をそのまま渡しており、ダークの primary (トーン 80) は 0.6 未満の
+        ため選択中のタブが「明るい面に白文字」で読みにくい。ライブラリ (alpha) 側の挙動なので回避はしていない (回避するなら
+        ダークで `primaryFixed` (トーン 90) を渡せば黒文字になることは確認済み)。`setThemeNightMode` は明示する
+        (渡さないとダークのシートにライトの面が出る)。
+      * タブ (Photos / Collections) が右に寄るのはピッカー側のレイアウト。シートを外して置いても同じだった (シートや絵文字
+        ピッカーとは無関係)。AOSP main の `NavigationBar.kt` は左右対称なので、端末に入っている Photo Picker の版の問題と
+        思われる。アプリからは直せない。
+    * OS 標準版 (`PickMultipleVisualMedia` / 残り 1 枚なら `PickVisualMedia`): 埋め込み版が使えない端末。開き方 (高さ) は
+      OS が決めるので調整できない。既に画像があれば画像だけを選ばせる。
   * 段取りは `AttachmentUploads` (`ui/composer/`、テストは `AttachmentUploadsTest`): 追加 → 送る前の検査 (`checkUpload`:
     `supported_mime_types`・`image_size_limit` / `video_size_limit`) → 送信中 (進み具合) → 変換待ち (`Processing`) → 完了 / 失敗。
     ✕ で送信を止める (サーバに残った分は投稿されなければサーバが消すので削除 API は呼ばない)。通信エラー (`UploadFailure.Failed`)

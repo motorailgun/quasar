@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,7 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
@@ -44,6 +47,8 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
+import es.aria_on_the_planet.quasar.ui.component.composer.MediaPickerSheet
+import es.aria_on_the_planet.quasar.ui.component.composer.isEmbeddedPhotoPickerAvailable
 
 /**
  * 投稿画面。トップバーの Post で送信し、成功したら [onClose] する。
@@ -84,12 +89,24 @@ fun ComposerScreen(
     val pickSingle = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.addMedia(listOf(uri))
     }
-    val openMediaPicker = {
+    // 使える端末では埋め込みのピッカーをシートで開く (最初は半分の高さ)。開けなかったら以後は OS 標準のピッカー
+    var mediaSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var embeddedPickerFailed by rememberSaveable { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val openSystemMediaPicker = {
         val request = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
         // 動画は単独でしか付けられないので、既に画像があれば画像だけ選ばせる
         val imagesOnly = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
         val input = if (composer.attachments.isEmpty()) request else imagesOnly
         if (remaining >= 2) pickMultiple.launch(input) else if (remaining == 1) pickSingle.launch(input)
+    }
+    val openMediaPicker = {
+        if (isEmbeddedPhotoPickerAvailable() && !embeddedPickerFailed) {
+            keyboard?.hide()
+            mediaSheetOpen = true
+        } else {
+            openSystemMediaPicker()
+        }
     }
 
     val requestClose = { if (isEmpty) onClose() else confirmingDiscard = true }
@@ -147,6 +164,23 @@ fun ComposerScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding),
+        )
+    }
+
+    if (mediaSheetOpen && isEmbeddedPhotoPickerAvailable()) {
+        MediaPickerSheet(
+            // 埋め込みのピッカーで選んだもの (content:// の URI) を選択済みとして渡す
+            selected = remember { composer.attachments.mapNotNull { it.previewUri?.toUri() }.toSet() },
+            maxItems = limits.maxMediaAttachments,
+            onSelect = viewModel::addMedia,
+            onDeselect = viewModel::removeMedia,
+            onDismiss = { mediaSheetOpen = false },
+            onError = { error ->
+                Log.w("ComposerScreen", "Embedded photo picker failed; falling back to the system picker", error)
+                mediaSheetOpen = false
+                embeddedPickerFailed = true
+                openSystemMediaPicker()
+            },
         )
     }
 

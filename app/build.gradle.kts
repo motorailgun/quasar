@@ -59,6 +59,8 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     // 添付する動画 (端末内) のサムネイル
     implementation(libs.coil.video)
+    // 投稿画面に埋め込む Photo Picker (Android 14 + SDK 拡張 15 以上。それ以外は OS 標準の Photo Picker)
+    implementation(libs.androidx.photopicker.compose)
     // メディアの再生 (インライン / メディアビューア)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.datasource.okhttp)

@@ -152,8 +152,8 @@ fun ProfileScreen(
                             .drawBehind {
                                 // ぼかしの上、ボタンの下に不透明な面を重ね、スクロール量で消す (alpha は描画時に読む)
                                 drawRect(surface.copy(alpha = tabsSolidAlpha))
-                                // 上端は不透明なトップバーの色、下へ向かって透明にして、トップバーとの境目を馴染ませる
-                                drawRect(Brush.verticalGradient(listOf(surface, Color.Transparent)))
+                                // 上端は不透明なトップバーの色、高さの半分で透明になるようにして、トップバーとの境目を馴染ませる
+                                drawRect(Brush.verticalGradient(0f to surface, 0.5f to Color.Transparent))
                             },
                     )
                 },

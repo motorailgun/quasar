@@ -220,5 +220,8 @@
     <string name="quick_post_start_typing">Start writing a post</string>
     <string name="quick_post_has_poll">Poll</string>
     <string name="quick_post_has_cw">Content warning</string>
+    <string name="composer_reply_placeholder">Post your reply</string>
+    <string name="composer_replying_to">Replying to %1$s</string>
+    <string name="composer_cancel_reply">Cancel reply</string>
     <string name="account_menu">Account</string>
 </resources>

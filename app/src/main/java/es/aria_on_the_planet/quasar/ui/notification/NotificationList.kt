@@ -87,6 +87,7 @@ fun NotificationList(
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
+    onReply: ((Post) -> Unit)? = null,
 ) {
     LoadMoreEffect(state, onLoadMore)
     // 先頭にいるときにストリーミングの新着が入ったら見せる
@@ -103,6 +104,7 @@ fun NotificationList(
                         onMediaClick = onMediaClick,
                         onVote = onVote,
                         onAction = onAction,
+                        onReply = onReply,
                     )
                 }
                 HorizontalDivider()
@@ -137,6 +139,7 @@ fun NotificationItem(
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
+    onReply: ((Post) -> Unit)? = null,
 ) {
     if (group.type.isCompact) {
         CompactNotification(group, modifier, onUserClick, onPostClick)
@@ -152,6 +155,7 @@ fun NotificationItem(
             onMediaClick = onMediaClick,
             onVote = onVote,
             onAction = onAction,
+            onReply = onReply,
             showReplyIndicator = false,
         )
         return
@@ -167,6 +171,7 @@ fun NotificationItem(
                 onMediaClick = onMediaClick,
                 onVote = onVote,
                 onAction = onAction,
+                onReply = onReply,
                 showReplyIndicator = true,
             )
         } else {

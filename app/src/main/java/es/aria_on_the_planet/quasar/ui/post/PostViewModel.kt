@@ -70,6 +70,23 @@ class PostViewModel(
         }
     }
 
+    /**
+     * 投稿したリプライをスレッドに足し、返信先のリプライ数を 1 増やす。このスレッドへの返信でなければ何もしない。
+     * (ポスト画面はストリーミングを受けないので、自分の投稿は手元で足す。)
+     */
+    fun addPublishedReply(reply: Post) {
+        _state.update { s ->
+            val thread = s.thread ?: return@update s
+            val descendants = insertReply(thread.descendants, thread.post.statusId, reply) ?: return@update s
+            if (descendants === thread.descendants) return@update s
+            val bump = { post: Post ->
+                if (post.statusId == reply.inReplyToId) post.copy(repliesCount = post.repliesCount + 1) else post
+            }
+            val updated = thread.copy(post = bump(thread.post), descendants = descendants.map(bump))
+            s.copy(thread = updated, replies = linearReplies(updated.descendants))
+        }
+    }
+
     fun refresh() {
         if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }

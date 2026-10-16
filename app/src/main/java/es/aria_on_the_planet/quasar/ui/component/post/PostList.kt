@@ -55,6 +55,7 @@ fun PostList(
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
+    onReply: ((Post) -> Unit)? = null,
     onGapClick: (TimelineItem.Gap) -> Unit = {},
     header: (LazyListScope.() -> Unit)? = null,
 ) {
@@ -79,6 +80,7 @@ fun PostList(
                         onMediaClick = onMediaClick,
                         onVote = onVote,
                         onAction = onAction,
+                        onReply = onReply,
                     )
                     is TimelineItem.Gap -> GapRow(item, onClick = { onGapClick(item) })
                 }

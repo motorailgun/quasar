@@ -55,6 +55,9 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  * @param onAttachmentDescriptionChange 代替テキストのダイアログで保存したとき。
  * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯)、ピッカー、入力中の `:shortcode:` の強調に使う。
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
+ * @param header 自分のアイコンの行より上に出すもの (返信先の [ReplyContext])。一緒にスクロールする。
+ *   あるときはアイコンの行の上の余白を詰める (縦線をアイコンまで繋げるため、余白は header 側が持つ)。
+ * @param placeholder 本文欄が空のときの文言。
  */
 @Composable
 fun Composer(
@@ -71,6 +74,8 @@ fun Composer(
     onAttachmentDescriptionChange: (DraftAttachment, String) -> Unit = { attachment, description ->
         state.attachments = state.attachments.map { if (it.localId == attachment.localId) it.copy(description = description) else it }
     },
+    header: (@Composable () -> Unit)? = null,
+    placeholder: String = stringResource(R.string.composer_placeholder),
 ) {
     val focusRequester = remember { FocusRequester() }
     val contentWarningFocusRequester = remember { FocusRequester() }
@@ -94,64 +99,69 @@ fun Composer(
     val keyboard = LocalSoftwareKeyboardController.current
 
     Column(modifier) {
-        Row(
+        Column(
             Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            ComposerAccountIcon(account)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f).animateContentSize()) {
-                ContentWarningField(
-                    state = state.contentWarning,
-                    visible = state.contentWarningEnabled,
-                    outputTransformation = highlight,
-                    modifier = Modifier
-                        .focusRequester(contentWarningFocusRequester)
-                        .onFocusChanged { if (it.hasFocus) activeField = state.contentWarning },
-                )
-                ComposerTextField(
-                    state = state.text,
-                    enabled = enabled,
-                    minHeight = TextMinHeight,
-                    outputTransformation = highlight,
-                    // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
-                    modifier = Modifier
-                        .focusRequester(focusRequester)
-                        .onFocusChanged { if (it.isFocused) activeField = state.text }
-                        .padding(top = 8.dp),
-                )
-                AttachmentStrip(
-                    attachments = attachments,
-                    onRemove = onRemoveAttachment,
-                    onEditDescription = { editingDescriptionOf = it.localId },
-                    onRetry = onRetryAttachment,
-                    canAddMore = enabled && canAddMedia,
-                    onAdd = onAttachMedia,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-                AnimatedVisibility(videoWithOthers) {
-                    Text(
-                        stringResource(R.string.composer_media_video_alone),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
+            header?.invoke()
+            Row(
+                Modifier.padding(start = 16.dp, end = 16.dp, top = if (header != null) 0.dp else 12.dp, bottom = 8.dp),
+            ) {
+                ComposerAccountIcon(account)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f).animateContentSize()) {
+                    ContentWarningField(
+                        state = state.contentWarning,
+                        visible = state.contentWarningEnabled,
+                        outputTransformation = highlight,
+                        modifier = Modifier
+                            .focusRequester(contentWarningFocusRequester)
+                            .onFocusChanged { if (it.hasFocus) activeField = state.contentWarning },
                     )
-                }
-                AnimatedVisibility(attachments.isNotEmpty()) {
-                    SensitiveMediaToggle(
-                        checked = state.sensitive,
-                        onCheckedChange = { state.sensitive = it },
+                    ComposerTextField(
+                        state = state.text,
+                        enabled = enabled,
+                        placeholder = placeholder,
+                        minHeight = TextMinHeight,
+                        outputTransformation = highlight,
+                        // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
+                        modifier = Modifier
+                            .focusRequester(focusRequester)
+                            .onFocusChanged { if (it.isFocused) activeField = state.text }
+                            .padding(top = 8.dp),
                     )
-                }
-                if (poll != null) {
-                    PollEditor(
-                        poll = poll,
-                        onChange = { state.poll = it },
-                        limits = limits,
+                    AttachmentStrip(
+                        attachments = attachments,
+                        onRemove = onRemoveAttachment,
+                        onEditDescription = { editingDescriptionOf = it.localId },
+                        onRetry = onRetryAttachment,
+                        canAddMore = enabled && canAddMedia,
+                        onAdd = onAttachMedia,
                         modifier = Modifier.padding(top = 12.dp),
                     )
+                    AnimatedVisibility(videoWithOthers) {
+                        Text(
+                            stringResource(R.string.composer_media_video_alone),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                    AnimatedVisibility(attachments.isNotEmpty()) {
+                        SensitiveMediaToggle(
+                            checked = state.sensitive,
+                            onCheckedChange = { state.sensitive = it },
+                        )
+                    }
+                    if (poll != null) {
+                        PollEditor(
+                            poll = poll,
+                            onChange = { state.poll = it },
+                            limits = limits,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
             }
         }

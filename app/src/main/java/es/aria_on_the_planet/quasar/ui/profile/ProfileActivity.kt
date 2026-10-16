@@ -14,9 +14,11 @@ import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.follows.openFollowList
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMediaViewer
+import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
+import es.aria_on_the_planet.quasar.ui.composer.openComposer
 
 /** アカウントのプロフィール画面。[openProfile] で起動する。 */
 class ProfileActivity : ComponentActivity() {
@@ -47,6 +49,11 @@ class ProfileActivity : ComponentActivity() {
                     onFollowingClick = { openFollowList(accountId, FollowListTab.Following) },
                     onFollowersClick = { openFollowList(accountId, FollowListTab.Followers) },
                     onOpenImage = ::openMediaViewer,
+                    // プロフィールにはクイック投稿バーが無いので、返信は単独の投稿画面で書く (下書きは共有)
+                    onReply = { post: Post ->
+                        container.draftStore.open(session).startReply(post)
+                        openComposer()
+                    }.takeIf { viewModel.canInteract },
                 )
             }
         }

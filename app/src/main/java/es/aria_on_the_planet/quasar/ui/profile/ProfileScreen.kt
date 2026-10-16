@@ -75,6 +75,7 @@ fun ProfileScreen(
     onFollowingClick: () -> Unit,
     onFollowersClick: () -> Unit,
     onOpenImage: (MediaViewerArgs) -> Unit,
+    onReply: ((Post) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val profile = state.profile.profile
@@ -191,6 +192,7 @@ fun ProfileScreen(
                             onMediaClick = onMediaClick,
                             onVote = onVote,
                             onAction = onAction,
+                            onReply = onReply,
                         )
                     }
                 },
@@ -214,6 +216,7 @@ private fun ProfileTabPage(
     onMediaClick: (MediaClick) -> Unit,
     onVote: (suspend (Post, List<Int>) -> Boolean)?,
     onAction: OnPostAction?,
+    onReply: ((Post) -> Unit)?,
 ) {
     PostList(
         items = feed.items,
@@ -228,6 +231,7 @@ private fun ProfileTabPage(
         onMediaClick = onMediaClick,
         onVote = onVote,
         onAction = onAction,
+        onReply = onReply,
         header = {
             // 通常の一覧にも同じポストが含まれうるので、ピン留めは 1 アイテムにまとめてキー衝突を避ける
             if (pinnedPosts.isNotEmpty()) {
@@ -239,6 +243,7 @@ private fun ProfileTabPage(
                         onMediaClick = onMediaClick,
                         onVote = onVote,
                         onAction = onAction,
+                        onReply = onReply,
                     )
                 }
             }

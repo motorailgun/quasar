@@ -54,6 +54,7 @@ fun PostDetail(
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
+    onReply: ((Post) -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -183,6 +184,6 @@ fun PostDetail(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
-        PostActionRow(post, onAction = onAction)
+        PostActionRow(post, onAction = onAction, onReply = onReply)
     }
 }

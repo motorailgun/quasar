@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,13 +41,18 @@ import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
+import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 
 /**
- * フルの投稿画面。トップバーの Post で送信する。
+ * フルの投稿画面。トップバーの Post で送信する。返信中は上に返信先 ([ReplyContext]、✕ で返信をやめる) を出す。
+ *
+ * 投稿できたときの後始末は [DraftStore] が行う (下書きが空のものに替わり、[DraftStore.published] で知らせる)。
+ * 閉じるのは呼び出し側がそれを受けて行う。
  *
  * @param session 書きかけの投稿 ([DraftStore] から受け取る。クイック投稿バーと共有)。
  * @param onClose 下書きを残したまま閉じる。
- * @param onFinish 投稿した・破棄した (下書きを終えて閉じる)。呼び出し側は [DraftStore.finish] する。
+ * @param onFinish 破棄した (下書きを終えて閉じる)。呼び出し側は [DraftStore.finish] する。
  * @param keepDraftOnClose `true` なら × / 戻るはそのまま [onClose] (クイック投稿バーに下書きが残るので確認は要らない)。
  *   `false` なら入力があるときは破棄の確認を出す (単独の `ComposerActivity`)。
  */
@@ -69,9 +75,6 @@ fun ComposerScreen(
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.posted) {
-        if (state.posted) onFinish()
-    }
     val errorText = state.error?.let { stringResource(R.string.composer_post_failed, it) }
     LaunchedEffect(errorText) {
         if (errorText != null) {
@@ -81,6 +84,8 @@ fun ComposerScreen(
     }
 
     val openMediaPicker = rememberMediaPicker(session)
+    val context = LocalContext.current
+    val replyTarget = composer.inReplyTo
 
     val requestClose = {
         if (keepDraftOnClose || isEmpty) onClose() else confirmingDiscard = true
@@ -136,6 +141,19 @@ fun ComposerScreen(
             onAttachmentDescriptionChange = { attachment, description ->
                 session.setAttachmentDescription(attachment.localId, description)
             },
+            header = replyTarget?.let { target ->
+                {
+                    ReplyContext(
+                        post = target,
+                        myAcct = state.account?.screenName,
+                        onCancel = session::cancelReply,
+                        onMediaClick = context::openMedia,
+                    )
+                }
+            },
+            placeholder = stringResource(
+                if (replyTarget != null) R.string.composer_reply_placeholder else R.string.composer_placeholder,
+            ),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)

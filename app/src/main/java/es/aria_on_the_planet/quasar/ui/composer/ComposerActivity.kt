@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.QuasarApplication
@@ -13,8 +14,9 @@ import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 
 /**
  * 単独の投稿画面。[openComposer] で起動する。要ログイン。
- * 下書きはクイック投稿バーと共有する ([DraftStore])。メイン画面ではバーから同じ画面内でフル画面に広げるので、
- * これはそれ以外の入口 (今後のリプライ等) 用。
+ * 下書きはクイック投稿バーと共有する ([DraftStore])。メイン画面・ポスト画面ではバーから同じ画面内でフル画面に
+ * 広げるので、これはバーの無い画面 (プロフィールからの返信等) 用。返信先は開く前に下書きへ設定しておく。
+ * 閉じても下書きは残る (バーと同じ。共有の下書きなので、ここで破棄するとバーの書きかけまで消える)。
  */
 class ComposerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,6 +32,9 @@ class ComposerActivity : ComponentActivity() {
         setContent {
             QuasarAppContent(container, inlinePlayback = false) {
                 val draft by container.draftStore.current.collectAsStateWithLifecycle()
+                LaunchedEffect(Unit) {
+                    container.draftStore.published.collect { finish() }
+                }
                 draft?.let {
                     ComposerScreen(
                         session = it,
@@ -38,7 +43,7 @@ class ComposerActivity : ComponentActivity() {
                             container.draftStore.finish()
                             finish()
                         },
-                        keepDraftOnClose = false,
+                        keepDraftOnClose = true,
                     )
                 }
             }

@@ -40,15 +40,14 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     // 書きかけの投稿 (クイック投稿バー)。投稿できるのはトークンがあるときだけ
-                    val draft by container.draftStore.current.collectAsStateWithLifecycle()
                     LaunchedEffect(current) {
                         if (current.accessToken != null) container.draftStore.open(current)
                     }
                     TimelineScreen(
                         viewModel = viewModel,
                         onLogout = container.sessionStore::clear,
-                        composer = draft.takeIf { current.accessToken != null },
-                        onDraftFinished = container.draftStore::finish,
+                        drafts = container.draftStore,
+                        canPost = current.accessToken != null,
                     )
                 }
             }

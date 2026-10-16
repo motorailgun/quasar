@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -72,6 +73,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.hazeBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.characterCount
 import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
@@ -84,11 +86,14 @@ import es.aria_on_the_planet.quasar.ui.component.composer.ComposerToolbar
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiButton
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiPickerSheet
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiSuggestionStrip
+import es.aria_on_the_planet.quasar.ui.component.composer.ReplyTargetPreview
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.composer.VisibilityButton
 import es.aria_on_the_planet.quasar.ui.component.composer.insertEmoji
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiShortcodeHighlight
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiSuggestions
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -96,6 +101,7 @@ import kotlinx.coroutines.launch
  *
  * ```
  *          ───              ← ピル: 上へ引っ張るとフルの投稿画面 ([onExpand])
+ * [返信先 ✕]                ← 返信中だけ ([ReplyTargetPreview])
  * [絵文字の候補]
  * [添付 (小)]
  * (icon) 本文 ...   [送信]
@@ -104,6 +110,9 @@ import kotlinx.coroutines.launch
  *
  * 入力していない間はバー全体がタップ領域で、どこを押しても本文の入力を始める (ボタンはそれぞれの操作)。
  * 下書きは [session] (フル画面と共有)。CW と投票はフル画面で編集し、付いているときはチップで示す (タップで広げる)。
+ *
+ * @param barState 外から入力を始めさせる (返信ボタン等。[QuickPostBarState.requestInput])。
+ * @param onMediaClick 返信先のメディアのタップ。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -112,13 +121,16 @@ fun QuickPostBar(
     hazeState: HazeState,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
+    barState: QuickPostBarState = rememberQuickPostBarState(),
+    onMediaClick: (MediaClick) -> Unit = {},
 ) {
     val state by session.state.collectAsStateWithLifecycle()
     val composer = session.composer
     val limits = state.limits
     val enabled = !state.sending
     val canSubmit by remember(composer, limits) { derivedStateOf { composer.toDraft().problems(limits).isEmpty() } }
-    val isEmpty by remember(composer) { derivedStateOf { composer.toDraft().isEmpty } }
+    // 自動で入れた宛先だけ (ポスト画面を開いただけ) なら空と同じ扱いにする
+    val isEmpty by remember(composer) { derivedStateOf { composer.toDraft().isEmpty || composer.isUntouched() } }
     val characterCount by remember(composer, limits) { derivedStateOf { composer.toDraft().characterCount(limits) } }
     val suggestions by rememberEmojiSuggestions(composer.text, state.emojis)
     val highlight = rememberEmojiShortcodeHighlight(state.emojis)
@@ -130,6 +142,13 @@ fun QuickPostBar(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val attachments = composer.attachments
+    val replyTarget = composer.inReplyTo
+    LaunchedEffect(barState) {
+        barState.requests.collect {
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
     val canAddMedia = composer.poll == null &&
         attachments.size < limits.maxMediaAttachments &&
         attachments.none { it.isVideoLike }
@@ -181,6 +200,19 @@ fun QuickPostBar(
             .animateContentSize(),
     ) {
         ExpandHandle(onExpand = onExpand)
+        // 消えるアニメーションの間も前の返信先を出しておく (表示用に覚えるだけなので State にしない)
+        val lastReplyTarget = remember { arrayOfNulls<Post>(1) }
+        if (replyTarget != null) lastReplyTarget[0] = replyTarget
+        AnimatedVisibility(replyTarget != null) {
+            lastReplyTarget[0]?.let { target ->
+                ReplyTargetPreview(
+                    post = target,
+                    onCancel = session::cancelReply,
+                    onMediaClick = onMediaClick,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+            }
+        }
         EmojiSuggestionStrip(suggestions)
         AttachmentStrip(
             attachments = attachments,
@@ -207,6 +239,9 @@ fun QuickPostBar(
             ComposerTextField(
                 state = composer.text,
                 enabled = enabled,
+                placeholder = stringResource(
+                    if (replyTarget != null) R.string.composer_reply_placeholder else R.string.composer_placeholder,
+                ),
                 textStyle = MaterialTheme.typography.bodyLarge,
                 lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = MaxLines),
                 outputTransformation = highlight,
@@ -256,6 +291,20 @@ fun QuickPostBar(
         )
     }
 }
+
+/** [QuickPostBar] を外から操作する。[rememberQuickPostBarState] で作る。 */
+@Stable
+class QuickPostBarState {
+    internal val requests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** 本文欄にフォーカスしてキーボードを出す (返信ボタンを押したとき等)。 */
+    fun requestInput() {
+        requests.tryEmit(Unit)
+    }
+}
+
+@Composable
+fun rememberQuickPostBarState(): QuickPostBarState = remember { QuickPostBarState() }
 
 /**
  * 上端のピル。上へ引っ張ると指に合わせてバーが伸び、[ExpandDistance] を超えるか上へ素早く払うと [onExpand]。

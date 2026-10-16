@@ -27,6 +27,8 @@ class PostActivity : ComponentActivity() {
             finish()
             return
         }
+        // 下書きはタイムラインと共有 (メイン画面を経ずに開かれた場合もここで用意する)
+        if (session.accessToken != null) container.draftStore.open(session)
         setContent {
             QuasarAppContent(container) {
                 val viewModel: PostViewModel = viewModel(
@@ -36,6 +38,7 @@ class PostActivity : ComponentActivity() {
                 )
                 PostScreen(
                     viewModel = viewModel,
+                    drafts = container.draftStore,
                     onBack = ::finish,
                     onUserClick = ::openProfile,
                     onPostClick = { post -> if (post.statusId != statusId) openPost(post) },

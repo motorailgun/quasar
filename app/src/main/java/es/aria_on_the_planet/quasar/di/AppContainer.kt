@@ -55,7 +55,7 @@ class AppContainer(context: Context) {
     val mediaDownloader: MediaDownloader = SystemMediaDownloader(context)
 
     /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
-    val draftStore = DraftStore { session, scope ->
+    val draftStore = DraftStore { session, scope, onPublished ->
         ComposerSession(
             session = session,
             scope = scope,
@@ -65,6 +65,7 @@ class AppContainer(context: Context) {
             statusRepository = statusRepository,
             mediaRepository = mediaRepository,
             openUploadSource = ::uploadSource,
+            onPublished = onPublished,
         )
     }
     val streamingClient = StreamingClient(okHttpClient, json, instanceRepository)

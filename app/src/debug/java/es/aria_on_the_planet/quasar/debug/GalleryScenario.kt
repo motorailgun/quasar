@@ -16,6 +16,8 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     EmojiPicker("emoji-picker", R.string.gallery_emoji_picker, "emoji-picker.json"),
     Profile("profile", R.string.gallery_profile, "profile.json"),
     PostVariety("post-variety", R.string.gallery_post_variety, "post-variety.json"),
+    /** 返信先の表示 (バーの縮小版 / フル画面の X 風)。データは post-variety を使い回す。 */
+    Reply("reply", R.string.gallery_reply, "post-variety.json"),
     ;
 
     companion object {

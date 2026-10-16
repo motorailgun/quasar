@@ -89,6 +89,19 @@ object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
 }
 
+/** [PostCard] の表示の種類。 */
+enum class PostCardMode {
+    /** 一覧・スレッド用の全部入り。 */
+    Full,
+
+    /**
+     * 返信画面の上に出す返信先 (X の返信画面の形)。本文 (CW・長文の折りたたみ込み) とメディアだけで、
+     * ラベル (ブースト・リプライ・ピン留め)・公開範囲・投票・リンクプレビュー・引用・アクション行は出さない。
+     * カード全体のタップも受けない。
+     */
+    ReplyContext,
+}
+
 /**
  * ポスト 1 件。タイムライン・プロフィール等で再利用する stateless コンポーネント。
  *
@@ -96,8 +109,11 @@ object PostCardDefaults {
  * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
  * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (未ログイン時など)。
  * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (未ログイン時など)。
+ * @param onReply アクション行のリプライが押されたとき。`null` なら表示のみ。
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
  *   返信関係が別の形で分かる場所では `false` にする。
+ * @param mode 表示の種類 ([PostCardMode])。
+ * @param authorTrailing 投稿者行の右端に置くもの ([PostCardMode.ReplyContext] の ✕ 等)。公開範囲のアイコンの代わりに出す。
  */
 @Composable
 fun PostCard(
@@ -110,28 +126,19 @@ fun PostCard(
     onMediaClick: (MediaClick) -> Unit = {},
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
+    onReply: ((Post) -> Unit)? = null,
     showReplyIndicator: Boolean = true,
+    mode: PostCardMode = PostCardMode.Full,
+    authorTrailing: (@Composable () -> Unit)? = null,
 ) {
+    val full = mode == PostCardMode.Full
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onPostClick(post) }
+            .then(if (full) Modifier.clickable { onPostClick(post) } else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        if (pinned) {
-            PinnedLabel(Modifier.padding(start = 52.dp, bottom = 2.dp))
-        }
-        post.boostedBy?.let { booster ->
-            BoostedByLabel(
-                booster,
-                Modifier
-                    .padding(start = 52.dp, bottom = 4.dp)
-                    .clickable { onUserClick(booster) },
-            )
-        }
-        if (showReplyIndicator && post.inReplyToId != null) {
-            ReplyToLabel(post.inReplyToAcct, Modifier.padding(start = 52.dp, bottom = 4.dp))
-        }
+        if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick)
         Row {
             UserIcon(
                 user = post.author,
@@ -139,7 +146,12 @@ fun PostCard(
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                AuthorLine(post, onAuthorClick = { onUserClick(post.author) })
+                AuthorLine(
+                    post,
+                    onAuthorClick = { onUserClick(post.author) },
+                    showVisibility = full,
+                    trailing = authorTrailing,
+                )
                 Spacer(Modifier.size(4.dp))
                 var expanded by rememberContentWarningExpanded(post)
                 post.contentWarning?.let { cw ->
@@ -160,12 +172,14 @@ fun PostCard(
                             stateKey = post.statusId,
                             maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
                         )
-                        post.poll?.let { poll ->
-                            PollView(
-                                poll = poll,
-                                onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
+                        if (full) {
+                            post.poll?.let { poll ->
+                                PollView(
+                                    poll = poll,
+                                    onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -179,29 +193,50 @@ fun PostCard(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                // リンクプレビュー・引用も本文の一部として CW で隠す
-                AnimatedVisibility(visible = expanded) {
-                    Column {
-                        post.card?.let { card ->
-                            LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
-                        }
-                        post.quote?.let { quote ->
-                            QuotedPost(
-                                quote = quote,
-                                mediaHeight = mediaHeight * 0.75f,
-                                // 引用の高さは添付画像と同じ高さまで
-                                maxHeight = mediaHeight,
-                                onPostClick = onPostClick,
-                                onMediaClick = onMediaClick,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
+                if (full) {
+                    // リンクプレビュー・引用も本文の一部として CW で隠す
+                    AnimatedVisibility(visible = expanded) {
+                        Column {
+                            post.card?.let { card ->
+                                LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
+                            }
+                            post.quote?.let { quote ->
+                                QuotedPost(
+                                    quote = quote,
+                                    mediaHeight = mediaHeight * 0.75f,
+                                    // 引用の高さは添付画像と同じ高さまで
+                                    maxHeight = mediaHeight,
+                                    onPostClick = onPostClick,
+                                    onMediaClick = onMediaClick,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
                         }
                     }
+                    Spacer(Modifier.size(8.dp))
+                    PostActionRow(post, onAction = onAction, onReply = onReply)
                 }
-                Spacer(Modifier.size(8.dp))
-                PostActionRow(post, onAction = onAction)
             }
         }
+    }
+}
+
+/** 本文の上のラベル (ピン留め・ブースト・リプライ)。 */
+@Composable
+private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Boolean, onUserClick: (User) -> Unit) {
+    if (pinned) {
+        PinnedLabel(Modifier.padding(start = 52.dp, bottom = 2.dp))
+    }
+    post.boostedBy?.let { booster ->
+        BoostedByLabel(
+            booster,
+            Modifier
+                .padding(start = 52.dp, bottom = 4.dp)
+                .clickable { onUserClick(booster) },
+        )
+    }
+    if (showReplyIndicator && post.inReplyToId != null) {
+        ReplyToLabel(post.inReplyToAcct, Modifier.padding(start = 52.dp, bottom = 4.dp))
     }
 }
 
@@ -220,13 +255,21 @@ fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
 }
 
 @Composable
-private fun AuthorLine(post: Post, onAuthorClick: () -> Unit) {
+private fun AuthorLine(
+    post: Post,
+    onAuthorClick: () -> Unit,
+    showVisibility: Boolean = true,
+    trailing: (@Composable () -> Unit)? = null,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         // 表示名 + screenName + 時刻は左に詰め、公開範囲のアイコンは右端に寄せる
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             AuthorNameAndTime(post, onAuthorClick)
         }
-        if (post.visibility.hasIcon) {
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
+        } else if (showVisibility && post.visibility.hasIcon) {
             Spacer(Modifier.width(8.dp))
             // アクション行のアイコンと同じ幅の枠の中央に置き、右端のブックマークと縦に揃える
             Box(Modifier.size(ActionIconSize), contentAlignment = Alignment.Center) {
@@ -332,10 +375,15 @@ private fun PinnedLabel(modifier: Modifier = Modifier) {
 
 /**
  * リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。
- * [onAction] があればブースト・お気に入り・ブックマークを押せる (リプライは未実装で表示のみ)。
+ * [onAction] があればブースト・お気に入り・ブックマークを、[onReply] があればリプライを押せる。
  */
 @Composable
-fun PostActionRow(post: Post, modifier: Modifier = Modifier, onAction: OnPostAction? = null) {
+fun PostActionRow(
+    post: Post,
+    modifier: Modifier = Modifier,
+    onAction: OnPostAction? = null,
+    onReply: ((Post) -> Unit)? = null,
+) {
     val viewer = post.viewer
     Row(
         // 押せる範囲を広げた分 (左右の余白) だけ外にはみ出させ、アイコンの位置は余白なしのときと揃える
@@ -358,6 +406,8 @@ fun PostActionRow(post: Post, modifier: Modifier = Modifier, onAction: OnPostAct
             icon = Icons.AutoMirrored.Outlined.Reply,
             label = stringResource(R.string.post_replies),
             count = post.repliesCount,
+            toggle = false,
+            onClick = onReply?.let { { it(post) } },
         )
         PostActionButton(
             icon = if (viewer.reblogged) Icons.Filled.Repeat else Icons.Outlined.Repeat,
@@ -392,8 +442,8 @@ fun PostActionRow(post: Post, modifier: Modifier = Modifier, onAction: OnPostAct
 private val ActionPaddingHorizontal = 6.dp
 
 /**
- * アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタンになる。
- * [enabled] が `false` ならグレーアウトして押せない。
+ * アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタン ([toggle] が `false` なら
+ * 普通のボタン) になる。[enabled] が `false` ならグレーアウトして押せない。
  *
  * アニメーションは Expressive の motionScheme (テーマの spring) に合わせる:
  * 押している間はアイコンを縮め、タップでオンになったらアイコンを弾ませて後ろから粒を散らす ([actionBurst])。
@@ -409,6 +459,7 @@ private fun PostActionButton(
     active: Boolean = false,
     activeColor: Color = MaterialTheme.colorScheme.primary,
     enabled: Boolean = true,
+    toggle: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     val motion = MaterialTheme.motionScheme
@@ -459,7 +510,15 @@ private fun PostActionButton(
             )
             .clip(CircleShape)
             .then(
-                if (onClick != null) {
+                if (onClick != null && !toggle) {
+                    Modifier.clickable(
+                        enabled = enabled,
+                        interactionSource = interactionSource,
+                        indication = ripple(),
+                        role = Role.Button,
+                        onClick = onClick,
+                    )
+                } else if (onClick != null) {
                     Modifier.toggleable(
                         value = active,
                         enabled = enabled,

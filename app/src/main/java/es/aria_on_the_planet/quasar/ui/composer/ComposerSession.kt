@@ -12,6 +12,7 @@ import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import es.aria_on_the_planet.quasar.domain.model.UploadFailure
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -37,8 +38,6 @@ data class ComposerScreenState(
     val sending: Boolean = false,
     /** 送信失敗の内容。表示したら [ComposerSession.errorShown] で消す。 */
     val error: String? = null,
-    /** 投稿できた (画面を閉じる)。 */
-    val posted: Boolean = false,
 )
 
 /**
@@ -46,7 +45,8 @@ data class ComposerScreenState(
  * フルの投稿画面が同じものを共有する (バーから引き上げても、アップロード中の添付ごと続きを書ける)。
  *
  * [DraftStore] が作って持ち、投稿・破棄したら [close] して新しいものに替える。処理は [scope] 上で動くので、
- * 画面を切り替えても止まらない。
+ * 画面を切り替えても止まらない。返信先 ([ComposerState.inReplyTo]) もこの下書きの一部で、返信と通常の投稿で
+ * 下書きを分けない。
  */
 class ComposerSession(
     private val session: Session,
@@ -58,6 +58,8 @@ class ComposerSession(
     private val mediaRepository: MediaRepository,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
+    /** 投稿できた。[DraftStore] がこの下書きを終えて空のものに替える。 */
+    private val onPublished: (Post) -> Unit,
 ) {
     /** 入力内容。 */
     val composer = ComposerState()
@@ -120,8 +122,9 @@ class ComposerSession(
         _state.update { it.copy(sending = true, error = null) }
         scope.launch {
             try {
-                statusRepository.publish(session, draft, key)
-                _state.update { it.copy(sending = false, posted = true) }
+                val post = statusRepository.publish(session, draft, key)
+                _state.update { it.copy(sending = false) }
+                onPublished(post)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -130,6 +133,29 @@ class ComposerSession(
             }
         }
     }
+
+    /**
+     * [target] への返信にする (返信中なら返信先を付け替える)。本文・添付は残す。
+     *
+     * @param auto ポスト画面を開いたときの自動の返信か ([ComposerState.autoReply])。
+     */
+    fun startReply(target: Post, auto: Boolean = false) {
+        composer.startReply(target, myAcct = _state.value.account?.screenName, auto = auto)
+    }
+
+    /** 返信をやめる (✕)。 */
+    fun cancelReply() = composer.cancelReply()
+
+    /**
+     * ポスト画面を開いたとき: 何も書いていなければ [target] (主役のポスト) への返信にする (X と同じ)。
+     * 書きかけ・返信ボタンで付けた返信先があれば何もしない。離れるときは [releaseAutoReply]。
+     */
+    fun startAutoReply(target: Post) {
+        if (composer.canAutoReply(target)) startReply(target, auto = true)
+    }
+
+    /** ポスト画面を離れるとき: 自動で付けた返信を、何も書いていなければ外す。 */
+    fun releaseAutoReply() = composer.releaseAutoReply()
 
     /** Photo Picker で選ばれたメディアを添付し、アップロードを始める。既に添付しているものは無視する。 */
     fun addMedia(uris: List<Uri>) {

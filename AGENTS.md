@@ -36,7 +36,7 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength, MediaSave)
+│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -47,6 +47,7 @@ es.aria_on_the_planet.quasar
     │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
     │   ├── post/PostTime.kt        詳細日時のフォーマット
     │   ├── post/QuotedPost.kt      引用ポストの縮小表示 / 表示不可時のプレースホルダ
+    │   ├── post/ThreadLines.kt     スレッドの縦線 (ポスト画面・返信画面の返信先)
     │   ├── poll/PollView.kt        投票 (選択肢 / 結果) + PollMath.kt (割合・残り時間)
     │   ├── scaffold/DetailScaffold.kt 詳細画面共通の骨組み (戻る付きトップバー + スクロールでタイトル切替 + PTR)
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
@@ -61,7 +62,8 @@ es.aria_on_the_planet.quasar
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
-    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker)
+    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
+    │   │                           ReplyTarget = 返信先の表示: ReplyTargetPreview / ReplyContext / ReplyingToLabel)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle) /
     │   │                           CollapsingHeaderLayout (スクロールで畳まれるヘッダ + 残るタブ + 本体)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
@@ -74,7 +76,7 @@ es.aria_on_the_planet.quasar
     ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
     └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / ComposerActivity / QuickPostBar /
-                                    AttachmentUploads / MediaPickerHost)
+                                    QuickComposerHost / AttachmentUploads / MediaPickerHost)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -143,6 +145,7 @@ data class Post(
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
     val inReplyToId: String?,      // in_reply_to_id (中身の値)
+    val mentions: List<String>,    // mentions の acct (返信の宛先に使う)
 )
 
 /** ログイン中ユーザーから見た状態。API では認証時のみ返るため、未認証時はすべて false。 */
@@ -315,11 +318,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
 * 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / 投票 (PollView) /
   添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
+* `mode = PostCardMode.ReplyContext` は返信画面の上の返信先用: 本文 (CW・長文の折りたたみ込み) とメディアだけで、ラベル・
+  公開範囲・投票・カード・引用・アクション行を出さず、カード全体のタップも受けない。`authorTrailing` は投稿者行の右端 (✕ 等)。
 * `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),
   ブックマーク=secondary) で表示する。
-  ブースト・お気に入り・ブックマークは押せる (`onAction`、未ログインなら `null` で表示のみ)。リプライは表示のみ。
+  ブースト・お気に入り・ブックマークは押せる (`onAction`、未ログインなら `null` で表示のみ)。リプライは `onReply`
+  (トグルではないので `PostAction` とは別の口。`PostList` / `NotificationList` / `PostDetail` 等は中継するだけ。「投稿」の「返信」)。
 * `Post` 以外の状態を持たない (stateless)。
 
 ### PostList (`ui/component/post/PostList.kt`)
@@ -543,13 +549,18 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 投稿 (`ui/composer/`, `ui/component/composer/`)
 
-* **入口**: メイン画面下のクイック投稿バー (`QuickPostBar`、ログイン時のみ。FAB は廃止)。ピルを上へ引っ張ると
+* **入口**: メイン画面とポスト画面の下のクイック投稿バー (`QuickPostBar`、ログイン時のみ。FAB は廃止)。ピルを上へ引っ張ると
   (または投票・CW のチップ / 添付の ALT のタップ)、同じ画面内でフルの投稿画面 (`ComposerScreen`) が下から伸びて開く。
-  `ComposerActivity` (`Context.openComposer()`) は他の入口 (今後のリプライ等) 用に残している。
+  バー + フル画面 + 送信エラーのスナックバーは `QuickComposerHost` にまとめてあり、両画面はそれで一覧を包む
+  (一覧は `hazeSource` を付け、下端の余白に引数の `barSpace` を足す)。
+  `ComposerActivity` (`Context.openComposer()`) はバーの無い画面 (プロフィールからの返信) 用。閉じても下書きは残す。
 * **下書きの共有**: 書きかけの投稿は `ComposerSession` (入力 `ComposerState`・添付のアップロード・送信・上限・アカウント・絵文字)。
   `DraftStore` (`AppContainer.draftStore`) がアプリ全体で 1 つ持ち、バー・フル画面・`ComposerActivity` が同じものを使う。
   session は自分のコルーチンの範囲 (`SupervisorJob` + Main) で動くので、画面を切り替えてもアップロードは止まらない。
   投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。アカウントが変わったら作り直す。プロセスが終わると消える (保存しない)。
+  * 投稿できたら `DraftStore` 自身が `finish()` し、`DraftStore.published` (SharedFlow) に投稿を流す。同じ下書きを複数の画面
+    (メイン画面とポスト画面) が表示しているので、後始末は画面ではなくここで 1 回だけ行う。画面はそれを受けてフル画面を閉じる・
+    スレッドに足す (`PostViewModel.addPublishedReply`) だけ。
   * フル画面 (バーから): × / 戻るはバーに戻るだけ (下書きは残るので確認しない)。`ComposerActivity`: 入力があれば破棄の確認。
 * **クイック投稿バー** (`ui/composer/QuickPostBar.kt`): 浮かぶ角丸の面で、後ろの一覧を Haze (`dev.chrisbanes.haze:haze-blur`) で
   ぼかす (一覧の `HorizontalPager` に `hazeSource`、バーに `hazeBlur(HazeInput.Sources(state))`)。
@@ -645,7 +656,24 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
-* **未実装**: リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、
+* **返信**:
+  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アプリ全体で 1 つ)。
+    返信ボタン (`onReply`) は `session.startReply(post)` + `QuickPostBarState.requestInput()` (バーにフォーカス)。
+    返信中に別のポストの返信ボタンを押すと返信先を上書きし、本文は残す。プロフィール (バーが無い) は `startReply` → `openComposer()`。
+  * `startReply` は宛先 (`@作者 @メンション先 `、自分は除く) を本文に入れ、公開範囲を返信前の値と返信先の狭い方にし、返信先の CW を
+    引き継ぐ。ユーザーが書いた本文・選び直した値は変えない。`cancelReply` (✕) は自動で変えたもののうち変えられていないものを
+    返信前に戻す。計算は純粋関数 (`domain/model/Reply.kt`: `replyMentions` / `replyVisibility` / `startReply` / `cancelReply` /
+    `isUntouched`、`ReplyDraftTest`)。`ReplyMemory` が「返信前の値」と「自動で入れた値」を持つ。
+  * 表示: バーは返信中なら本文の上に `ReplyTargetPreview` (縮小・本文 2 行・メディア 48dp・✕)。フル画面は `Composer(header = ...)`
+    に `ReplyContext` (X の返信画面の形: `PostCard(ReplyContext)` + 縦線 + 「Replying to @acct」 + 投稿者行の右端に ✕)。
+    どちらも入口に関係なく `inReplyTo` だけで決まる。本文欄の文言は「Post your reply」。
+  * **ポスト画面の自動の返信** (X と同じ): 前面に来たとき (`LifecycleResumeEffect`) 何も書いていなければ本体への返信にし
+    (`startAutoReply`、`ComposerState.autoReply = true`)、離れるとき (pause) まだ何も書いていなければ外す (`releaseAutoReply`)。
+    下書きを共有しているので、外さないとタイムラインのバーまで返信になる。返信ボタンで付けた返信先・書きかけがあれば付け替えない。
+    ✕ で外した自動の返信は、その下書きの間は同じポストに付け直さない (`dismissedAutoReplyId`)。
+  * ポスト画面はストリーミングを受けないので、自分の返信は `published` から `insertReply` (`ReplyList.kt`、深さ優先の順で
+    返信先の子孫の末尾へ) で足し、返信先のリプライ数を +1 する。
+* **未実装**: 下書き保存、
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 
@@ -744,7 +772,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar/.debug.DebugGalleryActivity \
       --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60]
   ```
-  `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety。
+  `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
+  reply (返信先の 2 つの表示。データは post-variety を使い回す)。
   表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
@@ -790,6 +819,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   リンクが開くことがある (既知の挙動)。
 * `StickToTopEffect` はコンポジション中に LazyListState を読んで「直前に先頭にいたか」を判定している。
   一覧の先頭キーの決め方を変えるときは挙動を確認する。
+* **入力欄のある Activity は manifest で `android:windowSoftInputMode="adjustResize"` にする** (MainActivity / PostActivity /
+  ComposerActivity)。未指定だと OS が `adjustPan` を選ぶことがあり、ウィンドウごと押し上げられた上に Compose の
+  `WindowInsets.ime` の分も持ち上がって、クイック投稿バーがキーボードの高さ 1 つ分上 (画面の上端付近) に飛ぶ。
 * **凹みのある形 (`MaterialShapes.Cookie9Sided` 等) に `Modifier.shadow` を付けない**。影の計算が RenderThread で非常に重く、
   ヘッダのアイコンに 12dp の影を付けたら 1 フレームに約 10 秒かかり、起動直後に固まって ANR になった。影は円などの凸形で付ける
   (見た目の形と影の形は別でよい)。
@@ -802,8 +834,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ### 実機での確認 (adb)
 * 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。
-  `adb devices` の先頭の device を使う。切断・ロック・スリープは頻繁に起きる → 勝手にエミュレータへ切り替えず、
-  ユーザーに再接続・解除を頼む。
+  `adb devices` の先頭の device を使う。切断・ロック・スリープは頻繁に起きる → 実機が寝ていて (`dumpsys power` の
+  `mWakefulness=Asleep`) エミュレータが起きているなら、エミュレータで動作確認する。どちらも使えなければユーザーに解除を頼む。
+  エミュレータにはログイン情報が無いことがあるので、ログインが要る確認はその旨を伝える。
 * 座標決め打ちのタップは許可されているが、アプリの外 (ブラウザ等) に出たら即中断する。リンクを避けるため、
   ポストを開くときはアクション行の空き部分をタップする。
 * 先頭へ戻るために下方向スワイプを繰り返すと pull-to-refresh が発動し一覧が読み直される (gap も消える)。
@@ -828,7 +861,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
-* **操作**: リプライは未実装 (投稿はテキスト・CW・投票・公開範囲・メディア添付)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
+* **操作**: 投稿はテキスト・CW・投票・公開範囲・メディア添付・リプライ (リプライは実機で未確認)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
   操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。

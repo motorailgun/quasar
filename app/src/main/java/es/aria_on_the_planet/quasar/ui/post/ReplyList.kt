@@ -25,3 +25,25 @@ fun linearReplies(descendants: List<Post>): List<ReplyRow> =
             connectedToNext = next != null && next.inReplyToId == post.statusId,
         )
     }
+
+/**
+ * 投稿したリプライ [reply] をスレッドの [descendants] に入れる。API と同じ深さ優先の順になるよう、返信先の
+ * 子孫の並びの末尾に置く。返信先が本体 ([rootId]) でも子孫でもなければ (祖先への返信等) `null`。
+ * 既に含まれていればそのまま返す (再読み込み済み等)。
+ */
+fun insertReply(descendants: List<Post>, rootId: String, reply: Post): List<Post>? {
+    if (descendants.any { it.statusId == reply.statusId }) return descendants
+    val parentId = reply.inReplyToId ?: return null
+    val parentIndex = when (parentId) {
+        rootId -> -1
+        else -> descendants.indexOfFirst { it.statusId == parentId }.takeIf { it >= 0 } ?: return null
+    }
+    // 返信先の子孫 (返信先へ辿り着く行) が続く間は進める
+    val subtree = HashSet<String>().apply { add(parentId) }
+    var insertAt = parentIndex + 1
+    while (insertAt < descendants.size && descendants[insertAt].inReplyToId in subtree) {
+        subtree += descendants[insertAt].statusId
+        insertAt++
+    }
+    return descendants.toMutableList().apply { add(insertAt, reply) }
+}

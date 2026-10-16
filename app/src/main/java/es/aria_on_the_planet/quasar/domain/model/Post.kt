@@ -38,6 +38,8 @@ data class Post(
     val inReplyToId: String? = null,
     /** リプライ先アカウントの acct (`username` または `username@domain`)。特定できなければ `null`。 */
     val inReplyToAcct: String? = null,
+    /** 本文でメンションしているアカウントの acct (mentions)。返信の宛先に使う。 */
+    val mentions: List<String> = emptyList(),
 )
 
 /** ポストの公開範囲 (visibility)。 */

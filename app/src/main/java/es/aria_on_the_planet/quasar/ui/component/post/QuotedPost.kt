@@ -137,9 +137,10 @@ fun QuotedPost(
     }
 }
 
+/** 小さいアイコン (20dp) + 表示名 + @acct · 時刻 の 1 行。返信先の縮小表示 (ReplyTargetPreview) でも使う。 */
 @Composable
-private fun QuoteHeader(post: Post) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+internal fun QuoteHeader(post: Post, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         UserIcon(user = post.author, size = 20.dp)
         Spacer(Modifier.width(6.dp))
         EmojiText(

@@ -1,18 +1,10 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,7 +33,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
@@ -53,7 +44,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,9 +72,9 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.list.scrollToTop
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
-import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
-import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
-import es.aria_on_the_planet.quasar.ui.composer.QuickPostBar
+import es.aria_on_the_planet.quasar.ui.composer.DraftStore
+import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
+import es.aria_on_the_planet.quasar.ui.composer.rememberQuickPostBarState
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
@@ -98,8 +88,8 @@ import kotlin.math.abs
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     onLogout: () -> Unit,
-    composer: ComposerSession? = null,
-    onDraftFinished: () -> Unit = {},
+    drafts: DraftStore,
+    canPost: Boolean,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -109,6 +99,7 @@ fun TimelineScreen(
     val pagerState = rememberPagerState(initialPage = state.available.indexOf(state.selected)) { state.available.size }
     val dragging by pagerState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     // スワイプで切り替わったら選択に反映する (ボタンで選んだときは先に select 済み)
     LaunchedEffect(pagerState) {
@@ -127,36 +118,35 @@ fun TimelineScreen(
     }
 
     // クイック投稿バー: 下に浮かべ、後ろの一覧をぼかす。ピルを引き上げると同じ画面内でフルの投稿画面に広がる
-    var composerExpanded by rememberSaveable { mutableStateOf(false) }
     val hazeState = rememberHazeState()
-    var barHeight by remember { mutableStateOf(0.dp) }
+    val barState = rememberQuickPostBarState()
     var headerHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
-    val draftState = composer?.state?.collectAsStateWithLifecycle()?.value
+    val draft by drafts.current.collectAsStateWithLifecycle()
+    val composer = draft.takeIf { canPost }
     // ヘッダ左のアイコンに出すログイン中のアカウント (投稿用に取得しているものを使う)
-    val account: User? = draftState?.account
-    if (composer != null && draftState != null) {
-        // バーから投稿した (フル画面からの投稿はフル画面が onFinish で知らせる)
-        LaunchedEffect(draftState.posted) {
-            if (draftState.posted && !composerExpanded) onDraftFinished()
-        }
-        val postError = draftState.error?.takeUnless { composerExpanded }
-            ?.let { stringResource(R.string.composer_post_failed, it) }
-        LaunchedEffect(postError) {
-            if (postError != null) {
-                snackbarHostState.showSnackbar(postError)
-                composer.errorShown()
-            }
+    val account: User? = composer?.state?.collectAsStateWithLifecycle()?.value?.account
+    // 返信ボタン: 下書き (返信と通常の投稿で共有) の返信先にしてバーで書き始める
+    val onReply: ((Post) -> Unit)? = composer?.let { session ->
+        { post ->
+            session.startReply(post)
+            barState.requestInput()
         }
     }
-    // 一覧の上端はヘッダ (ステータスバーを含む) の分だけ空ける。一覧自体は画面の最上端から描き、スクロールすると
-    // ステータスバーやヘッダの裏に入る
-    val topPadding = headerHeight
-    // 一覧の下端はバー (と下の余白・ナビゲーションバー) の分だけ空け、最後の項目がバーに隠れないようにする
-    val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-        if (composer != null) barHeight + BarMargin * 2 else 0.dp
 
-    Box(Modifier.fillMaxSize()) {
+    QuickComposerHost(
+        drafts = drafts,
+        hazeState = hazeState,
+        snackbarHostState = snackbarHostState,
+        enabled = canPost,
+        barState = barState,
+        onMediaClick = context::openMedia,
+    ) { barSpace ->
+        // 一覧の上端はヘッダ (ステータスバーを含む) の分だけ空ける。一覧自体は画面の最上端から描き、スクロールすると
+        // ステータスバーやヘッダの裏に入る
+        val topPadding = headerHeight
+        // 一覧の下端はバー (と下の余白・ナビゲーションバー) の分だけ空け、最後の項目がバーに隠れないようにする
+        val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + barSpace
         // トップバーは置かず、ヘッダ (アイコン + タブ) を一覧の上に浮かべる
         Scaffold { _ ->
             Box(Modifier.fillMaxSize()) {
@@ -183,6 +173,7 @@ fun TimelineScreen(
                         viewModel = viewModel,
                         topPadding = topPadding,
                         bottomPadding = bottomPadding,
+                        onReply = onReply,
                     )
                 }
                 StatusBarScrim(Modifier.align(Alignment.TopCenter))
@@ -206,51 +197,11 @@ fun TimelineScreen(
                         .align(Alignment.TopCenter)
                         .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
                 )
-                Column(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        // キーボードが出ているときはその上に乗せる
-                        .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                        .padding(horizontal = BarMargin, vertical = BarMargin),
-                ) {
-                    SnackbarHost(snackbarHostState)
-                    if (composer != null) {
-                        QuickPostBar(
-                            session = composer,
-                            hazeState = hazeState,
-                            onExpand = { composerExpanded = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
-                        )
-                    }
-                }
-            }
-        }
-
-        // バーが下から伸びるようにフルの投稿画面を出す (下書きは共有、閉じるとバーに戻る)
-        AnimatedVisibility(
-            visible = composerExpanded && composer != null,
-            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
-        ) {
-            composer?.let {
-                ComposerScreen(
-                    session = it,
-                    onClose = { composerExpanded = false },
-                    onFinish = {
-                        composerExpanded = false
-                        onDraftFinished()
-                    },
-                    keepDraftOnClose = true,
-                )
             }
         }
     }
 }
 
-private val BarMargin = 12.dp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -261,6 +212,7 @@ private fun ColumnPage(
     viewModel: TimelineViewModel,
     topPadding: Dp,
     bottomPadding: Dp,
+    onReply: ((Post) -> Unit)?,
 ) {
     val context = LocalContext.current
     val feed = state.feedOf(column)
@@ -306,6 +258,7 @@ private fun ColumnPage(
                 onMediaClick = onMediaClick,
                 onVote = onVote,
                 onAction = onAction,
+                onReply = onReply,
             )
 
             else -> PostList(
@@ -319,6 +272,7 @@ private fun ColumnPage(
                 onPostClick = context::openPost,
                 onVote = onVote,
                 onAction = onAction,
+                onReply = onReply,
                 onMediaClick = onMediaClick,
                 onGapClick = { gap -> viewModel.fillGap(column, gap) },
             )

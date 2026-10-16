@@ -127,6 +127,7 @@ fun StatusDto.toDomain(): Post {
         statusId = body.id,
         inReplyToId = body.inReplyToId,
         inReplyToAcct = body.replyTargetAcct(),
+        mentions = body.mentions.map { it.acct },
     )
 }
 

@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.feed
 
+import es.aria_on_the_planet.quasar.domain.model.Page
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,23 +23,43 @@ data class FeedState<T>(
 /**
  * `max_id` で古い方向へページングする一覧の状態管理。ポスト・通知など ID を持つ一覧で共通に使う。
  *
+ * 次ページの `max_id` は [fetchPage] が返す [Page.nextMaxId] で決める。項目の ID から決まる一覧 (ポスト・通知) は
+ * `nextMaxIdOf` を取る副コンストラクタを使う。
+ *
  * @param R API から取得する 1 件の型。
  * @param T 表示する 1 件の型 (グルーピング等で [R] と異なりうる)。
- * @param nextMaxIdOf 取得したページから次ページの `max_id` を決める (ページ中で最も古い ID)。
  * @param append 現在の一覧に、取得した (より古い) ページを足した一覧を返す純粋関数。refresh では空の一覧に足す。
  * @param trim [updateList] (ストリーム・補完による新しい側への追加) の後に一覧を最大件数に切り詰める純粋関数。
  *   読み進めて伸ばした分 (loadMore) には適用しない。
  * @param nextMaxIdOfItems 切り詰めで末尾が変わったときに、残った一覧から次ページの `max_id` を求め直す。
- * @param fetch `maxId` より古いものを返す。`null` なら最新から。
+ * @param fetchPage `maxId` より古いページを返す。`null` なら最新から。
  */
 open class PagedFeed<R, T>(
     private val scope: CoroutineScope,
-    private val nextMaxIdOf: (page: List<R>) -> String?,
     private val append: (current: List<T>, page: List<R>) -> List<T>,
     private val trim: (List<T>) -> List<T> = { it },
     private val nextMaxIdOfItems: (List<T>) -> String? = { null },
-    private val fetch: suspend (maxId: String?) -> List<R>,
+    private val fetchPage: suspend (maxId: String?) -> Page<R>,
 ) {
+    /**
+     * @param nextMaxIdOf 取得したページから次ページの `max_id` を決める (ページ中で最も古い ID)。
+     * @param fetch `maxId` より古いものを返す。`null` なら最新から。
+     */
+    constructor(
+        scope: CoroutineScope,
+        nextMaxIdOf: (page: List<R>) -> String?,
+        append: (current: List<T>, page: List<R>) -> List<T>,
+        trim: (List<T>) -> List<T> = { it },
+        nextMaxIdOfItems: (List<T>) -> String? = { null },
+        fetch: suspend (maxId: String?) -> List<R>,
+    ) : this(
+        scope = scope,
+        append = append,
+        trim = trim,
+        nextMaxIdOfItems = nextMaxIdOfItems,
+        fetchPage = { maxId -> fetch(maxId).let { Page(it, nextMaxIdOf(it)) } },
+    )
+
     private val _state = MutableStateFlow(FeedState<T>())
     val state: StateFlow<FeedState<T>> = _state.asStateFlow()
 
@@ -47,14 +68,14 @@ open class PagedFeed<R, T>(
         _state.update { it.copy(isRefreshing = true, error = null) }
         scope.launch {
             try {
-                val page = fetch(null)
+                val page = fetchPage(null)
                 _state.update {
                     it.copy(
-                        items = append(emptyList(), page),
+                        items = append(emptyList(), page.items),
                         isRefreshing = false,
                         loaded = true,
-                        endReached = page.isEmpty(),
-                        nextMaxId = nextMaxIdOf(page),
+                        endReached = page.endReached,
+                        nextMaxId = page.nextMaxId,
                     )
                 }
             } catch (e: CancellationException) {
@@ -63,6 +84,12 @@ open class PagedFeed<R, T>(
                 _state.update { it.copy(isRefreshing = false, loaded = true, error = e.message ?: e.toString()) }
             }
         }
+    }
+
+    /** まだ読み込んでいなければ読み込む (タブを初めて開いたとき等)。 */
+    fun ensureLoaded() {
+        val current = _state.value
+        if (!current.loaded && !current.isRefreshing) refresh()
     }
 
     /** 読み込み済みの項目を書き換える (投票結果の反映など)。 */
@@ -94,13 +121,13 @@ open class PagedFeed<R, T>(
         _state.update { it.copy(isLoadingMore = true, error = null) }
         scope.launch {
             try {
-                val page = fetch(maxId)
+                val page = fetchPage(maxId)
                 _state.update { s ->
                     s.copy(
-                        items = append(s.items, page),
+                        items = append(s.items, page.items),
                         isLoadingMore = false,
-                        endReached = page.isEmpty(),
-                        nextMaxId = nextMaxIdOf(page) ?: s.nextMaxId,
+                        endReached = page.endReached,
+                        nextMaxId = page.nextMaxId ?: s.nextMaxId,
                     )
                 }
             } catch (e: CancellationException) {

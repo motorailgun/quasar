@@ -10,6 +10,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
+import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
+import es.aria_on_the_planet.quasar.ui.follows.openFollowList
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.post.openPost
@@ -41,6 +43,8 @@ class ProfileActivity : ComponentActivity() {
                     onUserClick = { user -> if (user.inServerId != accountId) openProfile(user) },
                     onPostClick = ::openPost,
                     onMediaClick = ::openMedia,
+                    onFollowingClick = { openFollowList(accountId, FollowListTab.Following) },
+                    onFollowersClick = { openFollowList(accountId, FollowListTab.Followers) },
                 )
             }
         }

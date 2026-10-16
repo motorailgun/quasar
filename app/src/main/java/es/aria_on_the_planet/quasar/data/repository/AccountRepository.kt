@@ -5,9 +5,11 @@ import es.aria_on_the_planet.quasar.data.mapper.postVisibility
 import es.aria_on_the_planet.quasar.data.mapper.toProfile
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.Profile
+import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,8 +48,42 @@ class AccountRepository(
     suspend fun fetchProfile(session: Session, accountId: String): Profile =
         api.account(session.serverUrl, session.accessToken, accountId).toProfile()
 
-    suspend fun fetchPosts(session: Session, accountId: String, maxId: String? = null, limit: Int): List<Post> =
-        api.accountStatuses(session.serverUrl, session.accessToken, accountId, maxId, limit).map { it.toDomain() }
+    /** @param onlyMedia `true` ならメディア付きのポストのみ (プロフィールのメディア一覧)。 */
+    suspend fun fetchPosts(
+        session: Session,
+        accountId: String,
+        maxId: String? = null,
+        limit: Int,
+        onlyMedia: Boolean = false,
+    ): List<Post> =
+        api.accountStatuses(session.serverUrl, session.accessToken, accountId, maxId, limit, onlyMedia = onlyMedia)
+            .map { it.toDomain() }
+
+    /** [accountId] がフォローしているアカウント。`max_id` はフォロー関係の ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchFollowing(session: Session, accountId: String, maxId: String? = null): Page<User> =
+        fetchRelations(session, accountId, "following", maxId)
+
+    /** [accountId] のフォロワー。`max_id` はフォロー関係の ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchFollowers(session: Session, accountId: String, maxId: String? = null): Page<User> =
+        fetchRelations(session, accountId, "followers", maxId)
+
+    private suspend fun fetchRelations(session: Session, accountId: String, relation: String, maxId: String?): Page<User> =
+        api.accountRelations(session.serverUrl, session.accessToken, accountId, relation, maxId)
+            .let { page -> Page(page.items.map { it.toDomain() }, page.nextMaxId) }
+
+    /** ログイン中ユーザーと [accountId] との関係。未認証なら `null`。 */
+    suspend fun fetchRelationship(session: Session, accountId: String): Relationship? {
+        val token = session.accessToken ?: return null
+        return api.relationships(session.serverUrl, token, listOf(accountId))
+            .firstOrNull { it.id == accountId }
+            ?.toDomain()
+    }
+
+    /** [accountId] をフォローする (`follow = false` ならフォロー / リクエストをやめる)。要認証。更新後の関係を返す。 */
+    suspend fun setFollowing(session: Session, accountId: String, follow: Boolean): Relationship {
+        val token = checkNotNull(session.accessToken) { "Not logged in" }
+        return api.follow(session.serverUrl, token, accountId, follow).toDomain()
+    }
 
     /** ピン留めされたポスト。サーバによっては多いため [MaxPinnedPosts] 件で打ち切る。 */
     suspend fun fetchPinnedPosts(session: Session, accountId: String): List<Post> =

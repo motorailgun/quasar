@@ -11,6 +11,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
 import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
+import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
@@ -29,6 +30,7 @@ import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
 import es.aria_on_the_planet.quasar.domain.model.Quote
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
+import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -63,6 +65,15 @@ fun AccountDto.toProfile() = Profile(
     createdAt = createdAt?.let { parseInstantOrNull(it) },
     locked = locked,
     bot = bot,
+)
+
+fun RelationshipDto.toDomain() = Relationship(
+    following = following,
+    requested = requested,
+    followedBy = followedBy,
+    requestedBy = requestedBy,
+    blocking = blocking,
+    blockedBy = blockedBy,
 )
 
 fun FieldDto.toDomain() = ProfileField(

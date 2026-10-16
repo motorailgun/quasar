@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.feed
 
+import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import kotlinx.coroutines.CoroutineScope
@@ -76,6 +77,40 @@ class PostFeedTest {
         assertEquals(listOf(null, "20", "9"), requested)
         assertEquals(listOf("10", "9", "30", "20"), feed.state.value.items)
         assertTrue(feed.state.value.endReached)
+    }
+
+    @Test
+    fun pagesByCursorFromPageWhenIdsAreNotCursors() {
+        // フォロー / フォロワー一覧: max_id は項目 (アカウント) の ID ではなく Link ヘッダの値
+        val requested = mutableListOf<String?>()
+        val feed = PagedFeed<String, String>(
+            scope = scope,
+            append = appendDistinct(idOf = { it }),
+        ) { maxId ->
+            requested += maxId
+            when (maxId) {
+                null -> Page(listOf("a", "b"), nextMaxId = "f2")
+                "f2" -> Page(listOf("b", "c"), nextMaxId = null) // 最後のページは next が無い
+                else -> error("unexpected $maxId")
+            }
+        }
+        feed.refresh()
+        assertFalse(feed.state.value.endReached)
+        feed.loadMore()
+        assertTrue(feed.state.value.endReached)
+        feed.loadMore() // 終端到達後は取得しない
+        assertEquals(listOf(null, "f2"), requested)
+        assertEquals(listOf("a", "b", "c"), feed.state.value.items)
+    }
+
+    @Test
+    fun ensureLoadedFetchesOnlyOnce() {
+        var fetched = 0
+        val feed = PostFeed(scope) { fetched++; emptyList() }
+        feed.ensureLoaded()
+        feed.ensureLoaded()
+        assertEquals(1, fetched)
+        assertTrue(feed.state.value.loaded)
     }
 
     @Test

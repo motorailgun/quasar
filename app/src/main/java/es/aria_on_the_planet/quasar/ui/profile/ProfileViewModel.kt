@@ -11,6 +11,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
 import es.aria_on_the_planet.quasar.domain.model.Profile
+import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
@@ -37,11 +38,32 @@ data class ProfileExtras(
     val followersYouFollow: List<User> = emptyList(),
 )
 
+/** プロフィールの投稿一覧のタブ。 */
+enum class ProfileTab { Posts, Media }
+
+/** ヘッダ右側のボタン。 */
+sealed interface ProfileButtonState {
+    /** 出さない (未ログイン・関係の取得前 / 失敗)。 */
+    data object None : ProfileButtonState
+
+    /** 自分のプロフィール。編集画面は未実装なので押しても何もしない。 */
+    data object EditProfile : ProfileButtonState
+
+    /** 他人のプロフィール。[isUpdating] はフォロー / 解除の送信中。 */
+    data class Follow(val relationship: Relationship, val isUpdating: Boolean = false) : ProfileButtonState
+}
+
 data class ProfileScreenState(
     val profile: ProfileState = ProfileState(),
     val extras: ProfileExtras = ProfileExtras(),
     val posts: PostFeedState = PostFeedState(),
-)
+    val media: PostFeedState = PostFeedState(),
+    val tab: ProfileTab = ProfileTab.Posts,
+    val button: ProfileButtonState = ProfileButtonState.None,
+) {
+    /** 選択中のタブの一覧。 */
+    val selectedFeed: PostFeedState get() = if (tab == ProfileTab.Media) media else posts
+}
 
 class ProfileViewModel(
     private val session: Session,
@@ -55,6 +77,8 @@ class ProfileViewModel(
 
     private val profile = MutableStateFlow(ProfileState())
     private val extras = MutableStateFlow(ProfileExtras())
+    private val tab = MutableStateFlow(ProfileTab.Posts)
+    private val button = MutableStateFlow<ProfileButtonState>(ProfileButtonState.None)
 
     private val posts = PostFeed(viewModelScope) { maxId ->
         repository.fetchPosts(
@@ -65,7 +89,18 @@ class ProfileViewModel(
         )
     }
 
-    val state: StateFlow<ProfileScreenState> = combine(profile, extras, posts.state, ::ProfileScreenState)
+    /** メディア付きのポストのみ (メディアのタブ)。初めて開いたときに読み込む。 */
+    private val media = PostFeed(viewModelScope) { maxId ->
+        repository.fetchPosts(session = session, accountId = accountId, maxId = maxId, limit = PageSize, onlyMedia = true)
+    }
+
+    val state: StateFlow<ProfileScreenState> = combine(
+        combine(profile, extras, ::Pair),
+        posts.state,
+        media.state,
+        tab,
+        button,
+    ) { (profile, extras), posts, media, tab, button -> ProfileScreenState(profile, extras, posts, media, tab, button) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileScreenState())
 
     init {
@@ -75,14 +110,50 @@ class ProfileViewModel(
     fun refresh() {
         loadProfile()
         loadExtras()
+        loadRelationship()
         posts.refresh()
+        // 開いたことのないタブは読まない
+        if (media.state.value.loaded) media.refresh()
     }
 
-    fun loadMore() = posts.loadMore()
+    /** [tab] の一覧の続きを読む (ページャの各ページから呼ぶ)。 */
+    fun loadMore(tab: ProfileTab) = if (tab == ProfileTab.Media) media.loadMore() else posts.loadMore()
+
+    /** 表示中のタブ (ページャのページ)。初めて開いたタブは読み込む。 */
+    fun selectTab(selected: ProfileTab) {
+        tab.value = selected
+        if (selected == ProfileTab.Media) media.ensureLoaded()
+    }
+
+    /** フォローする (`follow = false` ならフォロー / リクエストをやめる)。確認は画面側で済ませてから呼ぶ。 */
+    fun setFollowing(follow: Boolean) {
+        val current = button.value as? ProfileButtonState.Follow ?: return
+        if (current.isUpdating) return
+        button.value = current.copy(isUpdating = true)
+        viewModelScope.launch {
+            try {
+                val updated = repository.setFollowing(session, accountId, follow)
+                button.value = ProfileButtonState.Follow(updated)
+                // フォロワー数はプロフィールを読み直さずに手元で合わせる (リクエスト中は数えない)
+                val delta = updated.following.toInt() - current.relationship.following.toInt()
+                if (delta != 0) {
+                    profile.update { s ->
+                        s.copy(profile = s.profile?.let { it.copy(followersCount = (it.followersCount + delta).coerceAtLeast(0)) })
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to ${if (follow) "follow" else "unfollow"}", e)
+                button.value = current
+            }
+        }
+    }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
         viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
             posts.updatePosts { it.withPoll(poll) }
+            media.updatePosts { it.withPoll(poll) }
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map { it.withPoll(poll) }) }
         }
 
@@ -91,6 +162,7 @@ class ProfileViewModel(
         send = { statusId, action -> statusRepository.perform(session, statusId, action) },
         update = { transform ->
             posts.updatePosts(transform)
+            media.updatePosts(transform)
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map(transform)) }
         },
         onError = { message, error -> Log.w(TAG, message, error) },
@@ -125,6 +197,22 @@ class ProfileViewModel(
         }
     }
 
+    /** 自分のプロフィールか、相手との関係を読む。未ログインなら何もしない (ボタンを出さない)。 */
+    private fun loadRelationship() {
+        if (!canInteract) return
+        viewModelScope.launch {
+            val me = runOptional("current account") { repository.fetchMe(session) } ?: return@launch
+            if (me.user.inServerId == accountId) {
+                button.value = ProfileButtonState.EditProfile
+                return@launch
+            }
+            val relationship = runOptional("relationship") { repository.fetchRelationship(session, accountId) }
+                ?: return@launch
+            // 送信中なら、その応答で上書きされるので触らない
+            button.update { if (it is ProfileButtonState.Follow && it.isUpdating) it else ProfileButtonState.Follow(relationship) }
+        }
+    }
+
     private suspend fun <T> runOptional(label: String, block: suspend () -> T): T? = try {
         block()
     } catch (e: CancellationException) {
@@ -141,3 +229,5 @@ class ProfileViewModel(
         const val PageSize = 40
     }
 }
+
+private fun Boolean.toInt() = if (this) 1 else 0

@@ -4,6 +4,7 @@ import android.icu.text.CompactDecimalFormat
 import android.icu.text.NumberFormat
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -45,6 +47,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
+import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
@@ -57,13 +60,23 @@ private val HeaderHeight = 140.dp
 private val AvatarSize = 88.dp
 private val AvatarRing = 4.dp
 
-/** プロフィール上部 (ヘッダ画像・アイコン・名前・bio・フィールド・統計)。 */
+/**
+ * プロフィール上部 (ヘッダ画像・アイコン・名前・bio・フィールド・統計)。
+ *
+ * @param relationship 相手との関係。@acct の横に「Follows you」等を出す。未ログイン・取得前は `null`。
+ * @param actions アイコンの右 (ヘッダ画像の下) に置くボタン (フォロー / プロフィール編集)。
+ * @param onFollowingClick / [onFollowersClick] 統計のフォロー数・フォロワー数のタップ (一覧を開く)。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProfileHeader(
     profile: Profile,
     modifier: Modifier = Modifier,
     followersYouFollow: List<User> = emptyList(),
+    relationship: Relationship? = null,
+    onFollowingClick: () -> Unit = {},
+    onFollowersClick: () -> Unit = {},
+    actions: @Composable () -> Unit = {},
 ) {
     val user = profile.user
     Column(modifier.fillMaxWidth()) {
@@ -92,6 +105,14 @@ fun ProfileHeader(
             ) {
                 UserIcon(user = user, size = AvatarSize)
             }
+            // X と同じく、アイコンの右・ヘッダ画像の下 (下端をアイコンに揃える)
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(start = AvatarSize + 32.dp, end = 16.dp),
+            ) {
+                actions()
+            }
         }
 
         Column(
@@ -113,11 +134,15 @@ fun ProfileHeader(
                         BadgeIcon(Icons.Outlined.SmartToy, stringResource(R.string.profile_bot))
                     }
                 }
-                Text(
-                    text = "@${user.fullScreenName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "@${user.fullScreenName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    relationship?.let { RelationshipLabel(it) }
+                }
             }
 
             if (user.note.isNotBlank()) {
@@ -135,12 +160,32 @@ fun ProfileHeader(
 
             profile.createdAt?.let { JoinedDate(it) }
 
-            ProfileStats(profile)
+            ProfileStats(profile, onFollowingClick, onFollowersClick)
 
             FollowersYouFollow(followersYouFollow)
         }
         HorizontalDivider()
     }
+}
+
+/** 相手 → 自分の関係 (X の「Follows you」)。リクエストが来ていればそちらを優先する。 */
+@Composable
+private fun RelationshipLabel(relationship: Relationship) {
+    val text = when {
+        relationship.requestedBy -> R.string.profile_requested_to_follow_you
+        relationship.followedBy -> R.string.profile_follows_you
+        else -> return
+    }
+    Text(
+        text = stringResource(text),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(start = 8.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
@@ -224,19 +269,28 @@ private fun JoinedDate(createdAt: Instant) {
 }
 
 @Composable
-private fun ProfileStats(profile: Profile) {
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+private fun ProfileStats(profile: Profile, onFollowingClick: () -> Unit, onFollowersClick: () -> Unit) {
+    // タップできる統計は押した範囲が分かるよう少し余白を取るので、その分だけ間隔を詰める
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Stat(profile.postsCount, stringResource(R.string.profile_posts))
-        Stat(profile.followingCount, stringResource(R.string.profile_following))
-        Stat(profile.followersCount, stringResource(R.string.profile_followers))
+        Stat(profile.followingCount, stringResource(R.string.profile_following), onFollowingClick)
+        Stat(profile.followersCount, stringResource(R.string.profile_followers), onFollowersClick)
     }
 }
 
 @Composable
-private fun Stat(count: Int, label: String) {
+private fun Stat(count: Int, label: String, onClick: (() -> Unit)? = null) {
     val locale = LocalConfiguration.current.locales[0]
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
+        modifier = if (onClick != null) {
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        } else {
+            Modifier.padding(end = 4.dp)
+        },
         text = buildAnnotatedString {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(formatCount(count, locale)) }
             append(' ')

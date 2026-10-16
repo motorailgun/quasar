@@ -63,7 +63,36 @@ fun DetailScaffold(
     val scrolledPast by remember(listState) {
         derivedStateOf { listState.firstVisibleItemIndex > revealIndex }
     }
-    val showRevealed = revealedTitle != null && scrolledPast
+    DetailScaffold(
+        onBack = onBack,
+        titleRevealed = scrolledPast,
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = modifier,
+        title = title,
+        revealedTitle = revealedTitle,
+        content = content,
+    )
+}
+
+/**
+ * [DetailScaffold] の、タイトルを切り替えるかを呼び出し側が決める版 (一覧が 1 本ではない画面向け)。
+ *
+ * @param titleRevealed `true` なら [revealedTitle] を出す。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DetailScaffold(
+    onBack: () -> Unit,
+    titleRevealed: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    title: @Composable () -> Unit = {},
+    revealedTitle: (@Composable () -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val showRevealed = revealedTitle != null && titleRevealed
 
     Scaffold(
         modifier = modifier,
@@ -97,12 +126,13 @@ fun DetailScaffold(
     }
 }
 
+/** 詳細画面の pull-to-refresh (Expressive の LoadingIndicator)。トップバーの下にタブ等を挟む画面でも使う。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DetailRefreshBox(
+fun DetailRefreshBox(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val pullState = rememberPullToRefreshState()

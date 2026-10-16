@@ -177,6 +177,20 @@ data class ContextDto(
     val descendants: List<StatusDto> = emptyList(),
 )
 
+/** https://docs.joinmastodon.org/entities/Relationship/ (使う項目のみ) */
+@Serializable
+data class RelationshipDto(
+    val id: String,
+    val following: Boolean = false,
+    /** フォローリクエストを送って承認待ち (鍵アカウント)。 */
+    val requested: Boolean = false,
+    @SerialName("followed_by") val followedBy: Boolean = false,
+    /** 相手から自分へのフォローリクエストが承認待ち (Mastodon 4.1+)。 */
+    @SerialName("requested_by") val requestedBy: Boolean = false,
+    val blocking: Boolean = false,
+    @SerialName("blocked_by") val blockedBy: Boolean = false,
+)
+
 /** https://docs.joinmastodon.org/entities/FamiliarFollowers/ */
 @Serializable
 data class FamiliarFollowersDto(

@@ -34,7 +34,7 @@ es.aria_on_the_planet.quasar
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
-├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
+├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
 │                                   PostDraft, ComposeLimits, PostLength)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
@@ -50,19 +50,24 @@ es.aria_on_the_planet.quasar
     │   ├── scaffold/DetailScaffold.kt 詳細画面共通の骨組み (戻る付きトップバー + スクロールでタイトル切替 + PTR)
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem、インライン再生) + MediaClick
+    │   ├── user/UserList.kt        ユーザーの集合 (LazyColumn) + UserListItem (フォロー / フォロワー一覧)
+    │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに)
+    │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
     │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker)
-    │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
+    │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle) /
+    │   │                           CollapsingHeaderLayout (スクロールで畳まれるヘッダ + 残るタブ + 本体)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
     ├── timeline/                   タイムライン画面 + ViewModel
-    ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
+    ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ActionButton / ViewModel)
+    ├── follows/                    フォロー / フォロワー一覧 (FollowListActivity / Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
     └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / ComposerActivity / QuickPostBar /
@@ -199,6 +204,10 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | プロフィール | `GET /api/v1/accounts/:id` |
 | プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
+| メディア一覧 | `GET /api/v1/accounts/:id/statuses?only_media=true` (40 件ずつ。ブーストは含まれない) |
+| フォロー / フォロワー一覧 | `GET /api/v1/accounts/:id/following` / `followers` (**Link ヘッダ**でページング。下記) |
+| 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` (要認証) |
+| フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (要認証。鍵アカウントは `requested` になる) |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
 | 通知 (グループ) | `GET /api/v2/notifications` (要認証、Mastodon 4.3+、既定) |
 | 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
@@ -223,6 +232,9 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 1 件で、`append(current, page)` (純粋関数) で一覧を組み立て、`nextMaxIdOf(page)` で取得した生ページから次の `max_id` を
 決める。`appendDistinct` は重複を捨てる標準の append。`PostFeed` はそのポスト版 (`PostFeedState = FeedState<Post>`、
 `.posts` は `.items` の別名)。通知は `PagedFeed<NotificationGroup, NotificationEntry>`。
+`max_id` が項目の ID ではない一覧 (フォロー / フォロワー: `max_id` はフォロー関係の ID で、Link ヘッダの `rel="next"` で
+渡される) は、主コンストラクタの `fetchPage` で `Page(items, nextMaxId)` を返す (`nextMaxIdFromLinkHeader`、
+`MastodonApi.accountRelations`)。`nextMaxId == null` で終端。`ensureLoaded()` はタブを初めて開いたとき用。
 
 ## 再利用 UI コンポーネント
 
@@ -366,7 +378,31 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * **自分がフォローしている人のうちのフォロワー** ("followers you follow"): `GET /api/v1/accounts/familiar_followers?id[]=:id`
     (要認証。未ログインなら呼ばない)。統計行の下に、重ねたアイコン最大 3 つ + 「Followed by A, B, and N others you follow」。
   * ピン留め・フォロワー情報は補助情報 (`ProfileExtras`) 扱いで、取得失敗時はログのみで非表示にする。
-  * 未実装: フォローボタン、投稿/返信/メディアのタブ切り替え、familiar followers の一覧画面。
+  * **フォローボタン** (`ProfileActionButton`): ヘッダ画像の下・アイコンの右 (X と同じ位置) に置く。未ログイン・関係の取得前 / 失敗は
+    出さない。自分 (`fetchMe` の ID と一致) なら「Edit profile」(押しても何もしない。編集画面は未実装)。他人は
+    `Relationship.followState` (Relationship エンティティの `following` / `requested` / `blocking` / `blocked_by`) で決める:
+    * NotFollowing: Follow (塗り)。相手からフォローされていれば Follow back、**鍵アカウントなら Request to follow** (リクエスト送信)。
+    * Requested (リクエスト送信済み・承認待ち。リモートの応答待ちでも立つ): Requested (枠線)。押すとリクエストの取り下げ (`unfollow`)。
+    * Following: Following (枠線)。押すと解除。
+    * Blocking / BlockedBy: 押せないボタン (ブロック解除は未実装)。
+    フォロー・リクエスト送信・解除・取り下げはどれも `ConfirmDialog` で確認してから `ProfileViewModel.setFollowing`。
+    成功したら応答の関係で置き換え (鍵アカウントへの follow は `requested = true` で返る)、フォロワー数を手元で ±1。失敗はログのみで元に戻す。
+  * @acct の横に相手 → 自分の関係のラベル: `requested_by` (Mastodon 4.1+) なら「Requested to follow you」、`followed_by` なら「Follows you」。
+    リクエストの承認・拒否は未実装。
+  * **構成**: `CollapsingHeaderLayout` で 上からヘッダ (`ProfileHeader`) / タブ (`ConnectedTabRow`) / `HorizontalPager`
+    (タブごとの `PostList`、それぞれ別の LazyListState)。一覧を上へスクロールするとまずヘッダが畳まれ (nested scroll の
+    pre-scroll)、タブは上端に残る。下へは一覧が先頭に着いてからヘッダが開き、開き切った余りが pull-to-refresh へ回る。
+    ヘッダ自体の上でのドラッグも同じ扱い (`scrollable` で拾って nested scroll に流す)。ヘッダが畳まれ切ったらトップバーに名前
+    (`DetailScaffold(titleRevealed = ...)`)。ヘッダの畳み具合は両タブで共有し、タブごとのスクロール位置とは同期しない (X と同じ)。
+  * **タブ** (Posts / Media): ボタンでも左右スワイプでも切り替わる (`pagerState.targetPage` を `selectTab` に渡す)。Media は
+    `only_media=true` で絞り込んだポストの一覧 (別の `PostFeed`。初めて開いたときに読む) を同じ `PostList` で出すだけ。
+    ピン留めは Posts のみ。投票・ブースト等の反映は両方の一覧に当てる。
+  * フォロー数・フォロワー数のタップで `openFollowList(accountId, tab)`。
+  * 未実装: 返信のタブ、familiar followers の一覧画面、プロフィール編集。
+* **フォロー / フォロワー一覧** (`FollowListActivity`): `Context.openFollowList(accountId, tab)` で起動 (extra は ID とタブ)。
+  トップバー (表示名 + @acct) の下に `ConnectedTabRow` (Following / Followers) + `HorizontalPager` (スワイプでも切り替え)。
+  各タブは開いたときに読み込み、PTR と追加読み込みあり。行は `UserList` (アイコン / 名前 / @acct / bio 3 行)。タップでプロフィール。
+  一覧を隠しているアカウント (`hide_collections`) は空で返るので「Nothing to show」。行ごとのフォローボタンは未実装 (`trailing` スロットのみ)。
   * 注: API の Profile エンティティ (`/api/v1/profile`) はログイン中ユーザー自身の編集用 (raw な値) で、
     他人のプロフィール表示には Account を使う。ドメインの `Profile` は表示用で、API の Profile とは別物。
 * **Post** (`PostActivity`): `Context.openPost(post)` で起動する (extra は `post.statusId`)。
@@ -681,7 +717,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
-* **操作**: リプライ・フォローは未実装 (投稿はテキスト・CW・投票・公開範囲・メディア添付)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
+* **操作**: リプライは未実装 (投稿はテキスト・CW・投票・公開範囲・メディア添付)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
   操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
@@ -689,7 +725,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
 * **自動更新**: グローバルは購読しない、通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。
-* **プロフィール**: フォローボタン、投稿 / 返信 / メディアのタブ。
+* **プロフィール**: 返信のタブ、プロフィール編集、一覧の行ごとのフォローボタン、フォロー失敗時の UI 通知。
 * **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
 * **ローカライズ**: 文字列は英語のみ。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

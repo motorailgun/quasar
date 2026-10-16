@@ -9,6 +9,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
+import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
@@ -16,6 +17,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
 import okhttp3.FormBody
+import okhttp3.Headers
 import okhttp3.MultipartBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody
@@ -25,6 +27,9 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class MastodonApiException(val code: Int, message: String) : IOException(message)
+
+/** Link ヘッダでページングする一覧の 1 ページ。[nextMaxId] が `null` なら最後のページ。 */
+data class LinkedPage<T>(val items: List<T>, val nextMaxId: String?)
 
 /** Mastodon REST API の薄いクライアント。 */
 class MastodonApi(
@@ -187,6 +192,7 @@ class MastodonApi(
      * https://docs.joinmastodon.org/methods/accounts/#statuses
      *
      * @param pinned `true` ならピン留めされたポストのみ取得する。
+     * @param onlyMedia `true` ならメディア付きのポストのみ取得する (ブーストは含まれない)。
      */
     suspend fun accountStatuses(
         serverUrl: String,
@@ -195,11 +201,51 @@ class MastodonApi(
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
         pinned: Boolean = false,
+        onlyMedia: Boolean = false,
     ): List<StatusDto> = getStatuses(serverUrl, accessToken, "api/v1/accounts/$id/statuses") {
         maxId?.let { addQueryParameter("max_id", it) }
         addQueryParameter("limit", limit.toString())
         if (pinned) addQueryParameter("pinned", "true")
+        if (onlyMedia) addQueryParameter("only_media", "true")
     }
+
+    /**
+     * フォローしているアカウント (https://docs.joinmastodon.org/methods/accounts/#following) /
+     * フォロワー (https://docs.joinmastodon.org/methods/accounts/#followers)。[relation] は `following` か `followers`。
+     *
+     * `max_id` はアカウントの ID ではなくフォロー関係の ID なので、次ページの `max_id` は Link ヘッダから取る。
+     * 一覧を隠しているアカウント (`hide_collections`) では、本人以外には空が返る。
+     */
+    suspend fun accountRelations(
+        serverUrl: String,
+        accessToken: String?,
+        id: String,
+        relation: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): LinkedPage<AccountDto> {
+        val url = serverUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/v1/accounts/$id/$relation")
+            .apply { maxId?.let { addQueryParameter("max_id", it) } }
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        val (items, headers) = executeWithHeaders<List<AccountDto>>(Request.Builder().url(url), accessToken)
+        return LinkedPage(items, nextMaxIdFromLinkHeader(headers["Link"]))
+    }
+
+    /** https://docs.joinmastodon.org/methods/accounts/#relationships (要認証) */
+    suspend fun relationships(serverUrl: String, accessToken: String, ids: List<String>): List<RelationshipDto> =
+        get(serverUrl, accessToken, "api/v1/accounts/relationships") {
+            ids.forEach { addQueryParameter("id[]", it) }
+        }
+
+    /**
+     * フォローする (https://docs.joinmastodon.org/methods/accounts/#follow) / フォロー (リクエスト) をやめる
+     * (https://docs.joinmastodon.org/methods/accounts/#unfollow)。要認証。更新後の関係を返す。
+     * 鍵アカウントへのフォローは `requested` になる。
+     */
+    suspend fun follow(serverUrl: String, accessToken: String, id: String, follow: Boolean): RelationshipDto =
+        post(serverUrl, accessToken, "api/v1/accounts/$id/${if (follow) "follow" else "unfollow"}") {}
 
     /** https://docs.joinmastodon.org/methods/accounts/#familiar_followers (要認証) */
     suspend fun familiarFollowers(
@@ -248,7 +294,13 @@ class MastodonApi(
         builder: Request.Builder,
         accessToken: String?,
         httpClient: OkHttpClient = client,
-    ): T =
+    ): T = executeWithHeaders<T>(builder, accessToken, httpClient).first
+
+    private suspend inline fun <reified T> executeWithHeaders(
+        builder: Request.Builder,
+        accessToken: String?,
+        httpClient: OkHttpClient = client,
+    ): Pair<T, Headers> =
         withContext(Dispatchers.IO) {
             val request = builder
                 .apply { accessToken?.let { header("Authorization", "Bearer $it") } }
@@ -262,7 +314,7 @@ class MastodonApi(
                     if (!response.isSuccessful) {
                         throw MastodonApiException(response.code, "HTTP ${response.code}: $body")
                     }
-                    json.decodeFromString<T>(body)
+                    json.decodeFromString<T>(body) to response.headers
                 }
             } finally {
                 cancellation.dispose()

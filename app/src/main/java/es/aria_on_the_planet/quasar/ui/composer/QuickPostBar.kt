@@ -10,6 +10,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +39,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -53,6 +57,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -83,6 +88,7 @@ import es.aria_on_the_planet.quasar.ui.component.composer.VisibilityButton
 import es.aria_on_the_planet.quasar.ui.component.composer.insertEmoji
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiShortcodeHighlight
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiSuggestions
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -99,7 +105,7 @@ import kotlinx.coroutines.launch
  * 入力していない間はバー全体がタップ領域で、どこを押しても本文の入力を始める (ボタンはそれぞれの操作)。
  * 下書きは [session] (フル画面と共有)。CW と投票はフル画面で編集し、付いているときはチップで示す (タップで広げる)。
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun QuickPostBar(
     session: ComposerSession,
@@ -128,7 +134,25 @@ fun QuickPostBar(
         attachments.size < limits.maxMediaAttachments &&
         attachments.none { it.isVideoLike }
 
-    // 入力中の「戻る」はフォーカスを外すだけ (キーボードは先に閉じる)
+    // 「戻る」等でキーボードだけ閉じられたら、フォーカスも外して縮める。キーボードが一度出てから閉じたときだけ反応する。
+    // 公開範囲のメニュー・絵文字 / メディアのピッカー・OS 標準のピッカーは別ウィンドウ (別画面) に移るためにキーボードが
+    // 閉じるので、閉じた後もこの画面のウィンドウにフォーカスがあるときだけ縮める (移るのを少し待ってから見る)
+    val imeVisible = WindowInsets.isImeVisible
+    val windowInfo = LocalWindowInfo.current
+    var imeShownWhileFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible) {
+        if (imeVisible) {
+            imeShownWhileFocused = focused
+        } else {
+            if (imeShownWhileFocused) {
+                delay(WindowFocusSettleMillis)
+                if (focused && windowInfo.isWindowFocused) focusManager.clearFocus()
+            }
+            imeShownWhileFocused = false
+        }
+    }
+
+    // ハードウェアキーボード等でキーボードが出ていないときの「戻る」もフォーカスを外すだけ
     NavigationBackHandler(
         state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
         isBackEnabled = focused,
@@ -346,3 +370,4 @@ private val AttachmentHeight = 64.dp
 private const val MaxLines = 5
 private val ExpandDistance = 96.dp
 private const val FlingVelocity = 1500f
+private const val WindowFocusSettleMillis = 150L

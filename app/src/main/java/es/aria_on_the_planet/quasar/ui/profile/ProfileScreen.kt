@@ -45,6 +45,7 @@ import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.layout.CollapsingHeaderLayout
 import es.aria_on_the_planet.quasar.ui.component.layout.rememberCollapsingHeaderState
+import es.aria_on_the_planet.quasar.ui.component.list.scrollToTop
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
@@ -145,7 +146,16 @@ fun ProfileScreen(
                     ConnectedTabRow(
                         labels = tabLabels,
                         selectedIndex = pagerState.targetPage,
-                        onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index, animationSpec = spatialSpec) } },
+                        onSelect = { index ->
+                            scope.launch {
+                                if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                                    // 表示中のタブをもう一度押したら一覧を先頭へ (ヘッダの畳み具合はそのまま)
+                                    listStates.getValue(tabs[index]).scrollToTop()
+                                } else {
+                                    pagerState.animateScrollToPage(index, animationSpec = spatialSpec)
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .onSizeChanged { tabsHeight = with(density) { it.height.toDp() } }
                             .hazeBlur(input = HazeInput.Sources(hazeState), style = tabsBlurStyle)

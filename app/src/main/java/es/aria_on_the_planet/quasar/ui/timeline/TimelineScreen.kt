@@ -79,6 +79,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.component.list.scrollToTop
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
@@ -191,9 +192,13 @@ fun TimelineScreen(
                     pagerState = pagerState,
                     hazeState = hazeState,
                     onSelect = { column ->
-                        viewModel.select(column)
-                        scope.launch {
-                            pagerState.animateScrollToPage(state.available.indexOf(column), animationSpec = pageSpring)
+                        val index = state.available.indexOf(column)
+                        if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                            // 表示中のカラムのボタンをもう一度押したら先頭へ
+                            scope.launch { listStates.getValue(column).scrollToTop() }
+                        } else {
+                            viewModel.select(column)
+                            scope.launch { pagerState.animateScrollToPage(index, animationSpec = pageSpring) }
                         }
                     },
                     onLogout = onLogout,

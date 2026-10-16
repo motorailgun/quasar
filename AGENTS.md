@@ -451,7 +451,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (ページャが `hazeSource`、`backgroundColor` 必須は他と同様)。表示中のページの一覧が先頭から動いていない間は不透明な
     surface を重ねて今までどおりに見せ、スクロールしたらそれを消してぼかしにする。トップバーは不透明のまま。ヘッダが畳まれ切ったらトップバーに名前
     (`DetailScaffold(titleRevealed = ...)`)。ヘッダの畳み具合は両タブで共有し、タブごとのスクロール位置とは同期しない (X と同じ)。
-  * **タブ** (Posts / Media): ボタンでも左右スワイプでも切り替わる (`pagerState.targetPage` を `selectTab` に渡す)。Media は
+  * **タブ** (Posts / Media): ボタンでも左右スワイプでも切り替わる (`pagerState.targetPage` を `selectTab` に渡す)。
+    表示中のタブをもう一度押すとその一覧を先頭へ (`scrollToTop`)。ヘッダは開かない (畳み具合は nested scroll でしか
+    動かず、プログラムからのスクロールは届かない。開くなら `CollapsingHeaderState.offset` を別に 0 へ動かす)。Media は
     `only_media=true` で絞り込んだポストの一覧 (別の `PostFeed`。初めて開いたときに読む) を同じ `PostList` で出すだけ。
     ピン留めは Posts のみ。投票・ブースト等の反映は両方の一覧に当てる。
   * フォロー数・フォロワー数のタップで `openFollowList(accountId, tab)`。
@@ -525,7 +527,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     ログアウト。未取得 / 未ログインは汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。
-    未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。
+    未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。表示中のカラムのボタンをもう一度押すと一覧の先頭へ
+    スクロールする (`LazyListState.scrollToTop`、`ui/component/list/`。遠いときは 10 件目まで飛んでから動かす)。
   * 一覧は画面の最上端から描き (edge-to-edge)、上端の余白はヘッダの高さ (ステータスバー込み) を `contentPadding` で取る。
     スクロールするとステータスバー・ヘッダの裏に入る。ステータスバーの部分には読みやすさのため薄いグラデーション
     (`StatusBarScrim`)。PTR のインジケータはヘッダの下から出す。

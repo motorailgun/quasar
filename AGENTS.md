@@ -25,7 +25,8 @@ es.aria_on_the_planet.quasar
 ├── QuasarApplication.kt / MainActivity.kt
 ├── di/AppContainer.kt              手動 DI
 ├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
-├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody
+├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody、
+│                                   メディアの保存 (MediaDownloader / SystemMediaDownloader = DownloadManager)
 ├── data/
 │   ├── remote/
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
@@ -35,7 +36,7 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength)
+│                                   PostDraft, ComposeLimits, PostLength, MediaSave)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -486,8 +487,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   (投稿者行・時刻) をタップするとリンクが開くことがある。
 * **メディアビューア** (`MediaViewerActivity`): `Context.openMedia(MediaClick)` で起動する (extra は `MediaViewerArgs` の JSON)。
   同じポストのメディアを左右スワイプ、上下スワイプ (ゴムのように引っかかり、離すと一覧の元の位置へ縮んで戻る。透過 Activity)、
-  右上メニュー (ブラウザで開く。
-  保存は差し込み口のみ)。video / gifv / audio は Media3 で再生し、ダブルタップ ±10 秒・シークバー・「現在 / 全体」・ミュート。
+  右上メニュー (保存・ブラウザで開く。保存は DownloadManager で `Pictures/Quasar/` 等へ、権限なし)。video / gifv / audio は Media3 で再生し、ダブルタップ ±10 秒・シークバー・「現在 / 全体」・ミュート。
   設計・PiP への準備・注意点は [docs/media-viewer.md](docs/media-viewer.md)。
 
 * **Login (暫定)**: サーバ URL とアクセストークン (任意) を入力。トークンなしでは Home を無効化。
@@ -830,7 +830,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
 * **操作**: リプライは未実装 (投稿はテキスト・CW・投票・公開範囲・メディア添付)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
   操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
-* **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
+* **メディアビューア**: PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
 * **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。

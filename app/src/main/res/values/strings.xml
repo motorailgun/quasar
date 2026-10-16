@@ -125,6 +125,8 @@
     <string name="media_viewer_close">Close</string>
     <string name="media_viewer_menu">More options</string>
     <string name="media_viewer_save">Save</string>
+    <string name="media_viewer_saving">Saving to %1$s</string>
+    <string name="media_viewer_save_failed">Couldn\'t save</string>
     <string name="media_viewer_open_in_browser">Open in browser</string>
     <string name="media_viewer_unsupported">This media type can\'t be shown in the app</string>
     <string name="media_viewer_load_error">Couldn\'t load the image</string>

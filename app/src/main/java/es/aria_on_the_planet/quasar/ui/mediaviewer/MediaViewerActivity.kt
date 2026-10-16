@@ -14,6 +14,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.domain.model.MediaType
+import es.aria_on_the_planet.quasar.domain.model.mediaSaveTarget
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.player.createMediaPlayer
@@ -48,7 +49,11 @@ class MediaViewerActivity : ComponentActivity() {
                         }
                     },
                 )
-                MediaViewerScreen(viewModel = viewModel, onDismissed = ::finish)
+                MediaViewerScreen(
+                    viewModel = viewModel,
+                    onDismissed = ::finish,
+                    onSave = { media -> mediaSaveTarget(media)?.takeIf { container.mediaDownloader.save(it) } },
+                )
             }
         }
     }

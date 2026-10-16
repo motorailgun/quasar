@@ -26,6 +26,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.keepScreenOn
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -51,6 +55,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.domain.model.MediaSaveFolder
+import es.aria_on_the_planet.quasar.domain.model.MediaSaveTarget
+import es.aria_on_the_planet.quasar.domain.model.SaveDirectory
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import es.aria_on_the_planet.quasar.ui.component.player.rememberIsPlaying
@@ -63,13 +70,14 @@ import kotlinx.coroutines.launch
  * 上部バー・再生操作・システムバーはタップで出し入れする。再生中は画面を消さず、背面に回ったら (ON_STOP) 一時停止する。
  *
  * @param onDismissed 閉じるアニメーションが終わった後 (Activity を finish する)。
- * @param onSave 保存。`null` の間はメニューに出さない (保存先 (MediaStore) の実装は未着手)。
+ * @param onSave 保存。受け付けたら保存先、失敗なら `null` を返す (結果はスナックバーで知らせる)。`null` ならメニューに出さない。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MediaViewerScreen(
     viewModel: MediaViewerViewModel,
     onDismissed: () -> Unit,
-    onSave: ((MediaAttachment) -> Unit)? = null,
+    onSave: (suspend (MediaAttachment) -> MediaSaveTarget?)? = null,
 ) {
     val items = viewModel.items
     val pagerState = rememberPagerState(initialPage = viewModel.args.initialIndex) { items.size }
@@ -91,6 +99,22 @@ fun MediaViewerScreen(
         onDismissed = onDismissed,
     )
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val resources = LocalResources.current
+    val save: ((MediaAttachment) -> Unit)? = onSave?.let { save ->
+        { media ->
+            scope.launch {
+                val target = save(media)
+                val message = if (target != null) {
+                    resources.getString(R.string.media_viewer_saving, "${target.directory.folderName}/$MediaSaveFolder")
+                } else {
+                    resources.getString(R.string.media_viewer_save_failed)
+                }
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(message)
+            }
+        }
+    }
     // 上下スワイプ・「戻る」の途中や閉じている間は上部バー・再生操作を隠す
     val showControls = controlsVisible && !dismissState.isActive
     DismissibleViewer(
@@ -135,11 +159,33 @@ fun MediaViewerScreen(
                 count = items.size,
                 onClose = { scope.launch { dismissState.dismiss() } },
                 onOpenUrl = openUrl,
-                onSave = onSave,
+                onSave = save,
+            )
+        }
+        // 下端の再生操作に重ならない高さに出す。既定 (inverseSurface) はライトテーマで暗く、黒背景に埋もれるので surface 系にする
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.systemBarsIgnoringVisibility)
+                .padding(bottom = 80.dp),
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
 }
+
+/** 端末上でのディレクトリ名 (Environment.DIRECTORY_*)。 */
+private val SaveDirectory.folderName: String
+    get() = when (this) {
+        SaveDirectory.Pictures -> "Pictures"
+        SaveDirectory.Music -> "Music"
+        SaveDirectory.Downloads -> "Download"
+    }
 
 /** 操作部分と一緒にシステムバーも出し入れする (隠している間は端からのスワイプで一時的に出る)。 */
 @Composable

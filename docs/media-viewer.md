@@ -122,13 +122,26 @@ SurfaceView は Compose の `graphicsLayer` の alpha (閉じるときのフェ�
 * 再生部品は `Player` インターフェースにだけ依存する (将来 MediaSession と組み合わせやすい)。
 * 注意: 透過 Activity のまま PiP に入れるかは未確認。駄目なら `Activity.setTranslucent(false)` (API 30+) で切り替える。
 
-## 保存 (未実装、差し込み口のみ)
-* `MediaViewerScreen(onSave = ...)` が `null` の間はメニューに「保存」を出さない。保存元は `originalUrl` (リモートの原本優先)。
-* minSdk 33 なので、MediaStore (Pictures / Movies / Music) に書き込むだけならストレージ権限は要らない。
-  必要なのは OkHttp でのダウンロード、MediaStore への挿入 (IS_PENDING)、拡張子・MIME の決定、進捗・失敗の表示。
+## 保存
+システムの DownloadManager に任せる (`data/media/MediaDownloader.kt` の `SystemMediaDownloader`)。**権限は宣言しない**。
+* 取得元は `originalUrl` (リモートの原本優先)。保存先・ファイル名・MIME は純粋関数 `mediaSaveTarget` (`domain/model/MediaSave.kt`、
+  `MediaSaveTest`) が決める:
+  * image / video / gifv → `Pictures/Quasar/`、audio → `Music/Quasar/`、unknown → `Download/Quasar/`
+    (MediaProvider は最上位のディレクトリごとに置ける種類を制限していて、Pictures には画像・動画しか置けない)。
+  * ファイル名は `<取得元のホスト>_<メディア ID>.<拡張子>`。拡張子は URL のパスから、無ければ type から (jpg / mp4 / mp3)。
+    `:` 等は `_` に置き換える (プロフィール画像の合成 ID `avatar:<id>` 等)。
+* `setDestinationInExternalPublicDir` は targetSdk Q 以上なら既知の公開ディレクトリに権限なしで書ける。サブディレクトリも
+  DownloadProvider が作る。保存されたファイルはメディアスキャンされ、MediaStore の持ち主はこのアプリになる (エミュレータで確認)。
+* 同じファイル名が既にあれば DownloadProvider が `-1` 等を付けて別名にする (上書き・失敗にはならない)。
+* 進み具合・完了・失敗は DownloadProvider の通知 (`VISIBILITY_VISIBLE_NOTIFY_COMPLETED`)。通知を出すのはシステム側なので
+  `POST_NOTIFICATIONS` は要らない。アプリは結果を受け取らない (`ACTION_DOWNLOAD_COMPLETE` の receiver は無い)。
+  ビューアは受け付けたら「Saving to Pictures/Quasar」、受け付けられなければ「Couldn't save」をスナックバーで出す。
+* DownloadManager は http / https しか受け付けない (ギャラリーの `file:///android_asset` は「Couldn't save」になる)。
+* 未対応: remote_url で失敗したときに url で取り直す (受け取るなら完了の receiver が要る)、ダウンロード中の通知のタップ
+  (`ACTION_NOTIFICATION_CLICKED`)。
 
 ## 未実装・未確認
-* 保存、PiP、代替テキストの表示。
+* PiP、代替テキストの表示。
 * 画像: 拡大中に端まで動かしたら次のページへ送る、拡大率を元画像の解像度に合わせる (今は一律 5 倍まで)。
 * 一覧での自動再生 (入れるなら `DisplaySettings` の設定項目にし、既定はオフ)。
 * ビューアから戻ったときにインライン再生を続きから再開すること。

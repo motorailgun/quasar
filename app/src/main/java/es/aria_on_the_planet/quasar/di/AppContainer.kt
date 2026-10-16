@@ -3,6 +3,8 @@ package es.aria_on_the_planet.quasar.di
 import android.content.Context
 import android.net.Uri
 import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
+import es.aria_on_the_planet.quasar.data.media.MediaDownloader
+import es.aria_on_the_planet.quasar.data.media.SystemMediaDownloader
 import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
@@ -48,6 +50,9 @@ class AppContainer(context: Context) {
 
     /** 端末のファイル (Photo Picker の結果等) をアップロード元にする。問い合わせを伴うので IO スレッドで呼ぶ。 */
     fun uploadSource(uri: Uri): UploadSource = ContentUriUploadSource(contentResolver, uri)
+
+    /** メディアの保存 (システムの DownloadManager に任せる)。 */
+    val mediaDownloader: MediaDownloader = SystemMediaDownloader(context)
 
     /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
     val draftStore = DraftStore { session, scope ->

@@ -392,7 +392,10 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * **構成**: `CollapsingHeaderLayout` で 上からヘッダ (`ProfileHeader`) / タブ (`ConnectedTabRow`) / `HorizontalPager`
     (タブごとの `PostList`、それぞれ別の LazyListState)。一覧を上へスクロールするとまずヘッダが畳まれ (nested scroll の
     pre-scroll)、タブは上端に残る。下へは一覧が先頭に着いてからヘッダが開き、開き切った余りが pull-to-refresh へ回る。
-    ヘッダ自体の上でのドラッグも同じ扱い (`scrollable` で拾って nested scroll に流す)。ヘッダが畳まれ切ったらトップバーに名前
+    ヘッダ自体の上でのドラッグも同じ扱い (`scrollable` で拾って nested scroll に流す)。
+    一覧はタブの裏から描き (`pinnedOverlapsContent = true`、一覧の先頭にタブの高さ分の余白)、タブの背景は Haze のぼかし
+    (ページャが `hazeSource`、`backgroundColor` 必須は他と同様)。表示中のページの一覧が先頭から動いていない間は不透明な
+    surface を重ねて今までどおりに見せ、スクロールしたらそれを消してぼかしにする。トップバーは不透明のまま。ヘッダが畳まれ切ったらトップバーに名前
     (`DetailScaffold(titleRevealed = ...)`)。ヘッダの畳み具合は両タブで共有し、タブごとのスクロール位置とは同期しない (X と同じ)。
   * **タブ** (Posts / Media): ボタンでも左右スワイプでも切り替わる (`pagerState.targetPage` を `selectTab` に渡す)。Media は
     `only_media=true` で絞り込んだポストの一覧 (別の `PostFeed`。初めて開いたときに読む) を同じ `PostList` で出すだけ。

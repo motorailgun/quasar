@@ -1,6 +1,24 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,6 +85,19 @@ fun ProfileScreen(
     val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
     val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
     val tabLabels = tabs.map { stringResource(it.label()) }
+    // ページごとの一覧の位置。タブの背景 (スクロールしたらぼかし) の判定にも使うのでここで持つ
+    val listStates = tabs.associateWith { rememberLazyListState() }
+    val hazeState = rememberHazeState()
+    val tabsBlurStyle = rememberTabsBlurStyle()
+    val density = LocalDensity.current
+    var tabsHeight by remember { mutableStateOf(0.dp) }
+    val currentList = listStates.getValue(tabs[pagerState.currentPage])
+    val listScrolled by remember(currentList) {
+        derivedStateOf { currentList.firstVisibleItemIndex > 0 || currentList.firstVisibleItemScrollOffset > 0 }
+    }
+    // 一覧がタブの裏に入っていない間は不透明 (今までどおり)、入ったらぼかしに切り替える
+    val tabsSolidAlpha by animateFloatAsState(if (listScrolled) 0f else 1f, label = "tabsSolidAlpha")
+    val surface = MaterialTheme.colorScheme.surface
 
     // スワイプでもボタンでも、行き先のタブを選択として扱う (初めて開くタブはここで読み込む)
     LaunchedEffect(pagerState.targetPage) {
@@ -91,6 +122,8 @@ fun ProfileScreen(
             else -> CollapsingHeaderLayout(
                 state = headerState,
                 modifier = Modifier.fillMaxSize(),
+                // 一覧をタブの裏まで描き、タブの背景でぼかす
+                pinnedOverlapsContent = true,
                 header = {
                     ProfileHeader(
                         profile = profile,
@@ -114,18 +147,30 @@ fun ProfileScreen(
                         labels = tabLabels,
                         selectedIndex = pagerState.targetPage,
                         onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index, animationSpec = spatialSpec) } },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+                        modifier = Modifier
+                            .onSizeChanged { tabsHeight = with(density) { it.height.toDp() } }
+                            .hazeBlur(input = HazeInput.Sources(hazeState), style = tabsBlurStyle)
+                            .drawBehind {
+                                // ぼかしの上、ボタンの下に不透明な面を重ね、スクロール量で消す (alpha は描画時に読む)
+                                drawRect(surface.copy(alpha = tabsSolidAlpha))
+                                // 上端は不透明なトップバーの色、下へ向かって透明にして、トップバーとの境目を馴染ませる
+                                drawRect(Brush.verticalGradient(listOf(surface, Color.Transparent)))
+                            },
                     )
                 },
                 content = {
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .hazeSource(hazeState),
                         key = { tabs[it] },
                     ) { page ->
                         val tab = tabs[page]
                         ProfileTabPage(
                             tab = tab,
+                            listState = listStates.getValue(tab),
+                            topPadding = tabsHeight,
                             feed = if (tab == ProfileTab.Media) state.media else state.posts,
                             pinnedPosts = if (tab == ProfileTab.Posts) state.extras.pinnedPosts else emptyList(),
                             onLoadMore = { viewModel.loadMore(tab) },
@@ -147,6 +192,8 @@ fun ProfileScreen(
 @Composable
 private fun ProfileTabPage(
     tab: ProfileTab,
+    listState: LazyListState,
+    topPadding: Dp,
     feed: PostFeedState,
     pinnedPosts: List<Post>,
     onLoadMore: () -> Unit,
@@ -159,7 +206,9 @@ private fun ProfileTabPage(
     PostList(
         items = feed.items,
         modifier = Modifier.fillMaxSize(),
-        state = rememberLazyListState(),
+        state = listState,
+        // 先頭はタブの裏に隠れないようタブの高さ分あける
+        contentPadding = PaddingValues(top = topPadding),
         isLoadingMore = feed.isLoadingMore,
         onLoadMore = onLoadMore,
         onUserClick = onUserClick,
@@ -202,6 +251,22 @@ private fun ProfileTabPage(
             }
         },
     )
+}
+
+/** タブの背景のぼかし (タイムラインのヘッダ・クイック投稿バーと同じく下地 surface + 灰色の tint。ただし弱め)。 */
+@Composable
+private fun rememberTabsBlurStyle(): HazeBlurStyle {
+    val background = MaterialTheme.colorScheme.surface
+    // トップバー (不透明) の直下に並ぶので、色味は濃いめ・ぼかしは弱めにして馴染ませる
+    val tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
+    return remember(background, tint) {
+        HazeBlurStyle {
+            blurRadius(6.dp)
+            // 一覧そのものには背景が無いので、下地を敷かないとぼかした結果が透けて後ろの実物がくっきり見える
+            backgroundColor(background)
+            colorEffects(listOf(HazeColorEffect.tint(tint)))
+        }
+    }
 }
 
 private fun ProfileTab.label(): Int = when (this) {

@@ -74,6 +74,10 @@ fun rememberCollapsingHeaderState(): CollapsingHeaderState =
  *
  * [content] 内の一覧のスクロールは nested scroll で受け取る。[header] の上でのドラッグも同じように畳む / 開く
  * ([header] 自体はスクロールしないので、ここで拾う)。
+ *
+ * @param pinnedOverlapsContent `true` なら [content] を [pinned] の裏から始める ([pinned] を半透明・ぼかしにして、
+ *   スクロールした一覧を透かす用)。その場合 [content] の一覧は先頭に [pinned] の高さ分の余白を取る。
+ *   一覧が [header] の裏に入ることは無い (上へのスクロールではまず [header] が畳まれる) ので、重なるのは [pinned] だけ。
  */
 @Composable
 fun CollapsingHeaderLayout(
@@ -82,6 +86,7 @@ fun CollapsingHeaderLayout(
     pinned: @Composable () -> Unit,
     content: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    pinnedOverlapsContent: Boolean = false,
 ) {
     // 見出しの上でのドラッグ。自分では何も消費せず、nested scroll (state.connection とその外側) に任せる
     val headerDrag = rememberScrollableState { 0f }
@@ -98,16 +103,18 @@ fun CollapsingHeaderLayout(
         val headerHeight = headerPlaceable?.height ?: 0
         val pinnedHeight = pinnedPlaceable?.height ?: 0
         val height = constraints.maxHeight
-        val contentHeight = (height - pinnedHeight).coerceAtLeast(0)
+        val contentTop = if (pinnedOverlapsContent) 0 else pinnedHeight
+        val contentHeight = (height - contentTop).coerceAtLeast(0)
         val contentPlaceable = contentMeasurables.firstOrNull()
             ?.measure(constraints.copy(minHeight = contentHeight, maxHeight = contentHeight))
         if (state.maxOffset != headerHeight.toFloat()) state.maxOffset = headerHeight.toFloat()
         layout(constraints.maxWidth, height) {
             // 見出しの高さが縮んだ (補助情報の取得失敗等) 直後でも、はみ出さないよう丸める
             val offset = state.offset.coerceIn(0f, headerHeight.toFloat()).roundToInt()
+            // 重なり順は後に置いたものが上: 本体 → 見出し → 残る部分
+            contentPlaceable?.place(0, headerHeight + contentTop - offset)
             headerPlaceable?.place(0, -offset)
             pinnedPlaceable?.place(0, headerHeight - offset)
-            contentPlaceable?.place(0, headerHeight + pinnedHeight - offset)
         }
     }
 }

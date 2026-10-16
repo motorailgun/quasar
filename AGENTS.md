@@ -7,7 +7,8 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 
 | 用途 | ライブラリ |
 | --- | --- |
-| UI | Jetpack Compose, `androidx.compose.material3` 1.5.x (Expressive API: `MaterialExpressiveTheme`, `LoadingIndicator`, `ButtonGroup` 等) |
+| UI | Jetpack Compose, `androidx.compose.material3` 1.5.x (Expressive API: `MaterialExpressiveTheme`, `LoadingIndicator` 等) |
+| ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`) |
@@ -425,10 +426,18 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * mention は見出しを付けず PostCard だけ (本文に @ユーザー名 が入るため。Reply to も出さない)。
   * それ以外 (status / quote / update / poll 等) は「アイコン + 〜しました + 時刻」の見出しと PostCard。
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
-* **Timeline**: 上部に Home / Local / Global の切り替え (Expressive の `ButtonGroup` 系トグル)、
+* **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
+  * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct・
+    ログアウト。未取得 / 未ログインは汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
+    連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
+    形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。
+    未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。
+  * 一覧は画面の最上端から描き (edge-to-edge)、上端の余白はヘッダの高さ (ステータスバー込み) を `contentPadding` で取る。
+    スクロールするとステータスバー・ヘッダの裏に入る。ステータスバーの部分には読みやすさのため薄いグラデーション
+    (`StatusBarScrim`)。PTR のインジケータはヘッダの下から出す。
   * カラムは `HorizontalPager` で、左右スワイプでも切り替わる (ページごとに PTR・LazyListState を持つ)。吸着とボタンでの
-    切り替えは `motionScheme.defaultSpatialSpec()` の spring。切り替えボタンの幅はページ位置 (小数) から決め、指に追従する。
+    切り替えは `motionScheme.defaultSpatialSpec()` の spring。タブの幅はページ位置 (小数) から決め、指に追従する。
   * 読み込み: 指で引き出し始めたカラム / 落ち着いたカラムだけ `ensureLoaded`。ボタンで遠くへ飛ぶ時に通過するカラムは読まない。
     選択 (`viewModel.select`) はボタン押下時と `settledPage` の変化時。
   * ドラッグにゴムの抵抗を付けた版は `timeline-swipe-rubber-band` ブランチにある (60fps 出ていないように見えたので保留)。
@@ -645,6 +654,9 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   リンクが開くことがある (既知の挙動)。
 * `StickToTopEffect` はコンポジション中に LazyListState を読んで「直前に先頭にいたか」を判定している。
   一覧の先頭キーの決め方を変えるときは挙動を確認する。
+* **凹みのある形 (`MaterialShapes.Cookie9Sided` 等) に `Modifier.shadow` を付けない**。影の計算が RenderThread で非常に重く、
+  ヘッダのアイコンに 12dp の影を付けたら 1 フレームに約 10 秒かかり、起動直後に固まって ANR になった。影は円などの凸形で付ける
+  (見た目の形と影の形は別でよい)。
 * カスタム絵文字の縦横比はメモリ上のキャッシュのみ。初回は正方形で表示され、読み込み後に幅が変わる。
 
 ### ビルド

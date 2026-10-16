@@ -189,4 +189,5 @@
     <string name="quick_post_start_typing">Start writing a post</string>
     <string name="quick_post_has_poll">Poll</string>
     <string name="quick_post_has_cw">Content warning</string>
+    <string name="account_menu">Account</string>
 </resources>

@@ -46,8 +46,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -62,7 +60,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
@@ -81,6 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
@@ -103,7 +101,6 @@ fun TimelineScreen(
     onDraftFinished: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     // カラムごとにスクロール位置を保持する
     val listStates = ColumnType.entries.associateWith { rememberLazyListState() }
@@ -132,9 +129,12 @@ fun TimelineScreen(
     var composerExpanded by rememberSaveable { mutableStateOf(false) }
     val hazeState = rememberHazeState()
     var barHeight by remember { mutableStateOf(0.dp) }
+    var headerHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
-    if (composer != null) {
-        val draftState by composer.state.collectAsStateWithLifecycle()
+    val draftState = composer?.state?.collectAsStateWithLifecycle()?.value
+    // ヘッダ左のアイコンに出すログイン中のアカウント (投稿用に取得しているものを使う)
+    val account: User? = draftState?.account
+    if (composer != null && draftState != null) {
         // バーから投稿した (フル画面からの投稿はフル画面が onFinish で知らせる)
         LaunchedEffect(draftState.posted) {
             if (draftState.posted && !composerExpanded) onDraftFinished()
@@ -148,45 +148,22 @@ fun TimelineScreen(
             }
         }
     }
+    // 一覧の上端はヘッダ (ステータスバーを含む) の分だけ空ける。一覧自体は画面の最上端から描き、スクロールすると
+    // ステータスバーやヘッダの裏に入る
+    val topPadding = headerHeight
     // 一覧の下端はバー (と下の余白・ナビゲーションバー) の分だけ空け、最後の項目がバーに隠れないようにする
     val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
         if (composer != null) barHeight + BarMargin * 2 else 0.dp
 
     Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            topBar = {
-                Column {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.app_name)) },
-                        actions = {
-                            IconButton(onClick = onLogout) {
-                                Icon(Icons.AutoMirrored.Outlined.Logout, stringResource(R.string.logout))
-                            }
-                        },
-                        scrollBehavior = scrollBehavior,
-                    )
-                    TimelineSelector(
-                        available = state.available,
-                        pagerState = pagerState,
-                        onSelect = { column ->
-                            viewModel.select(column)
-                            scope.launch {
-                                pagerState.animateScrollToPage(state.available.indexOf(column), animationSpec = pageSpring)
-                            }
-                        },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            },
-        ) { padding ->
+        // トップバーは置かず、ヘッダ (アイコン + タブ) を一覧の上に浮かべる
+        Scaffold { _ ->
             Box(Modifier.fillMaxSize()) {
                 HorizontalPager(
                     state = pagerState,
-                    // 下端はバーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
+                    // 上下ともヘッダ・バーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = padding.calculateTopPadding())
                         .hazeSource(hazeState),
                     key = { state.available[it] },
                     // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
@@ -203,9 +180,27 @@ fun TimelineScreen(
                         state = state,
                         listState = listStates.getValue(column),
                         viewModel = viewModel,
+                        topPadding = topPadding,
                         bottomPadding = bottomPadding,
                     )
                 }
+                StatusBarScrim(Modifier.align(Alignment.TopCenter))
+                TimelineHeader(
+                    account = account,
+                    available = state.available,
+                    pagerState = pagerState,
+                    hazeState = hazeState,
+                    onSelect = { column ->
+                        viewModel.select(column)
+                        scope.launch {
+                            pagerState.animateScrollToPage(state.available.indexOf(column), animationSpec = pageSpring)
+                        }
+                    },
+                    onLogout = onLogout,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
+                )
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -259,6 +254,7 @@ private fun ColumnPage(
     state: TimelineScreenState,
     listState: LazyListState,
     viewModel: TimelineViewModel,
+    topPadding: Dp,
     bottomPadding: Dp,
 ) {
     val context = LocalContext.current
@@ -274,7 +270,8 @@ private fun ColumnPage(
             PullToRefreshDefaults.LoadingIndicator(
                 state = pullState,
                 isRefreshing = isRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter),
+                // ヘッダの下から出す
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = topPadding),
             )
         },
     ) {
@@ -296,7 +293,7 @@ private fun ColumnPage(
                 entries = state.notifications.items,
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
-                contentPadding = PaddingValues(bottom = bottomPadding),
+                contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
                 onUserClick = context::openProfile,
@@ -310,7 +307,7 @@ private fun ColumnPage(
                 items = state.timelines.getValue(timelineType).items,
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
-                contentPadding = PaddingValues(bottom = bottomPadding),
+                contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
                 onUserClick = context::openProfile,
@@ -324,51 +321,6 @@ private fun ColumnPage(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun TimelineSelector(
-    available: List<ColumnType>,
-    pagerState: PagerState,
-    onSelect: (ColumnType) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // スワイプ中も指に合わせて幅が移るよう、ページの位置 (小数) から各ボタンの重みを決める
-    val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
-    val selectedIndex = pagerState.targetPage
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-    ) {
-        available.forEachIndexed { index, type ->
-            val checked = index == selectedIndex
-            // 4 カラムでは等幅にラベルが収まらないので、選択中のみラベルを出して幅を広げる
-            val closeness = (1f - abs(position - index)).coerceIn(0f, 1f)
-            val weight = 1f + (SelectedWeight - 1f) * closeness
-            ToggleButton(
-                checked = checked,
-                onCheckedChange = { onSelect(type) },
-                modifier = Modifier.weight(weight).semantics { role = Role.RadioButton },
-                shapes = when (index) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    available.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                },
-            ) {
-                val label = stringResource(type.label())
-                Icon(
-                    type.icon(),
-                    contentDescription = if (checked) null else label,
-                    modifier = Modifier.size(18.dp),
-                )
-                if (checked) {
-                    Box(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun CenteredMessage(message: String) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -376,16 +328,15 @@ private fun CenteredMessage(message: String) {
     }
 }
 
-private const val SelectedWeight = 1.8f
 
-private fun ColumnType.icon() = when (this) {
+internal fun ColumnType.icon() = when (this) {
     ColumnType.Home -> Icons.Outlined.Home
     ColumnType.Notifications -> Icons.Outlined.Notifications
     ColumnType.Local -> Icons.Outlined.Groups
     ColumnType.Global -> Icons.Outlined.Public
 }
 
-private fun ColumnType.label() = when (this) {
+internal fun ColumnType.label() = when (this) {
     ColumnType.Home -> R.string.timeline_home
     ColumnType.Notifications -> R.string.column_notifications
     ColumnType.Local -> R.string.timeline_local

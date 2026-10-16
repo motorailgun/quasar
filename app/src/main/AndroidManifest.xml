@@ -29,6 +29,10 @@
         <activity
             android:name=".ui.post.PostActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.composer.ComposerActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateVisible" />
         <!-- PiP 対応時に再生を途切れさせないよう、画面サイズの変更は自前で受ける (supportsPictureInPicture は未設定) -->
         <activity
             android:name=".ui.mediaviewer.MediaViewerActivity"

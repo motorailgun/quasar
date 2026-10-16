@@ -17,6 +17,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -63,6 +65,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.notification.NotificationList
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
+import es.aria_on_the_planet.quasar.ui.composer.openComposer
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
@@ -130,6 +133,14 @@ fun TimelineScreen(
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (viewModel.canInteract) {
+                val context = LocalContext.current
+                FloatingActionButton(onClick = context::openComposer) {
+                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.compose))
+                }
+            }
+        },
     ) { padding ->
         HorizontalPager(
             state = pagerState,

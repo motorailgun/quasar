@@ -30,8 +30,9 @@ es.aria_on_the_planet.quasar
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
-│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository
-├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote)
+│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository
+├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
+│                                   PostDraft, ComposeLimits, PostLength)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -50,6 +51,8 @@ es.aria_on_the_planet.quasar
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
+    │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
+    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
@@ -58,7 +61,8 @@ es.aria_on_the_planet.quasar
     ├── timeline/                   タイムライン画面 + ViewModel
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
     ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
-    └── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
+    ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
+    └── composer/                   投稿画面 (ComposerActivity / Screen / ViewModel)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -200,6 +204,9 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` (要認証) |
 | ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` (要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
+| 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き、要認証) |
+| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (要認証。`source.privacy` が既定の公開範囲) |
+| サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
 
@@ -421,6 +428,39 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * ドラッグにゴムの抵抗を付けた版は `timeline-swipe-rubber-band` ブランチにある (60fps 出ていないように見えたので保留)。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
 
+## 投稿 (`ui/composer/`, `ui/component/composer/`)
+
+* 画面: `Context.openComposer()` → `ComposerActivity` (要ログイン)。タイムラインの FAB (ログイン時のみ) から開く。
+  X の投稿画面 (`x_posting.jpg`) を参考に、トップバー (× / Post)・アイコン + 本文・下端のツールバー
+  (左端に残り文字数、右寄せで公開範囲 / メディア / 投票 / CW)。
+  アイコンの色はオン = primary、オフ = primary を背景色へ寄せた色、選べない (メディアと投票の排他等) = 標準の無効色
+  (`ComposerIconColors`)。
+  `Scaffold(contentWindowInsets = WindowInsets.safeDrawing)` + `consumeWindowInsets` でツールバーをキーボードの直上に置く。
+  入力があるときの「戻る」/ × は破棄の確認 (`NavigationBackHandler`)。成功したら閉じる (タイムラインにはストリーミングで載る)。
+  失敗はスナックバー (Mastodon の `{"error": ...}` の文言) で、入力は残す。
+* 部品は**クイック投稿バーでも組み直せるよう分離**している。どれも状態を持たず、値とコールバックだけを受ける:
+  `ComposerAccountIcon` (`UserIcon` + 取得前のプレースホルダ) / `ComposerTextField` (枠無しの `BasicTextField` + `TextFieldState`) /
+  `ContentWarningField` / `VisibilityButton` (メニューで選ぶ。`compact` でアイコンのみ) / `ComposerToolbar` (スロット) +
+  `AttachMediaButton` / `PollButton` / `ContentWarningButton` / `CharacterCounter` / `AttachmentStrip` + `SensitiveMediaToggle` / `PollEditor`。
+  `Composer` はそれらを X の配置で並べた全体のラッパー (高さいっぱいを使う前提。別の配置では部品を直接使う)。
+* 状態は `ComposerState` (`TextFieldState` + snapshot state)。投稿画面では ViewModel が持ち、それ以外は `rememberComposerState()`
+  (`rememberSaveable`。添付は保存しない)。`toDraft()` で `PostDraft` にする。
+* ドメイン: `PostDraft` / `PollDraft` / `DraftAttachment` (+ `UploadState`)。送信可否は純粋関数 `PostDraft.problems(limits)`
+  (空・文字数超過・メディアと投票の併用・未アップロード・選択肢の数/空/長さ)。メディアと投票は同時に付けられない (Mastodon の制約)
+  ので、片方があるともう片方のボタンを無効にする。
+* 文字数は `countPostCharacters` (`PostLength.kt`): Mastodon の `StatusLengthValidator` に合わせ、CW + 本文、URL は一律
+  `characters_reserved_per_url` (23)、`@user@domain` は `@user` 分、書記素単位。URL の判定は twitter-text より簡略化している。
+* 上限 (`ComposeLimits`) は `InstanceRepository` から。取得前・失敗時は Mastodon の既定値 (500 字 / 4 枚 / 4 択)。
+  `InstanceRepository` はサーバごとにプロセス内で 1 回だけ取得し (失敗はキャッシュしない)、ストリーミング URL もここから取る。
+* 公開範囲・閲覧注意の初期値は `AccountRepository.fetchMe` (`verify_credentials` の `source`、セッションごとにキャッシュ)。
+  取得前にユーザーが変えていたら上書きしない。
+* 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
+* フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
+  `DraftMappersTest`。
+* **未実装**: メディアの選択・アップロード・代替テキストの編集 (`AttachmentStrip` はレイアウトと Preview のみ。追加ボタンは何もしない)、
+  リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、カスタム絵文字・メンションの補完、
+  言語の指定、予約投稿、クイック投稿バー。
+
 ## 自動更新 (Streaming API)
 
 * `StreamingClient` (`data/streaming/`) が OkHttp の WebSocket で `wss://<configuration.urls.streaming>/api/v1/streaming`
@@ -549,7 +589,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
-* **操作**: リプライ・投稿・フォローは未実装。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
+* **操作**: リプライ・フォローは未実装 (投稿はテキスト・CW・投票・公開範囲まで。メディア添付は未実装)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
   操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。

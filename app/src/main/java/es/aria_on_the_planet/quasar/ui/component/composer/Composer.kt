@@ -1,0 +1,135 @@
+package es.aria_on_the_planet.quasar.ui.component.composer
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
+import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
+import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.domain.model.characterCount
+
+/**
+ * 投稿欄全体 (X の投稿画面の配置)。
+ *
+ * ```
+ * (icon) [CW 欄]
+ *        本文
+ *        [添付] / [投票]                    ← ここまでスクロール
+ * ─────────────────────────────────────
+ * (残り)      [公開範囲][メディア][投票][CW]  ← 下端に固定。ボタンは右寄せ
+ * ```
+ *
+ * 状態は [state] に読み書きするだけで、送信は呼び出し側 (トップバーの Post ボタン等) が行う。
+ * 高さいっぱいを使う前提なので、クイック投稿バーなど別の配置では各部品を直接組み合わせる。
+ *
+ * @param account 投稿するアカウント。取得前は `null` (アイコンはプレースホルダ)。
+ * @param onAttachMedia メディア追加ボタン。NOTE: 端末のメディア選択は未実装。
+ * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
+ */
+@Composable
+fun Composer(
+    state: ComposerState,
+    account: User?,
+    limits: ComposeLimits,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    autoFocus: Boolean = false,
+    onAttachMedia: () -> Unit = {},
+    onEditAttachmentDescription: (DraftAttachment) -> Unit = {},
+) {
+    val focusRequester = remember { FocusRequester() }
+    if (autoFocus) {
+        LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
+    }
+    val characterCount by remember(state, limits) { derivedStateOf { state.toDraft().characterCount(limits) } }
+    val poll = state.poll
+    val attachments = state.attachments
+
+    Column(modifier) {
+        Row(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+        ) {
+            ComposerAccountIcon(account)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f).animateContentSize()) {
+                ContentWarningField(state.contentWarning, visible = state.contentWarningEnabled)
+                ComposerTextField(
+                    state = state.text,
+                    enabled = enabled,
+                    minHeight = TextMinHeight,
+                    // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
+                    modifier = Modifier.focusRequester(focusRequester).padding(top = 8.dp),
+                )
+                AttachmentStrip(
+                    attachments = attachments,
+                    onRemove = { state.removeAttachment(it.localId) },
+                    onEditDescription = onEditAttachmentDescription,
+                    canAddMore = attachments.size < limits.maxMediaAttachments,
+                    onAdd = onAttachMedia,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                AnimatedVisibility(attachments.isNotEmpty()) {
+                    SensitiveMediaToggle(
+                        checked = state.sensitive,
+                        onCheckedChange = { state.sensitive = it },
+                    )
+                }
+                if (poll != null) {
+                    PollEditor(
+                        poll = poll,
+                        onChange = { state.poll = it },
+                        limits = limits,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
+        }
+        ComposerToolbar(
+            modifier = Modifier.fillMaxWidth(),
+            leading = { CharacterCounter(used = characterCount, max = limits.maxCharacters) },
+        ) {
+            VisibilityButton(
+                visibility = state.visibility,
+                onChange = { state.visibility = it },
+                enabled = enabled,
+            )
+            // メディアと投票は同時に付けられない (使えない方は無効の色)
+            AttachMediaButton(
+                onClick = onAttachMedia,
+                active = attachments.isNotEmpty(),
+                enabled = enabled && poll == null && attachments.size < limits.maxMediaAttachments,
+            )
+            PollButton(
+                checked = poll != null,
+                onCheckedChange = { state.togglePoll() },
+                enabled = enabled && attachments.isEmpty(),
+            )
+            ContentWarningButton(
+                checked = state.contentWarningEnabled,
+                onCheckedChange = { state.contentWarningEnabled = it },
+                enabled = enabled,
+            )
+        }
+    }
+}
+
+private val TextMinHeight = 120.dp

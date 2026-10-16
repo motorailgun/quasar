@@ -2,8 +2,10 @@ package es.aria_on_the_planet.quasar.ui.component.post
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Nightlight
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
@@ -39,3 +41,30 @@ private fun PostVisibility.icon(): Pair<ImageVector, Int>? = when (this) {
     PostVisibility.Direct -> Icons.Outlined.MailOutline to R.string.post_visibility_direct
     PostVisibility.Public, PostVisibility.Private -> null
 }
+
+/** 公開範囲を選ぶ場面 (投稿画面) 用の、すべての公開範囲に付くアイコン。 */
+val PostVisibility.selectorIcon: ImageVector
+    get() = when (this) {
+        PostVisibility.Public -> Icons.Outlined.Public
+        PostVisibility.Unlisted -> Icons.Outlined.Nightlight
+        PostVisibility.Private -> Icons.Outlined.Lock
+        PostVisibility.Direct -> Icons.Outlined.MailOutline
+    }
+
+/** 公開範囲の名前 (文字列リソース)。 */
+val PostVisibility.labelRes: Int
+    get() = when (this) {
+        PostVisibility.Public -> R.string.post_visibility_public
+        PostVisibility.Unlisted -> R.string.post_visibility_unlisted
+        PostVisibility.Private -> R.string.post_visibility_private
+        PostVisibility.Direct -> R.string.post_visibility_direct
+    }
+
+/** 公開範囲の説明 (文字列リソース)。 */
+val PostVisibility.descriptionRes: Int
+    get() = when (this) {
+        PostVisibility.Public -> R.string.post_visibility_public_description
+        PostVisibility.Unlisted -> R.string.post_visibility_unlisted_description
+        PostVisibility.Private -> R.string.post_visibility_private_description
+        PostVisibility.Direct -> R.string.post_visibility_direct_description
+    }

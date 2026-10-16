@@ -108,9 +108,28 @@ class MastodonApi(
     suspend fun statusAction(serverUrl: String, accessToken: String, id: String, action: String): StatusDto =
         post(serverUrl, accessToken, "api/v1/statuses/$id/$action") {}
 
-    /** https://docs.joinmastodon.org/methods/instance/#v2 の `configuration.urls.streaming`。 */
-    suspend fun streamingUrl(serverUrl: String): String? =
-        get<InstanceDto>(serverUrl, null, "api/v2/instance") {}.configuration?.urls?.streaming
+    /**
+     * ポストを投稿する (要認証)。https://docs.joinmastodon.org/methods/statuses/#create
+     *
+     * @param params フォームの項目 (`status`, `visibility`, `poll[options][]` 等。同じ名前を複数回含みうる)。
+     * @param idempotencyKey 同じキーの再送は二重に投稿されない (サーバが 1 時間覚えている)。
+     */
+    suspend fun postStatus(
+        serverUrl: String,
+        accessToken: String,
+        params: List<Pair<String, String>>,
+        idempotencyKey: String,
+    ): StatusDto = post(serverUrl, accessToken, "api/v1/statuses", headers = mapOf("Idempotency-Key" to idempotencyKey)) {
+        params.forEach { (name, value) -> add(name, value) }
+    }
+
+    /** https://docs.joinmastodon.org/methods/instance/#v2 (認証不要) */
+    suspend fun instance(serverUrl: String): InstanceDto =
+        get(serverUrl, null, "api/v2/instance") {}
+
+    /** ログイン中のアカウント (要認証)。`source` (既定の公開範囲等) を含む。 */
+    suspend fun verifyCredentials(serverUrl: String, accessToken: String): AccountDto =
+        get(serverUrl, accessToken, "api/v1/accounts/verify_credentials") {}
 
     /** https://docs.joinmastodon.org/methods/accounts/#get */
     suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =
@@ -167,11 +186,14 @@ class MastodonApi(
         serverUrl: String,
         accessToken: String?,
         path: String,
+        headers: Map<String, String> = emptyMap(),
         crossinline form: FormBody.Builder.() -> Unit,
     ): T {
         val url = serverUrl.toHttpUrl().newBuilder().addPathSegments(path).build()
         val body: RequestBody = FormBody.Builder().apply(form).build()
-        return execute(Request.Builder().url(url).post(body), accessToken)
+        val builder = Request.Builder().url(url).post(body)
+        headers.forEach { (name, value) -> builder.header(name, value) }
+        return execute(builder, accessToken)
     }
 
     private suspend inline fun <reified T> execute(builder: Request.Builder, accessToken: String?): T =

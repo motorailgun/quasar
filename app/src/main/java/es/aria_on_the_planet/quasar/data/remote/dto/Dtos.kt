@@ -30,6 +30,15 @@ data class AccountDto(
     @SerialName("following_count") val followingCount: Int = 0,
     @SerialName("followers_count") val followersCount: Int = 0,
     val fields: List<FieldDto> = emptyList(),
+    /** verify_credentials (CredentialAccount) のときだけ返る。 */
+    val source: AccountSourceDto? = null,
+)
+
+/** https://docs.joinmastodon.org/entities/Account/#source */
+@Serializable
+data class AccountSourceDto(
+    val privacy: String? = null,
+    val sensitive: Boolean = false,
 )
 
 /** https://docs.joinmastodon.org/entities/Status/#Mention */
@@ -123,6 +132,30 @@ data class InstanceDto(
 @Serializable
 data class InstanceConfigurationDto(
     val urls: InstanceUrlsDto? = null,
+    val statuses: InstanceStatusesDto? = null,
+    @SerialName("media_attachments") val mediaAttachments: InstanceMediaDto? = null,
+    val polls: InstancePollsDto? = null,
+)
+
+@Serializable
+data class InstanceStatusesDto(
+    @SerialName("max_characters") val maxCharacters: Int? = null,
+    @SerialName("max_media_attachments") val maxMediaAttachments: Int? = null,
+    @SerialName("characters_reserved_per_url") val charactersReservedPerUrl: Int? = null,
+)
+
+@Serializable
+data class InstanceMediaDto(
+    // 新しいサーバではこちらにも載る。無ければ statuses.max_media_attachments を使う
+    @SerialName("max_media_attachments") val maxMediaAttachments: Int? = null,
+)
+
+@Serializable
+data class InstancePollsDto(
+    @SerialName("max_options") val maxOptions: Int? = null,
+    @SerialName("max_characters_per_option") val maxCharactersPerOption: Int? = null,
+    @SerialName("min_expiration") val minExpiration: Long? = null,
+    @SerialName("max_expiration") val maxExpiration: Long? = null,
 )
 
 @Serializable

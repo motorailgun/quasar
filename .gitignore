@@ -15,5 +15,6 @@
 local.properties
 
 # references
-x_*.png
+/*.png
+/*.jpg
 

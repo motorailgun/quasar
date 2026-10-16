@@ -1,12 +1,14 @@
 package es.aria_on_the_planet.quasar.data.repository
 
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
+import es.aria_on_the_planet.quasar.data.mapper.toFormParams
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -45,6 +47,15 @@ class StatusRepository(
     suspend fun perform(session: Session, statusId: String, action: PostAction): Post {
         val token = requireNotNull(session.accessToken) { "Post actions require login" }
         return api.statusAction(session.serverUrl, token, statusId, action.endpoint).toDomain()
+    }
+
+    /**
+     * [draft] を投稿し、作成されたポストを返す。未認証では投稿できない。
+     * 同じ [idempotencyKey] での再送は二重に投稿されない (通信エラー後の再試行用)。
+     */
+    suspend fun publish(session: Session, draft: PostDraft, idempotencyKey: String): Post {
+        val token = requireNotNull(session.accessToken) { "Posting requires login" }
+        return api.postStatus(session.serverUrl, token, draft.toFormParams(), idempotencyKey).toDomain()
     }
 }
 

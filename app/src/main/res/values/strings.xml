@@ -15,6 +15,12 @@
     <string name="post_action_done">Done</string>
     <string name="post_visibility_unlisted">Quiet public</string>
     <string name="post_visibility_direct">Private mention</string>
+    <string name="post_visibility_public">Public</string>
+    <string name="post_visibility_private">Followers only</string>
+    <string name="post_visibility_public_description">Anyone on and off Mastodon</string>
+    <string name="post_visibility_unlisted_description">Hidden from search, trends, and public timelines</string>
+    <string name="post_visibility_private_description">Only your followers</string>
+    <string name="post_visibility_direct_description">Only people mentioned in the post</string>
     <string name="post_reactions">Favourites</string>
     <string name="post_pinned">Pinned</string>
     <string name="post_reply_to">Reply to %1$s</string>
@@ -127,4 +133,42 @@
         <item quantity="other">%1$s boosted %2$d of your posts</item>
     </plurals>
     <string name="notification_unknown">Notification from %1$s</string>
+    <string name="compose">New post</string>
+    <string name="composer_placeholder">What\'s on your mind?</string>
+    <string name="composer_cw_placeholder">Content warning</string>
+    <string name="composer_post">Post</string>
+    <string name="composer_close">Close</string>
+    <string name="composer_add_media">Add media</string>
+    <string name="composer_add_poll">Add poll</string>
+    <string name="composer_remove_poll">Remove poll</string>
+    <string name="composer_content_warning">Content warning</string>
+    <string name="composer_visibility">Visibility</string>
+    <string name="composer_remaining_characters">%1$d characters remaining</string>
+    <string name="composer_discard_title">Discard post?</string>
+    <string name="composer_discard_message">What you\'ve written will be lost.</string>
+    <string name="composer_discard">Discard</string>
+    <string name="composer_keep_editing">Keep editing</string>
+    <string name="composer_post_failed">Couldn\'t post: %1$s</string>
+    <string name="composer_poll_option">Option %1$d</string>
+    <string name="composer_poll_add_option">Add option</string>
+    <string name="composer_poll_remove_option">Remove option</string>
+    <string name="composer_poll_multiple">Multiple choice</string>
+    <string name="composer_poll_duration">Poll duration</string>
+    <string name="composer_media_remove">Remove</string>
+    <string name="composer_media_alt">ALT</string>
+    <string name="composer_media_alt_description">Edit image description</string>
+    <string name="composer_media_failed">Upload failed</string>
+    <string name="composer_media_sensitive">Mark media as sensitive</string>
+    <plurals name="composer_poll_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="composer_poll_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="composer_poll_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
 </resources>

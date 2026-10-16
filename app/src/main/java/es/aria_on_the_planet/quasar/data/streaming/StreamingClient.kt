@@ -1,7 +1,7 @@
 package es.aria_on_the_planet.quasar.data.streaming
 
 import android.util.Log
-import es.aria_on_the_planet.quasar.data.remote.MastodonApi
+import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
 import es.aria_on_the_planet.quasar.data.session.Session
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 class StreamingClient(
     okHttpClient: OkHttpClient,
     private val json: Json,
-    private val api: MastodonApi,
+    private val instanceRepository: InstanceRepository,
 ) {
     // 長時間の接続なので読み取りタイムアウトは無効にし、ping で生存確認する
     private val client = okHttpClient.newBuilder()
@@ -42,7 +42,7 @@ class StreamingClient(
         val token = session.accessToken ?: return@flow
         if (channels.isEmpty()) return@flow
         val base = try {
-            api.streamingUrl(session.serverUrl)
+            instanceRepository.instance(session.serverUrl).streamingUrl
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

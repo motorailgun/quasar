@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Poll
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -77,6 +78,23 @@ fun AttachMediaButton(
 ) {
     IconButton(onClick = onClick, modifier = modifier, enabled = enabled, colors = composerIconColors(active)) {
         Icon(Icons.Outlined.Image, contentDescription = stringResource(R.string.composer_add_media))
+    }
+}
+
+/**
+ * カスタム絵文字のピッカーを開くボタン。
+ *
+ * @param active ピッカーを開いているか (オンの色で示す)。
+ */
+@Composable
+fun EmojiButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    active: Boolean = false,
+    enabled: Boolean = true,
+) {
+    IconButton(onClick = onClick, modifier = modifier, enabled = enabled, colors = composerIconColors(active)) {
+        Icon(Icons.Outlined.EmojiEmotions, contentDescription = stringResource(R.string.composer_emoji))
     }
 }
 

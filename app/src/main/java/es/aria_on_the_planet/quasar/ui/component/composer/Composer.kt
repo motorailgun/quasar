@@ -16,11 +16,14 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
@@ -36,7 +39,7 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  *        本文
  *        [添付] / [投票]                    ← ここまでスクロール
  * ─────────────────────────────────────
- * (残り)      [公開範囲][メディア][投票][CW]  ← 下端に固定。ボタンは右寄せ
+ * (残り)  [公開範囲][絵文字][メディア][投票][CW]  ← 下端に固定。ボタンは右寄せ
  * ```
  *
  * 状態は [state] に読み書きするだけで、送信は呼び出し側 (トップバーの Post ボタン等) が行う。
@@ -44,7 +47,7 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  *
  * @param account 投稿するアカウント。取得前は `null` (アイコンはプレースホルダ)。
  * @param onAttachMedia メディア追加ボタン。NOTE: 端末のメディア選択は未実装。
- * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯) と、入力中の `:shortcode:` の強調に使う。
+ * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯)、ピッカー、入力中の `:shortcode:` の強調に使う。
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
  */
 @Composable
@@ -60,6 +63,7 @@ fun Composer(
     onEditAttachmentDescription: (DraftAttachment) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
+    val contentWarningFocusRequester = remember { FocusRequester() }
     if (autoFocus) {
         LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
     }
@@ -68,8 +72,12 @@ fun Composer(
     val attachments = state.attachments
     // 補完はフォーカスのある方の欄 (本文 / CW) に対して出す
     var activeField by remember(state) { mutableStateOf(state.text) }
-    val suggestions by rememberEmojiSuggestions(activeField, emojis)
+    // CW 欄を閉じた後は本文へ戻す
+    val targetField = if (activeField === state.contentWarning && !state.contentWarningEnabled) state.text else activeField
+    val suggestions by rememberEmojiSuggestions(targetField, emojis)
     val highlight = rememberEmojiShortcodeHighlight(emojis)
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     Column(modifier) {
         Row(
@@ -85,7 +93,9 @@ fun Composer(
                     state = state.contentWarning,
                     visible = state.contentWarningEnabled,
                     outputTransformation = highlight,
-                    modifier = Modifier.onFocusChanged { if (it.hasFocus) activeField = state.contentWarning },
+                    modifier = Modifier
+                        .focusRequester(contentWarningFocusRequester)
+                        .onFocusChanged { if (it.hasFocus) activeField = state.contentWarning },
                 )
                 ComposerTextField(
                     state = state.text,
@@ -132,6 +142,15 @@ fun Composer(
                 onChange = { state.visibility = it },
                 enabled = enabled,
             )
+            EmojiButton(
+                onClick = {
+                    // シートの検索欄を使わない限りキーボードは要らないので閉じる
+                    keyboard?.hide()
+                    pickerOpen = true
+                },
+                active = pickerOpen,
+                enabled = enabled && emojis.isNotEmpty(),
+            )
             // メディアと投票は同時に付けられない (使えない方は無効の色)
             AttachMediaButton(
                 onClick = onAttachMedia,
@@ -149,6 +168,28 @@ fun Composer(
                 enabled = enabled,
             )
         }
+    }
+
+    if (pickerOpen) {
+        EmojiPickerSheet(
+            emojis = emojis,
+            // 選んだ絵文字は直前に入力していた欄のカーソル位置へ入れる (シートは開いたままで、続けて選べる)
+            onSelect = { emoji ->
+                val field = targetField
+                val (text, cursor) = insertEmojiAtCursor(field.text, field.selection, emoji.shortcode)
+                field.edit {
+                    replace(0, length, text)
+                    selection = TextRange(cursor)
+                }
+            },
+            onDismiss = {
+                pickerOpen = false
+                // 入力していた欄へ戻し、続けて打てるようにする
+                val requester = if (targetField === state.contentWarning) contentWarningFocusRequester else focusRequester
+                requester.requestFocus()
+                keyboard?.show()
+            },
+        )
     }
 }
 

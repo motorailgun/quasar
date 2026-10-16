@@ -52,7 +52,7 @@ es.aria_on_the_planet.quasar
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
-    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete)
+    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle)
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
@@ -433,7 +433,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 * 画面: `Context.openComposer()` → `ComposerActivity` (要ログイン)。タイムラインの FAB (ログイン時のみ) から開く。
   X の投稿画面 (`x_posting.jpg`) を参考に、トップバー (× / Post)・アイコン + 本文・下端のツールバー
-  (左端に残り文字数、右寄せで公開範囲 / メディア / 投票 / CW)。
+  (左端に残り文字数、右寄せで公開範囲 / 絵文字 / メディア / 投票 / CW)。
   アイコンの色はオン = primary、オフ = primary を背景色へ寄せた色、選べない (メディアと投票の排他等) = 標準の無効色
   (`ComposerIconColors`)。
   `Scaffold(contentWindowInsets = WindowInsets.safeDrawing)` + `consumeWindowInsets` でツールバーをキーボードの直上に置く。
@@ -465,12 +465,22 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
     primary 色 + SemiBold にする (本文は変えない)。判定はサーバ (`CustomEmoji::SCAN_RE`) と同じ前後条件で、Ruby の
     `[[:alnum:]]` に合わせ、かな・漢字の直後も絵文字にならない。
   * `BasicTextField(TextFieldState)` は `InlineTextContent` 非対応のため、入力欄内で画像にはしない。
+* **絵文字ピッカー** (`EmojiPicker.kt`): ツールバーの絵文字ボタンで `ModalBottomSheet` を開く (開くときにキーボードは閉じる)。
+  `EmojiPicker` (検索欄 + `LazyVerticalGrid`) は入れ物に依存しない部品で、`EmojiPickerSheet` がシートに載せる。
+  * 並びは `groupEmojisByCategory` (分類なし「Custom」が先頭、残りはカテゴリ名順、カテゴリ内はサーバの順)。検索中は
+    カテゴリを外して `rankEmojis` の順。グリッドは `static_url` (動かない版) で表示する。
+  * 選ぶと直前にフォーカスのあった欄 (本文 / CW) のカーソル位置へ `insertEmojiAtCursor` で挿入し (直前が英数字・かななら
+    空白を前に足す)。シートは開いたままで続けて選べ、閉じたらその欄にフォーカスとキーボードを戻す。
+  * 検索欄にフォーカスが来たらシートを全体に広げ、`imePadding` でキーボードの上に収める (半分の高さでは隠れる)。
+  * 検索欄は `KeyboardType.Ascii` (`IME_FLAG_FORCE_ASCII`) で英字入力を求めるが、Mozc 系 IME (実機の Arte) は無視して
+    かなのまま (`KeyboardType.Uri` でも同じ)。その場合はユーザーが英字に切り替える必要がある。
+  * 未実装: 最近使った絵文字、長押しでのショートコード表示、アニメーション版の表示。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
 * **未実装**: メディアの選択・アップロード・代替テキストの編集 (`AttachmentStrip` はレイアウトと Preview のみ。追加ボタンは何もしない)、
-  リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、絵文字ピッカー (次の予定。
-  `CustomEmoji.category` は取得済み)、メンション・ハッシュタグの補完、
+  リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、
+  メンション・ハッシュタグの補完、
   言語の指定、予約投稿、クイック投稿バー。
 
 ## 自動更新 (Streaming API)

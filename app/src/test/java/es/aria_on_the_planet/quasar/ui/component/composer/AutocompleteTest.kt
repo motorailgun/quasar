@@ -85,4 +85,16 @@ class AutocompleteTest {
         assertEquals(listOf(1..6), findEmojiShortcodes("(:blob:)", known))
         assertEquals(emptyList<IntRange>(), findEmojiShortcodes(":blob:", emptySet()))
     }
+
+    @Test
+    fun insertsAtCursorWithSpacesWhereNeeded() {
+        assertEquals(":blob: " to 7, insertEmojiAtCursor("", TextRange(0), "blob"))
+        // 直前が文字なら前に空白を足す
+        assertEquals("hi :blob: " to 10, insertEmojiAtCursor("hi", TextRange(2), "blob"))
+        assertEquals("あ :blob: " to 9, insertEmojiAtCursor("あ", TextRange(1), "blob"))
+        // 直前が空白なら足さない。後ろに空白があれば足さずにその後ろへ
+        assertEquals("a :blob: b" to 9, insertEmojiAtCursor("a  b", TextRange(2), "blob"))
+        // 範囲選択は置き換える
+        assertEquals("x :blob: z" to 9, insertEmojiAtCursor("x yy z", TextRange(2, 4), "blob"))
+    }
 }

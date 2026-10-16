@@ -171,4 +171,8 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
+    <string name="composer_emoji">Insert emoji</string>
+    <string name="emoji_picker_search">Search emoji</string>
+    <string name="emoji_picker_uncategorized">Custom</string>
+    <string name="emoji_picker_empty">No emoji found</string>
 </resources>

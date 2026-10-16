@@ -55,6 +55,20 @@ fun insertEmoji(text: CharSequence, range: TextRange, shortcode: String): Pair<S
 }
 
 /**
+ * カーソル位置 (範囲選択中はその範囲) に `:shortcode:` を挿入した後の本文と、カーソルを置く位置 (ピッカー用)。
+ * サーバに絵文字として認識されるよう、直前が英数字・かな・コロンなら空白を前に、直後が空白でなければ後ろに足す。
+ */
+fun insertEmojiAtCursor(text: CharSequence, selection: TextRange, shortcode: String): Pair<String, Int> {
+    val start = selection.min.coerceIn(0, text.length)
+    val end = selection.max.coerceIn(0, text.length)
+    val before = text.getOrNull(start - 1)
+    val needsLeadingSpace = before != null && (before.isLetterOrDigit() || before in Colons)
+    val prefix = if (needsLeadingSpace) " " else ""
+    val (inserted, cursor) = insertEmoji(text.substring(0, start) + prefix + text.substring(end), TextRange(start + prefix.length), shortcode)
+    return inserted to cursor
+}
+
+/**
  * 本文中で絵文字になる `:shortcode:` の範囲 ([known] にあるもののみ)。前後の条件はサーバ
  * (Mastodon の `CustomEmoji::SCAN_RE`) と同じで、英数字やコロンに挟まれたものは絵文字にならない。
  */

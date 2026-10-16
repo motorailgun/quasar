@@ -53,6 +53,7 @@ es.aria_on_the_planet.quasar
     │   ├── user/UserList.kt        ユーザーの集合 (LazyColumn) + UserListItem (フォロー / フォロワー一覧)
     │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに)
     │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
+    │   ├── blur/SurfaceBlur.kt     浮かぶ UI の背景のぼかし (rememberSurfaceBlurStyle。半径・濃さは DisplaySettings)
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
@@ -632,7 +633,13 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * 表示設定は `DisplaySettings` (`ui/settings/`) にまとめ、`AppContainer.displaySettings` (StateFlow) から
   `QuasarAppContent` が `LocalDisplaySettings` として提供する。各 Activity の setContent は `QuasarAppContent(container)` で包む。
 * 今は既定値のみ。設定画面を作るときは永続化 (DataStore 等) して `displaySettings` を更新する。
-  設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)。
+  設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、`surfaceBlurRadius` / `surfaceBlurTintAlpha`
+  (一覧の上に浮かぶ UI の背景のぼかしの半径と色味の濃さ。既定 6dp / 0.8)。
+* **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取る**。半径・濃さを
+  個別に書かない (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブで共通)。部品ごとに変えてよいのは色味の色だけ
+  (クイック投稿バーは surfaceContainer、他は既定の surfaceContainerHigh)。下地の surface もここで敷く。
+  ぼかした面に縁を付けるときは `surfaceBlurBorder()` (outlineVariant 0.5 の 1dp) を使う。
+  閲覧注意メディアの `Modifier.blur` は隠すためのものなので対象外。
 * 同様に通知の取得 API (`NotificationRepository.api`) も将来の設定項目候補。
 
 ## テーマ / 色
@@ -642,6 +649,10 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3) を dynamic color の primary に harmonize し、
   ライト/ダークに応じた役割色 (color / onColor / container / onContainer) を MDC の `MaterialColors` で作る。
   色を直接ハードコードせず、新しい意味の色が要るときはここに追加する。
+* メディアの上・メディアビューアの黒背景の上に重ねる白文字・半透明の黒は `MediaOverlayColors` (`ui/component/player/`) に
+  集める (テーマに依らず固定してよいのはこの用途だけ)。インラインのメディア (再生ボタン・GIF ラベル・目アイコン) や
+  投稿欄の添付 (アップロード中の表示・ALT) もこれを使い、`Color.Black.copy(...)` 等を個別に書かない。
+* 自前で色を決める無効状態のアイコン・文字は `onSurface.copy(alpha = DisabledContentAlpha)` (`ui/theme/ContentAlpha.kt`、0.38)。
 
 ## 開発メモ
 

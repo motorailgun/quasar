@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
+import es.aria_on_the_planet.quasar.ui.theme.DisabledContentAlpha
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedContent
@@ -410,7 +411,7 @@ private fun PostActionButton(
     val motion = MaterialTheme.motionScheme
     val color by animateColorAsState(
         when {
-            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha)
+            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledContentAlpha)
             active -> activeColor
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
@@ -510,7 +511,6 @@ private fun PostActionButton(
 private val ActionIconSize = 18.dp
 
 /** 押せない項目の色の不透明度 (Material の disabled content と同じ)。 */
-private const val DisabledAlpha = 0.38f
 
 /** 押している間のアイコンの縮小率。 */
 private const val PressedIconScale = 0.8f

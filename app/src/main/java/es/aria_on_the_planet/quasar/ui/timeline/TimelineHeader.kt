@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurBorder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,8 +55,8 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
+import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
@@ -85,7 +86,7 @@ fun TimelineHeader(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val blurStyle = rememberChipBlurStyle()
+    val blurStyle = rememberSurfaceBlurStyle()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -116,20 +117,6 @@ fun StatusBarScrim(modifier: Modifier = Modifier) {
             .windowInsetsTopHeight(WindowInsets.statusBars)
             .background(Brush.verticalGradient(listOf(color.copy(alpha = 0.85f), color.copy(alpha = 0f)))),
     )
-}
-
-/** ぼかした面 (後ろの一覧が透けて見える)。下地を敷かないと一覧そのものの透明部分から実物が透ける。 */
-@Composable
-private fun rememberChipBlurStyle(): HazeBlurStyle {
-    val background = MaterialTheme.colorScheme.surface
-    val tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f)
-    return remember(background, tint) {
-        HazeBlurStyle {
-            blurRadius(20.dp)
-            backgroundColor(background)
-            colorEffects(listOf(HazeColorEffect.tint(tint)))
-        }
-    }
 }
 
 private fun Modifier.blurredSurface(hazeState: HazeState, style: HazeBlurStyle, shape: Shape): Modifier = this
@@ -221,7 +208,7 @@ private fun ColumnTabs(
             // 一覧の上に浮いて見えるよう軽い影を付ける (視認性のため)
             .shadow(HeaderShadowElevation, CircleShape)
             .blurredSurface(hazeState, blurStyle, CircleShape)
-            .border(1.dp, colors.outlineVariant.copy(alpha = 0.5f), CircleShape)
+            .border(surfaceBlurBorder(), CircleShape)
             // ボタンはカプセルの内側に少し寄せる。カプセルと同じ高さだと、枠 (中身の上に描かれる) と切り抜きが選択中の
             // ボタンの上下の縁に掛かり、切れて見える
             .padding(TabInset),

@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.composer
 
+import es.aria_on_the_planet.quasar.ui.theme.DisabledContentAlpha
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -149,10 +150,9 @@ object ComposerIconColors {
     fun off(): Color = lerp(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.surface, OffFraction)
 
     @Composable
-    fun disabled(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha)
+    fun disabled(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledContentAlpha)
 
     private const val OffFraction = 0.5f
-    private const val DisabledAlpha = 0.38f
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.media
 
+import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -230,10 +230,10 @@ private fun BoxScope.PlaybackFailedLabel() {
     Text(
         text = stringResource(R.string.player_error),
         style = MaterialTheme.typography.labelSmall,
-        color = Color.White,
+        color = MediaOverlayColors.Content,
         modifier = Modifier
             .align(Alignment.Center)
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+            .background(MediaOverlayColors.Scrim, RoundedCornerShape(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
@@ -246,7 +246,7 @@ private fun SensitiveToggle(hidden: Boolean, onToggle: () -> Unit, modifier: Mod
             .padding(6.dp)
             .size(32.dp)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(MediaOverlayColors.Scrim)
             .clickable(onClick = onToggle),
         contentAlignment = Alignment.Center,
     ) {
@@ -254,7 +254,7 @@ private fun SensitiveToggle(hidden: Boolean, onToggle: () -> Unit, modifier: Mod
             // ぼかし中は「表示する」、表示中は「隠す」
             imageVector = if (hidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
             contentDescription = stringResource(if (hidden) R.string.media_show else R.string.media_hide),
-            tint = Color.White,
+            tint = MediaOverlayColors.Content,
             modifier = Modifier.size(18.dp),
         )
     }
@@ -273,10 +273,10 @@ private fun PlayButton(onClick: () -> Unit) {
         Icon(
             Icons.Filled.PlayArrow,
             contentDescription = stringResource(R.string.player_play),
-            tint = Color.White,
+            tint = MediaOverlayColors.Content,
             modifier = Modifier
                 .size(40.dp)
-                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                .background(MediaOverlayColors.Scrim, CircleShape)
                 .padding(6.dp),
         )
     }
@@ -287,10 +287,10 @@ private fun TypeLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = Color.White,
+        color = MediaOverlayColors.Content,
         modifier = modifier
             .padding(6.dp)
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+            .background(MediaOverlayColors.Scrim, RoundedCornerShape(4.dp))
             .padding(horizontal = 4.dp, vertical = 1.dp),
     )
 }

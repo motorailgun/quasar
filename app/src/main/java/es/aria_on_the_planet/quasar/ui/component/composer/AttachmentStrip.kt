@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.composer
 
+import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,7 +40,6 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -129,24 +129,24 @@ fun AttachmentThumbnail(
             )
         }
         when (val state = attachment.state) {
-            is UploadState.Pending -> Overlay { LoadingIndicator(color = Color.White) }
+            is UploadState.Pending -> Overlay { LoadingIndicator(color = MediaOverlayColors.Content) }
 
             is UploadState.Uploading -> Overlay {
                 val progress = state.progress
                 if (progress == null) {
-                    LoadingIndicator(color = Color.White)
+                    LoadingIndicator(color = MediaOverlayColors.Content)
                 } else {
                     val animated by animateFloatAsState(progress, label = "uploadProgress")
                     CircularProgressIndicator(
                         progress = { animated },
-                        color = Color.White,
-                        trackColor = Color.White.copy(alpha = 0.3f),
+                        color = MediaOverlayColors.Content,
+                        trackColor = MediaOverlayColors.ContentInactive,
                     )
                 }
             }
 
             is UploadState.Processing -> Overlay {
-                LoadingIndicator(color = Color.White)
+                LoadingIndicator(color = MediaOverlayColors.Content)
                 OverlayLabel(stringResource(R.string.composer_media_processing))
             }
 
@@ -156,7 +156,7 @@ fun AttachmentThumbnail(
                     Icon(
                         if (retryable) Icons.Outlined.Refresh else Icons.Outlined.ErrorOutline,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MediaOverlayColors.Content,
                     )
                     OverlayLabel(
                         stringResource(
@@ -178,8 +178,8 @@ fun AttachmentThumbnail(
             onClick = onRemove,
             modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(28.dp),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = Scrim,
-                contentColor = Color.White,
+                containerColor = MediaOverlayColors.Scrim,
+                contentColor = MediaOverlayColors.Content,
             ),
         ) {
             Icon(
@@ -202,7 +202,7 @@ private fun Overlay(onClick: (() -> Unit)? = null, content: @Composable () -> Un
     Column(
         Modifier
             .fillMaxSize()
-            .background(Scrim)
+            .background(MediaOverlayColors.Scrim)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -214,7 +214,7 @@ private fun OverlayLabel(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
-        color = Color.White,
+        color = MediaOverlayColors.Content,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(horizontal = 8.dp),
     )
@@ -223,7 +223,7 @@ private fun OverlayLabel(text: String) {
 /** 動画 / GIF の印 (右下)。 */
 @Composable
 private fun MediaKindBadge(gif: Boolean, modifier: Modifier = Modifier) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(6.dp), color = Scrim, contentColor = Color.White) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(6.dp), color = MediaOverlayColors.Scrim, contentColor = MediaOverlayColors.Content) {
         if (gif) {
             Text("GIF", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
         } else {
@@ -239,8 +239,8 @@ private fun AltBadge(hasDescription: Boolean, onClick: () -> Unit, modifier: Mod
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(6.dp),
-        color = if (hasDescription) MaterialTheme.colorScheme.primary else Scrim,
-        contentColor = if (hasDescription) MaterialTheme.colorScheme.onPrimary else Color.White,
+        color = if (hasDescription) MaterialTheme.colorScheme.primary else MediaOverlayColors.Scrim,
+        contentColor = if (hasDescription) MaterialTheme.colorScheme.onPrimary else MediaOverlayColors.Content,
     ) {
         Text(
             stringResource(R.string.composer_media_alt),
@@ -285,7 +285,6 @@ fun SensitiveMediaToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, m
 private val AttachmentHeight = 120.dp
 private val FadingEdgeWidth = 12.dp
 private val ThumbnailShape = RoundedCornerShape(12.dp)
-private val Scrim = Color.Black.copy(alpha = 0.55f)
 
 @Preview(showBackground = true)
 @Composable

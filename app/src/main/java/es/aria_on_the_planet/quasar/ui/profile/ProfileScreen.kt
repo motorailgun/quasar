@@ -14,9 +14,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
+import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.foundation.layout.Box
@@ -88,7 +87,7 @@ fun ProfileScreen(
     // ページごとの一覧の位置。タブの背景 (スクロールしたらぼかし) の判定にも使うのでここで持つ
     val listStates = tabs.associateWith { rememberLazyListState() }
     val hazeState = rememberHazeState()
-    val tabsBlurStyle = rememberTabsBlurStyle()
+    val tabsBlurStyle = rememberSurfaceBlurStyle()
     val density = LocalDensity.current
     var tabsHeight by remember { mutableStateOf(0.dp) }
     val currentList = listStates.getValue(tabs[pagerState.currentPage])
@@ -251,22 +250,6 @@ private fun ProfileTabPage(
             }
         },
     )
-}
-
-/** タブの背景のぼかし (タイムラインのヘッダ・クイック投稿バーと同じく下地 surface + 灰色の tint。ただし弱め)。 */
-@Composable
-private fun rememberTabsBlurStyle(): HazeBlurStyle {
-    val background = MaterialTheme.colorScheme.surface
-    // トップバー (不透明) の直下に並ぶので、色味は濃いめ・ぼかしは弱めにして馴染ませる
-    val tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
-    return remember(background, tint) {
-        HazeBlurStyle {
-            blurRadius(6.dp)
-            // 一覧そのものには背景が無いので、下地を敷かないとぼかした結果が透けて後ろの実物がくっきり見える
-            backgroundColor(background)
-            colorEffects(listOf(HazeColorEffect.tint(tint)))
-        }
-    }
 }
 
 private fun ProfileTab.label(): Int = when (this) {

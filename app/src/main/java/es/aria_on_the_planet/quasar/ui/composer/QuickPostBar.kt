@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurBorder
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animate
@@ -68,9 +69,8 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
+import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.characterCount
 import es.aria_on_the_planet.quasar.domain.model.isEmpty
@@ -160,23 +160,13 @@ fun QuickPostBar(
     )
 
     val shape = RoundedCornerShape(BarCornerRadius)
-    val background = MaterialTheme.colorScheme.surface
-    val tint = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = BarTintAlpha)
-    val blurStyle = remember(background, tint) {
-        HazeBlurStyle {
-            blurRadius(BarBlurRadius)
-            // 一覧そのものには背景が無い (Scaffold が塗っている) ので、下地を敷かないとぼかした結果が透けて
-            // 後ろの実物がくっきり見えてしまう
-            backgroundColor(background)
-            colorEffects(listOf(HazeColorEffect.tint(tint)))
-        }
-    }
+    val blurStyle = rememberSurfaceBlurStyle(tintColor = MaterialTheme.colorScheme.surfaceContainer)
     val startTyping = stringResource(R.string.quick_post_start_typing)
     Column(
         modifier
             .clip(shape)
             .hazeBlur(input = HazeInput.Sources(hazeState), style = blurStyle)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+            .border(surfaceBlurBorder(), shape)
             // 入力していない間はどこを押しても入力を始める (本文欄だけでは当たり判定が小さい)。
             // 子のボタン等が受けたタップはそちらが優先され、押せないもの (空の送信ボタン等) はここに回る
             .clickable(
@@ -363,8 +353,6 @@ private fun DraftExtras(hasPoll: Boolean, hasContentWarning: Boolean, onClick: (
 }
 
 private val BarCornerRadius = 28.dp
-private val BarBlurRadius = 24.dp
-private const val BarTintAlpha = 0.72f
 private val HandleHeight = 20.dp
 private val AttachmentHeight = 64.dp
 private const val MaxLines = 5

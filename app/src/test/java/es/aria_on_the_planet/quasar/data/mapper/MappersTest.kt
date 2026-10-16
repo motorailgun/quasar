@@ -132,6 +132,19 @@ class MappersTest {
 
         val withHeader = alice.copy(header = "https://remote.example/h.png").toProfile()
         assertEquals("https://remote.example/h.png", withHeader.headerUrl)
+        // header_static が無ければ header をそのまま使う
+        assertEquals("https://remote.example/h.png", withHeader.headerStaticUrl)
+
+        val animated = alice.copy(
+            header = "https://remote.example/h.gif",
+            headerStatic = "https://remote.example/h_static.png",
+            avatar = "https://remote.example/a.gif",
+            avatarStatic = "https://remote.example/a_static.png",
+        ).toProfile()
+        assertEquals("https://remote.example/h_static.png", animated.headerStaticUrl)
+        assertEquals("https://remote.example/a.gif", animated.user.iconUrl)
+        assertEquals("https://remote.example/a_static.png", animated.user.iconStaticUrl)
+        assertEquals("https://remote.example/a.gif", alice.copy(avatar = "https://remote.example/a.gif").toDomain().iconStaticUrl)
     }
 
     @Test

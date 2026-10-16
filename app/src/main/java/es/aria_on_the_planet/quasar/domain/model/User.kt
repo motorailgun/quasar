@@ -14,6 +14,8 @@ data class User(
     /** プロフィール文 (HTML)。カスタム絵文字を含みうる。 */
     val note: String,
     val emojis: List<CustomEmoji>,
+    /** アイコンのアニメーションしない版 (`avatar_static`)。 */
+    val iconStaticUrl: String = iconUrl,
 ) {
     /** ドメインを含む `username@domain` 形式。ローカルユーザーにも所属サーバのドメインを付ける。 */
     val fullScreenName: String

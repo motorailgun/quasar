@@ -20,6 +20,17 @@ data class DisplaySettings(
     val surfaceBlurRadius: Dp = DefaultSurfaceBlurRadius,
     /** 同じぼかしに重ねる色味の不透明度 (0〜1)。大きいほど後ろが見えにくい。 */
     val surfaceBlurTintAlpha: Float = DefaultSurfaceBlurTintAlpha,
+    /**
+     * 画像のアニメーション (GIF / APNG / Motion WebP) を動かすか。オフなら他の項目に関わらずすべて止める。
+     * 判定は `DisplaySettings.animates(ImageKind)` (`ui/component/image/ImageKind.kt`) にまとめている。
+     */
+    val animateImages: Boolean = true,
+    /** ポストの中身 (本文・CW・投票・通知の抜粋) のカスタム絵文字。 */
+    val animatePostEmojis: Boolean = true,
+    /** それ以外 (表示名・bio・フィールド等) のカスタム絵文字。 */
+    val animateOtherEmojis: Boolean = true,
+    /** ユーザーのアイコン。 */
+    val animateAvatars: Boolean = true,
 ) {
     companion object {
         const val DefaultLongPostMaxLines = 8

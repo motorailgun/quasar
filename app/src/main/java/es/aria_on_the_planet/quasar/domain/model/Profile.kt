@@ -6,6 +6,8 @@ import java.time.Instant
 data class Profile(
     val user: User,
     val headerUrl: String?,
+    /** ヘッダ画像のアニメーションしない版 (`header_static`)。 */
+    val headerStaticUrl: String?,
     val postsCount: Int,
     val followingCount: Int,
     val followersCount: Int,

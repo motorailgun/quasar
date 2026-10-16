@@ -52,12 +52,14 @@ fun AccountDto.toDomain() = User(
     iconUrl = avatar,
     note = note,
     emojis = emojis.map { it.toDomain() },
+    iconStaticUrl = avatarStatic ?: avatar,
 )
 
 fun AccountDto.toProfile() = Profile(
     user = toDomain(),
     // Mastodon は未設定時に missing.png を返すので、それはヘッダ無しとして扱う
-    headerUrl = header?.takeUnless { it.isBlank() || it.endsWith("/missing.png") },
+    headerUrl = header?.takeUnless { it.isMissingHeader() },
+    headerStaticUrl = (headerStatic ?: header)?.takeUnless { it.isMissingHeader() },
     postsCount = statusesCount,
     followingCount = followingCount,
     followersCount = followersCount,
@@ -81,6 +83,8 @@ fun FieldDto.toDomain() = ProfileField(
     value = value,
     verifiedAt = verifiedAt?.let { parseInstantOrNull(it) },
 )
+
+private fun String.isMissingHeader() = isBlank() || endsWith("/missing.png")
 
 private fun parseInstantOrNull(value: String): Instant? = runCatching { Instant.parse(value) }.getOrNull()
 

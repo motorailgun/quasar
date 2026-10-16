@@ -109,6 +109,7 @@ fun QuotedPost(
                                 text = post.text,
                                 emojis = post.emojis,
                                 isHtml = true,
+                                postContent = true,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 6.dp),
                             )

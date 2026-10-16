@@ -24,7 +24,10 @@ data class AccountDto(
     @SerialName("display_name") val displayName: String = "",
     val note: String = "",
     val avatar: String,
+    /** アニメーションしない版 (アニメーションしない画像なら [avatar] と同じ)。 */
+    @SerialName("avatar_static") val avatarStatic: String? = null,
     val header: String? = null,
+    @SerialName("header_static") val headerStatic: String? = null,
     val emojis: List<CustomEmojiDto> = emptyList(),
     val locked: Boolean = false,
     val bot: Boolean = false,

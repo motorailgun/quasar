@@ -49,7 +49,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
@@ -247,6 +248,7 @@ private fun CompactNotification(
                     text = cw ?: post.text,
                     emojis = post.emojis,
                     isHtml = cw == null,
+                    postContent = true,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,
@@ -310,6 +312,7 @@ private fun AccountReactionsItem(
                     text = cw ?: post.text,
                     emojis = post.emojis,
                     isHtml = cw == null,
+                    postContent = true,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,
@@ -341,8 +344,9 @@ private fun MediaThumbnail(media: MediaAttachment, sensitive: Boolean) {
             }
         }
     } else {
-        AsyncImage(
-            model = media.previewUrl,
+        RemoteImage(
+            url = media.previewUrl,
+            kind = ImageKind.Other,
             contentDescription = media.description,
             placeholder = placeholder,
             error = placeholder,

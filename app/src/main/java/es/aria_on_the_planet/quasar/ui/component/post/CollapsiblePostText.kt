@@ -36,7 +36,7 @@ fun CollapsiblePostText(
 ) {
     val lineHeight = lineHeightDp(style)
     if (maxCollapsedLines == null || lineHeight == null) {
-        EmojiText(text = html, emojis = emojis, isHtml = true, style = style, modifier = modifier)
+        EmojiText(text = html, emojis = emojis, isHtml = true, postContent = true, style = style, modifier = modifier)
         return
     }
     CollapsibleContent(
@@ -46,7 +46,7 @@ fun CollapsiblePostText(
         fadeHeight = FadeHeight,
         toggle = { expanded, onToggle -> ShowMoreToggle(expanded = expanded, onToggle = onToggle) },
     ) {
-        EmojiText(text = html, emojis = emojis, isHtml = true, style = style)
+        EmojiText(text = html, emojis = emojis, isHtml = true, postContent = true, style = style)
     }
 }
 

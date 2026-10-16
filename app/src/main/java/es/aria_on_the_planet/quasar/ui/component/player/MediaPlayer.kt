@@ -30,9 +30,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaType
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
 
 /**
@@ -81,8 +82,9 @@ fun MediaPlayer(
 fun MediaPoster(media: MediaAttachment, contentScale: ContentScale, modifier: Modifier = Modifier) {
     val placeholder = rememberBlurHashPainter(media.blurhash)
     if (media.previewUrl != null) {
-        AsyncImage(
-            model = media.previewUrl,
+        RemoteImage(
+            url = media.previewUrl,
+            kind = ImageKind.Other,
             contentDescription = media.description,
             placeholder = placeholder,
             error = placeholder,
@@ -116,8 +118,9 @@ fun AudioArtwork(artworkUrl: String?, rotating: Boolean, modifier: Modifier = Mo
             .graphicsLayer { rotationZ = rotation.value }
             .clip(CircleShape)
         if (artworkUrl != null) {
-            AsyncImage(
-                model = artworkUrl,
+            RemoteImage(
+                url = artworkUrl,
+                kind = ImageKind.Avatar,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = iconModifier,

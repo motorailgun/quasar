@@ -34,9 +34,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.player.FullControls
 import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import es.aria_on_the_planet.quasar.ui.component.player.MediaPlayer
@@ -83,14 +84,14 @@ fun ImagePage(
         Box(Modifier.fillMaxSize().zoomable(zoom), contentAlignment = Alignment.Center) {
             if (!loaded) MediaPoster(media, ContentScale.Fit, Modifier.fillMaxSize())
             urls.getOrNull(urlIndex)?.let { url ->
-                AsyncImage(
-                    model = url,
+                RemoteImage(
+                    url = url,
+                    kind = ImageKind.Other,
                     contentDescription = media.description,
                     contentScale = ContentScale.Fit,
-                    onSuccess = { success ->
+                    onLoaded = { size ->
                         loaded = true
                         // meta に無い・不正確なこともあるので、実際の画像の縦横比で移動範囲を決める
-                        val size = success.painter.intrinsicSize
                         if (size.width > 0f && size.height > 0f) zoom.contentAspectRatio = size.width / size.height
                     },
                     onError = {

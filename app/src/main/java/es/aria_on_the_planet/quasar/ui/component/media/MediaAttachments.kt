@@ -1,5 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.media
 
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -48,7 +50,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaType
@@ -202,8 +203,9 @@ private fun BoxScope.MediaThumbnail(attachment: MediaAttachment, hidden: Boolean
             modifier = Modifier.fillMaxSize(),
         )
     } else if (attachment.previewUrl != null) {
-        AsyncImage(
-            model = attachment.previewUrl,
+        RemoteImage(
+            url = attachment.previewUrl,
+            kind = ImageKind.Other,
             contentDescription = if (hidden) stringResource(R.string.media_sensitive) else attachment.description,
             placeholder = placeholder,
             error = placeholder,

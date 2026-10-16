@@ -31,8 +31,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 
 /** 入力中の `:sho` に対する絵文字の候補。 */
 @Stable
@@ -99,8 +100,10 @@ fun EmojiSuggestionStrip(
                     onClick = { shown.select(emoji) },
                     label = { Text(":${emoji.shortcode}:", maxLines = 1) },
                     leadingIcon = {
-                        AsyncImage(
-                            model = emoji.staticUrl,
+                        RemoteImage(
+                            url = emoji.url,
+                            staticUrl = emoji.staticUrl,
+                            kind = ImageKind.OtherEmoji,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                         )

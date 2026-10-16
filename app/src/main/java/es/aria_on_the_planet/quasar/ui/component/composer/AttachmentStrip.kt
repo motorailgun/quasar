@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.composer
 
+import es.aria_on_the_planet.quasar.ui.component.image.LocalImage
 import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -48,7 +49,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.selection.toggleable
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
 import es.aria_on_the_planet.quasar.domain.model.UploadFailure
@@ -116,8 +116,8 @@ fun AttachmentThumbnail(
             .clip(ThumbnailShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
-        AsyncImage(
-            model = attachment.previewUri,
+        LocalImage(
+            uri = attachment.previewUri,
             contentDescription = attachment.description.ifBlank { null },
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

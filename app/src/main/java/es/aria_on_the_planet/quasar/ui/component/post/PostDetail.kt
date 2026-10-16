@@ -119,6 +119,7 @@ fun PostDetail(
                     text = post.text,
                     emojis = post.emojis,
                     isHtml = true,
+                    postContent = true,
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 post.poll?.let { poll ->

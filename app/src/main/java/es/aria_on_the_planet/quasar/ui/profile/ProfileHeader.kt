@@ -42,13 +42,14 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
 import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import java.time.Instant
@@ -88,8 +89,10 @@ fun ProfileHeader(
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
                 if (profile.headerUrl != null) {
-                    AsyncImage(
-                        model = profile.headerUrl,
+                    RemoteImage(
+                        url = profile.headerUrl,
+                        staticUrl = profile.headerStaticUrl,
+                        kind = ImageKind.Other,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

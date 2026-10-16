@@ -11,7 +11,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
-| 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`) |
+| 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
@@ -55,7 +55,8 @@ es.aria_on_the_planet.quasar
     │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
     │   ├── blur/SurfaceBlur.kt     浮かぶ UI の背景のぼかし (rememberSurfaceBlurStyle。半径・濃さは DisplaySettings)
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
-    │   ├── image/                  BlurHash デコーダ + プレースホルダ Painter
+    │   ├── image/                  RemoteImage / LocalImage (画像表示の唯一の入口) + ImageKind / BlurHash デコーダ + プレースホルダ Painter
+    │   │   └── loader/             Coil の ImageLoader とデコーダ (AnimationGate / APNG のデコーダ・再生・時刻計算・ヘッダの判定)
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
@@ -90,6 +91,7 @@ data class User(
     val iconUrl: String,      // Account.avatar
     val note: String,         // プロフィール文 (HTML, カスタム絵文字を含みうる)
     val emojis: List<CustomEmoji>,
+    val iconStaticUrl: String = iconUrl, // Account.avatar_static (アニメーションを止めるとき用)
 )
 
 // User は一覧表示に必要な最小限。プロフィール画面用の詳細は Profile に分ける
@@ -98,6 +100,7 @@ data class User(
 data class Profile(
     val user: User,
     val headerUrl: String?,        // header。未設定時の .../missing.png は null にする
+    val headerStaticUrl: String?,  // header_static
     val postsCount: Int,           // statuses_count
     val followingCount: Int,       // following_count
     val followersCount: Int,       // followers_count
@@ -245,10 +248,46 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * `EmojiText(text: String, emojis: List<CustomEmoji>, isHtml: Boolean, ...)`
   * `isHtml = true` のとき Mastodon の HTML を `AnnotatedString.fromHtml` で変換 (リンク付き)。
   * `:shortcode:` を `emojis` と照合し、`InlineTextContent` + Coil の `AsyncImage` で画像に置換。
+  * `postContent = true` はポストの中身 (本文・CW・投票・通知の抜粋)。絵文字のアニメーションの設定が「本文」と
+    「それ以外」(表示名・bio・フィールド等、既定の `false`) で分かれているため。
   * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
     (横長の絵文字は横長に表示)。API はサイズを返さないため、画像読み込み時に `EmojiAspectRatios` (URL ごとの
     アプリ全体キャッシュ) へ記録し、記録されると再レイアウトする。未読み込みの間は正方形。比率は 1/4〜8 に丸める。
 * 変換処理 (`replaceEmojiShortcodes`, `simplifyMastodonHtml`) は純粋関数として分離し、ユニットテスト可能にする。
+
+### RemoteImage / LocalImage (`ui/component/image/`)
+画像は**`AsyncImage` を直接使わず必ず `RemoteImage` (サーバ上の画像) / `LocalImage` (投稿欄の添付等、端末内) を使う**。
+Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.linecorp.apng`) は `loader/ApngDecoder.kt` と `loader/ApngAnimationDrawable.kt` だけ。
+
+* `RemoteImage(url, contentDescription, kind: ImageKind, staticUrl, placeholder, error, contentScale, onLoaded(Size), onError)`。
+  Coil の API は包み切らず、使っているものだけ通す (`onLoaded` は画像の本来の大きさ、別 URL の再試行は呼び出し側)。
+* アニメーション (GIF / APNG / Motion WebP) を動かすかは `DisplaySettings.animates(kind)`。`ImageKind` は PostEmoji /
+  OtherEmoji / Avatar / Other。止めるときは `staticUrl` (`static_url` / `avatar_static` / `header_static`) があればそれを読み、
+  無ければ先頭 (既定) のフレームを静止画で出す。
+* 仕組み (`loader/`):
+  * `newQuasarImageLoader` が ImageLoader を作る。**ServiceLoader の自動登録は切っている** (`serviceLoaderEnabled(false)`)。
+    自動登録された coil-gif は下記の止める仕組みを通らずアニメーションさせてしまうため。コンポーネントは全部ここで並べる。
+  * リクエストの `animate(enabled)` (Extras + メモリキャッシュのキー) を `AnimationGate` が見て、止めるならアニメーション用の
+    デコーダを飛ばす (Coil 標準のデコーダが静止画で読む)。メモリキャッシュのキーを分けないと、切り替えても前の結果が出る。
+  * GIF / Motion WebP は coil-gif の `AnimatedImageDecoder` (Android の ImageDecoder)。APNG は ImageDecoder がアニメーション
+    しないので `ApngDecoderFactory` (apng-drawable)。APNG の判定は `readApngInfo` (純粋関数、`ApngHeaderTest`): `acTL` が
+    最初の `IDAT` より前にあれば APNG。拡張子・Content-Type は普通の PNG と同じなので見ない。2 フレーム未満は静止画扱い。
+  * apng-drawable は全フレームを先に展開する (ネイティブ)。`newDrawable()` / `mutate()` (Coil が描く前に呼ぶ) は内部で
+    `Apng.copy()` を呼ぶが、フレームは共有され、コピーごとに増えるのは 1 フレーム分の Bitmap だけ (96x96・30 フレームで
+    全体 1.1MB に対し 1 回あたり約 130KB と計測)。展開後 16MB を超える APNG はアニメーションさせない。同じ画像を
+    何度も展開しないよう `ApngFrameCache` (URL = `diskCacheKey` ごと、32MB の LRU) に元を持ち、表示には
+    `ConstantState.newDrawable()` を返す。元は描かない。追い出しても `recycle()` しない (表示中の別インスタンスがありうる)。
+  * **再生は `ApngAnimationDrawable` が行い、`ApngDrawable` を `start()` しない**。`ApngDrawable` は再生中ずっと毎フレーム
+    `invalidateSelf()` し、描くたびにネイティブでコマを Bitmap へ書き出すので、14〜50fps の APNG でも 120Hz で描き直し続ける
+    (実機のピッカーで 124fps・1 コアの 18%)。自前の Drawable で、コマの位置は純粋関数 `ApngTimeline` (`ApngTimelineTest`。
+    10ms 以下のコマは GIF と同じく 100ms 扱い) で求め、コマが変わる時刻にだけ `scheduleSelf` する (同じ場面で 78fps・12.5%)。
+    コマの指定は `seekTo(開始時刻)`。**`seekToFrame` は `loopCount = 0` (無限) で例外を投げる** (ライブラリの不具合) ので使わない。
+    `Apng` クラスは Kotlin の `internal` で参照できないため、`ApngDrawable` を「再生させない入れ物」として使っている。
+  * メモリ不足: `ApngFrameCache` は `ComponentCallbacks2` (`newQuasarImageLoader` で登録)。Coil のメモリキャッシュと同じく
+    `TRIM_MEMORY_BACKGROUND` 以上 / `onLowMemory` で空にする (logcat の `ApngFrameCache` に空けた量)。表示中のコピーはフレームを
+    共有しているが、空けた後も再生・展開し直しとも問題ないことを実機で確認済み (`am send-trim-memory <pkg> BACKGROUND`)。
+  * Bitmap 以外 (アニメーション) の結果は Coil のメモリキャッシュに入らない (1 つの Drawable は 1 箇所でしか再生できない
+    ため)。GIF / WebP は表示のたびにデコードされるが、ImageDecoder は少しずつ読むので軽い。
 
 ### PostCard (`ui/component/post/PostCard.kt`)
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。
@@ -545,13 +584,14 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * **絵文字ピッカー** (`EmojiPicker.kt`): ツールバーの絵文字ボタンで `ModalBottomSheet` を開く (開くときにキーボードは閉じる)。
   `EmojiPicker` (検索欄 + `LazyVerticalGrid`) は入れ物に依存しない部品で、`EmojiPickerSheet` がシートに載せる。
   * 並びは `groupEmojisByCategory` (分類なし「Custom」が先頭、残りはカテゴリ名順、カテゴリ内はサーバの順)。検索中は
-    カテゴリを外して `rankEmojis` の順。グリッドは `static_url` (動かない版) で表示する。
+    カテゴリを外して `rankEmojis` の順。グリッド・補完候補の帯のアニメーションは「それ以外の絵文字」の設定
+    (`ImageKind.OtherEmoji`) に従い、止めるときは `static_url`。
   * 選ぶと直前にフォーカスのあった欄 (本文 / CW) のカーソル位置へ `insertEmojiAtCursor` で挿入し (直前が英数字・かななら
     空白を前に足す)。シートは開いたままで続けて選べ、閉じたらその欄にフォーカスとキーボードを戻す。
   * 検索欄にフォーカスが来たらシートを全体に広げ、`imePadding` でキーボードの上に収める (半分の高さでは隠れる)。
   * 検索欄は `KeyboardType.Ascii` (`IME_FLAG_FORCE_ASCII`) で英字入力を求めるが、Mozc 系 IME (実機の Arte) は無視して
     かなのまま (`KeyboardType.Uri` でも同じ)。その場合はユーザーが英字に切り替える必要がある。
-  * 未実装: 最近使った絵文字、長押しでのショートコード表示、アニメーション版の表示。
+  * 未実装: 最近使った絵文字、長押しでのショートコード表示。
 * **メディアの添付**:
   * 選ぶのは Photo Picker。**権限は宣言しない** (`READ_MEDIA_*` は使わない)。返る `content://` は一時的な許可なので、選んだらすぐ送る。
     * 埋め込み版 (`MediaPickerSheet`、`androidx.photopicker:photopicker-compose`。**alpha**): Android 14 + SDK 拡張 15 以上
@@ -633,7 +673,10 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * 表示設定は `DisplaySettings` (`ui/settings/`) にまとめ、`AppContainer.displaySettings` (StateFlow) から
   `QuasarAppContent` が `LocalDisplaySettings` として提供する。各 Activity の setContent は `QuasarAppContent(container)` で包む。
 * 今は既定値のみ。設定画面を作るときは永続化 (DataStore 等) して `displaySettings` を更新する。
-  設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、`surfaceBlurRadius` / `surfaceBlurTintAlpha`
+  設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
+  `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
+  `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
+  `surfaceBlurRadius` / `surfaceBlurTintAlpha`
   (一覧の上に浮かぶ UI の背景のぼかしの半径と色味の濃さ。既定 6dp / 0.8)。
 * **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取る**。半径・濃さを
   個別に書かない (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブで共通)。部品ごとに変えてよいのは色味の色だけ
@@ -722,6 +765,11 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   ポストを開くときはアクション行の空き部分をタップする。
 * 先頭へ戻るために下方向スワイプを繰り返すと pull-to-refresh が発動し一覧が読み直される (gap も消える)。
   ボタン等を探すときは fling しないよう長めの duration (1500ms 程度) でゆっくりスクロールする。
+* **`./gradlew connectedDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
+  計測をするなら `installDebug` / `installDebugAndroidTest` + `adb shell am instrument` を使う。
+* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。release を debug 鍵で一時的に署名して入れる
+  (同じ鍵なのでデータは残る。測定後は `build.gradle.kts` を戻して debug を入れ直す)。フレーム数・ジャンクは
+  `dumpsys gfxinfo <pkg>` (`reset` してから)、CPU は `/proc/<pid>/task/*/stat`。**RenderThread は 2 本ある**ので合計する。
 * 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
 * gap の動作確認は流量のあるグローバルで行う: `TimelineViewModel.StreamGlobalTimeline = true` にして、別画面を
   開いて (= 切断) 8 分ほど待ってから戻る。確認後は必ず `false` に戻す。
@@ -741,5 +789,11 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。
 * **プロフィール**: 返信のタブ、プロフィール編集、一覧の行ごとのフォローボタン、フォロー失敗時の UI 通知。
 * **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
+* **画像のアニメーション**: GIF / APNG / Motion WebP の再生・設定のオン / オフ・メモリ不足時の挙動は確認済み。負荷は
+  Snapdragon 8 Elite (OnePlus 13) でしか測っていない (release 相当、何もしない状態): ピッカー (APNG 3 つ) 78fps・CPU 12.5%
+  (1 コア比、8 割が RenderThread)、アイコンが動くタイムラインの 1 画面 1.4fps・0.9%、スクロール中のジャンク 0。描き直しは
+  「どれかのコマが変わったとき」なので、動く画像が増えるほど (コマの時刻がずれるほど) 画面全体の描き直しが増える。
+  低価格帯の端末で重ければ、全 APNG のコマ送りを共通の刻み (例: 30fps) に揃えると描き直しをまとめられる (未実装。
+  GIF / WebP は ImageDecoder が自前で時刻を決めるので対象外)。設定画面が無いので切り替えは `DisplaySettings` の既定値で確かめる。
 * **ローカライズ**: 文字列は英語のみ。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

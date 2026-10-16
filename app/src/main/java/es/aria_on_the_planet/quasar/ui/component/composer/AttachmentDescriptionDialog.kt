@@ -25,9 +25,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
+import es.aria_on_the_planet.quasar.ui.component.image.LocalImage
 
 /**
  * 添付メディアの代替テキストを編集するダイアログ。上にメディア全体 (クロップせず縦横比のまま)、下に入力欄 (残り文字数付き)。
@@ -51,8 +51,8 @@ fun AttachmentDescriptionDialog(
             Column {
                 // 説明を書くための表示なので、切らずに全体を見せる。大きさは画像の縦横比に合わせ、角丸も画像に沿わせる
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    AsyncImage(
-                        model = attachment.previewUri,
+                    LocalImage(
+                        uri = attachment.previewUri,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier

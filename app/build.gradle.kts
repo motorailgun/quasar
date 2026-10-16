@@ -59,6 +59,9 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     // 添付する動画 (端末内) のサムネイル
     implementation(libs.coil.video)
+    // アニメーション画像 (GIF / Motion WebP は coil-gif = Android の ImageDecoder、APNG は LINE の apng-drawable)
+    implementation(libs.coil.gif)
+    implementation(libs.apng.drawable)
     // 投稿画面に埋め込む Photo Picker (Android 14 + SDK 拡張 15 以上。それ以外は OS 標準の Photo Picker)
     implementation(libs.androidx.photopicker.compose)
     // クイック投稿バーの背景ブラー (後ろの一覧をぼかす)

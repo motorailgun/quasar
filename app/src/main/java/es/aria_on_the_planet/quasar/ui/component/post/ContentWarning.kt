@@ -31,7 +31,7 @@ fun ContentWarning(
     style: TextStyle = MaterialTheme.typography.bodyMedium,
 ) {
     Column(modifier) {
-        EmojiText(text = text, emojis = emojis, style = style)
+        EmojiText(text = text, emojis = emojis, postContent = true, style = style)
         ShowMoreToggle(expanded = expanded, onToggle = onToggle)
     }
 }

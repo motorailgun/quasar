@@ -46,9 +46,10 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import kotlinx.coroutines.launch
 
 /**
@@ -150,9 +151,11 @@ private fun EmojiCell(emoji: CustomEmoji, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // 一覧は動かない版 (static_url) で軽くする
-        AsyncImage(
-            model = emoji.staticUrl,
+        // アニメーションさせるかは「それ以外の絵文字」の設定に従う (止めるときは static_url)
+        RemoteImage(
+            url = emoji.url,
+            staticUrl = emoji.staticUrl,
+            kind = ImageKind.OtherEmoji,
             contentDescription = ":${emoji.shortcode}:",
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(EmojiSize),

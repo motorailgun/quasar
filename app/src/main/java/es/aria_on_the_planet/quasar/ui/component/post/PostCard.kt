@@ -1,5 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.theme.DisabledContentAlpha
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -68,7 +70,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -207,8 +208,10 @@ fun PostCard(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    AsyncImage(
-        model = user.iconUrl,
+    RemoteImage(
+        url = user.iconUrl,
+        staticUrl = user.iconStaticUrl,
+        kind = ImageKind.Avatar,
         contentDescription = user.screenName,
         modifier = modifier
             .size(size)

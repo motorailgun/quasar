@@ -4,9 +4,8 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import coil3.video.VideoFrameDecoder
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import es.aria_on_the_planet.quasar.di.AppContainer
+import es.aria_on_the_planet.quasar.ui.component.image.loader.newQuasarImageLoader
 
 class QuasarApplication : Application(), SingletonImageLoader.Factory {
     lateinit var container: AppContainer
@@ -18,11 +17,5 @@ class QuasarApplication : Application(), SingletonImageLoader.Factory {
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
-        ImageLoader.Builder(context)
-            .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { container.okHttpClient }))
-                // 投稿画面で添付する動画のサムネイル (content:// の動画から 1 コマ取り出す)
-                add(VideoFrameDecoder.Factory())
-            }
-            .build()
+        newQuasarImageLoader(context, callFactory = { container.okHttpClient })
 }

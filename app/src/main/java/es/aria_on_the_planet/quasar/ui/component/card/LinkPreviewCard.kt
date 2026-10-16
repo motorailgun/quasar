@@ -15,8 +15,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.domain.model.PreviewCard
+import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
+import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
 import java.net.URI
 
@@ -35,8 +36,9 @@ fun LinkPreviewCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (card.imageUrl != null) {
                 val placeholder = rememberBlurHashPainter(card.blurhash)
-                AsyncImage(
-                    model = card.imageUrl,
+                RemoteImage(
+                    url = card.imageUrl,
+                    kind = ImageKind.Other,
                     contentDescription = null,
                     placeholder = placeholder,
                     error = placeholder,

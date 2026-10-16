@@ -110,6 +110,7 @@ private fun PollResults(poll: Poll) {
                     EmojiText(
                         text = option.title,
                         emojis = poll.emojis,
+                        postContent = true,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = if (isLeading) FontWeight.Bold else FontWeight.Normal,
                         ),
@@ -165,6 +166,7 @@ private fun PollChoices(poll: Poll, onVote: suspend (List<Int>) -> Boolean) {
             EmojiText(
                 text = option.title,
                 emojis = poll.emojis,
+                postContent = true,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary.takeIf { !(poll.multiple && index in selected) }
                     ?: MaterialTheme.colorScheme.onPrimary,

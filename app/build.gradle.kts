@@ -28,6 +28,16 @@ android {
                 enable = false
             }
         }
+        // 性能の測定用 (release と同じ設定で、debug 鍵で署名する。applicationId が同じなので debug と入れ替えてもデータは残る)。
+        // 測定にデバッグ用のギャラリーを使えるよう、ソースは debug と共有する (src/debug)
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
+    }
+    sourceSets {
+        getByName("benchmark").setRoot("src/debug")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

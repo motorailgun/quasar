@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug ビルドだけに入るもの (src/debug)。release には含まれない -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- 固定データで画面を組み立てるギャラリー。adb から開けるよう exported、ランチャーにも出す -->
+        <activity
+            android:name=".debug.DebugGalleryActivity"
+            android:exported="true"
+            android:label="@string/gallery_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

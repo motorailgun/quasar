@@ -78,6 +78,15 @@ es.aria_on_the_planet.quasar
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
 
+debug / benchmark ビルドだけに入るもの (`app/src/debug/`、release には入らない):
+
+```
+es.aria_on_the_planet.quasar.debug  DebugGalleryActivity / GalleryScenario (+ 表示設定の上書き) / GalleryFixtures
+assets/gallery/                     固定データ (API と同じ形の JSON + 画像)。scripts/gallery/generate.py が生成
+```
+
+`scripts/gallery/generate.py` (ギャラリーの固定データの生成)、`scripts/perf/measure.sh` (描画の負荷の測定)。
+
 ## ドメインモデル
 
 ```kotlin
@@ -706,7 +715,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 * ビルド: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug`
   (システムに Java が無いので Android Studio 同梱の JBR を使う)
-* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテストのみ。instrumentation / UI テストは無い)
+* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテストのみ。instrumentation / UI テストは無い)。
+  ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
+* 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
 * Expressive API は `@OptIn(ExperimentalMaterial3ExpressiveApi::class)` が必要。material3 は BOM ではなく 1.5.x を個別指定。
 * **できる限り pure Jetpack Compose で、モダンな書き方にする**。XML は Android の仕組み上 Compose で代わりがきかないもの
   (manifest、Activity のテーマ = ウィンドウ属性、文字列リソース等) に限る。
@@ -717,6 +728,28 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `BackHandler` / `OnBackPressedCallback` は使わない。manifest で `enableOnBackInvokedCallback="true"`。
 * 文字列リソースは `res/values/strings.xml` に置く (今は英語のみ)。
 * コミットはユーザーが行う。エージェントはコミットしない (頼まれた場合を除く)。
+
+### デバッグ用ギャラリー (`app/src/debug/`)
+固定データで本物の部品 (`PostList` / `PostCard` / `ProfileHeader` / `EmojiPicker`) を組み立てて表示する、debug / benchmark
+ビルドだけの画面。条件に合う投稿をサーバで探さずに、見た目・動作・負荷を確かめるためのもの。ランチャーにも「Quasar Gallery」で出る。
+
+* adb から開く (`--activity-clear-task` を付ける。付けないと開いている間に別のシナリオを指定しても切り替わらない。
+  Android 16 の実機では、同じ Activity への intent が「届けた」扱いのまま `onNewIntent` が呼ばれなかった):
+  ```
+  adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar/.debug.DebugGalleryActivity \
+      --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60]
+  ```
+  `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety。
+  表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
+* 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
+  (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
+  APNG のデコーダもそのまま通る)。手で編集せず `python3 scripts/gallery/generate.py` で作り直す (中身は毎回同じ)。
+  * テスト画像もスクリプトで描く: APNG (20ms / 70ms / 0ms のコマ、3 回で止まる、横長)、GIF、アニメーション WebP、静止画、
+    アニメーションするアイコン (GIF / APNG / WebP)・ヘッダ。それぞれ静止版 (`*_static.png`) も作る。
+  * **実在の投稿・名前・アイコン・サーバを入れない**。ドメインは予約済みの `.invalid`、画像は自作。
+* シナリオを足す: `generate.py` に JSON を足す → `GalleryScenario` に 1 行 → `GalleryScreen` の `when` に表示を足す。
+  `GalleryFixturesTest` (`src/testDebug`) が、全 JSON が読めること・画像の実在・`:shortcode:` に絵文字があること・ID の一意を検査する。
+* ボタンの操作 (ブースト等)・プロフィールへの遷移は無効 (データ層を通らない)。メディアのタップはビューアが開く。
 
 ### ロジックの置き場所とテスト
 * 一覧の組み立て・書き換えは純粋関数にし、ユニットテストを付ける。壊れやすい所は特に厚めに:
@@ -772,12 +805,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ボタン等を探すときは fling しないよう長めの duration (1500ms 程度) でゆっくりスクロールする。
 * **`./gradlew connectedDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
   計測をするなら `installDebug` / `installDebugAndroidTest` + `adb shell am instrument` を使う。
-* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。release を debug 鍵で一時的に署名して入れる
-  (同じ鍵なのでデータは残る。測定後は `build.gradle.kts` を戻して debug を入れ直す)。フレーム数・ジャンクは
-  `dumpsys gfxinfo <pkg>` (`reset` してから)、CPU は `/proc/<pid>/task/*/stat`。**RenderThread は 2 本ある**ので合計する。
+* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleBenchmark`。
+  release と同じ設定 + debug 鍵の署名 + ギャラリー入り。applicationId が同じなので debug と入れ替えてもデータは残る) を入れ、
+  `scripts/perf/measure.sh <label> <秒> [swipe]` で測る (端末が複数なら `ADB="adb -t 3"`)。終わったら debug を入れ直す。
+  benchmark は debuggable ではないので `run-as` は使えない。フレーム数・ジャンクは `dumpsys gfxinfo <pkg>` (`reset` してから)、
+  CPU は `/proc/<pid>/task/*/stat`。**RenderThread は 2 本ある**ので合計する (スクリプトは対応済み)。
   **gfxinfo の「Total frames rendered」はプロセス内の全ウィンドウの合計**。ボトムシート (絵文字ピッカー等) は別ウィンドウなので、
   後ろの画面の描き直しも足される (`framestats` は `ViewRootImpl@...` ごとに分かれている)。後ろのタイムラインの中身は時間で
-  変わるので、版どうしを比べるときは同じ状態のうちに交互に測る。
+  変わるので、実データで版どうしを比べるときは同じ状態のうちに交互に測る。条件を揃えたいならギャラリーを使う。
+* 特定の条件の投稿・ユーザー (アニメ絵文字・アイコン等) をタイムラインで探し回らない。まずギャラリーにシナリオを足す。
 * 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
 * gap の動作確認は流量のあるグローバルで行う: `TimelineViewModel.StreamGlobalTimeline = true` にして、別画面を
   開いて (= 切断) 8 分ほど待ってから戻る。確認後は必ず `false` に戻す。

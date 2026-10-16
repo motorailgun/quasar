@@ -1,0 +1,562 @@
+[
+ {
+  "shortcode": "still_00",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_01",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_02",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_03",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_04",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "still_05",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_06",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_07",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_08",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_09",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "still_10",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_11",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_12",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_13",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_14",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "still_15",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_16",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_17",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_18",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_19",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "still_20",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_21",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_22",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_23",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_24",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "still_25",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_26",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_27",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_28",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_29",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "still_30",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_31",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_32",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_33",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_34",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "still_35",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_36",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_37",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_38",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_39",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "still_40",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_41",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_42",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_43",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_44",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "still_45",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_46",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_47",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_48",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_49",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "still_50",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_51",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_52",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_53",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_54",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "still_55",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_56",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_57",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_58",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_59",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "still_60",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_61",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_62",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_63",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_64",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "still_65",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "bounce_once_66",
+  "url": "file:///android_asset/gallery/images/bounce_once.png",
+  "static_url": "file:///android_asset/gallery/images/bounce_once_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_67",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_68",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_69",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "still_70",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "pulse_webp_71",
+  "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "spin_fast_72",
+  "url": "file:///android_asset/gallery/images/spin_fast.png",
+  "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "spin_slow_73",
+  "url": "file:///android_asset/gallery/images/spin_slow.png",
+  "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "spin_zero_74",
+  "url": "file:///android_asset/gallery/images/spin_zero.png",
+  "static_url": "file:///android_asset/gallery/images/spin_zero_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "still_75",
+  "url": "file:///android_asset/gallery/images/still.png",
+  "static_url": "file:///android_asset/gallery/images/still.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wide_wave_76",
+  "url": "file:///android_asset/gallery/images/wide_wave.png",
+  "static_url": "file:///android_asset/gallery/images/wide_wave_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ },
+ {
+  "shortcode": "bounce_gif_77",
+  "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+  "visible_in_picker": true,
+  "category": null
+ },
+ {
+  "shortcode": "blink_gif_78",
+  "url": "file:///android_asset/gallery/images/blink_gif.gif",
+  "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+  "visible_in_picker": true,
+  "category": "Animated"
+ },
+ {
+  "shortcode": "wobble_webp_79",
+  "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+  "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+  "visible_in_picker": true,
+  "category": "Mixed"
+ }
+]

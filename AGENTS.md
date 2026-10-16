@@ -24,13 +24,15 @@ es.aria_on_the_planet.quasar
 ├── QuasarApplication.kt / MainActivity.kt
 ├── di/AppContainer.kt              手動 DI
 ├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
+├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody
 ├── data/
 │   ├── remote/
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
-│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository
+│   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
+│                                   MediaRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
 │                                   PostDraft, ComposeLimits, PostLength)
 └── ui/
@@ -62,7 +64,7 @@ es.aria_on_the_planet.quasar
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ViewModel)
     ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
-    └── composer/                   投稿画面 (ComposerActivity / Screen / ViewModel)
+    └── composer/                   投稿画面 (ComposerActivity / Screen / ViewModel / AttachmentUploads)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -206,6 +208,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 | 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き、要認証) |
 | ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (要認証。`source.privacy` が既定の公開範囲) |
+| メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
+| 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (認証不要。`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 
@@ -475,11 +479,24 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * 検索欄は `KeyboardType.Ascii` (`IME_FLAG_FORCE_ASCII`) で英字入力を求めるが、Mozc 系 IME (実機の Arte) は無視して
     かなのまま (`KeyboardType.Uri` でも同じ)。その場合はユーザーが英字に切り替える必要がある。
   * 未実装: 最近使った絵文字、長押しでのショートコード表示、アニメーション版の表示。
+* **メディアの添付**:
+  * 選ぶのは Photo Picker (`PickMultipleVisualMedia` / 残り 1 枚なら `PickVisualMedia`)。**権限は宣言しない** (minSdk 33 で OS 標準。
+    `READ_MEDIA_*` は使わない)。既に画像があれば画像だけを選ばせる。返る `content://` は一時的な許可なので、選んだらすぐ送る。
+  * 段取りは `AttachmentUploads` (`ui/composer/`、テストは `AttachmentUploadsTest`): 追加 → 送る前の検査 (`checkUpload`:
+    `supported_mime_types`・`image_size_limit` / `video_size_limit`) → 送信中 (進み具合) → 変換待ち (`Processing`) → 完了 / 失敗。
+    ✕ で送信を止める (サーバに残った分は投稿されなければサーバが消すので削除 API は呼ばない)。通信エラー (`UploadFailure.Failed`)
+    だけタップで再送でき、権限なし (401/403 → `NotAllowed`)・拒否 (422 → `Rejected`)・上限超えは再送しない。
+  * 代替テキスト (ALT): ダイアログ (`AttachmentDescriptionDialog`、上限は `description_limit`)。送る前に入れた分はアップロードに含め、
+    送った後に変えたら `PUT` で反映 (送信中に変えた分は完了後に反映)。
+  * 動画・GIF は他のメディアと一緒に付けられない (`DraftAttachment.isVideoLike`、`DraftProblem.VideoWithOtherMedia`)。
+    動画があれば追加ボタンを無効にする。動画のサムネイルは `coil-video` (`VideoFrameDecoder`)。
+  * `UploadSource` でデータ層を `ContentResolver` から切り離している (`AppContainer.uploadSource(uri)` が作る。IO スレッドで呼ぶ)。
+  * アクセストークンに `write:media` が無いとアップロードは 403 になる (手入力のトークンで起きる。OAuth 実装時は scope に含める)。
+  * 未実装: 画像の縮小・圧縮、焦点 (focus) の指定、カメラ撮影、プロセス再生成後の添付の復元。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
-* **未実装**: メディアの選択・アップロード・代替テキストの編集 (`AttachmentStrip` はレイアウトと Preview のみ。追加ボタンは何もしない)、
-  リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、
+* **未実装**: リプライ (`ComposerState.inReplyToId` / `in_reply_to_id` の送信までは用意済み)、下書き保存、
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿、クイック投稿バー。
 
@@ -611,7 +628,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
-* **操作**: リプライ・フォローは未実装 (投稿はテキスト・CW・投票・公開範囲まで。メディア添付は未実装)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
+* **操作**: リプライ・フォローは未実装 (投稿はテキスト・CW・投票・公開範囲・メディア添付)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
   操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: 保存 (MediaStore)、PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。

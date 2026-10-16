@@ -6,6 +6,7 @@ import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
 import es.aria_on_the_planet.quasar.domain.model.PollDraft
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
+import es.aria_on_the_planet.quasar.domain.model.UploadFailure
 import es.aria_on_the_planet.quasar.domain.model.UploadState
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -43,7 +44,7 @@ class DraftMappersTest {
             sensitive = true,
             attachments = listOf(
                 DraftAttachment("1", null, state = UploadState.Uploaded("m1")),
-                DraftAttachment("2", null, state = UploadState.Failed),
+                DraftAttachment("2", null, state = UploadState.Failed(UploadFailure.Failed)),
             ),
         ).toFormParams()
         assertEquals(listOf("sensitive" to "true", "media_ids[]" to "m1"), params.drop(2))
@@ -77,6 +78,7 @@ class DraftMappersTest {
             {"configuration": {
               "urls": {"streaming": "wss://example.com"},
               "statuses": {"max_characters": 1000, "max_media_attachments": 8, "characters_reserved_per_url": 23},
+              "media_attachments": {"supported_mime_types": ["image/png"], "image_size_limit": 100, "video_size_limit": 200, "description_limit": 1000},
               "polls": {"max_options": 10, "max_characters_per_option": 100, "min_expiration": 300, "max_expiration": 2629746}
             }}
             """,
@@ -87,6 +89,10 @@ class DraftMappersTest {
         assertEquals(10, limits.maxPollOptions)
         assertEquals(100, limits.maxPollOptionCharacters)
         assertEquals(5.minutes, limits.minPollExpiration)
+        assertEquals(100L, limits.imageSizeLimit)
+        assertEquals(200L, limits.videoSizeLimit)
+        assertEquals(setOf("image/png"), limits.supportedMimeTypes)
+        assertEquals(1000, limits.maxDescriptionCharacters)
     }
 
     @Test

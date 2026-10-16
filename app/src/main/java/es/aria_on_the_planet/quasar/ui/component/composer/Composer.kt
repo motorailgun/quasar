@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -23,8 +25,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
@@ -46,7 +50,10 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  * 高さいっぱいを使う前提なので、クイック投稿バーなど別の配置では各部品を直接組み合わせる。
  *
  * @param account 投稿するアカウント。取得前は `null` (アイコンはプレースホルダ)。
- * @param onAttachMedia メディア追加ボタン。NOTE: 端末のメディア選択は未実装。
+ * @param onAttachMedia メディア追加ボタン (端末のメディアを選ぶ画面を開く)。
+ * @param onRemoveAttachment 添付の ✕。アップロードを止める等が要るなら差し替える。
+ * @param onRetryAttachment 通信エラーで失敗した添付のタップ。
+ * @param onAttachmentDescriptionChange 代替テキストのダイアログで保存したとき。
  * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯)、ピッカー、入力中の `:shortcode:` の強調に使う。
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
  */
@@ -60,7 +67,11 @@ fun Composer(
     enabled: Boolean = true,
     autoFocus: Boolean = false,
     onAttachMedia: () -> Unit = {},
-    onEditAttachmentDescription: (DraftAttachment) -> Unit = {},
+    onRemoveAttachment: (DraftAttachment) -> Unit = { state.removeAttachment(it.localId) },
+    onRetryAttachment: (DraftAttachment) -> Unit = {},
+    onAttachmentDescriptionChange: (DraftAttachment, String) -> Unit = { attachment, description ->
+        state.attachments = state.attachments.map { if (it.localId == attachment.localId) it.copy(description = description) else it }
+    },
 ) {
     val focusRequester = remember { FocusRequester() }
     val contentWarningFocusRequester = remember { FocusRequester() }
@@ -77,6 +88,10 @@ fun Composer(
     val suggestions by rememberEmojiSuggestions(targetField, emojis)
     val highlight = rememberEmojiShortcodeHighlight(emojis)
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    var editingDescriptionOf by rememberSaveable { mutableStateOf<String?>(null) }
+    // 動画 (GIF 含む) は単独でしか付けられないので、あればそれ以上足せない
+    val canAddMedia = poll == null && attachments.size < limits.maxMediaAttachments && attachments.none { it.isVideoLike }
+    val videoWithOthers = attachments.size > 1 && attachments.any { it.isVideoLike }
     val keyboard = LocalSoftwareKeyboardController.current
 
     Column(modifier) {
@@ -110,12 +125,21 @@ fun Composer(
                 )
                 AttachmentStrip(
                     attachments = attachments,
-                    onRemove = { state.removeAttachment(it.localId) },
-                    onEditDescription = onEditAttachmentDescription,
-                    canAddMore = attachments.size < limits.maxMediaAttachments,
+                    onRemove = onRemoveAttachment,
+                    onEditDescription = { editingDescriptionOf = it.localId },
+                    onRetry = onRetryAttachment,
+                    canAddMore = enabled && canAddMedia,
                     onAdd = onAttachMedia,
                     modifier = Modifier.padding(top = 12.dp),
                 )
+                AnimatedVisibility(videoWithOthers) {
+                    Text(
+                        stringResource(R.string.composer_media_video_alone),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
                 AnimatedVisibility(attachments.isNotEmpty()) {
                     SensitiveMediaToggle(
                         checked = state.sensitive,
@@ -155,7 +179,7 @@ fun Composer(
             AttachMediaButton(
                 onClick = onAttachMedia,
                 active = attachments.isNotEmpty(),
-                enabled = enabled && poll == null && attachments.size < limits.maxMediaAttachments,
+                enabled = enabled && canAddMedia,
             )
             PollButton(
                 checked = poll != null,
@@ -168,6 +192,19 @@ fun Composer(
                 enabled = enabled,
             )
         }
+    }
+
+    val editing = editingDescriptionOf?.let { id -> attachments.firstOrNull { it.localId == id } }
+    if (editing != null) {
+        AttachmentDescriptionDialog(
+            attachment = editing,
+            maxLength = limits.maxDescriptionCharacters,
+            onSave = { description ->
+                onAttachmentDescriptionChange(editing, description)
+                editingDescriptionOf = null
+            },
+            onDismiss = { editingDescriptionOf = null },
+        )
     }
 
     if (pickerOpen) {

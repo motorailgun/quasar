@@ -151,6 +151,10 @@ data class InstanceStatusesDto(
 data class InstanceMediaDto(
     // 新しいサーバではこちらにも載る。無ければ statuses.max_media_attachments を使う
     @SerialName("max_media_attachments") val maxMediaAttachments: Int? = null,
+    @SerialName("supported_mime_types") val supportedMimeTypes: List<String>? = null,
+    @SerialName("image_size_limit") val imageSizeLimit: Long? = null,
+    @SerialName("video_size_limit") val videoSizeLimit: Long? = null,
+    @SerialName("description_limit") val descriptionLimit: Int? = null,
 )
 
 @Serializable

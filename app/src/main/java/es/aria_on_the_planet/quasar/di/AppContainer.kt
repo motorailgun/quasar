@@ -1,10 +1,14 @@
 package es.aria_on_the_planet.quasar.di
 
 import android.content.Context
+import android.net.Uri
+import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
+import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
+import es.aria_on_the_planet.quasar.data.repository.MediaRepository
 import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
@@ -36,5 +40,11 @@ class AppContainer(context: Context) {
     val notificationRepository = NotificationRepository(api)
     val instanceRepository = InstanceRepository(api)
     val emojiRepository = EmojiRepository(api)
+    val mediaRepository = MediaRepository(api)
+
+    private val contentResolver = context.applicationContext.contentResolver
+
+    /** 端末のファイル (Photo Picker の結果等) をアップロード元にする。問い合わせを伴うので IO スレッドで呼ぶ。 */
+    fun uploadSource(uri: Uri): UploadSource = ContentUriUploadSource(contentResolver, uri)
     val streamingClient = StreamingClient(okHttpClient, json, instanceRepository)
 }

@@ -19,9 +19,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,7 @@ import androidx.compose.foundation.selection.toggleable
 import coil3.compose.AsyncImage
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.DraftAttachment
+import es.aria_on_the_planet.quasar.domain.model.UploadFailure
 import es.aria_on_the_planet.quasar.domain.model.UploadState
 import es.aria_on_the_planet.quasar.ui.component.modifier.horizontalFadingEdges
 import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
@@ -63,6 +68,7 @@ fun AttachmentStrip(
     onRemove: (DraftAttachment) -> Unit,
     onEditDescription: (DraftAttachment) -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: (DraftAttachment) -> Unit = {},
     canAddMore: Boolean = false,
     onAdd: () -> Unit = {},
     height: Dp = AttachmentHeight,
@@ -83,6 +89,7 @@ fun AttachmentStrip(
                     attachment = attachment,
                     onRemove = { onRemove(attachment) },
                     onEditDescription = { onEditDescription(attachment) },
+                    onRetry = { onRetry(attachment) },
                     modifier = Modifier.size(height),
                 )
             }
@@ -91,7 +98,10 @@ fun AttachmentStrip(
     }
 }
 
-/** 添付 1 件のサムネイル。 */
+/**
+ * 添付 1 件のサムネイル。アップロード中は進み具合 (分からなければ不定のインジケータ)、サーバの変換待ちは
+ * 「Processing」、失敗は理由を重ねる。通信エラーで失敗したものはタップで [onRetry]。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AttachmentThumbnail(
@@ -99,6 +109,7 @@ fun AttachmentThumbnail(
     onRemove: () -> Unit,
     onEditDescription: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
 ) {
     Box(
         modifier
@@ -111,23 +122,54 @@ fun AttachmentThumbnail(
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
-        when (attachment.state) {
-            is UploadState.Pending, is UploadState.Uploading -> Box(
-                Modifier.fillMaxSize().background(Scrim),
-                contentAlignment = Alignment.Center,
-            ) { LoadingIndicator(color = Color.White) }
+        if (attachment.isVideoLike) {
+            MediaKindBadge(
+                gif = attachment.mimeType == "image/gif",
+                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
+            )
+        }
+        when (val state = attachment.state) {
+            is UploadState.Pending -> Overlay { LoadingIndicator(color = Color.White) }
 
-            UploadState.Failed -> Column(
-                Modifier.fillMaxSize().background(Scrim),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = Color.White)
-                Text(
-                    stringResource(R.string.composer_media_failed),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                )
+            is UploadState.Uploading -> Overlay {
+                val progress = state.progress
+                if (progress == null) {
+                    LoadingIndicator(color = Color.White)
+                } else {
+                    val animated by animateFloatAsState(progress, label = "uploadProgress")
+                    CircularProgressIndicator(
+                        progress = { animated },
+                        color = Color.White,
+                        trackColor = Color.White.copy(alpha = 0.3f),
+                    )
+                }
+            }
+
+            is UploadState.Processing -> Overlay {
+                LoadingIndicator(color = Color.White)
+                OverlayLabel(stringResource(R.string.composer_media_processing))
+            }
+
+            is UploadState.Failed -> {
+                val retryable = state.reason == UploadFailure.Failed
+                Overlay(onClick = if (retryable) onRetry else null) {
+                    Icon(
+                        if (retryable) Icons.Outlined.Refresh else Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = Color.White,
+                    )
+                    OverlayLabel(
+                        stringResource(
+                            when (state.reason) {
+                                UploadFailure.TooLarge -> R.string.composer_media_too_large
+                                UploadFailure.Unsupported -> R.string.composer_media_unsupported
+                                UploadFailure.NotAllowed -> R.string.composer_media_not_allowed
+                                UploadFailure.Rejected -> R.string.composer_media_rejected
+                                UploadFailure.Failed -> R.string.composer_media_failed
+                            },
+                        ),
+                    )
+                }
             }
 
             is UploadState.Uploaded -> Unit
@@ -151,6 +193,42 @@ fun AttachmentThumbnail(
             onClick = onEditDescription,
             modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
         )
+    }
+}
+
+/** サムネイルに重ねる半透明の面 (状態の表示)。[onClick] があればタップできる。 */
+@Composable
+private fun Overlay(onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Scrim)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) { content() }
+}
+
+@Composable
+private fun OverlayLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.White,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(horizontal = 8.dp),
+    )
+}
+
+/** 動画 / GIF の印 (右下)。 */
+@Composable
+private fun MediaKindBadge(gif: Boolean, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(6.dp), color = Scrim, contentColor = Color.White) {
+        if (gif) {
+            Text("GIF", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+        } else {
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(2.dp).size(16.dp))
+        }
     }
 }
 
@@ -217,8 +295,9 @@ private fun AttachmentStripPreview() {
             AttachmentStrip(
                 attachments = listOf(
                     DraftAttachment("1", null, "A cat", UploadState.Uploaded("m1")),
-                    DraftAttachment("2", null, state = UploadState.Uploading(0.4f)),
-                    DraftAttachment("3", null, state = UploadState.Failed),
+                    DraftAttachment("2", null, state = UploadState.Uploading(0.4f), mimeType = "video/mp4"),
+                    DraftAttachment("3", null, state = UploadState.Failed(UploadFailure.Failed)),
+                    DraftAttachment("4", null, state = UploadState.Failed(UploadFailure.TooLarge)),
                 ),
                 onRemove = {},
                 onEditDescription = {},

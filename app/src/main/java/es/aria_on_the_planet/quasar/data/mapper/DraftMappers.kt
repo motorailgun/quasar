@@ -12,16 +12,21 @@ fun InstanceDto.toComposeLimits(): ComposeLimits {
     val defaults = ComposeLimits()
     val statuses = configuration?.statuses
     val polls = configuration?.polls
+    val media = configuration?.mediaAttachments
     return ComposeLimits(
         maxCharacters = statuses?.maxCharacters ?: defaults.maxCharacters,
         charactersPerUrl = statuses?.charactersReservedPerUrl ?: defaults.charactersPerUrl,
-        maxMediaAttachments = configuration?.mediaAttachments?.maxMediaAttachments
+        maxMediaAttachments = media?.maxMediaAttachments
             ?: statuses?.maxMediaAttachments
             ?: defaults.maxMediaAttachments,
         maxPollOptions = polls?.maxOptions ?: defaults.maxPollOptions,
         maxPollOptionCharacters = polls?.maxCharactersPerOption ?: defaults.maxPollOptionCharacters,
         minPollExpiration = polls?.minExpiration?.seconds ?: defaults.minPollExpiration,
         maxPollExpiration = polls?.maxExpiration?.seconds ?: defaults.maxPollExpiration,
+        imageSizeLimit = media?.imageSizeLimit ?: defaults.imageSizeLimit,
+        videoSizeLimit = media?.videoSizeLimit ?: defaults.videoSizeLimit,
+        supportedMimeTypes = media?.supportedMimeTypes?.toSet(),
+        maxDescriptionCharacters = media?.descriptionLimit ?: defaults.maxDescriptionCharacters,
     )
 }
 

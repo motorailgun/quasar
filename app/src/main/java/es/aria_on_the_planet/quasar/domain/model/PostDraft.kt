@@ -34,14 +34,50 @@ data class DraftAttachment(
     /** 代替テキスト。 */
     val description: String = "",
     val state: UploadState = UploadState.Pending,
-)
+    val mimeType: String? = null,
+) {
+    /**
+     * 動画扱いか (動画・音声・GIF)。Mastodon は GIF を動画 (gifv) に変換し、動画扱いのものは他のメディアと
+     * 一緒に付けられない。
+     */
+    val isVideoLike: Boolean
+        get() = mimeType != null && (mimeType.startsWith("video/") || mimeType.startsWith("audio/") || mimeType == "image/gif")
+}
 
 sealed interface UploadState {
     data object Pending : UploadState
     /** @param progress 0〜1。不明なら `null`。 */
     data class Uploading(val progress: Float?) : UploadState
+    /** 送信は済んだが、サーバ側で変換中 (動画等)。 */
+    data class Processing(val mediaId: String) : UploadState
     data class Uploaded(val mediaId: String) : UploadState
-    data object Failed : UploadState
+    data class Failed(val reason: UploadFailure) : UploadState
+}
+
+enum class UploadFailure {
+    /** ファイルサイズがサーバの上限を超えている。 */
+    TooLarge,
+    /** サーバが受け付けない形式。 */
+    Unsupported,
+    /** 権限が無い (トークンに `write:media` が無い等)。送り直しても失敗する。 */
+    NotAllowed,
+    /** サーバが中身を受け付けなかった (422 等)。送り直しても失敗する。 */
+    Rejected,
+    /** 通信エラー・サーバの一時的なエラー (送り直せる)。 */
+    Failed,
+}
+
+/**
+ * 送る前に分かる問題 (形式・サイズ)。`null` なら送ってよい。分からない項目 ([mimeType] / [size] が `null`) は
+ * 確かめずにサーバへ任せる。
+ */
+fun checkUpload(mimeType: String?, size: Long?, limits: ComposeLimits): UploadFailure? {
+    val supported = limits.supportedMimeTypes
+    if (mimeType != null && supported != null && mimeType !in supported) return UploadFailure.Unsupported
+    val isVideo = mimeType != null && (mimeType.startsWith("video/") || mimeType.startsWith("audio/"))
+    val limit = if (isVideo) limits.videoSizeLimit else limits.imageSizeLimit
+    if (size != null && size > limit) return UploadFailure.TooLarge
+    return null
 }
 
 /** 何も入力されていないか (破棄の確認が要らないか)。 */
@@ -56,6 +92,8 @@ enum class DraftProblem {
     MediaAndPoll,
     TooManyAttachments,
     AttachmentNotUploaded,
+    /** 動画 (GIF 含む) は 1 つだけで、他のメディアと一緒に付けられない。 */
+    VideoWithOtherMedia,
     TooFewPollOptions,
     TooManyPollOptions,
     BlankPollOption,
@@ -69,6 +107,7 @@ fun PostDraft.problems(limits: ComposeLimits): Set<DraftProblem> = buildSet {
     if (attachments.isNotEmpty() && poll != null) add(DraftProblem.MediaAndPoll)
     if (attachments.size > limits.maxMediaAttachments) add(DraftProblem.TooManyAttachments)
     if (attachments.any { it.state !is UploadState.Uploaded }) add(DraftProblem.AttachmentNotUploaded)
+    if (attachments.size > 1 && attachments.any { it.isVideoLike }) add(DraftProblem.VideoWithOtherMedia)
     if (poll != null) {
         if (poll.options.size < 2) add(DraftProblem.TooFewPollOptions)
         if (poll.options.size > limits.maxPollOptions) add(DraftProblem.TooManyPollOptions)

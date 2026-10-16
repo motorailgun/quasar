@@ -57,6 +57,8 @@ dependencies {
     // Material 3 の Custom colors (harmonize / ColorRoles) に使う
     implementation(libs.material.components)
     implementation(libs.coil.network.okhttp)
+    // 添付する動画 (端末内) のサムネイル
+    implementation(libs.coil.video)
     // メディアの再生 (インライン / メディアビューア)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.datasource.okhttp)

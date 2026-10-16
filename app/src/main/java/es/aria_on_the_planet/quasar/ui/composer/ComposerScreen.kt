@@ -1,5 +1,8 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -73,6 +76,22 @@ fun ComposerScreen(
         }
     }
 
+    // 端末のメディアは Photo Picker で選ぶ (権限は要らない)。複数選択は 2 枚以上でしか使えないので、残り 1 枚なら単一選択
+    val remaining = limits.maxMediaAttachments - composer.attachments.size
+    val pickMultiple = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = remaining.coerceAtLeast(2)),
+    ) { uris -> viewModel.addMedia(uris) }
+    val pickSingle = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.addMedia(listOf(uri))
+    }
+    val openMediaPicker = {
+        val request = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+        // 動画は単独でしか付けられないので、既に画像があれば画像だけ選ばせる
+        val imagesOnly = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        val input = if (composer.attachments.isEmpty()) request else imagesOnly
+        if (remaining >= 2) pickMultiple.launch(input) else if (remaining == 1) pickSingle.launch(input)
+    }
+
     val requestClose = { if (isEmpty) onClose() else confirmingDiscard = true }
     NavigationBackHandler(
         state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
@@ -118,6 +137,12 @@ fun ComposerScreen(
             emojis = state.emojis,
             enabled = !state.sending,
             autoFocus = true,
+            onAttachMedia = openMediaPicker,
+            onRemoveAttachment = { viewModel.removeAttachment(it.localId) },
+            onRetryAttachment = { viewModel.retryAttachment(it.localId) },
+            onAttachmentDescriptionChange = { attachment, description ->
+                viewModel.setAttachmentDescription(attachment.localId, description)
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)

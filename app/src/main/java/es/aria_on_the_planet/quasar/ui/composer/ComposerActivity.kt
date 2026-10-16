@@ -34,6 +34,8 @@ class ComposerActivity : ComponentActivity() {
                                 container.instanceRepository,
                                 container.emojiRepository,
                                 container.statusRepository,
+                                container.mediaRepository,
+                                container::uploadSource,
                             )
                         }
                     },

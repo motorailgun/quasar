@@ -6,19 +6,23 @@ import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
 import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
+import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
 import okhttp3.FormBody
+import okhttp3.MultipartBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class MastodonApiException(val code: Int, message: String) : IOException(message)
 
@@ -27,6 +31,12 @@ class MastodonApi(
     private val client: OkHttpClient,
     private val json: Json,
 ) {
+    // 大きな動画の送信や、送信後のサーバ側の処理を待つ間に切れないよう長めにする
+    private val uploadClient = client.newBuilder()
+        .writeTimeout(2, TimeUnit.MINUTES)
+        .readTimeout(2, TimeUnit.MINUTES)
+        .build()
+
     suspend fun homeTimeline(
         serverUrl: String,
         accessToken: String?,
@@ -124,6 +134,39 @@ class MastodonApi(
         params.forEach { (name, value) -> add(name, value) }
     }
 
+    /**
+     * メディアをアップロードする (要認証)。https://docs.joinmastodon.org/methods/media/#v2
+     * 画像は処理済み (200) で返るが、動画等は処理待ち (202、`url` が `null`) で返り、[media] で完了を待つ。
+     *
+     * @param file 送る中身。進み具合は呼び出し側の [RequestBody] 実装で数える。
+     */
+    suspend fun uploadMedia(
+        serverUrl: String,
+        accessToken: String,
+        fileName: String,
+        file: RequestBody,
+        description: String?,
+    ): MediaAttachmentDto {
+        val url = serverUrl.toHttpUrl().newBuilder().addPathSegments("api/v2/media").build()
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", fileName, file)
+            .apply { description?.takeIf { it.isNotBlank() }?.let { addFormDataPart("description", it) } }
+            .build()
+        return execute(Request.Builder().url(url).post(body), accessToken, uploadClient)
+    }
+
+    /** アップロードしたメディア (要認証)。処理中は 206 で `url` が `null`。https://docs.joinmastodon.org/methods/media/#get */
+    suspend fun media(serverUrl: String, accessToken: String, id: String): MediaAttachmentDto =
+        get(serverUrl, accessToken, "api/v1/media/$id") {}
+
+    /** 投稿前のメディアの代替テキストを変える (要認証)。https://docs.joinmastodon.org/methods/media/#update */
+    suspend fun updateMediaDescription(serverUrl: String, accessToken: String, id: String, description: String) {
+        val url = serverUrl.toHttpUrl().newBuilder().addPathSegments("api/v1/media/$id").build()
+        val body = FormBody.Builder().add("description", description).build()
+        execute<MediaAttachmentDto>(Request.Builder().url(url).put(body), accessToken)
+    }
+
     /** サーバのカスタム絵文字 (認証不要)。https://docs.joinmastodon.org/methods/custom_emojis/ */
     suspend fun customEmojis(serverUrl: String): List<CustomEmojiDto> =
         get(serverUrl, null, "api/v1/custom_emojis") {}
@@ -201,17 +244,28 @@ class MastodonApi(
         return execute(builder, accessToken)
     }
 
-    private suspend inline fun <reified T> execute(builder: Request.Builder, accessToken: String?): T =
+    private suspend inline fun <reified T> execute(
+        builder: Request.Builder,
+        accessToken: String?,
+        httpClient: OkHttpClient = client,
+    ): T =
         withContext(Dispatchers.IO) {
             val request = builder
                 .apply { accessToken?.let { header("Authorization", "Bearer $it") } }
                 .build()
-            client.newCall(request).execute().use { response ->
-                val body = response.body.string()
-                if (!response.isSuccessful) {
-                    throw MastodonApiException(response.code, "HTTP ${response.code}: $body")
+            val call = httpClient.newCall(request)
+            // コルーチンを止めたら通信も止める (アップロードの取り消し等)
+            val cancellation = coroutineContext.job.invokeOnCompletion { if (it != null) call.cancel() }
+            try {
+                call.execute().use { response ->
+                    val body = response.body.string()
+                    if (!response.isSuccessful) {
+                        throw MastodonApiException(response.code, "HTTP ${response.code}: $body")
+                    }
+                    json.decodeFromString<T>(body)
                 }
-                json.decodeFromString<T>(body)
+            } finally {
+                cancellation.dispose()
             }
         }
 

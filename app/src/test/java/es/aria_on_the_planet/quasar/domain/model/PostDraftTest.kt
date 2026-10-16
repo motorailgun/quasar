@@ -66,4 +66,32 @@ class PostDraftTest {
         ).pollDurations
         assertEquals(listOf("1h", "6h", "1d").map(kotlin.time.Duration::parse), durations)
     }
+
+    @Test
+    fun videoCannotBeCombined() {
+        val video = DraftAttachment("v", null, state = UploadState.Uploaded("mv"), mimeType = "video/mp4")
+        val gif = DraftAttachment("g", null, state = UploadState.Uploaded("mg"), mimeType = "image/gif")
+        assertFalse(DraftProblem.VideoWithOtherMedia in PostDraft("a", attachments = listOf(video)).problems(limits))
+        assertTrue(DraftProblem.VideoWithOtherMedia in PostDraft("a", attachments = listOf(video, uploaded("1"))).problems(limits))
+        assertTrue(DraftProblem.VideoWithOtherMedia in PostDraft("a", attachments = listOf(gif, uploaded("1"))).problems(limits))
+    }
+
+    @Test
+    fun processingMediaBlocksPosting() {
+        val processing = DraftAttachment("p", null, state = UploadState.Processing("m"))
+        assertTrue(DraftProblem.AttachmentNotUploaded in PostDraft("a", attachments = listOf(processing)).problems(limits))
+    }
+
+    @Test
+    fun checkUploadLimits() {
+        val limits = ComposeLimits(imageSizeLimit = 10, videoSizeLimit = 100, supportedMimeTypes = setOf("image/png", "video/mp4"))
+        assertEquals(null, checkUpload("image/png", 10, limits))
+        assertEquals(UploadFailure.TooLarge, checkUpload("image/png", 11, limits))
+        assertEquals(null, checkUpload("video/mp4", 100, limits))
+        assertEquals(UploadFailure.TooLarge, checkUpload("video/mp4", 101, limits))
+        assertEquals(UploadFailure.Unsupported, checkUpload("image/heic", 1, limits))
+        // 分からないものはサーバに任せる
+        assertEquals(null, checkUpload(null, null, limits))
+        assertEquals(null, checkUpload("image/heic", 1, ComposeLimits()))
+    }
 }

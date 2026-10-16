@@ -17,6 +17,14 @@ data class ComposeLimits(
     val maxPollOptionCharacters: Int = 50,
     val minPollExpiration: Duration = 5.minutes,
     val maxPollExpiration: Duration = 30.days,
+    /** 画像のファイルサイズ上限 (バイト)。 */
+    val imageSizeLimit: Long = 16L * 1024 * 1024,
+    /** 動画・音声のファイルサイズ上限 (バイト)。 */
+    val videoSizeLimit: Long = 99L * 1024 * 1024,
+    /** 受け付ける MIME 型。`null` ならサーバが返さなかったので確かめない。 */
+    val supportedMimeTypes: Set<String>? = null,
+    /** 代替テキストの最大文字数。 */
+    val maxDescriptionCharacters: Int = 1500,
 ) {
     /** 投票期間の選択肢 (Mastodon の Web UI と同じ) のうち、上限の範囲内のもの。 */
     val pollDurations: List<Duration>

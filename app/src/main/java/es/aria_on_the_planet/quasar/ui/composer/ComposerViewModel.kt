@@ -1,26 +1,32 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
+import es.aria_on_the_planet.quasar.data.repository.MediaRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
+import es.aria_on_the_planet.quasar.domain.model.UploadFailure
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.ComposerState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 data class ComposerScreenState(
@@ -41,9 +47,33 @@ class ComposerViewModel(
     private val instanceRepository: InstanceRepository,
     private val emojiRepository: EmojiRepository,
     private val statusRepository: StatusRepository,
+    private val mediaRepository: MediaRepository,
+    /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
+    private val openUploadSource: (Uri) -> UploadSource,
 ) : ViewModel() {
     /** 入力内容。画面回転で消えないよう ViewModel が持つ。 */
     val composer = ComposerState()
+
+    private val uploads = AttachmentUploads(
+        scope = viewModelScope,
+        attachments = { composer.attachments },
+        setAttachments = { composer.attachments = it },
+        limits = { _state.value.limits },
+        upload = { source, description, onProgress, onProcessing ->
+            mediaRepository.upload(session, source, description, onProgress, onProcessing)
+        },
+        updateDescription = { mediaId, description -> mediaRepository.updateDescription(session, mediaId, description) },
+        onError = { Log.w(TAG, "Media upload failed", it) },
+        classifyFailure = { e ->
+            when ((e as? MastodonApiException)?.code) {
+                401, 403 -> UploadFailure.NotAllowed
+                413 -> UploadFailure.TooLarge
+                415 -> UploadFailure.Unsupported
+                422 -> UploadFailure.Rejected
+                else -> UploadFailure.Failed
+            }
+        },
+    )
 
     private val _state = MutableStateFlow(ComposerScreenState())
     val state: StateFlow<ComposerScreenState> = _state.asStateFlow()
@@ -92,6 +122,23 @@ class ComposerViewModel(
             }
         }
     }
+
+    /** Photo Picker で選ばれたメディアを添付し、アップロードを始める。 */
+    fun addMedia(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            val sources = runCatchingLogged("media") {
+                withContext(Dispatchers.IO) { uris.map(openUploadSource) }
+            } ?: return@launch
+            uploads.add(sources)
+        }
+    }
+
+    fun removeAttachment(localId: String) = uploads.remove(localId)
+
+    fun retryAttachment(localId: String) = uploads.retry(localId)
+
+    fun setAttachmentDescription(localId: String, description: String) = uploads.setDescription(localId, description)
 
     fun errorShown() {
         _state.update { it.copy(error = null) }

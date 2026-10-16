@@ -19,8 +19,14 @@ import com.linecorp.apng.ApngDrawable
  *
  * [frames] はこの Drawable 専用のもの (`ConstantState.newDrawable()`) を渡す。描画用のビットマップを 1 枚持つので、
  * 複数の Drawable で共有すると互いのコマで上書きされる。
+ *
+ * [maxFps] があれば、描き直しの時刻を全 APNG 共通の刻みに切り上げる ([nextDrawTime])。1 つあたりの描き直しが
+ * 上限以下になるうえ、同じ画面の APNG の描き直しが同じフレームにまとまる。
  */
-internal class ApngAnimationDrawable(private val frames: ApngDrawable) : Drawable(), Animatable {
+internal class ApngAnimationDrawable(
+    private val frames: ApngDrawable,
+    private val maxFps: Int? = null,
+) : Drawable(), Animatable {
     private val timeline = ApngTimeline(frames.frameDurations.toIntArray(), frames.loopCount)
 
     /** [frames] の時間軸での各コマの開始時刻。表示時間の補正 ([ApngTimeline]) をする前の値で求める。 */
@@ -50,7 +56,7 @@ internal class ApngAnimationDrawable(private val frames: ApngDrawable) : Drawabl
             running = false
             pausedElapsed = elapsed
         } else {
-            scheduleSelf(nextFrame, startedAt + elapsed + wait)
+            scheduleSelf(nextFrame, nextDrawTime(startedAt + elapsed + wait, maxFps))
         }
     }
 

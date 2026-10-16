@@ -53,4 +53,35 @@ class ApngTimelineTest {
     fun negativeElapsedIsClampedToStart() {
         assertEquals(Frame(0, 30), timeline.frameAt(-5))
     }
+
+    @Test
+    fun nextDrawTimeWithoutLimitIsFrameChange() {
+        assertEquals(1_234L, nextDrawTime(1_234, maxFps = null))
+        assertEquals(1_234L, nextDrawTime(1_234, maxFps = 0))
+    }
+
+    @Test
+    fun nextDrawTimeIsRoundedUpToCommonTicks() {
+        // 30fps の刻み: 0, 34, 67, 100, 134, ... (k * 1000 / 30 の切り上げ)
+        assertEquals(34L, nextDrawTime(1, maxFps = 30))
+        assertEquals(34L, nextDrawTime(34, maxFps = 30))
+        assertEquals(67L, nextDrawTime(35, maxFps = 30))
+        assertEquals(100L, nextDrawTime(100, maxFps = 30))
+        // 刻みは時刻 0 起点なので、別々の画像でも同じ時刻にそろう
+        assertEquals(nextDrawTime(1_000_005, 30), nextDrawTime(1_000_020, 30))
+    }
+
+    @Test
+    fun ticksNeverExceedMaxFps() {
+        // 毎回直後の時刻を求め直しても、1 秒あたり maxFps 回を超えない
+        for (fps in listOf(1, 24, 30, 60)) {
+            var t = 0L
+            var draws = 0
+            while (t < 10_000) {
+                t = nextDrawTime(t + 1, fps)
+                draws++
+            }
+            assertTrue("fps=$fps draws=$draws", draws <= fps * 10 + 1)
+        }
+    }
 }

@@ -31,11 +31,17 @@ data class DisplaySettings(
     val animateOtherEmojis: Boolean = true,
     /** ユーザーのアイコン。 */
     val animateAvatars: Boolean = true,
+    /**
+     * 絵文字・アイコンのアニメーションの描き直しの上限 (fps)。`null` なら上限なし (画像の本来のコマ送り)。
+     * 今は APNG のみに効く (GIF / Motion WebP は Android の再生が自分でコマを進めるため)。
+     */
+    val emojiAvatarAnimationMaxFps: Int? = DefaultEmojiAvatarAnimationMaxFps,
 ) {
     companion object {
         const val DefaultLongPostMaxLines = 8
         val DefaultSurfaceBlurRadius = 6.dp
         const val DefaultSurfaceBlurTintAlpha = 0.8f
+        const val DefaultEmojiAvatarAnimationMaxFps = 30
     }
 }
 

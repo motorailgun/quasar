@@ -29,13 +29,14 @@ internal class ApngDecoderFactory(private val cache: ApngFrameCache) : Decoder.F
     override fun create(result: SourceFetchResult, options: Options, imageLoader: ImageLoader): Decoder? {
         val info = readApngInfo(result.source.source()) ?: return null
         if (info.decodedByteCount > MaxDecodedBytes) return null
-        return ApngDecoder(result.source, cacheKey = options.diskCacheKey, cache)
+        return ApngDecoder(result.source, cacheKey = options.diskCacheKey, maxFps = options.animationMaxFps, cache)
     }
 }
 
 private class ApngDecoder(
     private val source: ImageSource,
     private val cacheKey: String?,
+    private val maxFps: Int?,
     private val cache: ApngFrameCache,
 ) : Decoder {
     override suspend fun decode(): DecodeResult? = runInterruptible {
@@ -45,7 +46,7 @@ private class ApngDecoder(
         // newDrawable() (内部で Apng.copy()) はフレームの中身を共有し、描画用のビットマップ (1 フレーム分) だけを
         // 新しく持つ。再生位置は表示ごとに別
         val frames = original.constantState?.newDrawable() as? ApngDrawable ?: return@runInterruptible null
-        DecodeResult(image = ApngAnimationDrawable(frames).asImage(), isSampled = false)
+        DecodeResult(image = ApngAnimationDrawable(frames, maxFps).asImage(), isSampled = false)
     }
 
     /** 失敗したら `null` で次のデコーダに回すので、[source] は消費せず peek で読む。 */

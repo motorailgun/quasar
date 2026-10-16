@@ -30,5 +30,21 @@ internal class ApngTimeline(frameDurations: IntArray, private val loopCount: Int
     fun isFinished(elapsedMillis: Long): Boolean = loopCount > 0 && elapsedMillis >= loopDuration * loopCount
 }
 
+/**
+ * 次に描き直す時刻 (`SystemClock.uptimeMillis` の時間軸)。[maxFps] が無ければコマが変わる時刻 [frameChangeAt] そのもの、
+ * あれば `1000 / maxFps` ms ごとの共通の刻み (時刻 0 起点) のうち [frameChangeAt] 以降で最初のもの。
+ * 刻みはすべての画像で共通なので、同じ画面の描き直しが同じ時刻にまとまる。
+ */
+internal fun nextDrawTime(frameChangeAt: Long, maxFps: Int?): Long {
+    if (maxFps == null || maxFps <= 0) return frameChangeAt
+    // 刻み k の時刻は ceil(k * 1000 / maxFps)。それが frameChangeAt 以上 ⇔ k * 1000 / maxFps > frameChangeAt - 1
+    // なので、最初の k は floor((frameChangeAt - 1) * maxFps / 1000) + 1
+    val tick = Math.floorDiv((frameChangeAt - 1) * maxFps, 1000L) + 1
+    return ceilDiv(tick * 1000L, maxFps.toLong())
+}
+
+/** 切り上げの割り算 (`Math.ceilDiv` は Java 18 からで、古い Android には無い)。 */
+private fun ceilDiv(x: Long, y: Long): Long = -Math.floorDiv(-x, y)
+
 internal const val MinFrameDelayMillis = 10
 internal const val DefaultFrameDelayMillis = 100

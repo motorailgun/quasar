@@ -17,6 +17,7 @@ import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
  *
  * アニメーション画像 (GIF / APNG / Motion WebP) を動かすかは [kind] と `DisplaySettings` で決まる。止めるときは
  * [staticUrl] (API の `static_url` / `avatar_static` 等) があればそれを読み (通信量も減る)、無ければ先頭のフレームを出す。
+ * 絵文字・アイコンは描き直しの上限 (`DisplaySettings.emojiAvatarAnimationMaxFps`) も掛かる (今は APNG のみ)。
  *
  * @param onLoaded 読み込めたときに画像の本来の大きさ (px) を受け取る。縦横比を後から決める表示に使う。
  * @param onError 読み込めなかったとき。別の URL を試す等は呼び出し側で行う。
@@ -34,10 +35,12 @@ fun RemoteImage(
     onLoaded: ((Size) -> Unit)? = null,
     onError: (() -> Unit)? = null,
 ) {
-    val animate = LocalDisplaySettings.current.animates(kind)
+    val settings = LocalDisplaySettings.current
+    val animate = settings.animates(kind)
     QuasarAsyncImage(
         data = if (animate) url else staticUrl ?: url,
         animate = animate,
+        maxFps = settings.animationMaxFps(kind),
         contentDescription = contentDescription,
         modifier = modifier,
         placeholder = placeholder,
@@ -71,6 +74,7 @@ private fun QuasarAsyncImage(
     animate: Boolean,
     contentDescription: String?,
     modifier: Modifier,
+    maxFps: Int? = null,
     placeholder: Painter? = null,
     error: Painter? = null,
     contentScale: ContentScale,
@@ -78,12 +82,12 @@ private fun QuasarAsyncImage(
     onError: (() -> Unit)? = null,
 ) {
     val context = LocalPlatformContext.current
-    val request = remember(context, data, animate) {
+    val request = remember(context, data, animate, maxFps) {
         ImageRequest.Builder(context)
             .data(data)
             // Coil の既定 (URL そのもの) と同じだが、APNG の展開結果のキャッシュのキーとしてデコーダに渡すため明示する
             .diskCacheKey(data)
-            .animate(animate)
+            .animate(animate, maxFps)
             .build()
     }
     AsyncImage(

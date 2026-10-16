@@ -35,5 +35,18 @@ class ImageKindTest {
         ImageKind.entries.forEach { assertFalse(it.name, settings.animates(it)) }
     }
 
+    @Test
+    fun frameRateLimitAppliesToEmojisAndAvatarsOnly() {
+        val settings = DisplaySettings()
+        assertEquals(DisplaySettings.DefaultEmojiAvatarAnimationMaxFps, settings.animationMaxFps(ImageKind.PostEmoji))
+        assertEquals(30, settings.animationMaxFps(ImageKind.OtherEmoji))
+        assertEquals(30, settings.animationMaxFps(ImageKind.Avatar))
+        assertEquals(null, settings.animationMaxFps(ImageKind.Other))
+        assertEquals(12, DisplaySettings(emojiAvatarAnimationMaxFps = 12).animationMaxFps(ImageKind.Avatar))
+        // null・0 以下は上限なし
+        assertEquals(null, DisplaySettings(emojiAvatarAnimationMaxFps = null).animationMaxFps(ImageKind.Avatar))
+        assertEquals(null, DisplaySettings(emojiAvatarAnimationMaxFps = 0).animationMaxFps(ImageKind.Avatar))
+    }
+
     private fun DisplaySettings.animatingKinds() = ImageKind.entries.filter { animates(it) }.toSet()
 }

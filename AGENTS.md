@@ -283,6 +283,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     10ms 以下のコマは GIF と同じく 100ms 扱い) で求め、コマが変わる時刻にだけ `scheduleSelf` する (同じ場面で 78fps・12.5%)。
     コマの指定は `seekTo(開始時刻)`。**`seekToFrame` は `loopCount = 0` (無限) で例外を投げる** (ライブラリの不具合) ので使わない。
     `Apng` クラスは Kotlin の `internal` で参照できないため、`ApngDrawable` を「再生させない入れ物」として使っている。
+  * フレームレート上限: `DisplaySettings.emojiAvatarAnimationMaxFps` (既定 30、`null` で上限なし。設定画面で変える想定) を
+    `DisplaySettings.animationMaxFps(kind)` が絵文字・アイコンにだけ渡し (添付メディア等は上限なし)、リクエストの Extras
+    (`animate(enabled, maxFps)`) → `ApngDecoderFactory` → `ApngAnimationDrawable` と届く。次の描き直しの時刻を
+    `nextDrawTime` (純粋関数) で時刻 0 起点・`1000 / maxFps` ms の共通の刻みに切り上げるので、1 つあたり上限以下になり、
+    同じ画面の APNG の描き直しも同じフレームにまとまる。**APNG のみ** (GIF / WebP は上記のとおり Coil 任せ)。
   * メモリ不足: `ApngFrameCache` は `ComponentCallbacks2` (`newQuasarImageLoader` で登録)。Coil のメモリキャッシュと同じく
     `TRIM_MEMORY_BACKGROUND` 以上 / `onLowMemory` で空にする (logcat の `ApngFrameCache` に空けた量)。表示中のコピーはフレームを
     共有しているが、空けた後も再生・展開し直しとも問題ないことを実機で確認済み (`am send-trim-memory <pkg> BACKGROUND`)。
@@ -770,6 +775,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。release を debug 鍵で一時的に署名して入れる
   (同じ鍵なのでデータは残る。測定後は `build.gradle.kts` を戻して debug を入れ直す)。フレーム数・ジャンクは
   `dumpsys gfxinfo <pkg>` (`reset` してから)、CPU は `/proc/<pid>/task/*/stat`。**RenderThread は 2 本ある**ので合計する。
+  **gfxinfo の「Total frames rendered」はプロセス内の全ウィンドウの合計**。ボトムシート (絵文字ピッカー等) は別ウィンドウなので、
+  後ろの画面の描き直しも足される (`framestats` は `ViewRootImpl@...` ごとに分かれている)。後ろのタイムラインの中身は時間で
+  変わるので、版どうしを比べるときは同じ状態のうちに交互に測る。
 * 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
 * gap の動作確認は流量のあるグローバルで行う: `TimelineViewModel.StreamGlobalTimeline = true` にして、別画面を
   開いて (= 切断) 8 分ほど待ってから戻る。確認後は必ず `false` に戻す。
@@ -790,10 +798,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **プロフィール**: 返信のタブ、プロフィール編集、一覧の行ごとのフォローボタン、フォロー失敗時の UI 通知。
 * **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
 * **画像のアニメーション**: GIF / APNG / Motion WebP の再生・設定のオン / オフ・メモリ不足時の挙動は確認済み。負荷は
-  Snapdragon 8 Elite (OnePlus 13) でしか測っていない (release 相当、何もしない状態): ピッカー (APNG 3 つ) 78fps・CPU 12.5%
-  (1 コア比、8 割が RenderThread)、アイコンが動くタイムラインの 1 画面 1.4fps・0.9%、スクロール中のジャンク 0。描き直しは
-  「どれかのコマが変わったとき」なので、動く画像が増えるほど (コマの時刻がずれるほど) 画面全体の描き直しが増える。
-  低価格帯の端末で重ければ、全 APNG のコマ送りを共通の刻み (例: 30fps) に揃えると描き直しをまとめられる (未実装。
-  GIF / WebP は ImageDecoder が自前で時刻を決めるので対象外)。設定画面が無いので切り替えは `DisplaySettings` の既定値で確かめる。
+  Snapdragon 8 Elite (OnePlus 13) でしか測っていない (release 相当、何もしない状態、CPU は 1 コア比): ピッカー (APNG 3 つ) は
+  上限なし 82〜88fps・16%、上限 30fps で 41fps (ピッカー 30 + 後ろの画面の GIF 約 10)・11%。アイコンが動くタイムラインの
+  1 画面 1.4fps・0.9%、スクロール中のジャンク 0。GIF / WebP のフレームレート上限は実装しない方針 (Coil = ImageDecoder に任せる。
+  上限を掛けるには再生の置き換えが要る: GIF は android-gif-drawable、WebP は Fresco の animated-webp 等が候補だった)。
+  設定画面が無いので切り替えは `DisplaySettings` の既定値で確かめる。
 * **ローカライズ**: 文字列は英語のみ。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

@@ -17,6 +17,15 @@ enum class ImageKind {
     Other,
 }
 
+/**
+ * [kind] の画像のアニメーションの描き直しの上限 (fps)。`null` なら上限なし。絵文字・アイコンだけに掛ける
+ * (添付メディア等は本来のコマ送りで見せる)。
+ */
+fun DisplaySettings.animationMaxFps(kind: ImageKind): Int? = when (kind) {
+    ImageKind.PostEmoji, ImageKind.OtherEmoji, ImageKind.Avatar -> emojiAvatarAnimationMaxFps?.takeIf { it > 0 }
+    ImageKind.Other -> null
+}
+
 /** [kind] の画像をアニメーションさせるか。[DisplaySettings.animateImages] がオフならすべて止める。 */
 fun DisplaySettings.animates(kind: ImageKind): Boolean = animateImages && when (kind) {
     ImageKind.PostEmoji -> animatePostEmojis

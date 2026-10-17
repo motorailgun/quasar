@@ -171,6 +171,7 @@ fun PostCard(
                             emojis = post.emojis,
                             stateKey = post.statusId,
                             maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
+                            onLinkClick = rememberPostLinkHandler(post, onUserClick),
                         )
                         if (full) {
                             post.poll?.let { poll ->
@@ -207,6 +208,7 @@ fun PostCard(
                                     // 引用の高さは添付画像と同じ高さまで
                                     maxHeight = mediaHeight,
                                     onPostClick = onPostClick,
+                                    onUserClick = onUserClick,
                                     onMediaClick = onMediaClick,
                                     modifier = Modifier.padding(top = 8.dp),
                                 )

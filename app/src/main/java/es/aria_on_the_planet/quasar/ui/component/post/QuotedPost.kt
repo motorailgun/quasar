@@ -36,6 +36,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Quote
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
+import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
@@ -57,6 +58,7 @@ fun QuotedPost(
     modifier: Modifier = Modifier,
     mediaHeight: Dp = PostCardDefaults.MediaHeight * 0.75f,
     onPostClick: (Post) -> Unit = {},
+    onUserClick: (User) -> Unit = {},
     onMediaClick: (MediaClick) -> Unit = {},
     maxHeight: Dp? = null,
     nested: Boolean = false,
@@ -112,6 +114,7 @@ fun QuotedPost(
                                 postContent = true,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 6.dp),
+                                onLinkClick = rememberPostLinkHandler(post, onUserClick),
                             )
                         }
                         // 引用内の投票は閲覧のみ (結果表示)

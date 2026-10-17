@@ -122,6 +122,7 @@ fun PostDetail(
                     isHtml = true,
                     postContent = true,
                     style = MaterialTheme.typography.bodyLarge,
+                    onLinkClick = rememberPostLinkHandler(post, onUserClick),
                 )
                 post.poll?.let { poll ->
                     PollView(
@@ -153,6 +154,7 @@ fun PostDetail(
                         mediaHeight = mediaHeight * 0.75f,
                         maxHeight = mediaHeight,
                         onPostClick = onPostClick,
+                        onUserClick = onUserClick,
                         onMediaClick = onMediaClick,
                         modifier = Modifier.padding(top = 12.dp),
                     )

@@ -36,7 +36,7 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply)
+│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -145,7 +145,7 @@ data class Post(
     val boostedBy: User?,          // ブーストの場合、ブーストしたユーザー
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
     val inReplyToId: String?,      // in_reply_to_id (中身の値)
-    val mentions: List<String>,    // mentions の acct (返信の宛先に使う)
+    val mentions: List<Mention>,   // mentions (id / username / acct / url)。返信の宛先・本文のメンションのタップに使う
 )
 
 /** ログイン中ユーザーから見た状態。API では認証時のみ返るため、未認証時はすべて false。 */
@@ -261,6 +261,7 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * `EmojiText(text: String, emojis: List<CustomEmoji>, isHtml: Boolean, ...)`
   * `isHtml = true` のとき Mastodon の HTML を `AnnotatedString.fromHtml` で変換 (リンク付き)。
   * `:shortcode:` を `emojis` と照合し、`InlineTextContent` + Coil の `AsyncImage` で画像に置換。
+  * `onLinkClick` を渡すとリンクのタップを横取りする (引数は href、未指定なら `LocalUriHandler` で開く)。
   * `postContent = true` はポストの中身 (本文・CW・投票・通知の抜粋)。絵文字のアニメーションの設定が「本文」と
     「それ以外」(表示名・bio・フィールド等、既定の `false`) で分かれているため。
   * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
@@ -314,6 +315,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * リプライ表示: `inReplyToId` があるポストは、ブースト表示と同じ形 (アイコン + tertiary 色) で「Reply to @acct」を出す。
   acct は `in_reply_to_account_id` を、自分へのリプライなら投稿者、それ以外は `mentions` から引いて求める
   (見つからなければ「Reply」)。Post 画面のスレッドでは縦線で関係が分かるので `showReplyIndicator = false`。
+* 本文のメンション: タップでプロフィール (`onUserClick`)。判定は Mastodon Web と同じく href と `Post.mentions` の `url` の
+  一致 (`findByUrl`、`MentionTest`)。`class="mention"` はハッシュタグにも付き、他実装では付き方が揃わないので見ない。
+  一致しないリンクは今どおりブラウザ。`rememberPostLinkHandler` (`PostLinks.kt`) を PostCard / PostDetail / QuotedPost の本文に渡す。
+  `Mention.asUser()` は ID・acct・サーバだけの `User` (プロフィールを開く用。表示には使わない)。
+  url が一致しない実装 (本文が AP の id を指す等) はブラウザで開く。ハッシュタグ (`Status.tags`) は未対応。
 * 公開範囲: 投稿者行 (名前 / @acct) と同じ高さの右端に `VisibilityIcon` (公式 Web UI を元に、公開・フォロワー限定は出さず、
   未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
 * 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / 投票 (PollView) /

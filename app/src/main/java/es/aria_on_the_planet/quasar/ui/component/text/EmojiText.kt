@@ -6,11 +6,15 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
@@ -31,6 +35,8 @@ import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
  * @param isHtml `true` の場合 [text] を Mastodon の HTML として解釈する (リンク付き)。
  * @param postContent ポストの中身 (本文・CW・投票・通知の抜粋) なら `true`。絵文字のアニメーションの設定が
  *   「本文」と「それ以外」で分かれているため。表示名・bio・フィールド等は `false`。
+ * @param onLinkClick HTML のリンクのタップ (引数は href)。`null` なら [androidx.compose.ui.platform.LocalUriHandler]
+ *   でそのまま開く。メンションをプロフィールへ飛ばす等、リンク先によって振り分けるときに渡す。
  */
 @Composable
 fun EmojiText(
@@ -44,13 +50,25 @@ fun EmojiText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
     onTextLayout: (TextLayoutResult) -> Unit = {},
+    onLinkClick: ((String) -> Unit)? = null,
 ) {
     val linkColor = MaterialTheme.colorScheme.primary
-    val annotated = remember(text, emojis, isHtml, linkColor) {
+    // ラムダは毎回変わりうるので、変換をやり直さないよう最新の値を参照する固定のリスナーにする
+    val currentOnLinkClick by rememberUpdatedState(onLinkClick)
+    val handlesLinks = onLinkClick != null
+    val annotated = remember(text, emojis, isHtml, linkColor, handlesLinks) {
         val base = if (isHtml) {
+            val listener = if (handlesLinks) {
+                LinkInteractionListener { link ->
+                    (link as? LinkAnnotation.Url)?.let { currentOnLinkClick?.invoke(it.url) }
+                }
+            } else {
+                null
+            }
             AnnotatedString.fromHtml(
                 htmlString = simplifyMastodonHtml(text),
                 linkStyles = TextLinkStyles(style = SpanStyle(color = linkColor)),
+                linkInteractionListener = listener,
             ).trimWhitespace()
         } else {
             AnnotatedString(text)

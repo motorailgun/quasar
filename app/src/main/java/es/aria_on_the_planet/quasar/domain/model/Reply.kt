@@ -31,7 +31,7 @@ data class ReplyMemory(
  * メンションの無い自分のポストへの返信なら空。
  */
 fun replyRecipients(target: Post, myAcct: String?): List<String> =
-    (listOf(target.author.screenName) + target.mentions)
+    (listOf(target.author.screenName) + target.mentions.map { it.acct })
         .filterNot { myAcct != null && it.equals(myAcct, ignoreCase = true) }
         .distinctBy { it.lowercase() }
 

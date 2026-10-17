@@ -53,6 +53,7 @@ data class MentionDto(
     val id: String,
     val username: String,
     val acct: String,
+    val url: String = "",
 )
 
 /** Status.application: https://docs.joinmastodon.org/entities/Status/#application */

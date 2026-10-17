@@ -15,7 +15,7 @@ class ReplyDraftTest {
         cw: String? = null,
     ) = Post(
         "1", user(author), "", Instant.EPOCH, 0, 0, 0, emptyList(),
-        mentions = mentions, visibility = visibility, contentWarning = cw,
+        mentions = mentions.map { Mention(it, it.substringBefore('@'), it, "https://e.invalid/@$it") }, visibility = visibility, contentWarning = cw,
     )
 
     private val empty = ReplyFields("", PostVisibility.Public, contentWarningEnabled = false, contentWarning = "")

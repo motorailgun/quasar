@@ -18,6 +18,7 @@ import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
 import es.aria_on_the_planet.quasar.domain.model.MediaType
+import es.aria_on_the_planet.quasar.domain.model.Mention
 import es.aria_on_the_planet.quasar.domain.model.Notification
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
@@ -127,7 +128,7 @@ fun StatusDto.toDomain(): Post {
         statusId = body.id,
         inReplyToId = body.inReplyToId,
         inReplyToAcct = body.replyTargetAcct(),
-        mentions = body.mentions.map { it.acct },
+        mentions = body.mentions.map { Mention(it.id, it.username, it.acct, it.url) },
     )
 }
 

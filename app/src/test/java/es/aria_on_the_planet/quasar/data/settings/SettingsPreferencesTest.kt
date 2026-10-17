@@ -23,6 +23,7 @@ class SettingsPreferencesTest {
     private val changed = AppSettings(
         display = DisplaySettings(
             longPostMaxLines = null,
+            surfaceBlur = false,
             surfaceBlurRadiusDp = 10f,
             surfaceBlurTintAlpha = 0.5f,
             animateImages = false,

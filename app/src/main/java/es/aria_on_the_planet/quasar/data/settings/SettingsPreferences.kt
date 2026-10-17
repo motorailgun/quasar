@@ -84,6 +84,7 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         { it.display.longPostMaxLines },
         { s, v -> s.copy(display = s.display.copy(longPostMaxLines = v)) },
     ),
+    display("surface_blur", { it.surfaceBlur }) { copy(surfaceBlur = it) },
     SettingField(
         floatPreferencesKey("surface_blur_radius_dp"),
         { it.display.surfaceBlurRadiusDp },

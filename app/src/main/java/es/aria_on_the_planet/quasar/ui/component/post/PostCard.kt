@@ -3,7 +3,6 @@ package es.aria_on_the_planet.quasar.ui.component.post
 import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
 import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.theme.DisabledContentAlpha
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -50,10 +49,8 @@ import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -165,24 +162,22 @@ fun PostCard(
                     )
                 }
                 // CW で隠すのは本文・投票。メディアは CW とは独立に sensitive で制御する
-                AnimatedVisibility(visible = expanded) {
-                    Column {
-                        // 長い本文は設定の行数で折りたたむ
-                        CollapsiblePostText(
-                            html = post.text,
-                            emojis = post.emojis,
-                            stateKey = post.statusId,
-                            maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
-                            onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
-                        )
-                        if (full) {
-                            post.poll?.let { poll ->
-                                PollView(
-                                    poll = poll,
-                                    onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
-                            }
+                ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
+                    // 長い本文は設定の行数で折りたたむ
+                    CollapsiblePostText(
+                        html = post.text,
+                        emojis = post.emojis,
+                        stateKey = post.statusId,
+                        maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
+                        onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
+                    )
+                    if (full) {
+                        post.poll?.let { poll ->
+                            PollView(
+                                poll = poll,
+                                onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
                         }
                     }
                 }
@@ -198,8 +193,8 @@ fun PostCard(
                 }
                 if (full) {
                     // リンクプレビュー・引用も本文の一部として CW で隠す
-                    AnimatedVisibility(visible = expanded) {
-                        Column {
+                    if (post.card != null || post.quote != null) {
+                        ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
                             post.card?.let { card ->
                                 LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
                             }
@@ -245,7 +240,6 @@ private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Bool
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
     RemoteImage(
@@ -255,7 +249,7 @@ fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
         contentDescription = user.screenName,
         modifier = modifier
             .size(size)
-            .clip(MaterialShapes.Cookie9Sided.toShape()),
+            .clip(CircleShape),
     )
 }
 

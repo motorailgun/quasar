@@ -25,7 +25,7 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
             }
         }
         // 性能の測定用 (release と同じ設定で、debug 鍵で署名する。applicationId が同じなので debug と入れ替えてもデータは残る)。
@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.androidx.media3.ui.compose)
     implementation(libs.androidx.media3.ui.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // 性能の測定: Perfetto のトレースに Composable 単位の区間を出す (composition tracing)
+    "benchmarkImplementation"(libs.androidx.compose.runtime.tracing)
+    "benchmarkImplementation"(libs.androidx.tracing.perfetto.binary)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

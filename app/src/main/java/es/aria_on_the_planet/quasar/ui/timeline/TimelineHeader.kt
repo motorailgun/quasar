@@ -52,10 +52,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.hazeBlur
+import es.aria_on_the_planet.quasar.ui.component.blur.SurfaceBlurStyle
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -124,15 +123,15 @@ fun StatusBarScrim(modifier: Modifier = Modifier) {
     )
 }
 
-private fun Modifier.blurredSurface(hazeState: HazeState, style: HazeBlurStyle, shape: Shape): Modifier = this
+private fun Modifier.blurredSurface(hazeState: HazeState, style: SurfaceBlurStyle, shape: Shape): Modifier = this
     .clip(shape)
-    .hazeBlur(input = HazeInput.Sources(hazeState), style = style)
+    .surfaceBlur(hazeState, style)
 
 @Composable
 private fun AccountButton(
     account: User?,
     hazeState: HazeState,
-    blurStyle: HazeBlurStyle,
+    blurStyle: SurfaceBlurStyle,
     onOpenSettings: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -143,8 +142,7 @@ private fun AccountButton(
                 user = account,
                 size = AccountIconSize,
                 modifier = Modifier
-                    // 影は円にする。アイコンの形 (Cookie9Sided、凹みのある形) の影は RenderThread での計算が非常に重く、
-                    // 12dp では 1 フレームに 10 秒かかって起動直後に固まった (ANR)。凸形の影は軽い
+                    // 影は凸形 (円) で付ける。凹みのある形の影は RenderThread での計算が非常に重い (AGENTS.md)
                     .shadow(HeaderShadowElevation, CircleShape)
                     .clickable(role = Role.Button) { menuOpen = true },
             )
@@ -197,7 +195,7 @@ private fun ColumnTabs(
     available: List<ColumnType>,
     pagerState: PagerState,
     hazeState: HazeState,
-    blurStyle: HazeBlurStyle,
+    blurStyle: SurfaceBlurStyle,
     onSelect: (ColumnType) -> Unit,
     modifier: Modifier = Modifier,
 ) {

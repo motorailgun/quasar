@@ -59,8 +59,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import es.aria_on_the_planet.quasar.ui.component.blur.LocalSurfaceBlurEnabled
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurSource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -152,7 +153,7 @@ fun TimelineScreen(
                     // 上下ともヘッダ・バーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
                     modifier = Modifier
                         .fillMaxSize()
-                        .hazeSource(hazeState),
+                        .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
                     key = { state.available[it] },
                     // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
                     flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),

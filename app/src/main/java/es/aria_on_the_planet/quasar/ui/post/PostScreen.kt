@@ -34,8 +34,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import es.aria_on_the_planet.quasar.ui.component.blur.LocalSurfaceBlurEnabled
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurSource
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -187,7 +188,7 @@ fun PostScreen(
                             // バーの後ろまで描き (ぼかしの元)、最後のリプライがバーに隠れないよう下端を空ける
                             Modifier
                                 .fillMaxSize()
-                                .hazeSource(hazeState),
+                                .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
                             state = listState,
                             contentPadding = PaddingValues(bottom = barSpace),
                         ) {

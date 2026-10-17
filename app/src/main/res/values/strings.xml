@@ -283,6 +283,8 @@
         <item quantity="other">After %d lines</item>
     </plurals>
     <string name="settings_blur">Blur</string>
+    <string name="settings_blur_enabled">Blur behind floating bars</string>
+    <string name="settings_blur_enabled_summary">Always off while Battery Saver is on</string>
     <string name="settings_blur_radius">Blur strength</string>
     <string name="settings_blur_radius_value">%d dp</string>
     <string name="settings_blur_tint">Tint</string>

@@ -1,7 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
 import android.text.format.DateFormat
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -119,23 +118,21 @@ fun PostDetail(
             )
         }
         // CW で隠すのは本文・投票・リンクプレビュー・引用。メディアは sensitive で別に制御する
-        AnimatedVisibility(visible = expanded) {
-            Column {
-                EmojiText(
-                    text = post.text,
-                    emojis = post.emojis,
-                    isHtml = true,
-                    postContent = true,
-                    style = MaterialTheme.typography.bodyLarge,
-                    onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
+        ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
+            EmojiText(
+                text = post.text,
+                emojis = post.emojis,
+                isHtml = true,
+                postContent = true,
+                style = MaterialTheme.typography.bodyLarge,
+                onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
+            )
+            post.poll?.let { poll ->
+                PollView(
+                    poll = poll,
+                    onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
+                    modifier = Modifier.padding(top = 12.dp),
                 )
-                post.poll?.let { poll ->
-                    PollView(
-                        poll = poll,
-                        onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
             }
         }
         if (post.mediaAttachments.isNotEmpty()) {
@@ -148,8 +145,8 @@ fun PostDetail(
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
-        AnimatedVisibility(visible = expanded) {
-            Column {
+        if (post.card != null || post.quote != null) {
+            ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
                 post.card?.let { card ->
                     LinkPreviewCard(card = card, modifier = Modifier.padding(top = 12.dp))
                 }

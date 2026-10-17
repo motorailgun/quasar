@@ -22,13 +22,11 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Verified
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,7 +78,6 @@ private val AvatarRing = 4.dp
  * @param onFollowingClick / [onFollowersClick] 統計のフォロー数・フォロワー数のタップ (一覧を開く)。
  * @param onOpenImage アイコン・ヘッダ画像のタップ (メディアビューアを開く)。`null` ならタップできない。
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProfileHeader(
     profile: Profile,
@@ -140,7 +137,7 @@ fun ProfileHeader(
             Box(
                 Modifier
                     .padding(start = 16.dp, top = HeaderHeight - AvatarSize / 2 - AvatarRing)
-                    .background(MaterialTheme.colorScheme.surface, MaterialShapes.Cookie9Sided.toShape())
+                    .background(MaterialTheme.colorScheme.surface, CircleShape)
                     .padding(AvatarRing),
             ) {
                 UserIcon(

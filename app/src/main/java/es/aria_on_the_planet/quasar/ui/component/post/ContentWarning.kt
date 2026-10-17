@@ -1,6 +1,8 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -33,5 +35,23 @@ fun ContentWarning(
     Column(modifier) {
         EmojiText(text = text, emojis = emojis, postContent = true, style = style)
         ShowMoreToggle(expanded = expanded, onToggle = onToggle)
+    }
+}
+
+/**
+ * CW で隠す部分 (本文・投票・リンクプレビュー・引用)。CW のあるポスト ([hasWarning]) だけ [expanded] に合わせて
+ * 開閉をアニメーションし、無いポストは `AnimatedVisibility` を作らずにそのまま出す。一覧では項目が画面に入るたびに
+ * 組み立てるので、使わないアニメーションの分だけ重くなる (ポスト 1 件の組み立ての 2 割ほどを占めていた)。
+ */
+@Composable
+fun ContentWarningBody(
+    hasWarning: Boolean,
+    expanded: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (hasWarning) {
+        AnimatedVisibility(visible = expanded) { Column(content = content) }
+    } else {
+        Column(content = content)
     }
 }

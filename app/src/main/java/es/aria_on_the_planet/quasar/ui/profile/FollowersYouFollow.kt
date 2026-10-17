@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialShapes
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +29,6 @@ private val IconRing = 2.dp
 private val IconOverlapStep = 16.dp
 
 /** 「自分がフォローしている人のうち、このアカウントをフォローしている人」の要約 (X の Followed by ...)。 */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FollowersYouFollow(users: List<User>, modifier: Modifier = Modifier) {
     if (users.isEmpty()) return
@@ -44,7 +41,7 @@ fun FollowersYouFollow(users: List<User>, modifier: Modifier = Modifier) {
                     Modifier
                         .offset(x = IconOverlapStep * index)
                         .zIndex((icons.size - index).toFloat())
-                        .background(MaterialTheme.colorScheme.surface, MaterialShapes.Cookie9Sided.toShape())
+                        .background(MaterialTheme.colorScheme.surface, CircleShape)
                         .padding(IconRing),
                 ) {
                     UserIcon(user = user, size = IconSize)

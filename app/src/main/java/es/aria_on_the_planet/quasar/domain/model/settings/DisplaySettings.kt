@@ -7,7 +7,12 @@ data class DisplaySettings(
     /** タイムライン等でポスト本文を折りたたむ行数。これを超える分はフェードして「Show more」。`null` なら折りたたまない。 */
     val longPostMaxLines: Int? = DefaultLongPostMaxLines,
     /**
-     * 一覧の上に浮かぶ UI (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブ) の背景のぼかしの半径 (dp)。
+     * 一覧の上に浮かぶ UI (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブ) の背景をぼかすか。オフなら不透明な面。
+     * バッテリーセーバー中は設定に関わらずぼかさない (`rememberSurfaceBlurEnabled`)。ぼかしは描画の負荷が大きい。
+     */
+    val surfaceBlur: Boolean = true,
+    /**
+     * 同じぼかしの半径 (dp)。
      * `rememberSurfaceBlurStyle` が使う。閲覧注意メディアのぼかしは別 (隠すためのものなので対象外)。
      */
     val surfaceBlurRadiusDp: Float = DefaultSurfaceBlurRadiusDp,

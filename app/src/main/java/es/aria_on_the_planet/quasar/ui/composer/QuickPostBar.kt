@@ -68,9 +68,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.hazeBlur
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -184,7 +183,7 @@ fun QuickPostBar(
     Column(
         modifier
             .clip(shape)
-            .hazeBlur(input = HazeInput.Sources(hazeState), style = blurStyle)
+            .surfaceBlur(hazeState, blurStyle)
             .border(surfaceBlurBorder(), shape)
             // 入力していない間はどこを押しても入力を始める (本文欄だけでは当たり判定が小さい)。
             // 子のボタン等が受けたタップはそちらが優先され、押せないもの (空の送信ボタン等) はここに回る

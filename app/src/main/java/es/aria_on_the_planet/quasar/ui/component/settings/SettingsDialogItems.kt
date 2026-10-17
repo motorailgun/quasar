@@ -124,6 +124,7 @@ fun SettingsSliderItem(
     valueLabel: @Composable (Float) -> String,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     SettingsNavigationItem(
@@ -131,6 +132,7 @@ fun SettingsSliderItem(
         summary = valueLabel(value),
         onClick = { open = true },
         modifier = modifier,
+        enabled = enabled,
         showChevron = false,
     )
     if (open) {

@@ -811,8 +811,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   表示設定の項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
   `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
-  `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) / `surfaceBlurTintAlpha`
-  (一覧の上に浮かぶ UI の背景のぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`emojiAvatarAnimationMaxFps`。
+  `surfaceBlur` (一覧の上に浮かぶ UI の背景をぼかすか。既定オン) / `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) /
+  `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`emojiAvatarAnimationMaxFps`。
 * **操作前の確認**: `LocalActionConfirmer.current.confirm(target)` (suspend) が、設定で確認する操作ならダイアログ
   (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
@@ -831,9 +831,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 面の色は surfaceBright (背景は surfaceContainer)。`SegmentedListItem` の checked 版は選択中の色・形に変わるので、
     selected 系の色と `selectedShape` を通常と同じにしている (AOSP は面の色でオン / オフを示さない)。
   * 未ログインでの利用は考慮しない (ログイン必須の項目もそのまま出す。非ログインの経路は今後なくす方針)。
-* **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取る**。半径・濃さを
-  個別に書かない (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブで共通)。部品ごとに変えてよいのは色味の色だけ
+* **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取り、`Modifier.surfaceBlur` で
+  描く。元の一覧には `Modifier.surfaceBlurSource(state, LocalSurfaceBlurEnabled.current)`**。`hazeBlur` / `hazeSource` を直接
+  使わない。半径・濃さを個別に書かない (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブで共通)。部品ごとに変えてよいのは色味の色だけ
   (クイック投稿バーは surfaceContainer、他は既定の surfaceContainerHigh)。下地の surface もここで敷く。
+  * ぼかすかは `LocalSurfaceBlurEnabled` (`QuasarAppContent` が提供): 設定 `surfaceBlur` がオンで、バッテリーセーバー中でない
+    とき (`ACTION_POWER_SAVE_MODE_CHANGED` で追従)。ぼかさないときは色味を下地に重ねた不透明な色で塗り、元の一覧のレイヤも作らない。
+  * 負荷 (エミュレータ、タイムラインのスクロール中): ぼかし 2 枚 (ヘッダ・バー) で RenderThread が 1 フレームあたり約 4〜5ms 増える。
+    ノイズ 0・`HazePerformanceMode.Performance` (入力の縮小) ではほぼ変わらなかった (エミュレータでは)。
   ぼかした面に縁を付けるときは `surfaceBlurBorder()` (outlineVariant 0.5 の 1dp) を使う。
   閲覧注意メディアの `Modifier.blur` は隠すためのものなので対象外。
 
@@ -944,6 +949,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **凹みのある形 (`MaterialShapes.Cookie9Sided` 等) に `Modifier.shadow` を付けない**。影の計算が RenderThread で非常に重く、
   ヘッダのアイコンに 12dp の影を付けたら 1 フレームに約 10 秒かかり、起動直後に固まって ANR になった。影は円などの凸形で付ける
   (見た目の形と影の形は別でよい)。
+* **一覧の中で繰り返す部品 (アイコン等) を凹みのある形で `clip` しない**。アイコンは以前 Cookie9Sided で切っていたが、パスの
+  切り抜きが毎フレーム描かれ、タイムラインのスクロールで RenderThread が 1 フレームあたり約 5ms 増えていた (エミュレータで測定)。
+  今は円 (`CircleShape`)。
 * **Navigation 3 のエントリに変わる値を外から渡さない**。`NavDisplay` は積まれたエントリを中身のラムダごと使い回すので、
   `entryProvider { entry<...> { Page(settings) } }` のように外で読んだ値は開いたときのまま変わらない (設定画面のスイッチが
   その場で切り替わらなくなった)。変わる値はエントリの中で Flow から読む (`WithSettings`)。
@@ -952,7 +960,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ### ビルド
 * Gradle のインクリメンタルコンパイルが古い結果を返して、正しいコードでも型エラーになることがあった。
   不可解なエラーは `./gradlew :app:compileDebugKotlin --rerun` で確かめる。
-* release ビルドは R8 (minify) 無効。`material-icons-extended` が大きいので、有効にするか必要なアイコンだけにする。
+* release / benchmark ビルドは R8 (`optimization { enable = true }`、リソースの削減込み) 有効。APK は約 68MB → 8MB、main スレッドの
+  CPU は約半分。独自の keep ルールは無い (各ライブラリの consumer rules で足りている)。リフレクションや JNI を足したら
+  benchmark ビルドで動作 (起動・画面遷移・プロセス再生成後の復元・APNG) を確かめる。
 
 ### 実機での確認 (adb)
 * 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。
@@ -968,7 +978,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleBenchmark`。
   release と同じ設定 + debug 鍵の署名 + ギャラリー入り。applicationId が同じなので debug と入れ替えてもデータは残る) を入れ、
   `scripts/perf/measure.sh <label> <秒> [swipe]` で測る (端末が複数なら `ADB="adb -t 3"`)。終わったら debug を入れ直す。
-  benchmark は debuggable ではないので `run-as` は使えない。フレーム数・ジャンクは `dumpsys gfxinfo <pkg>` (`reset` してから)、
+  benchmark は debuggable ではないので `run-as` は使えない (`profileable` なので Perfetto の CPU プロファイルは取れる)。
+  benchmark には composition tracing (`runtime-tracing` + `tracing-perfetto-binary`) が入っている。Composable 単位の区間を
+  Perfetto に出すには、起動後に `adb shell am broadcast -a androidx.tracing.perfetto.action.ENABLE_TRACING -n <pkg>/androidx.tracing.perfetto.TracingReceiver`
+  を送り、トレースの設定に `track_event` (`enabled_categories: "*"`) のデータソースを足す。フレーム数・ジャンクは `dumpsys gfxinfo <pkg>` (`reset` してから)、
   CPU は `/proc/<pid>/task/*/stat`。**RenderThread は 2 本ある**ので合計する (スクリプトは対応済み)。
   **gfxinfo の「Total frames rendered」はプロセス内の全ウィンドウの合計**。ボトムシート (絵文字ピッカー等) は別ウィンドウなので、
   後ろの画面の描き直しも足される (`framestats` は `ViewRootImpl@...` ごとに分かれている)。後ろのタイムラインの中身は時間で

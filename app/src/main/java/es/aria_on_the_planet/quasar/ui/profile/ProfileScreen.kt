@@ -13,11 +13,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.blur.hazeBlur
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
-import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import es.aria_on_the_planet.quasar.ui.component.blur.LocalSurfaceBlurEnabled
+import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -163,7 +163,7 @@ fun ProfileScreen(
                         },
                         modifier = Modifier
                             .onSizeChanged { tabsHeight = with(density) { it.height.toDp() } }
-                            .hazeBlur(input = HazeInput.Sources(hazeState), style = tabsBlurStyle)
+                            .surfaceBlur(hazeState, tabsBlurStyle)
                             .drawBehind {
                                 // ぼかしの上、ボタンの下に不透明な面を重ね、スクロール量で消す (alpha は描画時に読む)
                                 drawRect(surface.copy(alpha = tabsSolidAlpha))
@@ -177,7 +177,7 @@ fun ProfileScreen(
                         state = pagerState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .hazeSource(hazeState),
+                            .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
                         key = { tabs[it] },
                     ) { page ->
                         val tab = tabs[page]

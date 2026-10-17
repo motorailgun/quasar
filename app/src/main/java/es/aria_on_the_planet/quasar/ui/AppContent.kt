@@ -5,6 +5,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.di.AppContainer
+import es.aria_on_the_planet.quasar.ui.component.blur.LocalSurfaceBlurEnabled
+import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurEnabled
 import es.aria_on_the_planet.quasar.ui.component.dialog.ActionConfirmationHost
 import es.aria_on_the_planet.quasar.ui.component.player.LocalInlinePlayback
 import es.aria_on_the_planet.quasar.ui.component.player.rememberInlinePlayback
@@ -36,7 +38,10 @@ fun QuasarAppContent(
                 LocalInlinePlayback provides playback,
                 LocalNow provides now,
             ) {
-                ActionConfirmationHost(loaded.confirmations, content)
+                // 設定とバッテリーセーバーから決まるので、表示設定を提供した内側で求める
+                CompositionLocalProvider(LocalSurfaceBlurEnabled provides rememberSurfaceBlurEnabled()) {
+                    ActionConfirmationHost(loaded.confirmations, content)
+                }
             }
         }
     }

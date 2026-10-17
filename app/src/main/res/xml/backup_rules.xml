@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
+   バックアップの対象 (Android 11 以前の端末用。12 以降は data_extraction_rules.xml)。
    See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- セッション (アクセストークン)。Keystore の鍵で暗号化しており、鍵は端末の外に出ないので復元しても読めない -->
+    <exclude domain="sharedpref" path="secure.xml" />
+    <!-- 以前の平文の保存 (起動時に secure.xml へ移して消す) -->
+    <exclude domain="sharedpref" path="session.xml" />
 </full-backup-content>

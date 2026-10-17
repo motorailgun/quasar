@@ -1,11 +1,16 @@
 package es.aria_on_the_planet.quasar.ui.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import es.aria_on_the_planet.quasar.R
@@ -18,6 +23,8 @@ import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import es.aria_on_the_planet.quasar.ui.component.post.descriptionRes
 import es.aria_on_the_planet.quasar.ui.component.post.labelRes
+import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
+import es.aria_on_the_planet.quasar.ui.component.settings.SettingsActionItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsChoiceItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsGroup
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsNavigationItem
@@ -26,14 +33,20 @@ import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSliderItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSplitSwitchItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSwitchItem
 import es.aria_on_the_planet.quasar.ui.navigation.Route
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import kotlin.math.roundToInt
 
 /** 設定を変える (`SettingsStore.launchUpdate`)。 */
 typealias UpdateSettings = ((AppSettings) -> AppSettings) -> Unit
 
-/** トップ: 各ページへの入口。 */
+/**
+ * トップ: 各ページへの入口 + ログアウト。ログアウトは設定に関わらず必ず確認する。
+ *
+ * @param serverUrl ログイン中のサーバ (ログアウトの項目の補足に出す)。
+ */
 @Composable
-fun SettingsTopPage(onNavigate: (Route) -> Unit, onBack: () -> Unit) {
+fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: () -> Unit, onBack: () -> Unit) {
+    var confirmLogout by rememberSaveable { mutableStateOf(false) }
     SettingsScaffold(title = stringResource(R.string.settings), onBack = onBack) {
         SettingsGroup(title = null) {
             SettingsNavigationItem(
@@ -61,6 +74,29 @@ fun SettingsTopPage(onNavigate: (Route) -> Unit, onBack: () -> Unit) {
                 onClick = { onNavigate(Route.SettingsConfirmations) },
             )
         }
+        SettingsGroup(title = null) {
+            SettingsActionItem(
+                title = stringResource(R.string.logout),
+                summary = serverUrl?.toHttpUrlOrNull()?.host,
+                icon = Icons.AutoMirrored.Outlined.Logout,
+                destructive = true,
+                onClick = { confirmLogout = true },
+            )
+        }
+    }
+    if (confirmLogout) {
+        ConfirmDialog(
+            title = stringResource(R.string.logout_confirm_title),
+            message = stringResource(R.string.logout_confirm_message),
+            confirmLabel = stringResource(R.string.logout),
+            dismissLabel = stringResource(R.string.cancel),
+            destructive = true,
+            onConfirm = {
+                confirmLogout = false
+                onLogout()
+            },
+            onDismiss = { confirmLogout = false },
+        )
     }
 }
 

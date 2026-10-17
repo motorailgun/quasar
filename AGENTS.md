@@ -34,7 +34,8 @@ es.aria_on_the_planet.quasar
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
-│   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
+│   ├── session/                    SessionStore (サーバ URL / アクセストークン / OAuth クライアント) + SecureStorage (Keystore で暗号化)
+│   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
 │   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
@@ -74,7 +75,7 @@ es.aria_on_the_planet.quasar
     │   └── modifier/               汎用 Modifier (FadingEdges: 左右 / 下端)
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
-    ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
+    ├── login/                      ログイン画面 (サーバを入力 → ブラウザで OAuth)
     ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
     │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド)
     ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
@@ -254,6 +255,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (認証不要。`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
+| OAuth クライアントの登録 | `POST /api/v1/apps` (ログインのたびに登録) |
+| 認可 / トークン / 無効化 | `GET /oauth/authorize` (ブラウザ) / `POST /oauth/token` (PKCE) / `POST /oauth/revoke` (ログアウト時) |
 
 `:id` は接続中サーバ内の ID (`User.inServerId`)。リモートユーザーでも接続中サーバに問い合わせる。
 
@@ -551,8 +554,24 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   右上メニュー (保存・ブラウザで開く。保存は DownloadManager で `Pictures/Quasar/` 等へ、権限なし)。video / gifv / audio は Media3 で再生し、ダブルタップ ±10 秒・シークバー・「現在 / 全体」・ミュート。
   設計・PiP への準備・注意点は [docs/media-viewer.md](docs/media-viewer.md)。
 
-* **Login (暫定)**: サーバ URL とアクセストークン (任意) を入力。トークンなしでは Home を無効化。
-  OAuth (`/api/v1/apps` + `/oauth/authorize`) は後続タスク。
+* **Login** (`LoginScreen`、`data/auth/`): サーバを入力 → OAuth の認可コード + PKCE (S256)。
+  * `OAuthLogin.begin` が `POST /api/v1/apps` (client_name `Quasar`、scope `read write push`。push は Web Push 対応時に
+    再ログインを求めないため) で登録し、認可画面の URL を返す。画面が Custom Tabs (`androidx.browser`) で開く。
+  * 戻り先は `OAuthConfig.RedirectUri` = `es.aria-on-the-planet.quasar://oauth` (manifest の MainActivity の intent-filter と
+    合わせる。スキームに `_` は使えないので `-`)。MainActivity は `singleTask` で、Custom Tab の上に重ならず `onNewIntent`
+    で受けて `OAuthLogin.handleRedirect` に渡す (起動時は `savedInstanceState == null` のときだけ)。
+  * 途中の状態 (`PendingAuthorization`: クライアント・code_verifier・state) は `SecureStorage` に保存し、ブラウザにいる間に
+    プロセスが終わっても続けられる。戻りを受けた時点で消す (コードは 1 回しか使えない)。進行中のものが無い戻りは無視する。
+    state の不一致は `InvalidResponse`。URI の解釈・認可 URL の組み立ては純粋関数 (`OAuth.kt`、`OAuthTest`)。
+  * トークンを得たら `SessionStore.save(session, client)`。ナビゲーションはセッションの有無で切り替わる。
+  * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser / Exchanging / Failed(`LoginError`))。
+  * 保存: `SessionStore` は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。
+    項目名を AAD にする。`EncryptedSharedPreferences` は非推奨なので使わない)。鍵は端末外に出ないので `secure.xml` は
+    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消して未ログイン扱い。
+    以前の平文の保存 (SharedPreferences `session`) は起動時に移して消す (そのトークンはクライアント情報が無いので
+    ログアウト時に無効化できない)。
+  * ログアウト: 設定画面のトップの末尾 (error 色、補足にサーバのホスト)。**設定に関わらず必ず** `ConfirmDialog` で確認してから
+    `OAuthLogin.logout` (保存を消してから `POST /oauth/revoke`。失敗はログのみ)。
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global。Home と通知はログイン時のみ。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
 * **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
@@ -587,7 +606,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct・
-    ログアウト。未取得 / 未ログインは汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
+    設定。未取得 / 未ログインは汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。
     未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。表示中のカラムのボタンをもう一度押すと一覧の先頭へ
@@ -706,7 +725,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 動画・GIF は他のメディアと一緒に付けられない (`DraftAttachment.isVideoLike`、`DraftProblem.VideoWithOtherMedia`)。
     動画があれば追加ボタンを無効にする。動画のサムネイルは `coil-video` (`VideoFrameDecoder`)。
   * `UploadSource` でデータ層を `ContentResolver` から切り離している (`AppContainer.uploadSource(uri)` が作る。IO スレッドで呼ぶ)。
-  * アクセストークンに `write:media` が無いとアップロードは 403 になる (手入力のトークンで起きる。OAuth 実装時は scope に含める)。
+  * アクセストークンに `write:media` が無いとアップロードは 403 になる (以前の手入力のトークンで起きうる。OAuth では `write` に含まれる)。
   * 未実装: 画像の縮小・圧縮、焦点 (focus) の指定、カメラ撮影、プロセス再生成後の添付の復元。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
@@ -904,6 +923,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 認証済みの Local / Global はミュート・ブロック・フィルタが効く (公開 API の結果と差が出ても正常)。
 * グローバルは「サーバに届いた順」で並び、表示時刻 (投稿日時) は前後する。
 
+### 機密情報とログ
+* **アクセストークン・client_secret・認可コード・code_verifier をログ・例外のメッセージ・クラッシュレポートに出さない。**
+  ログに出すのは接続・失敗の種類、件数、文字数まで (`StreamingClient` と同じ)。URL を出すときはクエリ (認可の戻りの `code` /
+  `state` 等) を落とす。
+* OkHttp の `HttpLoggingInterceptor` 等で通信をログに出すときは、`redactHeader("Authorization")` を必ず付け、レベルは
+  `HEADERS` まで (`BODY` はフォームの secret・トークン応答を出すので使わない)。debug ビルドだけに入れる。
+* 機密情報は `SecureStorage` 以外 (SharedPreferences・DataStore・`Route`・`rememberSaveable`・Intent の extra) に置かない。
+  これらはディスク・プロセスの外に出る。ソースにも埋め込まない (client_id / secret はサーバごとに動的に登録する)。
+
 ### Compose / UI
 * LazyColumn のキーは一意に保つ。同じポストが別の行にも出うる場所 (ピン留めと投稿一覧など) は 1 アイテムに
   まとめるかキーに接頭辞を付ける。重複キーはクラッシュする。
@@ -954,8 +982,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 未対応・今後の課題
 
-* **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
-  OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
+* **認証**: 複数アカウント無し (ログインは 1 つ)。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
+  OAuth のログインの往復 (ブラウザでの認可 → 戻り) は実機・エミュレータでまだ確認していない。
+  * **将来: 戻り先を App Links (検証済みの https URL) にする**。今のカスタムスキーム (`es.aria-on-the-planet.quasar://oauth`) は
+    他のアプリが同じスキームを登録すると戻りを横取りされうる (PKCE があるので盗まれたコードはトークンにできないが、
+    横取り自体は防げない。RFC 8252 7.2)。管理するドメインに `/.well-known/assetlinks.json` (パッケージ名 + 署名の
+    SHA-256) を置き、`OAuthConfig.RedirectUri` と manifest の intent-filter (`android:autoVerify="true"`) を変える。
+    App Links の検証が通らない端末ではブラウザでそのページが開いてしまうので、そのページから戻れるようにしておく。
 * **操作**: 投稿はテキスト・CW・投票・公開範囲・メディア添付・リプライ (リプライは実機で未確認)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
   操作失敗時の UI 通知、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: PiP、代替テキストの表示は未実装

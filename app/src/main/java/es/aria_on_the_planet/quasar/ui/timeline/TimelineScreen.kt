@@ -84,7 +84,6 @@ import kotlin.math.abs
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel,
-    onLogout: () -> Unit,
     drafts: DraftStore,
     canPost: Boolean,
 ) {
@@ -191,7 +190,6 @@ fun TimelineScreen(
                             scope.launch { pagerState.animateScrollToPage(index, animationSpec = pageSpring) }
                         }
                     },
-                    onLogout = onLogout,
                     onOpenSettings = navigator::openSettings,
                     modifier = Modifier
                         .align(Alignment.TopCenter)

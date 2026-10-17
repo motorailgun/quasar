@@ -9,13 +9,16 @@ import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
+import es.aria_on_the_planet.quasar.data.remote.dto.RegisteredAppDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusSourceDto
+import es.aria_on_the_planet.quasar.data.remote.dto.TokenDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import okhttp3.HttpUrl
 import okhttp3.FormBody
 import okhttp3.Headers
@@ -219,6 +222,42 @@ class MastodonApi(
     /** https://docs.joinmastodon.org/methods/instance/#v2 (認証不要) */
     suspend fun instance(serverUrl: String): InstanceDto =
         get(serverUrl, null, "api/v2/instance") {}
+
+    /** OAuth のクライアントとして登録する。https://docs.joinmastodon.org/methods/apps/#create */
+    suspend fun registerApp(serverUrl: String, clientName: String, redirectUri: String, scopes: String): RegisteredAppDto =
+        post(serverUrl, null, "api/v1/apps") {
+            add("client_name", clientName)
+            add("redirect_uris", redirectUri)
+            add("scopes", scopes)
+        }
+
+    /** 認可コードをアクセストークンに換える (PKCE)。https://docs.joinmastodon.org/methods/oauth/#token */
+    suspend fun obtainToken(
+        serverUrl: String,
+        clientId: String,
+        clientSecret: String,
+        redirectUri: String,
+        code: String,
+        codeVerifier: String,
+        scopes: String,
+    ): TokenDto = post(serverUrl, null, "oauth/token") {
+        add("grant_type", "authorization_code")
+        add("code", code)
+        add("client_id", clientId)
+        add("client_secret", clientSecret)
+        add("redirect_uri", redirectUri)
+        add("code_verifier", codeVerifier)
+        add("scope", scopes)
+    }
+
+    /** アクセストークンを無効にする (ログアウト)。https://docs.joinmastodon.org/methods/oauth/#revoke */
+    suspend fun revokeToken(serverUrl: String, clientId: String, clientSecret: String, token: String) {
+        post<JsonObject>(serverUrl, null, "oauth/revoke") {
+            add("client_id", clientId)
+            add("client_secret", clientSecret)
+            add("token", token)
+        }
+    }
 
     /** ログイン中のアカウント (要認証)。`source` (既定の公開範囲等) を含む。 */
     suspend fun verifyCredentials(serverUrl: String, accessToken: String): AccountDto =

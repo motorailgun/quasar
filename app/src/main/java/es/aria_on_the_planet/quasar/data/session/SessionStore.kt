@@ -1,43 +1,69 @@
 package es.aria_on_the_planet.quasar.data.session
 
 import android.content.Context
-import androidx.core.content.edit
+import es.aria_on_the_planet.quasar.data.auth.OAuthClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 data class Session(
     val serverUrl: String,
     val accessToken: String?,
 )
 
-/** 接続先サーバとアクセストークンを保持する。OAuth 実装までの暫定。 */
-class SessionStore(context: Context) {
-    private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
+/** 保存する形。[client] はトークンを発行したクライアント (ログアウト時の無効化用。手入力のトークンの頃のものは無い)。 */
+@Serializable
+private data class StoredSession(
+    val serverUrl: String,
+    val accessToken: String?,
+    val client: OAuthClient? = null,
+)
 
-    private val _session = MutableStateFlow(load())
+/** 接続先サーバとアクセストークンを [SecureStorage] (Keystore で暗号化) に保持する。 */
+class SessionStore(context: Context, private val storage: SecureStorage) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private var stored: StoredSession? = load(context)
+
+    private val _session = MutableStateFlow(stored?.toSession())
     val session: StateFlow<Session?> = _session.asStateFlow()
 
-    fun save(session: Session) {
-        prefs.edit {
-            putString(KEY_SERVER_URL, session.serverUrl)
-            putString(KEY_ACCESS_TOKEN, session.accessToken)
-        }
+    /** 今のセッションのトークンを発行したクライアント。 */
+    val client: OAuthClient? get() = stored?.client
+
+    fun save(session: Session, client: OAuthClient?) {
+        val value = StoredSession(session.serverUrl, session.accessToken, client)
+        storage.put(Key, json.encodeToString(value))
+        stored = value
         _session.value = session
     }
 
     fun clear() {
-        prefs.edit { clear() }
+        storage.remove(Key)
+        stored = null
         _session.value = null
     }
 
-    private fun load(): Session? {
-        val serverUrl = prefs.getString(KEY_SERVER_URL, null) ?: return null
-        return Session(serverUrl, prefs.getString(KEY_ACCESS_TOKEN, null))
+    private fun load(context: Context): StoredSession? =
+        storage.get(Key)?.let { runCatching { json.decodeFromString<StoredSession>(it) }.getOrNull() }
+            ?: migrateLegacy(context)
+
+    /** 以前の平文の保存 (SharedPreferences `session`) があれば暗号化して移し、元は消す。 */
+    private fun migrateLegacy(context: Context): StoredSession? {
+        val prefs = context.getSharedPreferences(LegacyPrefsName, Context.MODE_PRIVATE)
+        val serverUrl = prefs.getString("server_url", null)
+        val migrated = serverUrl?.let { StoredSession(it, prefs.getString("access_token", null)) }
+        migrated?.let { storage.put(Key, json.encodeToString(it)) }
+        context.deleteSharedPreferences(LegacyPrefsName)
+        return migrated
     }
 
+    private fun StoredSession.toSession() = Session(serverUrl, accessToken)
+
     private companion object {
-        const val KEY_SERVER_URL = "server_url"
-        const val KEY_ACCESS_TOKEN = "access_token"
+        const val Key = "session"
+        const val LegacyPrefsName = "session"
     }
 }

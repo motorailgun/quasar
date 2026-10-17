@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ButtonGroupDefaults
@@ -70,7 +69,7 @@ import kotlin.math.abs
  * (icon)  [⌂ Home ][🔔][👥][🌐]
  * ```
  *
- * * 左: ログイン中のアカウントのアイコン。タップでメニュー (ログアウト)。未取得・未ログインは汎用のアイコン。
+ * * 左: ログイン中のアカウントのアイコン。タップでメニュー (名前・@acct・設定)。未取得・未ログインは汎用のアイコン。
  * * 右: カラムの切り替え (Expressive の連結 `ToggleButton`)。全体の後ろに後ろの一覧をぼかしたカプセルを 1 枚敷き
  *   ([hazeState])、未選択のボタンは透明、選択中は primary で塗る。選択中のみラベルを出し、幅はページ位置 (小数) から
  *   決めてスワイプに追従する。選択中のボタンを押したときも [onSelect] を呼ぶ (画面側で一覧を先頭へスクロールする)。
@@ -84,7 +83,6 @@ fun TimelineHeader(
     pagerState: PagerState,
     hazeState: HazeState,
     onSelect: (ColumnType) -> Unit,
-    onLogout: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -100,7 +98,6 @@ fun TimelineHeader(
             account = account,
             hazeState = hazeState,
             blurStyle = blurStyle,
-            onLogout = onLogout,
             onOpenSettings = onOpenSettings,
         )
         Spacer(Modifier.width(10.dp))
@@ -136,7 +133,6 @@ private fun AccountButton(
     account: User?,
     hazeState: HazeState,
     blurStyle: HazeBlurStyle,
-    onLogout: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -189,14 +185,6 @@ private fun AccountButton(
                 onClick = {
                     menuOpen = false
                     onOpenSettings()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.logout)) },
-                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    onLogout()
                 },
             )
         }

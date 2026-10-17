@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
@@ -77,12 +78,17 @@ fun SettingsGroup(
 @Composable
 private fun itemShapes(): ListItemShapes = ListItemDefaults.shapes(shape = ItemShape, selectedShape = ItemShape)
 
-/** 項目の色。オンのスイッチの項目 (checked) も同じ色にする (AOSP と同じく、面の色で選択を示さない)。 */
+/**
+ * 項目の色。オンのスイッチの項目 (checked) も同じ色にする (AOSP と同じく、面の色で選択を示さない)。
+ * [contentColor] は題名とアイコンの色 (ログアウト等の取り消せない操作は error)。
+ */
 @Composable
-private fun itemColors(): ListItemColors {
+private fun itemColors(contentColor: Color = Color.Unspecified): ListItemColors {
     val colors = MaterialTheme.colorScheme
     return ListItemDefaults.segmentedColors(
         containerColor = colors.surfaceBright,
+        contentColor = contentColor,
+        leadingContentColor = contentColor,
         selectedContainerColor = colors.surfaceBright,
         selectedContentColor = colors.onSurface,
         selectedSupportingContentColor = colors.onSurfaceVariant,
@@ -119,6 +125,28 @@ fun SettingsNavigationItem(
         } else {
             null
         },
+        content = { Text(title) },
+    )
+}
+
+/** 押すとその場で操作する項目 (ログアウト等)。[destructive] なら題名とアイコンを error 色にする。 */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun SettingsActionItem(
+    title: String,
+    summary: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    destructive: Boolean = false,
+) {
+    SegmentedListItem(
+        onClick = onClick,
+        shapes = itemShapes(),
+        colors = itemColors(contentColor = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified),
+        modifier = modifier,
+        leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
+        supportingContent = Summary(summary),
         content = { Text(title) },
     )
 }

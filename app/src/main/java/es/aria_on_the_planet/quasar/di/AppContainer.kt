@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.di
 
 import android.content.Context
 import android.net.Uri
+import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
 import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
 import es.aria_on_the_planet.quasar.data.media.MediaDownloader
 import es.aria_on_the_planet.quasar.data.media.SystemMediaDownloader
@@ -14,6 +15,7 @@ import es.aria_on_the_planet.quasar.data.repository.MediaRepository
 import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
+import es.aria_on_the_planet.quasar.data.session.SecureStorage
 import es.aria_on_the_planet.quasar.data.session.SessionStore
 import es.aria_on_the_planet.quasar.data.settings.SettingsStore
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
@@ -41,10 +43,15 @@ class AppContainer(context: Context) {
 
     private val api = MastodonApi(okHttpClient, json)
 
-    val sessionStore = SessionStore(context)
+    private val secureStorage = SecureStorage(context)
+
+    val sessionStore = SessionStore(context, secureStorage)
 
     /** アプリ全体のコルーチン (プロセスと同じ寿命)。 */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** OAuth でのログイン・ログアウト。 */
+    val oauthLogin = OAuthLogin(api, secureStorage, sessionStore, appScope)
 
     /** 設定。ここで作った時点 (起動時) から読み込み始める。 */
     val settingsStore = SettingsStore(context, appScope)

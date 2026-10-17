@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     // 設定の保存
     implementation(libs.androidx.datastore.preferences)
+    // OAuth のログイン画面を開く (Custom Tabs)
+    implementation(libs.androidx.browser)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)

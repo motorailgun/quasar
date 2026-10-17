@@ -91,7 +91,7 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
             popTransitionSpec = { popTransition() },
             predictivePopTransitionSpec = { popTransition() },
             entryProvider = entryProvider {
-                entry<Route.Login> { LoginScreen(onLogin = container.sessionStore::save) }
+                entry<Route.Login> { LoginScreen(container.oauthLogin) }
                 entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
                 entry<Route.Profile> { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
                 entry<Route.FollowList> { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
@@ -178,7 +178,6 @@ private fun TimelineEntry(container: AppContainer, session: Session) {
     )
     TimelineScreen(
         viewModel = viewModel,
-        onLogout = container.sessionStore::clear,
         drafts = container.draftStore,
         canPost = session.accessToken != null,
     )
@@ -299,7 +298,15 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
     navigate: (Route) -> Unit,
 ) {
     val update = container.settingsStore::launchUpdate
-    entry<Route.Settings> { SettingsTopPage(onNavigate = navigate, onBack = navigator::back) }
+    entry<Route.Settings> {
+        val session by container.sessionStore.session.collectAsStateWithLifecycle()
+        SettingsTopPage(
+            serverUrl = session?.serverUrl,
+            onNavigate = navigate,
+            onLogout = container.oauthLogin::logout,
+            onBack = navigator::back,
+        )
+    }
     entry<Route.SettingsDisplay> {
         WithSettings(container) { DisplaySettingsPage(it.display, update, onNavigate = navigate, onBack = navigator::back) }
     }

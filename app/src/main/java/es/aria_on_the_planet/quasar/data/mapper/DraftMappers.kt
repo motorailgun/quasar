@@ -52,6 +52,31 @@ fun PostDraft.toFormParams(): List<Pair<String, String>> = buildList {
     inReplyToId?.let { add("in_reply_to_id" to it) }
 }
 
+/**
+ * `PUT /api/v1/statuses/:id` (編集) のフォーム項目。公開範囲・返信先は変えられないので送らない。
+ * CW・閲覧注意は外す場合も送る。添付・投票は送らなければ外れる。添付の代替テキストは `media_attributes` で送る
+ * (投稿済みのメディアは `PUT /api/v1/media/:id` で変えられない)。
+ */
+fun PostDraft.toEditFormParams(): List<Pair<String, String>> = buildList {
+    add("status" to text)
+    add("spoiler_text" to contentWarning.orEmpty())
+    add("sensitive" to (sensitive && attachments.isNotEmpty()).toString())
+    val uploaded = attachments.mapNotNull { attachment ->
+        (attachment.state as? UploadState.Uploaded)?.let { it.mediaId to attachment.description }
+    }
+    uploaded.forEach { (mediaId, _) -> add("media_ids[]" to mediaId) }
+    // Rails は同じキー (`id`) が再び来たところで次の要素にするので、要素ごとに id → description の順で並べる
+    uploaded.forEach { (mediaId, description) ->
+        add("media_attributes[][id]" to mediaId)
+        add("media_attributes[][description]" to description)
+    }
+    poll?.let { poll ->
+        poll.options.forEach { add("poll[options][]" to it) }
+        add("poll[expires_in]" to poll.expiresIn.inWholeSeconds.toString())
+        add("poll[multiple]" to poll.multiple.toString())
+    }
+}
+
 /** API での公開範囲の名前 ([postVisibility] の逆)。 */
 val PostVisibility.apiName: String
     get() = when (this) {

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
+import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
@@ -67,6 +68,12 @@ private fun optionalPositiveInt(name: String, get: (AppSettings) -> Int?, set: (
         decode = { stored -> if (stored == 0) Decoded(null) else stored.takeIf { it > 0 }?.let(::Decoded) },
     )
 
+/** 確認する操作のうち 1 つ ([target]) を、するか (`true`) で保存する。 */
+private fun confirm(name: String, target: ConfirmTarget) =
+    boolean(name, { target in it.confirmations }) { s, v ->
+        s.copy(confirmations = if (v) s.confirmations + target else s.confirmations - target)
+    }
+
 private inline fun <reified E : Enum<E>> enumOrNull(name: String): E? = enumValues<E>().firstOrNull { it.name == name }
 
 private const val AccountDefaultVisibility = "account"
@@ -113,14 +120,20 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
     },
     boolean("stream_local", { it.streaming.local }) { s, v -> s.copy(streaming = s.streaming.copy(local = v)) },
     boolean("stream_global", { it.streaming.global }) { s, v -> s.copy(streaming = s.streaming.copy(global = v)) },
+    // 確認する操作のうち、既定でオンのもの ([DefaultConfirmations]) は 1 つずつのキー、残りはまとめて 1 つのキー。
+    // まとめたキーに入れると、追加より前に保存したユーザーにはオフで読めてしまうため
     SettingField(
         stringSetPreferencesKey("confirm_targets"),
-        { it.confirmations },
-        { s, v -> s.copy(confirmations = v) },
+        { it.confirmations - DefaultConfirmations },
+        { s, v -> s.copy(confirmations = v + (s.confirmations intersect DefaultConfirmations)) },
         encode = { targets -> targets.mapTo(HashSet()) { it.name } },
-        // 知らない名前 (将来消した項目等) は捨てる
-        decode = { names -> Decoded(names.mapNotNullTo(HashSet()) { enumOrNull<ConfirmTarget>(it) }) },
+        // 知らない名前 (将来消した項目等) と個別のキーで持つものは捨てる
+        decode = { names ->
+            Decoded(names.mapNotNullTo(HashSet()) { enumOrNull<ConfirmTarget>(it) } - DefaultConfirmations)
+        },
     ),
+    confirm("confirm_edit_post", ConfirmTarget.EditPost),
+    confirm("confirm_delete_post", ConfirmTarget.DeletePost),
     SettingField(
         stringPreferencesKey("default_visibility"),
         { it.defaultVisibility },

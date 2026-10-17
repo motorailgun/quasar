@@ -15,8 +15,11 @@ import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
+import es.aria_on_the_planet.quasar.domain.model.StatusSource
 import es.aria_on_the_planet.quasar.domain.model.UploadFailure
 import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.domain.model.editDraftOf
+import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.ComposerState
 import kotlinx.coroutines.CancellationException
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.util.UUID
 
 data class ComposerScreenState(
@@ -42,6 +46,9 @@ data class ComposerScreenState(
     val error: String? = null,
 )
 
+/** 編集する自分のポストと、その原文。 */
+data class EditTarget(val post: Post, val source: StatusSource)
+
 /**
  * 書きかけの投稿 1 つ分 (入力内容・添付のアップロード・送信)。画面からは独立していて、クイック投稿バーと
  * フルの投稿画面が同じものを共有する (バーから引き上げても、アップロード中の添付ごと続きを書ける)。
@@ -49,6 +56,9 @@ data class ComposerScreenState(
  * [DraftStore] が作って持ち、投稿・破棄したら [close] して新しいものに替える。処理は [scope] 上で動くので、
  * 画面を切り替えても止まらない。返信先 ([ComposerState.inReplyTo]) もこの下書きの一部で、返信と通常の投稿で
  * 下書きを分けない。
+ *
+ * [editing] を渡すと既存のポストの編集になる (`PostViewModel` が作る。[DraftStore] の下書きとは別)。中身はポストの
+ * 内容で始まり、送信は編集 API。公開範囲・返信先は変えられず、設定・アカウントの既定値も入れない。
  */
 class ComposerSession(
     private val session: Session,
@@ -62,11 +72,21 @@ class ComposerSession(
     private val defaultVisibilitySetting: Flow<PostVisibility?>,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
-    /** 投稿できた。[DraftStore] がこの下書きを終えて空のものに替える。 */
+    /** 編集するポスト。`null` なら新しい投稿。 */
+    val editing: EditTarget? = null,
+    /** 投稿 (編集なら保存) できた。[DraftStore] がこの下書きを終えて空のものに替える。 */
     private val onPublished: (Post) -> Unit,
 ) {
     /** 入力内容。 */
     val composer = ComposerState()
+
+    /** 編集前の内容 (編集のとき)。変更の有無 ([hasChanges]) の比較に使う。 */
+    private val originalDraft = editing?.let { (post, source) ->
+        // 投票の期間の選択肢はサーバの上限の取得前なので既定値で選ぶ (編集画面で選び直せる)
+        editDraftOf(post, source, ComposeLimits().pollDurations, Instant.now()).also(composer::load)
+    }
+
+    val isEditing: Boolean get() = editing != null
 
     private val uploads = AttachmentUploads(
         scope = scope,
@@ -76,7 +96,11 @@ class ComposerSession(
         upload = { source, description, onProgress, onProcessing ->
             mediaRepository.upload(session, source, description, onProgress, onProcessing)
         },
-        updateDescription = { mediaId, description -> mediaRepository.updateDescription(session, mediaId, description) },
+        // 編集では代替テキストを編集の送信 (`media_attributes`) でまとめて送る。投稿済みのメディアは
+        // `PUT /api/v1/media/:id` で変えられない
+        updateDescription = { mediaId, description ->
+            if (editing == null) mediaRepository.updateDescription(session, mediaId, description)
+        },
         onError = { Log.w(TAG, "Media upload failed", it) },
         classifyFailure = { e ->
             when ((e as? MastodonApiException)?.code) {
@@ -111,16 +135,20 @@ class ComposerSession(
             runCatchingLogged("emojis") { emojiRepository.pickerEmojis(session.serverUrl) }
                 ?.let { emojis -> _state.update { it.copy(emojis = emojis) } }
         }
-        scope.launch {
-            defaultVisibilitySetting.collect { setting ->
-                visibilitySetting = setting
-                applyDefaultVisibility()
+        if (editing == null) {
+            scope.launch {
+                defaultVisibilitySetting.collect { setting ->
+                    visibilitySetting = setting
+                    applyDefaultVisibility()
+                }
             }
         }
         scope.launch {
             val sensitiveBefore = composer.sensitive
             runCatchingLogged("account") { accountRepository.fetchMe(session) }?.let { me ->
                 _state.update { it.copy(account = me.user) }
+                // 編集では既定値を入れない (公開範囲は変えられず、閲覧注意はポストのまま)
+                if (editing != null) return@let
                 accountDefaultVisibility = me.defaultVisibility
                 applyDefaultVisibility()
                 // 取得までの間にユーザーが選んでいたら上書きしない
@@ -137,16 +165,31 @@ class ComposerSession(
         appliedVisibility = value
     }
 
+    /** 閉じると失うものがあるか (新しい投稿なら何か書いたか、編集なら元の内容から変えたか)。スナップショットから読む。 */
+    fun hasChanges(): Boolean {
+        val draft = composer.toDraft()
+        return if (originalDraft != null) draft != originalDraft else !draft.isEmpty
+    }
+
     fun submit() {
         if (_state.value.sending) return
         val draft = composer.toDraft()
         if (draft.problems(_state.value.limits).isNotEmpty()) return
+        val editing = editing
+        if (editing != null) {
+            send { statusRepository.edit(session, editing.post.statusId, draft) }
+            return
+        }
         val key = lastAttempt?.takeIf { it.first == draft }?.second ?: UUID.randomUUID().toString()
         lastAttempt = draft to key
+        send { statusRepository.publish(session, draft, key) }
+    }
+
+    private fun send(request: suspend () -> Post) {
         _state.update { it.copy(sending = true, error = null) }
         scope.launch {
             try {
-                val post = statusRepository.publish(session, draft, key)
+                val post = request()
                 _state.update { it.copy(sending = false) }
                 onPublished(post)
             } catch (e: CancellationException) {

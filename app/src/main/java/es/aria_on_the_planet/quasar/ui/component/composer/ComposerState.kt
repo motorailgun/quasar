@@ -153,6 +153,18 @@ class ComposerState(
         autoReply = false
     }
 
+    /** [draft] の内容を入れる (ポストの編集の最初)。返信先は持たない ([PostDraft.inReplyToId] は使わない)。 */
+    fun load(draft: PostDraft) {
+        clear()
+        text.setTextAndPlaceCursorAtEnd(draft.text)
+        contentWarning.setTextAndPlaceCursorAtEnd(draft.contentWarning.orEmpty())
+        contentWarningEnabled = draft.contentWarning != null
+        visibility = draft.visibility
+        sensitive = draft.sensitive
+        poll = draft.poll
+        attachments = draft.attachments
+    }
+
     companion object {
         /**
          * 本文・CW・公開範囲・投票を保存する。添付はアップロードの途中状態を戻せないので、返信先はポストを

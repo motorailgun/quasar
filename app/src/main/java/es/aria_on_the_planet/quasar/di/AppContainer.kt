@@ -17,7 +17,10 @@ import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SessionStore
 import es.aria_on_the_planet.quasar.data.settings.SettingsStore
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
+import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
+import es.aria_on_the_planet.quasar.ui.composer.EditTarget
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,19 +65,30 @@ class AppContainer(context: Context) {
     val mediaDownloader: MediaDownloader = SystemMediaDownloader(context)
 
     /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
-    val draftStore = DraftStore { session, scope, onPublished ->
-        ComposerSession(
-            session = session,
-            scope = scope,
-            accountRepository = accountRepository,
-            instanceRepository = instanceRepository,
-            emojiRepository = emojiRepository,
-            statusRepository = statusRepository,
-            mediaRepository = mediaRepository,
-            defaultVisibilitySetting = settingsStore.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
-            openUploadSource = ::uploadSource,
-            onPublished = onPublished,
-        )
-    }
+    val draftStore = DraftStore { session, scope, onPublished -> composerSession(session, scope, null, onPublished) }
+
+    /**
+     * 投稿欄 1 つ分。[editing] が `null` なら新しい投稿 ([draftStore] が持つ)、あれば自分のポストの編集
+     * (ポスト画面が持つ)。[onPublished] は投稿・保存できたとき。
+     */
+    fun composerSession(
+        session: Session,
+        scope: CoroutineScope,
+        editing: EditTarget?,
+        onPublished: (Post) -> Unit,
+    ) = ComposerSession(
+        session = session,
+        scope = scope,
+        accountRepository = accountRepository,
+        instanceRepository = instanceRepository,
+        emojiRepository = emojiRepository,
+        statusRepository = statusRepository,
+        mediaRepository = mediaRepository,
+        defaultVisibilitySetting = settingsStore.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
+        openUploadSource = ::uploadSource,
+        editing = editing,
+        onPublished = onPublished,
+    )
+
     val streamingClient = StreamingClient(okHttpClient, json, instanceRepository)
 }

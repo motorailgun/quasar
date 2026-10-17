@@ -11,6 +11,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
+import es.aria_on_the_planet.quasar.data.remote.dto.StatusSourceDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
@@ -149,6 +150,33 @@ class MastodonApi(
         idempotencyKey: String,
     ): StatusDto = post(serverUrl, accessToken, "api/v1/statuses", headers = mapOf("Idempotency-Key" to idempotencyKey)) {
         params.forEach { (name, value) -> add(name, value) }
+    }
+
+    /** 編集用の原文 (本文・CW。HTML ではない) (要認証)。https://docs.joinmastodon.org/methods/statuses/#source */
+    suspend fun statusSource(serverUrl: String, accessToken: String, id: String): StatusSourceDto =
+        get(serverUrl, accessToken, "api/v1/statuses/$id/source") {}
+
+    /**
+     * 自分のポストを編集する (要認証)。https://docs.joinmastodon.org/methods/statuses/#edit
+     * 公開範囲・返信先は変えられない。添付・投票は送ったものに置き換わる (送らなければ外れる)。
+     *
+     * @param params フォームの項目 (`status`, `media_ids[]`, `media_attributes[][id]` 等。同じ名前を複数回含みうる)。
+     */
+    suspend fun editStatus(
+        serverUrl: String,
+        accessToken: String,
+        id: String,
+        params: List<Pair<String, String>>,
+    ): StatusDto {
+        val url = serverUrl.toHttpUrl().newBuilder().addPathSegments("api/v1/statuses/$id").build()
+        val body = FormBody.Builder().apply { params.forEach { (name, value) -> add(name, value) } }.build()
+        return execute(Request.Builder().url(url).put(body), accessToken)
+    }
+
+    /** 自分のポストを削除する (要認証)。https://docs.joinmastodon.org/methods/statuses/#delete */
+    suspend fun deleteStatus(serverUrl: String, accessToken: String, id: String) {
+        val url = serverUrl.toHttpUrl().newBuilder().addPathSegments("api/v1/statuses/$id").build()
+        execute<StatusDto>(Request.Builder().url(url).delete(), accessToken)
     }
 
     /**

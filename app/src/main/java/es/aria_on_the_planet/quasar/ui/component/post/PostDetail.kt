@@ -43,6 +43,8 @@ object PostDetailDefaults {
 
 /**
  * ポスト詳細画面の主役となるポスト。[PostCard] と同じ要素を、本文を大きく・詳細な投稿日時付きで表示する。
+ *
+ * @param menu 投稿者の行の右端 (公開範囲のアイコンの右) に出すもの (自分のポストのメニュー)。
  */
 @Composable
 fun PostDetail(
@@ -56,6 +58,7 @@ fun PostDetail(
     onAction: OnPostAction? = null,
     onReply: ((Post) -> Unit)? = null,
     onHashtagClick: ((String) -> Unit)? = null,
+    menu: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -70,7 +73,7 @@ fun PostDetail(
                     .clickable { onUserClick(booster) },
             )
         }
-        // 投稿者 (タップでプロフィール) と、右端に公開範囲のアイコン
+        // 投稿者 (タップでプロフィール) と、右端に公開範囲のアイコン (+ メニュー)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // タップ領域は投稿者の部分だけにする
             Box(Modifier.weight(1f)) {
@@ -102,6 +105,7 @@ fun PostDetail(
                 Spacer(Modifier.width(8.dp))
                 VisibilityIcon(post.visibility, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            menu?.invoke()
         }
         Spacer(Modifier.size(12.dp))
         var expanded by rememberContentWarningExpanded(post)

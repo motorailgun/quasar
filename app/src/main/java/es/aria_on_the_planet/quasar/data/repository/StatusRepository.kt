@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.repository
 
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
+import es.aria_on_the_planet.quasar.data.mapper.toEditFormParams
 import es.aria_on_the_planet.quasar.data.mapper.toFormParams
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.session.Session
@@ -9,6 +10,7 @@ import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
+import es.aria_on_the_planet.quasar.domain.model.StatusSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -56,6 +58,25 @@ class StatusRepository(
     suspend fun publish(session: Session, draft: PostDraft, idempotencyKey: String): Post {
         val token = requireNotNull(session.accessToken) { "Posting requires login" }
         return api.postStatus(session.serverUrl, token, draft.toFormParams(), idempotencyKey).toDomain()
+    }
+
+    /** 自分のポストの編集前の原文 (本文・CW)。 */
+    suspend fun fetchSource(session: Session, statusId: String): StatusSource {
+        val token = requireNotNull(session.accessToken) { "Editing requires login" }
+        val dto = api.statusSource(session.serverUrl, token, statusId)
+        return StatusSource(text = dto.text, contentWarning = dto.spoilerText)
+    }
+
+    /** 自分のポスト [statusId] を [draft] の内容に書き換え、更新後のポストを返す (公開範囲・返信先は変わらない)。 */
+    suspend fun edit(session: Session, statusId: String, draft: PostDraft): Post {
+        val token = requireNotNull(session.accessToken) { "Editing requires login" }
+        return api.editStatus(session.serverUrl, token, statusId, draft.toEditFormParams()).toDomain()
+    }
+
+    /** 自分のポスト [statusId] を削除する。 */
+    suspend fun delete(session: Session, statusId: String) {
+        val token = requireNotNull(session.accessToken) { "Deleting requires login" }
+        api.deleteStatus(session.serverUrl, token, statusId)
     }
 }
 

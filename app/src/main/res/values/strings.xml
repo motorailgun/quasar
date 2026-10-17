@@ -78,6 +78,11 @@
     <string name="hashtag_empty">No posts yet</string>
     <string name="hashtag_error">Failed to load: %1$s</string>
     <string name="post_title">Post</string>
+    <string name="post_menu">More options</string>
+    <string name="post_edit">Edit</string>
+    <string name="post_delete">Delete</string>
+    <string name="post_edit_load_failed">Couldn\'t open the post for editing: %1$s</string>
+    <string name="post_delete_failed">Couldn\'t delete the post: %1$s</string>
     <string name="post_no_replies">No replies yet</string>
     <string name="post_error">Failed to load post: %1$s</string>
     <string name="poll_vote">Vote</string>
@@ -181,8 +186,12 @@
     <string name="composer_discard_title">Discard post?</string>
     <string name="composer_discard_message">What you\'ve written will be lost.</string>
     <string name="composer_discard">Discard</string>
+    <string name="composer_discard_edit_title">Discard changes?</string>
+    <string name="composer_discard_edit_message">Your changes to this post will be lost.</string>
     <string name="composer_keep_editing">Keep editing</string>
     <string name="composer_post_failed">Couldn\'t post: %1$s</string>
+    <string name="composer_save">Save</string>
+    <string name="composer_save_failed">Couldn\'t save: %1$s</string>
     <string name="composer_poll_option">Option %1$d</string>
     <string name="composer_poll_add_option">Add option</string>
     <string name="composer_poll_remove_option">Remove option</string>
@@ -242,6 +251,11 @@
     <string name="confirm_bookmark">Bookmark</string>
     <string name="confirm_unbookmark_title">Remove bookmark?</string>
     <string name="confirm_remove">Remove</string>
+    <string name="confirm_edit_post_title">Save changes to this post?</string>
+    <string name="confirm_edit_post">Save</string>
+    <string name="confirm_delete_post_title">Delete this post?</string>
+    <string name="confirm_delete_post_message">This can\'t be undone.</string>
+    <string name="confirm_delete_post">Delete</string>
 
     <!-- 設定 -->
     <string name="settings">Settings</string>
@@ -252,7 +266,7 @@
     <string name="settings_posting">Posting</string>
     <string name="settings_posting_summary">Default visibility, confirm before posting</string>
     <string name="settings_confirmations">Confirmations</string>
-    <string name="settings_confirmations_summary">Boost, favourite, bookmark</string>
+    <string name="settings_confirmations_summary">Boost, favourite, bookmark, my posts</string>
 
     <string name="settings_posts">Posts</string>
     <string name="settings_long_post_max_lines">Collapse long posts</string>
@@ -304,4 +318,7 @@
     <string name="settings_confirm_unfavourite">Undo favourite</string>
     <string name="settings_confirm_bookmark">Bookmark</string>
     <string name="settings_confirm_unbookmark">Remove bookmark</string>
+    <string name="settings_my_posts">My posts</string>
+    <string name="settings_confirm_edit_post">Save edits</string>
+    <string name="settings_confirm_delete_post">Delete</string>
 </resources>

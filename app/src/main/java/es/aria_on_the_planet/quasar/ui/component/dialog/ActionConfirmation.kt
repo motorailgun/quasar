@@ -62,13 +62,20 @@ fun ActionConfirmationHost(confirmations: Set<ConfirmTarget>, content: @Composab
             title = stringResource(texts.title),
             confirmLabel = stringResource(texts.confirm),
             dismissLabel = stringResource(R.string.cancel),
+            message = texts.message?.let { stringResource(it) },
+            destructive = texts.destructive,
             onConfirm = { request.answer.complete(true) },
             onDismiss = { request.answer.complete(false) },
         )
     }
 }
 
-private class ConfirmationTexts(@StringRes val title: Int, @StringRes val confirm: Int)
+private class ConfirmationTexts(
+    @StringRes val title: Int,
+    @StringRes val confirm: Int,
+    @StringRes val message: Int? = null,
+    val destructive: Boolean = false,
+)
 
 private val ConfirmTarget.texts: ConfirmationTexts
     get() = when (this) {
@@ -79,4 +86,11 @@ private val ConfirmTarget.texts: ConfirmationTexts
         ConfirmTarget.Unfavourite -> ConfirmationTexts(R.string.confirm_unfavourite_title, R.string.confirm_remove)
         ConfirmTarget.Bookmark -> ConfirmationTexts(R.string.confirm_bookmark_title, R.string.confirm_bookmark)
         ConfirmTarget.Unbookmark -> ConfirmationTexts(R.string.confirm_unbookmark_title, R.string.confirm_remove)
+        ConfirmTarget.EditPost -> ConfirmationTexts(R.string.confirm_edit_post_title, R.string.confirm_edit_post)
+        ConfirmTarget.DeletePost -> ConfirmationTexts(
+            R.string.confirm_delete_post_title,
+            R.string.confirm_delete_post,
+            message = R.string.confirm_delete_post_message,
+            destructive = true,
+        )
     }

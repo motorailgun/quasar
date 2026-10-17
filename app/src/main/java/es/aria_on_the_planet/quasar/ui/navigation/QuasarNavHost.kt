@@ -252,7 +252,15 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
 private fun PostEntry(container: AppContainer, session: Session, key: Route.Post, navigator: Navigator) {
     val viewModel: PostViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { PostViewModel(session, key.statusId, container.statusRepository) }
+            initializer {
+                PostViewModel(
+                    session = session,
+                    statusId = key.statusId,
+                    repository = container.statusRepository,
+                    accountRepository = container.accountRepository,
+                    createEditor = { scope, target, onSaved -> container.composerSession(session, scope, target, onSaved) },
+                )
+            }
         },
     )
     PostScreen(

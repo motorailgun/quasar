@@ -99,4 +99,50 @@ class DraftMappersTest {
     fun missingLimitsFallBackToDefaults() {
         assertEquals(ComposeLimits(), json.decodeFromString<InstanceDto>("{}").toComposeLimits())
     }
+
+    @Test
+    fun editSendsMediaAttributesAndOmitsVisibilityAndReply() {
+        val draft = PostDraft(
+            "edited",
+            visibility = PostVisibility.Private,
+            sensitive = true,
+            attachments = listOf(
+                DraftAttachment("1", null, description = "a", state = UploadState.Uploaded("m1")),
+                DraftAttachment("2", null, description = "", state = UploadState.Uploaded("m2")),
+            ),
+            inReplyToId = "42",
+        )
+        assertEquals(
+            listOf(
+                "status" to "edited",
+                "spoiler_text" to "",
+                "sensitive" to "true",
+                "media_ids[]" to "m1",
+                "media_ids[]" to "m2",
+                "media_attributes[][id]" to "m1",
+                "media_attributes[][description]" to "a",
+                "media_attributes[][id]" to "m2",
+                "media_attributes[][description]" to "",
+            ),
+            draft.toEditFormParams(),
+        )
+    }
+
+    @Test
+    fun editWithPoll() {
+        val params = PostDraft("q", contentWarning = "cw", poll = PollDraft(listOf("a", "b"), 1.days, true))
+            .toEditFormParams()
+        assertEquals(
+            listOf(
+                "status" to "q",
+                "spoiler_text" to "cw",
+                "sensitive" to "false",
+                "poll[options][]" to "a",
+                "poll[options][]" to "b",
+                "poll[expires_in]" to "86400",
+                "poll[multiple]" to "true",
+            ),
+            params,
+        )
+    }
 }

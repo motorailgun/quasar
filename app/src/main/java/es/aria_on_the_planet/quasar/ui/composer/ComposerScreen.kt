@@ -37,7 +37,6 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
-import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
@@ -45,6 +44,7 @@ import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 
 /**
  * フルの投稿画面。トップバーの Post で送信する。返信中は上に返信先 ([ReplyContext]、✕ で返信をやめる) を出す。
+ * 編集 ([ComposerSession.isEditing]) では Save で保存し、公開範囲は変えられない。
  *
  * 投稿できたときの後始末は [DraftStore] が行う (下書きが空のものに替わり、[DraftStore.published] で知らせる)。
  * 閉じるのは呼び出し側がそれを受けて行う。
@@ -53,7 +53,7 @@ import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
  * @param onClose 下書きを残したまま閉じる。
  * @param onFinish 破棄した (下書きを終えて閉じる)。呼び出し側は [DraftStore.finish] する。
  * @param keepDraftOnClose `true` なら × / 戻るはそのまま [onClose] (クイック投稿バーに下書きが残るので確認は要らない)。
- *   `false` なら入力があるときは破棄の確認を出す (下書きを残さない使い方。今は無い)。
+ *   `false` なら変更があるとき ([ComposerSession.hasChanges]) は破棄の確認を出す (下書きを残さない使い方。編集)。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -70,11 +70,14 @@ fun ComposerScreen(
     val canSubmit by remember(composer, limits) {
         derivedStateOf { composer.toDraft().problems(limits).isEmpty() }
     }
-    val isEmpty by remember(composer) { derivedStateOf { composer.toDraft().isEmpty } }
+    val hasChanges by remember(session) { derivedStateOf { session.hasChanges() } }
+    val editing = session.isEditing
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val errorText = state.error?.let { stringResource(R.string.composer_post_failed, it) }
+    val errorText = state.error?.let {
+        stringResource(if (editing) R.string.composer_save_failed else R.string.composer_post_failed, it)
+    }
     LaunchedEffect(errorText) {
         if (errorText != null) {
             snackbarHostState.showSnackbar(errorText)
@@ -86,11 +89,12 @@ fun ComposerScreen(
     val replyTarget = composer.inReplyTo
 
     val requestClose = {
-        if (keepDraftOnClose || isEmpty) onClose() else confirmingDiscard = true
+        if (keepDraftOnClose || !hasChanges) onClose() else confirmingDiscard = true
     }
+    // 変更が無くても「戻る」はここで受ける (同じ画面に重ねて出しているとき、後ろの画面ごと戻らないように)
     NavigationBackHandler(
         state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
-        isBackEnabled = (keepDraftOnClose || !isEmpty) && !state.sending,
+        isBackEnabled = !state.sending,
         onBackCompleted = requestClose,
     )
 
@@ -116,7 +120,7 @@ fun ComposerScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         } else {
-                            Text(stringResource(R.string.composer_post))
+                            Text(stringResource(if (editing) R.string.composer_save else R.string.composer_post))
                         }
                     }
                 },
@@ -132,6 +136,7 @@ fun ComposerScreen(
             limits = limits,
             emojis = state.emojis,
             enabled = !state.sending,
+            visibilityEditable = !editing,
             autoFocus = true,
             onAttachMedia = openMediaPicker,
             onRemoveAttachment = { session.removeAttachment(it.localId) },
@@ -161,8 +166,10 @@ fun ComposerScreen(
 
     if (confirmingDiscard) {
         ConfirmDialog(
-            title = stringResource(R.string.composer_discard_title),
-            message = stringResource(R.string.composer_discard_message),
+            title = stringResource(if (editing) R.string.composer_discard_edit_title else R.string.composer_discard_title),
+            message = stringResource(
+                if (editing) R.string.composer_discard_edit_message else R.string.composer_discard_message,
+            ),
             confirmLabel = stringResource(R.string.composer_discard),
             dismissLabel = stringResource(R.string.composer_keep_editing),
             onConfirm = onFinish,

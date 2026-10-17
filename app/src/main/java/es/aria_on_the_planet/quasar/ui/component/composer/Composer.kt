@@ -54,6 +54,7 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  * @param onRetryAttachment 通信エラーで失敗した添付のタップ。
  * @param onAttachmentDescriptionChange 代替テキストのダイアログで保存したとき。
  * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯)、ピッカー、入力中の `:shortcode:` の強調に使う。
+ * @param visibilityEditable `false` なら公開範囲を変えられない (編集。公開範囲は表示だけ)。
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
  * @param header 自分のアイコンの行より上に出すもの (返信先の [ReplyContext])。一緒にスクロールする。
  *   あるときはアイコンの行の上の余白を詰める (縦線をアイコンまで繋げるため、余白は header 側が持つ)。
@@ -67,6 +68,7 @@ fun Composer(
     modifier: Modifier = Modifier,
     emojis: List<CustomEmoji> = emptyList(),
     enabled: Boolean = true,
+    visibilityEditable: Boolean = true,
     autoFocus: Boolean = false,
     onAttachMedia: () -> Unit = {},
     onRemoveAttachment: (DraftAttachment) -> Unit = { state.removeAttachment(it.localId) },
@@ -173,7 +175,7 @@ fun Composer(
             VisibilityButton(
                 visibility = state.visibility,
                 onChange = { state.visibility = it },
-                enabled = enabled,
+                enabled = enabled && visibilityEditable,
             )
             EmojiButton(
                 onClick = {

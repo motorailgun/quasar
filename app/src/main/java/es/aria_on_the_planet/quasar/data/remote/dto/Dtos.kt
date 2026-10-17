@@ -254,6 +254,15 @@ data class MediaSizeDto(
     val duration: Double? = null,
 )
 
+/** 編集用のポストの原文。https://docs.joinmastodon.org/entities/StatusSource/ */
+@Serializable
+data class StatusSourceDto(
+    val id: String,
+    /** 本文 (プレーンテキスト)。 */
+    val text: String = "",
+    @SerialName("spoiler_text") val spoilerText: String = "",
+)
+
 /** https://docs.joinmastodon.org/entities/Status/ */
 @Serializable
 data class StatusDto(

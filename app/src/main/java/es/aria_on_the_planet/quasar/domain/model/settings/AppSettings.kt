@@ -9,8 +9,8 @@ data class AppSettings(
     val display: DisplaySettings = DisplaySettings(),
     val notificationApi: NotificationApi = NotificationApi.Grouped,
     val streaming: StreamingSettings = StreamingSettings(),
-    /** 送る前に確認する操作。既定は無し (確認せずに送る)。 */
-    val confirmations: Set<ConfirmTarget> = emptySet(),
+    /** 送る前に確認する操作。既定は自分のポストの編集・削除だけ ([DefaultConfirmations])。 */
+    val confirmations: Set<ConfirmTarget> = DefaultConfirmations,
     /** 新しい投稿の公開範囲。`null` ならアカウントの既定 (`verify_credentials` の `source.privacy`)。 */
     val defaultVisibility: PostVisibility? = null,
 )
@@ -36,7 +36,18 @@ data class StreamingSettings(
 )
 
 /** 送る前に確認できる操作。 */
-enum class ConfirmTarget { Post, Boost, Unboost, Favourite, Unfavourite, Bookmark, Unbookmark }
+enum class ConfirmTarget {
+    Post, Boost, Unboost, Favourite, Unfavourite, Bookmark, Unbookmark,
+
+    /** 自分のポストの編集の保存。 */
+    EditPost,
+
+    /** 自分のポストの削除。 */
+    DeletePost,
+}
+
+/** 既定で確認する操作。取り消せない (削除) ・やり直しが面倒な (編集) 自分のポストへの操作。 */
+val DefaultConfirmations: Set<ConfirmTarget> = setOf(ConfirmTarget.EditPost, ConfirmTarget.DeletePost)
 
 /** この操作に対応する確認の対象。 */
 val PostAction.confirmTarget: ConfirmTarget

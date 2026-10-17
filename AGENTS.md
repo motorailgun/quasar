@@ -246,6 +246,9 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` (要認証) |
 | スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
 | 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き、要認証) |
+| 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト、要認証) |
+| 編集 | `PUT /api/v1/statuses/:id` (form。公開範囲・返信先は送らない。代替テキストは `media_attributes[][id/description]`) |
+| 削除 | `DELETE /api/v1/statuses/:id` (要認証) |
 | ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (要認証。`source.privacy` が既定の公開範囲) |
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
@@ -524,6 +527,17 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。
+  * **自分のポストの編集・削除**: 本体が自分のポスト (`fetchMe` の ID と投稿者が一致) なら、`PostDetail(menu = ...)` で投稿者行の
+    右端に︙ (`OwnPostMenu`: 編集 / error 色の削除)。
+    * 編集: `PostViewModel.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
+      を作る。**`DraftStore` の下書きとは別**で、ポスト画面の上に `ComposerScreen` を重ねる。中身は純粋関数 `editDraftOf`
+      (`PostEditTest`): 添付は投稿済みのメディアを Uploaded 扱い、投票の期間は残り時間に最も近い選択肢 (編集で数え直しになる)。
+      公開範囲は変えられない (`Composer(visibilityEditable = false)`)。送信は Save (`toEditFormParams`、`DraftMappersTest`)、
+      保存できたら本体を差し替えて閉じる。× / 戻るは変更があれば破棄の確認 (`ComposerSession.hasChanges`)。
+      投稿済みのメディアは `PUT /api/v1/media/:id` で変えられないので、編集中の代替テキストは編集の送信でまとめて送る。
+    * 削除: 確認の後 `PostViewModel.delete`、成功したら画面を閉じる。他の画面の一覧からは消さない (ストリーミングの
+      `delete` が届けば消える)。
+    * 失敗はスナックバー。
 * **DetailScaffold** (`ui/component/scaffold/`): Profile と Post で共通の骨組み。戻る付き TopAppBar、
   pull-to-refresh、`revealTitleAfterIndex` 番目のアイテムが画面外に出たら `title` → `revealedTitle` に切り替え。
   補助として `DetailTitle` (名前 + 補足の 2 段)、`DetailLoading`、`DetailMessage` を持つ。
@@ -761,10 +775,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## 設定
 
 * 設定全体は `AppSettings` (`domain/model/settings/`): 表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
-  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は空)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
+  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
   アカウントの既定 `source.privacy`。ダイレクトは選べない)。
 * 保存は `SettingsStore` (`data/settings/`、Preferences DataStore、`AppContainer.settingsStore`)。項目ごとに 1 キーで、
   対応表は `SettingsPreferences.kt` の `SettingFields` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはここに 1 行足す**。
+  * 確認する操作は 1 つのキー (`confirm_targets`) にまとめるが、既定でオンのもの (`DefaultConfirmations`) だけは個別の
+    boolean のキー (`confirm_edit_post` / `confirm_delete_post`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
   * キーが無ければ既定値。書き込みは変わった項目だけ (`writeSettingsChanges`)。`null` を値に持つ項目は番兵値
     (折りたたみ・fps は 0、公開範囲は `"account"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
     `null` 自体が値なので、decode は「読めない」と区別するため `Decoded` で包んで返す。
@@ -781,7 +797,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **操作前の確認**: `LocalActionConfirmer.current.confirm(target)` (suspend) が、設定で確認する操作ならダイアログ
   (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
-  投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン) から使う。
+  投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン。編集なら `EditPost`)、削除はポスト画面から使う。
+  設定画面の Confirmations の「My posts」で編集・削除の確認を切り替える。
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP

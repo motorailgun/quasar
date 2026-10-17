@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
+import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
@@ -77,6 +78,17 @@ class SettingsPreferencesTest {
     }
 
     @Test
+    fun defaultOnConfirmationsAreStoredPerTarget() {
+        // 既定でオンのものを切ったら、まとめたキーではなく個別のキーに書く
+        val prefs = written(AppSettings(), AppSettings(confirmations = setOf(ConfirmTarget.EditPost)))
+        assertEquals(setOf("confirm_delete_post"), prefs.asMap().keys.map { it.name }.toSet())
+        assertEquals(setOf(ConfirmTarget.EditPost), prefs.toAppSettings().confirmations)
+        // まとめたキーだけを保存していた (追加より前の) ユーザーにも既定値でオンになる
+        val legacy = mutablePreferencesOf(stringSetPreferencesKey("confirm_targets") to setOf("Post"))
+        assertEquals(setOf(ConfirmTarget.Post) + DefaultConfirmations, legacy.toAppSettings().confirmations)
+    }
+
+    @Test
     fun unreadableValuesFallBackToDefaultsPerField() {
         val prefs = mutablePreferencesOf(
             stringPreferencesKey("notification_api") to "Something",
@@ -92,7 +104,8 @@ class SettingsPreferencesTest {
         // ダイレクトは既定にできない
         assertEquals(null, settings.defaultVisibility)
         assertEquals(DisplaySettings(), settings.display)
-        assertEquals(setOf(ConfirmTarget.Boost), settings.confirmations)
+        // 個別のキーで持つもの (既定でオン) はキーが無いので既定値
+        assertEquals(setOf(ConfirmTarget.Boost) + DefaultConfirmations, settings.confirmations)
         // 読める項目はそのまま
         assertEquals(false, settings.streaming.local)
     }

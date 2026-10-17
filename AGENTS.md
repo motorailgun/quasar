@@ -916,6 +916,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **凹みのある形 (`MaterialShapes.Cookie9Sided` 等) に `Modifier.shadow` を付けない**。影の計算が RenderThread で非常に重く、
   ヘッダのアイコンに 12dp の影を付けたら 1 フレームに約 10 秒かかり、起動直後に固まって ANR になった。影は円などの凸形で付ける
   (見た目の形と影の形は別でよい)。
+* **Navigation 3 のエントリに変わる値を外から渡さない**。`NavDisplay` は積まれたエントリを中身のラムダごと使い回すので、
+  `entryProvider { entry<...> { Page(settings) } }` のように外で読んだ値は開いたときのまま変わらない (設定画面のスイッチが
+  その場で切り替わらなくなった)。変わる値はエントリの中で Flow から読む (`WithSettings`)。
 * カスタム絵文字の縦横比はメモリ上のキャッシュのみ。初回は正方形で表示され、読み込み後に幅が変わる。
 
 ### ビルド

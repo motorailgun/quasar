@@ -77,8 +77,6 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
 
     val context = LocalContext.current
     val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, onExit) }
-    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
-
     CompositionLocalProvider(LocalNavigator provides navigator) {
         NavDisplay(
             backStack = backStack,
@@ -101,7 +99,7 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
                 entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
                 entry<Route.Composer> { ComposerEntry(container, navigator) }
                 mediaViewerEntry(container, onBack = navigator::back)
-                settingsEntries(settings ?: AppSettings(), container, navigator) { backStack.add(it) }
+                settingsEntries(container, navigator) { backStack.add(it) }
             },
         )
     }
@@ -296,7 +294,6 @@ private fun ComposerEntry(container: AppContainer, navigator: Navigator) {
 
 /** 設定のページ。 */
 private fun EntryProviderScope<NavKey>.settingsEntries(
-    settings: AppSettings,
     container: AppContainer,
     navigator: Navigator,
     navigate: (Route) -> Unit,
@@ -304,12 +301,24 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
     val update = container.settingsStore::launchUpdate
     entry<Route.Settings> { SettingsTopPage(onNavigate = navigate, onBack = navigator::back) }
     entry<Route.SettingsDisplay> {
-        DisplaySettingsPage(settings.display, update, onNavigate = navigate, onBack = navigator::back)
+        WithSettings(container) { DisplaySettingsPage(it.display, update, onNavigate = navigate, onBack = navigator::back) }
     }
-    entry<Route.SettingsAnimation> { AnimationSettingsPage(settings.display, update, onBack = navigator::back) }
-    entry<Route.SettingsTimelines> { TimelineSettingsPage(settings, update, onBack = navigator::back) }
-    entry<Route.SettingsPosting> { PostingSettingsPage(settings, update, onBack = navigator::back) }
+    entry<Route.SettingsAnimation> {
+        WithSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
+    }
+    entry<Route.SettingsTimelines> { WithSettings(container) { TimelineSettingsPage(it, update, onBack = navigator::back) } }
+    entry<Route.SettingsPosting> { WithSettings(container) { PostingSettingsPage(it, update, onBack = navigator::back) } }
     entry<Route.SettingsConfirmations> {
-        ConfirmationSettingsPage(settings.confirmations, update, onBack = navigator::back)
+        WithSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
     }
+}
+
+/**
+ * 今の設定で [content] を描く。設定はエントリの中で読む: `NavDisplay` は積まれたエントリ (中身のラムダごと) を
+ * 使い回すので、`entryProvider` の外で読んだ値を渡すと、開いたときの値のまま変わらない。
+ */
+@Composable
+private fun WithSettings(container: AppContainer, content: @Composable (AppSettings) -> Unit) {
+    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
+    content(settings ?: AppSettings())
 }

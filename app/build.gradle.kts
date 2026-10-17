@@ -22,8 +22,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // リリース鍵は環境変数から読む (CI の release ワークフローが入れる)。無ければ release は未署名で作る。
+    // 鍵・パスワードはリポジトリ・gradle.properties に置かない
+    val releaseKeystore = providers.environmentVariable("QUASAR_KEYSTORE_PATH").orNull
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = providers.environmentVariable("QUASAR_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("QUASAR_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("QUASAR_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseKeystore != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                 enable = true
             }

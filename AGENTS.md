@@ -11,7 +11,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 設定 | Preferences DataStore (`androidx.datastore:datastore-preferences`) |
-| 画面内の遷移 | Navigation 3 (`androidx.navigation3`。今は設定画面の中だけ。他の画面は Activity ごと) |
+| 画面遷移 | Navigation 3 (`androidx.navigation3` + `lifecycle-viewmodel-navigation3`)。Activity は MainActivity 1 つ |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
@@ -24,7 +24,7 @@ DI フレームワークは現時点では使わず、`AppContainer` (手動 DI)
 
 ```
 es.aria_on_the_planet.quasar
-├── QuasarApplication.kt / MainActivity.kt
+├── QuasarApplication.kt / MainActivity.kt   MainActivity が唯一の Activity (中身は QuasarNavHost)
 ├── di/AppContainer.kt              手動 DI
 ├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
 ├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody、
@@ -75,14 +75,16 @@ es.aria_on_the_planet.quasar
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
-    ├── settings/                   設定画面 (SettingsActivity = Navigation 3 / SettingsScreen = 各ページ) + LocalDisplaySettings
+    ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
+    │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド)
+    ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
     ├── timeline/                   タイムライン画面 + ViewModel
-    ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ActionButton / ViewModel)
-    ├── follows/                    フォロー / フォロワー一覧 (FollowListActivity / Screen / ViewModel)
-    ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
-    ├── hashtag/                    ハッシュタグのタイムライン (HashtagActivity / Screen / ViewModel)
-    ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
-    └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / ComposerActivity / QuickPostBar /
+    ├── profile/                    プロフィール (Screen / Header / ActionButton / ViewModel)
+    ├── follows/                    フォロー / フォロワー一覧 (Screen / ViewModel)
+    ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
+    ├── hashtag/                    ハッシュタグのタイムライン (Screen / ViewModel)
+    ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
+    └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
                                     QuickComposerHost / AttachmentUploads / MediaPickerHost)
 ```
 
@@ -438,13 +440,26 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * タップ: メディアのタップはメディアビューア (unknown は元ファイルをブラウザ)。video / gifv / audio は**中央の再生ボタンだけ**
   その場でミュート再生 (`LocalInlinePlayback`。**自動再生はしない**。帯域の細いサーバが多いため)、再生中のタップで再生位置ごとビューアへ。
   呼び出し側へは `onMediaClick: (MediaClick) -> Unit` (ポスト + メディア + 再生位置 + 一覧での各メディアの位置) で伝え、
-  `Context.openMedia` に渡す。位置はビューアを上下スワイプで閉じるときに縮んで戻る先。
+  `Navigator.openMedia` に渡す。位置はビューアを上下スワイプで閉じるときに縮んで戻る先。
 * 再生・ビューアの詳細は [docs/media-viewer.md](docs/media-viewer.md)。
 * `sensitive` (閲覧注意) のぼかしと目アイコンは「Content Warning / NSFW」を参照。
 
 ## 画面
 
-* **Profile** (`ProfileActivity`): `Context.openProfile(user)` で起動する (extra はアカウント ID のみ)。
+* **画面遷移** (`ui/navigation/`): Activity は MainActivity 1 つで、画面の行き来は Navigation 3 (`QuasarNavHost` の `NavDisplay`)。
+  計画と経緯は [docs/navigation3-migration.md](docs/navigation3-migration.md)。
+  * 画面のキーは `Route` (`@Serializable`。引数は開き直すのに要る最小限 = ID 等。`rememberNavBackStack` がプロセスの再生成でも
+    復元する)。画面からは `Navigator` (`openProfile` / `openPost` / `openMedia` 等、`LocalNavigator`) で遷移する。
+    各画面 (`ProfileScreen` 等) はコールバックで遷移を受け、`QuasarNavHost` が `Navigator` から組み立てる。
+  * ViewModel は画面 (エントリ) ごと (`rememberViewModelStoreNavEntryDecorator`)。下に積まれた画面はコンポジションから外れる
+    (状態は `rememberSaveable` で残る)。`LaunchedEffect` / `repeatOnLifecycle` で動くもの (ストリーミング・インライン再生) は、
+    別の画面を開くと止まり、戻ると再開する。
+  * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。書きかけの投稿 (`DraftStore`) は
+    `QuasarNavHost` がセッションごとに開く。
+  * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ。予測型「戻る」も同じ動き)。メディアビューアだけは
+    `OverlaySceneStrategy` で下の画面に重ね、出入りは自分で描く。
+  * 画面の中の `NavigationBackHandler` (投稿の破棄確認・クイック投稿バーのフル画面・ビューア) は `NavDisplay` より先に「戻る」を受ける。
+* **Profile** (`Route.Profile(accountId)`)。
   * X のプロフィールを参考にした構成: ヘッダ画像 + 半分重なるアイコン (UserIcon, 88dp) / 表示名 (EmojiText) +
     鍵・bot バッジ / `@username@domain` / bio (EmojiText, HTML) / フィールド / 登録日 / 投稿・フォロー・フォロワー数。
   * フィールドは角丸の面に key: value で並べ、`verified_at` があるものは tertiary 色 + 認証アイコン。
@@ -488,18 +503,18 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * アイコン・ヘッダ画像のタップでメディアビューア (`openMediaViewer(MediaViewerArgs.singleImage(...))`、1 枚ずつで左右スワイプ無し)。
     ID は合成 (`avatar:<id>` / `header:<id>`)、読み込み中は static の URL を出す。開く前にピン留めポストのインライン再生を止める。
   * 未実装: 返信のタブ、familiar followers の一覧画面、プロフィール編集。
-* **ハッシュタグ** (`HashtagActivity`): `Context.openHashtag(name)` で起動 (extra は `#` 無しの名前)。
+* **ハッシュタグ** (`Route.Hashtag(name)`、`#` 無しの名前)。
   `GET /api/v1/timelines/tag/:hashtag` (max_id ページング、`TimelineRepository.fetchHashtag`) を `PostFeed` で読み、
-  `DetailScaffold` (タイトル `#名前`、PTR) + `PostList`。ストリーミングは受けない。返信はプロフィールと同じく `openComposer()`。
+  `DetailScaffold` (タイトル `#名前`、PTR) + `PostList`。ストリーミングは受けない。返信はプロフィールと同じく投稿画面 (`Route.Composer`)。
   同じタグのタップでは遷移しない。未実装: タグのフォロー (`POST /api/v1/tags/:id/follow`)・利用状況 (`history`)、
   複数タグ (`any[]` / `all[]`)、`local` / `only_media` の絞り込み。
-* **フォロー / フォロワー一覧** (`FollowListActivity`): `Context.openFollowList(accountId, tab)` で起動 (extra は ID とタブ)。
+* **フォロー / フォロワー一覧** (`Route.FollowList(accountId, tab)`)。
   トップバー (表示名 + @acct) の下に `ConnectedTabRow` (Following / Followers) + `HorizontalPager` (スワイプでも切り替え)。
   各タブは開いたときに読み込み、PTR と追加読み込みあり。行は `UserList` (アイコン / 名前 / @acct / bio 3 行)。タップでプロフィール。
   一覧を隠しているアカウント (`hide_collections`) は空で返るので「Nothing to show」。行ごとのフォローボタンは未実装 (`trailing` スロットのみ)。
   * 注: API の Profile エンティティ (`/api/v1/profile`) はログイン中ユーザー自身の編集用 (raw な値) で、
     他人のプロフィール表示には Account を使う。ドメインの `Profile` は表示用で、API の Profile とは別物。
-* **Post** (`PostActivity`): `Context.openPost(post)` で起動する (extra は `post.statusId`)。
+* **Post** (`Route.Post(statusId)`、ブーストなら中身の ID)。
   * 構成: 祖先 (古い順、PostCard をアイコン位置の縦線で連結) / 本体 (`PostDetail`) / リプライ一覧。
     初回表示時は本体ポストまでスクロールする。
   * `PostDetail`: PostCard の全要素 + 大きめの本文・メディア高さ 240dp + 詳細日時 + 区切り線付きアクション行。
@@ -517,8 +532,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ポスト本体のタップ (`onPostClick`) はタイムライン・プロフィール (ピン留め含む)・ポスト詳細から `openPost` する。
 * 既知の挙動: Compose はテキスト内リンクのタッチ判定を最小 48dp に広げるため、本文先頭のリンクの直上
   (投稿者行・時刻) をタップするとリンクが開くことがある。
-* **メディアビューア** (`MediaViewerActivity`): `Context.openMedia(MediaClick)` で起動する (extra は `MediaViewerArgs` の JSON)。
-  同じポストのメディアを左右スワイプ、上下スワイプ (ゴムのように引っかかり、離すと一覧の元の位置へ縮んで戻る。透過 Activity)、
+* **メディアビューア** (`Route.MediaViewer(MediaViewerArgs)`、`Navigator.openMedia(MediaClick)`)。下の画面に重ねて出す (`OverlaySceneStrategy`)。
+  同じポストのメディアを左右スワイプ、上下スワイプ (ゴムのように引っかかり、離すと一覧の元の位置へ縮んで戻る。下の画面が透ける)、
   右上メニュー (保存・ブラウザで開く。保存は DownloadManager で `Pictures/Quasar/` 等へ、権限なし)。video / gifv / audio は Media3 で再生し、ダブルタップ ±10 秒・シークバー・「現在 / 全体」・ミュート。
   設計・PiP への準備・注意点は [docs/media-viewer.md](docs/media-viewer.md)。
 
@@ -579,15 +594,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   (または投票・CW のチップ / 添付の ALT のタップ)、同じ画面内でフルの投稿画面 (`ComposerScreen`) が下から伸びて開く。
   バー + フル画面 + 送信エラーのスナックバーは `QuickComposerHost` にまとめてあり、両画面はそれで一覧を包む
   (一覧は `hazeSource` を付け、下端の余白に引数の `barSpace` を足す)。
-  `ComposerActivity` (`Context.openComposer()`) はバーの無い画面 (プロフィールからの返信) 用。閉じても下書きは残す。
+  単独の投稿画面 (`Route.Composer`、`Navigator.openComposer()`) はバーの無い画面 (プロフィール・ハッシュタグからの返信) 用。閉じても下書きは残す。
 * **下書きの共有**: 書きかけの投稿は `ComposerSession` (入力 `ComposerState`・添付のアップロード・送信・上限・アカウント・絵文字)。
-  `DraftStore` (`AppContainer.draftStore`) がアプリ全体で 1 つ持ち、バー・フル画面・`ComposerActivity` が同じものを使う。
+  `DraftStore` (`AppContainer.draftStore`) がアプリ全体で 1 つ持ち、バー・フル画面・単独の投稿画面が同じものを使う。
   session は自分のコルーチンの範囲 (`SupervisorJob` + Main) で動くので、画面を切り替えてもアップロードは止まらない。
   投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。アカウントが変わったら作り直す。プロセスが終わると消える (保存しない)。
   * 投稿できたら `DraftStore` 自身が `finish()` し、`DraftStore.published` (SharedFlow) に投稿を流す。同じ下書きを複数の画面
     (メイン画面とポスト画面) が表示しているので、後始末は画面ではなくここで 1 回だけ行う。画面はそれを受けてフル画面を閉じる・
     スレッドに足す (`PostViewModel.addPublishedReply`) だけ。
-  * フル画面 (バーから): × / 戻るはバーに戻るだけ (下書きは残るので確認しない)。`ComposerActivity`: 入力があれば破棄の確認。
+  * フル画面 (バーから): × / 戻るはバーに戻るだけ (下書きは残るので確認しない)。単独の投稿画面も同じ (閉じても下書きは残る)。
 * **クイック投稿バー** (`ui/composer/QuickPostBar.kt`): 浮かぶ角丸の面で、後ろの一覧を Haze (`dev.chrisbanes.haze:haze-blur`) で
   ぼかす (一覧の `HorizontalPager` に `hazeSource`、バーに `hazeBlur(HazeInput.Sources(state))`)。
   * **ぼかしには `backgroundColor` (surface) が必須**: 一覧そのものは背景が透明 (Scaffold が塗っている) なので、下地が無いと
@@ -685,7 +700,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **返信**:
   * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アプリ全体で 1 つ)。
     返信ボタン (`onReply`) は `session.startReply(post)` + `QuickPostBarState.requestInput()` (バーにフォーカス)。
-    返信中に別のポストの返信ボタンを押すと返信先を上書きし、本文は残す。プロフィール (バーが無い) は `startReply` → `openComposer()`。
+    返信中に別のポストの返信ボタンを押すと返信先を上書きし、本文は残す。プロフィール (バーが無い) は `startReply` → `Navigator.openComposer()`。
   * `startReply` は宛先 (`@作者 @メンション先 `、自分は除く) を本文に入れ、公開範囲を返信前の値と返信先の狭い方にし、返信先の CW を
     引き継ぐ。ユーザーが書いた本文・選び直した値は変えない。`cancelReply` (✕) は自動で変えたもののうち変えられていないものを
     返信前に戻す。計算は純粋関数 (`domain/model/Reply.kt`: `replyMentions` / `replyVisibility` / `startReply` / `cancelReply` /
@@ -756,8 +771,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 読み込みは非同期: `settings: StateFlow<AppSettings?>` は読み込み前 `null` (起動時から読み始める)。`QuasarAppContent` は
     読み込みまで中身を描かない (既定値で描いてから切り替わらない)。UI 以外は `loaded` (Flow) / `current()` で待つ
     (`TimelineViewModel` の自動更新・通知 API、`ComposerSession` の公開範囲)。
-* `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`) と `ActionConfirmationHost` を提供する。各 Activity の
-  setContent は `QuasarAppContent(container)` で包む。
+* `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`) と `ActionConfirmationHost` を提供する。Activity の
+  setContent は `QuasarAppContent(container)` で包む (MainActivity とデバッグ用ギャラリー)。
   表示設定の項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
   `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
@@ -769,9 +784,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン) から使う。
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
-* **設定画面** (`ui/settings/SettingsActivity`、`Context.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP
-  (Android 16) の設定画面の形。ページ (`SettingsRoute`: Top / Display / Animation / Timelines / Posting / Confirmations) の行き来は
-  Navigation 3 (`NavDisplay` + `rememberNavBackStack`。「戻る」は navigationevent 経由で予測型「戻る」のアニメーション付き)。
+* **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP
+  (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` /
+  `SettingsPosting` / `SettingsConfirmations`) は他の画面と同じバックスタックに積む。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
     (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
@@ -794,7 +809,6 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * Compose が描き始める前: テーマ (`res/values[-night]/themes.xml` の `Theme.Quasar`) の `windowBackground`。端末の
     dynamic color のニュートラル (ライト `system_neutral1_10` / ダーク `system_neutral1_900`) で、Material 3 の background に近い。
   * 描き始めたら: `QuasarAppContent` の `SyncWindowBackground()` (`ui/theme/WindowBackground.kt`) がテーマの `background` に合わせる。
-    透過ウィンドウ (`windowIsTranslucent`、メディアビューア) はテーマの属性で見分けて触らない。
   * 以前はテーマが Light 固定でウィンドウが白く、ダークテーマで設定画面のページ切り替えの間に光っていた。
 * アプリ独自の意味を持つ色は Material 3 の Custom colors として `MaterialTheme.extendedColors` (`ui/theme/ExtendedColors.kt`)
   で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3) を dynamic color の primary に harmonize し、
@@ -817,7 +831,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   (manifest、Activity のテーマ = ウィンドウ属性、文字列リソース等) に限る。
   * アニメーションは Compose (`animate*` / `Animatable` / `AnimatedVisibility` 等) で書く。`res/anim` の XML や
     `overridePendingTransition` / `overrideActivityTransition` での Activity 遷移アニメーションは使わない
-    (メディアビューアは透過 Activity + テーマで遷移アニメーションを切り、出入りを Compose で描いている)。
+    (画面遷移は Navigation 3 の `NavDisplay` の transitionSpec、メディアビューアの出入りは `DismissibleViewer` で描く)。
   * 「戻る」の横取りは `androidx.navigationevent` の `NavigationBackHandler` (予測型「戻る」の進み具合も取れる) を使い、
     `BackHandler` / `OnBackPressedCallback` は使わない。manifest で `enableOnBackInvokedCallback="true"`。
 * 文字列リソースは `res/values/strings.xml` に置く (今は英語のみ)。
@@ -880,8 +894,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   リンクが開くことがある (既知の挙動)。
 * `StickToTopEffect` はコンポジション中に LazyListState を読んで「直前に先頭にいたか」を判定している。
   一覧の先頭キーの決め方を変えるときは挙動を確認する。
-* **入力欄のある Activity は manifest で `android:windowSoftInputMode="adjustResize"` にする** (MainActivity / PostActivity /
-  ComposerActivity)。未指定だと OS が `adjustPan` を選ぶことがあり、ウィンドウごと押し上げられた上に Compose の
+* **MainActivity は manifest で `android:windowSoftInputMode="adjustResize"` にしておく** (入力欄のある画面がすべてここに載る)。未指定だと OS が `adjustPan` を選ぶことがあり、ウィンドウごと押し上げられた上に Compose の
   `WindowInsets.ime` の分も持ち上がって、クイック投稿バーがキーボードの高さ 1 つ分上 (画面の上端付近) に飛ぶ。
 * **凹みのある形 (`MaterialShapes.Cookie9Sided` 等) に `Modifier.shadow` を付けない**。影の計算が RenderThread で非常に重く、
   ヘッダのアイコンに 12dp の影を付けたら 1 フレームに約 10 秒かかり、起動直後に固まって ANR になった。影は円などの凸形で付ける

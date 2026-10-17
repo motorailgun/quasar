@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 今の書きかけの投稿 ([ComposerSession]) をアプリ全体で 1 つ持つ。クイック投稿バーとフルの投稿画面
- * (`ComposerActivity` を含む) はここから同じものを受け取る。
+ * (クイック投稿バーから開くもの・単独の投稿画面 `Route.Composer`) はここから同じものを受け取る。
  *
  * 各 session は自分のコルーチンの範囲を持ち、画面が閉じても添付のアップロードは続く。プロセスが終わると消える
  * (保存はしない)。

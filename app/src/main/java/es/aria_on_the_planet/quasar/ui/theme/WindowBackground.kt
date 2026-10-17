@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.toArgb
 /**
  * ウィンドウの背景をテーマの `background` に合わせる。Compose が描いていない所 (画面・ページの切り替えで半透明に
  * なった間など) に見えるのはこの色。テーマ (XML) の背景は Compose が描き始めるまでの近い色で、ここで正確な色
- * (dynamic color・ライト / ダーク) に揃える。`QuasarAppContent` が全 Activity で呼ぶので、各画面では背景を敷かない。
+ * (dynamic color・ライト / ダーク) に揃える。`QuasarAppContent` が呼ぶので、各画面では背景を敷かない。
  */
 @Composable
 fun SyncWindowBackground() {

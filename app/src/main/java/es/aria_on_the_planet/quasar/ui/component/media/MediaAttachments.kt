@@ -148,7 +148,7 @@ fun MediaAttachmentItem(
                     hidden -> hidden = false
                     playing -> {
                         val snapshot = playback.snapshot(owner)
-                        // ビューアは透過 Activity で、この画面は ON_STOP にならないので明示的に止める
+                        // ビューアはこの画面に重ねて出す (この画面はコンポジションに残る) ので明示的に止める
                         playback.stop(owner)
                         onClick(snapshot)
                     }

@@ -7,7 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 import es.aria_on_the_planet.quasar.ui.navigation.QuasarNavHost
 
-/** アプリの唯一の Activity (メディアビューアを除く)。画面の行き来は [QuasarNavHost] (Navigation 3)。 */
+/** アプリの唯一の Activity。画面の行き来は [QuasarNavHost] (Navigation 3)。 */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()

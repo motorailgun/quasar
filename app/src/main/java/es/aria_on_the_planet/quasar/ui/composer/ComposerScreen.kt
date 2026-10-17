@@ -53,7 +53,7 @@ import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
  * @param onClose 下書きを残したまま閉じる。
  * @param onFinish 破棄した (下書きを終えて閉じる)。呼び出し側は [DraftStore.finish] する。
  * @param keepDraftOnClose `true` なら × / 戻るはそのまま [onClose] (クイック投稿バーに下書きが残るので確認は要らない)。
- *   `false` なら入力があるときは破棄の確認を出す (単独の `ComposerActivity`)。
+ *   `false` なら入力があるときは破棄の確認を出す (下書きを残さない使い方。今は無い)。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable

@@ -13,7 +13,7 @@ AGENTS.md から参照される詳細。添付メディア (https://docs.joinmas
 | audio | 同上 (投稿者アイコンが回る) | 自動再生・**音あり**。投稿者アイコンを中央で回転 |
 | unknown | 元ファイル (`originalUrl`) をブラウザで開く | 「ブラウザで開く」ボタンだけのページ (左右スワイプで来たとき) |
 
-* ポストの添付以外 (プロフィールのアイコン・ヘッダ画像) は `MediaViewerArgs.singleImage` + `Context.openMediaViewer` で画像 1 枚として開く。
+* ポストの添付以外 (プロフィールのアイコン・ヘッダ画像) は `MediaViewerArgs.singleImage` + `Navigator.openMediaViewer` で画像 1 枚として開く。
   `meta` が無いので、閉じるときの戻り先の縦横比はビューアで読み込んだ画像のもの (`MediaViewerViewModel.onImageLoaded`) を使う
   (読み込み前に閉じたらその場で縮む)。添付でも `meta` が無ければ同じく読み込み結果を使う。
 
@@ -35,11 +35,11 @@ ui/component/player/            再生部品 (一覧とビューアで共通)
 └── InlinePlayback.kt       LocalInlinePlayback / rememberInlinePlayback
 ui/component/media/MediaClick.kt   タップの情報 (ポスト + メディア + インライン再生の位置)
 ui/mediaviewer/                 ビューア画面
-├── MediaViewerActivity.kt  起動 (Context.openMedia) と ViewModel の組み立てだけ (UI のロジックは持たない)
-├── MediaViewerArgs.kt      Intent extra の JSON (ViewerMedia はドメインの写し)
+├── MediaViewerEntry.kt     画面 (Route.MediaViewer) の組み立て (ViewModel・保存) と openMedia (unknown はブラウザ)
+├── MediaViewerArgs.kt      画面の引数 (@Serializable、Route.MediaViewer が持つ。ViewerMedia はドメインの写し)
 ├── MediaViewerViewModel.kt PlaybackController を保持 (回転しても再生継続)、ページ切り替えで差し替え。Player の作り方は関数で受け取る
 ├── MediaViewerScreen.kt    HorizontalPager + 上部バー (閉じる / 位置 / メニュー)。操作部分の表示状態・システムバー
-│                           (LocalActivity の window)・画面点灯 (Modifier.keepScreenOn)・ON_STOP で一時停止 (LifecycleEventEffect)
+│                           (LocalActivity の window。閉じたら表示・アイコンの色を戻す)・画面点灯 (Modifier.keepScreenOn)・ON_STOP で一時停止 (LifecycleEventEffect)
 ├── MediaPages.kt           ImagePage / PlayerPage / UnknownPage
 ├── Zoomable.kt             画像のピンチ拡大縮小 (ZoomState / Modifier.zoomable) + 純粋関数 (applyGesture / clampZoomOffset)
 └── DismissibleViewer.kt    出入り (開く・上下スワイプ・戻る・閉じる) + 純粋関数 (rubberBand / shouldDismiss / exitTransformTo / fitSize)
@@ -56,24 +56,23 @@ ui/mediaviewer/                 ビューア画面
 * シーク幅は `ExoPlayer.Builder.setSeekBack/ForwardIncrementMs(10_000)` (既定は 5 秒 / 15 秒)。通信はアプリ共通の OkHttpClient。
 
 ### インライン再生
-* `QuasarAppContent` が Activity ごとに `rememberInlinePlayback()` を `LocalInlinePlayback` で配る (ビューアは
-  `inlinePlayback = false`)。`PostList` → `PostCard` → `MediaAttachments` (引用・ピン留め含む) に引数を通さずに済む。
-* 止めるタイミング: 項目が LazyColumn から外れた (`DisposableEffect`)、閲覧注意のぼかしに戻した、画面の `ON_STOP`
-  (Player を解放してデコーダを手放す)。
-* **ビューアを開くときは明示的に止める**。ビューアは透過 Activity なので下の画面は `STARTED` のまま (`ON_STOP` が来ない)。
+* `QuasarAppContent` がアプリで 1 つの `rememberInlinePlayback()` を `LocalInlinePlayback` で配る。`PostList` → `PostCard` → `MediaAttachments` (引用・ピン留め含む) に引数を通さずに済む。
+* 止めるタイミング: 項目が LazyColumn から外れた・別の画面を開いて画面ごとコンポジションから外れた (`DisposableEffect`)、
+  閲覧注意のぼかしに戻した、アプリの `ON_STOP` (Player を解放してデコーダを手放す)。
+* **ビューアを開くときは明示的に止める**。ビューアは下の画面に重ねて出す (`OverlaySceneStrategy`) ので、下の画面はコンポジションに残り `STARTED` のまま。
   再生位置とミュート状態を `PlaybackSnapshot` に取ってから止め、ビューアはその位置から続ける。戻ったときに一覧側は再開しない。
 
 ### ビューア
-* 出入りのアニメーションはすべて Compose (`DismissibleViewer` / `DismissibleViewerState`) で描く。Activity の遷移
-  アニメーション (`res/anim`・`overrideActivityTransition`) は使わず、透過テーマで `windowAnimationStyle` を `@null` にしている。
-  * 開く: 最初の表示で背景と中身を 350ms でフェードイン (以前の `android:anim/fade_in` 500ms の 0.7 倍)。回転等では繰り返さない。
+* 出入りのアニメーションはすべて Compose (`DismissibleViewer` / `DismissibleViewerState`) で描く。ビューアは
+  `OverlaySceneStrategy` で下の画面に重ねるので、`NavDisplay` の遷移アニメーションは付かない。
+  * 開く: 最初の表示で背景と中身を 350ms でフェードイン (OS 標準のフェードイン 500ms の 0.7 倍)。回転等では繰り返さない。
   * 閉じる: 上下スワイプ・「戻る」・閉じるボタンのどれでも `DismissibleViewerState.dismiss()` で、一覧の元の位置へ縮んで戻る
-    (下記)。終わったら `finish()` (遷移アニメーション無し)。
+    (下記)。終わったら `back()` でバックスタックから外す。
   * 予測型「戻る」: `NavigationBackHandler` + `rememberNavigationEventState` の進み具合 (0〜1) に合わせて、上下スワイプと同じく
     縮み・背景が薄くなる。確定で閉じ、取り消しで元に戻る。
 * 上下スワイプで閉じる:
   * ドラッグ中はゴムのように引っかかる (`rubberBand`: 動き始めは指の 0.55 倍、遠くなるほど動かず、画面高の 30% を超えない)。
-    進むにつれて最大 15% 縮み、背景の黒が薄くなる (Activity は透過テーマ `Theme.Quasar.MediaViewer` なので元の画面が透ける)。
+    進むにつれて最大 15% 縮み、背景の黒が薄くなる (下の画面に重ねているので元の画面が透ける)。
   * 見た目で画面高の 8% 以上動かす (指で 1/4 画面ほど) か、動かした向きに速く弾いたら閉じる。戻す向きに弾いたら閉じない。
     それ以外はばねで戻る。
   * 閉じるときは、一覧での元の位置 (`MediaViewerArgs.sourceBounds`、`MediaAttachments` が各メディアの位置を
@@ -116,11 +115,12 @@ SurfaceView は Compose の `graphicsLayer` の alpha (閉じるときのフェ�
 ## PiP への準備 (未実装)
 * 再生を止めるのは `ON_PAUSE` ではなく `ON_STOP` (`MediaViewerScreen` の `LifecycleEventEffect` → `viewModel.pause()`)。PiP 中は onPause のまま
   再生を続けるため。
-* manifest で `configChanges="screenSize|smallestScreenSize|screenLayout|orientation"` を受けている。
-  `supportsPictureInPicture` はまだ付けていない。
+* ビューアは MainActivity の中の画面なので、PiP は Activity 全体で入り、PiP 中はビューアのプレイヤーだけを出す作りにする
+  (PiP 中は他の画面・システムバーを描かない)。`supportsPictureInPicture` と、PiP の出入りで作り直さないための
+  `configChanges` (`screenSize|smallestScreenSize|screenLayout|orientation`) は MainActivity にまだ付けていない。
+  回転で Activity が作り直されても、Player は ViewModel (画面ごと) が持つので再生は続く。
 * 操作部分は `FullControls(visible = ...)` の 1 フラグで隠せる。PiP 中は `onPictureInPictureModeChanged` から `false` にする。
 * 再生部品は `Player` インターフェースにだけ依存する (将来 MediaSession と組み合わせやすい)。
-* 注意: 透過 Activity のまま PiP に入れるかは未確認。駄目なら `Activity.setTranslucent(false)` (API 30+) で切り替える。
 
 ## 保存
 システムの DownloadManager に任せる (`data/media/MediaDownloader.kt` の `SystemMediaDownloader`)。**権限は宣言しない**。

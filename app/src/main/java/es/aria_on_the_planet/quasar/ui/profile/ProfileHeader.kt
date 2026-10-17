@@ -100,7 +100,7 @@ fun ProfileHeader(
     var avatarBounds by remember { mutableStateOf<Rect?>(null) }
     val openImage: ((id: String, url: String, staticUrl: String?, bounds: Rect?) -> Unit)? = onOpenImage?.let { open ->
         { id, url, staticUrl, bounds ->
-            // ビューアは透過 Activity で ON_STOP が来ないので、ピン留めポストのインライン再生はここで止める
+            // ビューアはこの画面に重ねて出す (画面はコンポジションに残る) ので、ピン留めポストのインライン再生はここで止める
             inlinePlayback?.stopActive()
             open(MediaViewerArgs.singleImage(id, url, staticUrl, bounds, windowSize))
         }

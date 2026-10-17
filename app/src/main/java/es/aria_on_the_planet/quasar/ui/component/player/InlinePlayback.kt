@@ -12,13 +12,14 @@ import okhttp3.OkHttpClient
 
 /**
  * 一覧でのインライン再生に使う [PlaybackController]。`null` ならインライン再生せず、タップでビューアを開く。
- * [QuasarAppContent][es.aria_on_the_planet.quasar.ui.QuasarAppContent] が Activity ごとに 1 つ提供する。
+ * [QuasarAppContent][es.aria_on_the_planet.quasar.ui.QuasarAppContent] がアプリで 1 つ提供する (再生できるのは同時に 1 つ)。
+ * 別の画面を開くと、元の画面のメディアはコンポジションから外れて自分の再生を止める。
  */
 val LocalInlinePlayback = staticCompositionLocalOf<PlaybackController?> { null }
 
 /**
- * 画面 (Activity) 単位のインライン再生。自動再生はしない (帯域の細いサーバも多いため、タップで再生)。
- * 画面が背面に回ったら ([Lifecycle.Event.ON_STOP]) Player を解放してデコーダを手放す。
+ * アプリ全体のインライン再生。自動再生はしない (帯域の細いサーバも多いため、タップで再生)。
+ * アプリが背面に回ったら ([Lifecycle.Event.ON_STOP]) Player を解放してデコーダを手放す。
  */
 @Composable
 fun rememberInlinePlayback(okHttpClient: OkHttpClient): PlaybackController {

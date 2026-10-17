@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 
 /**
  * メディアビューアの出入りの状態。開く (フェードイン)・閉じる (一覧の元の位置へ縮んで戻る) のアニメーションと、
- * 上下スワイプ / 予測型「戻る」の途中の見た目を持つ。Activity の遷移アニメーション (XML) は使わず、すべてここで描く。
+ * 上下スワイプ / 予測型「戻る」の途中の見た目を持つ。`NavDisplay` の遷移は付けず、すべてここで描く。
  */
 @Stable
 class DismissibleViewerState internal constructor(
@@ -165,7 +165,7 @@ fun rememberDismissibleViewerState(
 data class DismissTarget(val bounds: Rect, val aspectRatio: Float)
 
 /**
- * メディアビューアの外枠。背景の黒を自前で描き (Activity は透過で、元の画面が透けて見える)、出入りを担う。
+ * メディアビューアの外枠。背景の黒を自前で描き (元の画面の上に重ねているので、黒が薄くなると透けて見える)、出入りを担う。
  *
  * * 開く: 最初の表示でフェードイン ([EnterMillis])。回転等の作り直しでは繰り返さない。
  * * 上下スワイプ: 中身は指に付いて動くが、ゴムのように引っかかり、どれだけ動かしても画面高の 30% までしか進まない。
@@ -310,7 +310,7 @@ private const val DismissDistanceFraction = 0.08f
 private const val DragShrink = 0.15f
 private const val BackgroundFadeOnDrag = 0.6f
 private const val ExitMillis = 300
-/** 開くときのフェード。以前の Activity 遷移 (android:anim/fade_in の 500ms) の 0.7 倍。 */
+/** 開くときのフェード (OS 標準のフェードイン 500ms の 0.7 倍)。 */
 private const val EnterMillis = 350
 /** 閉じるアニメーションのうち、ここから先で中身を消す。 */
 private const val ExitFadeStart = 0.75f

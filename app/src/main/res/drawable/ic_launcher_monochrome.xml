@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- テーマアイコン用。形は ic_launcher_foreground と同じで単色 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M67.837,74.013C66.629,74.882 52.996,60.284 51.727,60.298C50.444,60.312 25.016,75.312 24.406,74.499C23.802,73.694 46.721,55.425 47.182,54.241C47.647,53.044 38.943,34.865 40.163,33.987C41.371,33.118 55.004,47.716 56.273,47.702C57.556,47.688 82.984,32.688 83.594,33.501C84.198,34.306 61.279,52.575 60.818,53.759C60.353,54.956 69.057,73.135 67.837,74.013Z" />
+</vector>

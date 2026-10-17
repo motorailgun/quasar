@@ -59,6 +59,7 @@ fun QuotedPost(
     mediaHeight: Dp = PostCardDefaults.MediaHeight * 0.75f,
     onPostClick: (Post) -> Unit = {},
     onUserClick: (User) -> Unit = {},
+    onHashtagClick: ((String) -> Unit)? = null,
     onMediaClick: (MediaClick) -> Unit = {},
     maxHeight: Dp? = null,
     nested: Boolean = false,
@@ -114,7 +115,7 @@ fun QuotedPost(
                                 postContent = true,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 6.dp),
-                                onLinkClick = rememberPostLinkHandler(post, onUserClick),
+                                onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
                             )
                         }
                         // 引用内の投票は閲覧のみ (結果表示)

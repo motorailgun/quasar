@@ -16,6 +16,7 @@ import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMediaViewer
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.hashtag.openHashtag
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 import es.aria_on_the_planet.quasar.ui.composer.openComposer
@@ -46,6 +47,7 @@ class ProfileActivity : ComponentActivity() {
                     onUserClick = { user -> if (user.inServerId != accountId) openProfile(user) },
                     onPostClick = ::openPost,
                     onMediaClick = ::openMedia,
+                    onHashtagClick = ::openHashtag,
                     onFollowingClick = { openFollowList(accountId, FollowListTab.Following) },
                     onFollowersClick = { openFollowList(accountId, FollowListTab.Followers) },
                     onOpenImage = ::openMediaViewer,

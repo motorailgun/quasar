@@ -55,6 +55,7 @@ fun PostDetail(
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
     onReply: ((Post) -> Unit)? = null,
+    onHashtagClick: ((String) -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -122,7 +123,7 @@ fun PostDetail(
                     isHtml = true,
                     postContent = true,
                     style = MaterialTheme.typography.bodyLarge,
-                    onLinkClick = rememberPostLinkHandler(post, onUserClick),
+                    onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
                 )
                 post.poll?.let { poll ->
                     PollView(
@@ -155,6 +156,7 @@ fun PostDetail(
                         maxHeight = mediaHeight,
                         onPostClick = onPostClick,
                         onUserClick = onUserClick,
+                        onHashtagClick = onHashtagClick,
                         onMediaClick = onMediaClick,
                         modifier = Modifier.padding(top = 12.dp),
                     )

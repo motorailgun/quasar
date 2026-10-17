@@ -35,8 +35,9 @@ import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
  * @param isHtml `true` の場合 [text] を Mastodon の HTML として解釈する (リンク付き)。
  * @param postContent ポストの中身 (本文・CW・投票・通知の抜粋) なら `true`。絵文字のアニメーションの設定が
  *   「本文」と「それ以外」で分かれているため。表示名・bio・フィールド等は `false`。
- * @param onLinkClick HTML のリンクのタップ (引数は href)。`null` なら [androidx.compose.ui.platform.LocalUriHandler]
- *   でそのまま開く。メンションをプロフィールへ飛ばす等、リンク先によって振り分けるときに渡す。
+ * @param onLinkClick HTML のリンクのタップ (href とリンクの文字列)。`null` なら
+ *   [androidx.compose.ui.platform.LocalUriHandler] でそのまま開く。メンション・ハッシュタグを画面内で開く等、
+ *   リンク先によって振り分けるときに渡す。
  */
 @Composable
 fun EmojiText(
@@ -50,7 +51,7 @@ fun EmojiText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
     onTextLayout: (TextLayoutResult) -> Unit = {},
-    onLinkClick: ((String) -> Unit)? = null,
+    onLinkClick: ((url: String, text: String?) -> Unit)? = null,
 ) {
     val linkColor = MaterialTheme.colorScheme.primary
     // ラムダは毎回変わりうるので、変換をやり直さないよう最新の値を参照する固定のリスナーにする
@@ -58,9 +59,11 @@ fun EmojiText(
     val handlesLinks = onLinkClick != null
     val annotated = remember(text, emojis, isHtml, linkColor, handlesLinks) {
         val base = if (isHtml) {
+            // リスナーにはリンクしか渡らないので、リンクの文字列 (`#tag` 等) は変換後に引けるようにしておく
+            var linkTexts = emptyMap<String, String>()
             val listener = if (handlesLinks) {
                 LinkInteractionListener { link ->
-                    (link as? LinkAnnotation.Url)?.let { currentOnLinkClick?.invoke(it.url) }
+                    (link as? LinkAnnotation.Url)?.let { currentOnLinkClick?.invoke(it.url, linkTexts[it.url]) }
                 }
             } else {
                 null
@@ -69,7 +72,7 @@ fun EmojiText(
                 htmlString = simplifyMastodonHtml(text),
                 linkStyles = TextLinkStyles(style = SpanStyle(color = linkColor)),
                 linkInteractionListener = listener,
-            ).trimWhitespace()
+            ).trimWhitespace().also { if (handlesLinks) linkTexts = it.linkTexts() }
         } else {
             AnnotatedString(text)
         }
@@ -118,6 +121,13 @@ private fun emojiInlineContent(
             )
         }
     }
+
+/** URL リンクの href → リンクの文字列。同じ href が複数あれば最初のもの。 */
+private fun AnnotatedString.linkTexts(): Map<String, String> =
+    getLinkAnnotations(0, length)
+        .mapNotNull { range -> (range.item as? LinkAnnotation.Url)?.let { it.url to text.substring(range.start, range.end) } }
+        .distinctBy { it.first }
+        .toMap()
 
 /** HTML 変換で前後に残る空白・改行を取り除く。 */
 private fun AnnotatedString.trimWhitespace(): AnnotatedString {

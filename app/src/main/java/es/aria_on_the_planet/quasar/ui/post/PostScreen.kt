@@ -64,6 +64,7 @@ fun PostScreen(
     onUserClick: (User) -> Unit,
     onPostClick: (Post) -> Unit,
     onMediaClick: (MediaClick) -> Unit,
+    onHashtagClick: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val draft by drafts.current.collectAsStateWithLifecycle()
@@ -155,6 +156,7 @@ fun PostScreen(
                                 onVote = onVote,
                                 onAction = onAction,
                                 onReply = onReply,
+                                onHashtagClick = onHashtagClick,
                                 showReplyIndicator = false,
                             )
                         }
@@ -172,6 +174,7 @@ fun PostScreen(
                                 onVote = onVote,
                                 onAction = onAction,
                                 onReply = onReply,
+                                onHashtagClick = onHashtagClick,
                             )
                             HorizontalDivider()
                         }
@@ -207,6 +210,7 @@ fun PostScreen(
                                 onVote = onVote,
                                 onAction = onAction,
                                 onReply = onReply,
+                                onHashtagClick = onHashtagClick,
                                 showReplyIndicator = false,
                             )
                         }

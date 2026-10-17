@@ -14,6 +14,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.domain.model.Hashtag
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.MediaMeta
 import es.aria_on_the_planet.quasar.domain.model.MediaSize
@@ -129,6 +130,7 @@ fun StatusDto.toDomain(): Post {
         inReplyToId = body.inReplyToId,
         inReplyToAcct = body.replyTargetAcct(),
         mentions = body.mentions.map { Mention(it.id, it.username, it.acct, it.url) },
+        tags = body.tags.map { Hashtag(it.name, it.url) },
     )
 }
 

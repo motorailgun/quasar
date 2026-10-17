@@ -26,4 +26,8 @@ class TimelineRepository(
         }
         return statuses.map { it.toDomain() }
     }
+
+    /** ハッシュタグ [hashtag] (`#` 無し) を含む公開ポストのうち、[maxId] より古いものを取得する。 */
+    suspend fun fetchHashtag(session: Session, hashtag: String, maxId: String? = null): List<Post> =
+        api.hashtagTimeline(session.serverUrl, session.accessToken, hashtag, maxId).map { it.toDomain() }
 }

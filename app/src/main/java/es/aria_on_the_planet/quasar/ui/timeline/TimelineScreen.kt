@@ -79,6 +79,7 @@ import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.post.openPost
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
+import es.aria_on_the_planet.quasar.ui.hashtag.openHashtag
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -133,6 +134,7 @@ fun TimelineScreen(
             barState.requestInput()
         }
     }
+    val onHashtagClick: (String) -> Unit = context::openHashtag
 
     QuickComposerHost(
         drafts = drafts,
@@ -174,6 +176,7 @@ fun TimelineScreen(
                         topPadding = topPadding,
                         bottomPadding = bottomPadding,
                         onReply = onReply,
+                        onHashtagClick = onHashtagClick,
                     )
                 }
                 StatusBarScrim(Modifier.align(Alignment.TopCenter))
@@ -213,6 +216,7 @@ private fun ColumnPage(
     topPadding: Dp,
     bottomPadding: Dp,
     onReply: ((Post) -> Unit)?,
+    onHashtagClick: ((String) -> Unit)?,
 ) {
     val context = LocalContext.current
     val feed = state.feedOf(column)
@@ -259,6 +263,7 @@ private fun ColumnPage(
                 onVote = onVote,
                 onAction = onAction,
                 onReply = onReply,
+                onHashtagClick = onHashtagClick,
             )
 
             else -> PostList(
@@ -273,6 +278,7 @@ private fun ColumnPage(
                 onVote = onVote,
                 onAction = onAction,
                 onReply = onReply,
+                onHashtagClick = onHashtagClick,
                 onMediaClick = onMediaClick,
                 onGapClick = { gap -> viewModel.fillGap(column, gap) },
             )

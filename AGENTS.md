@@ -36,7 +36,7 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention)
+│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -74,6 +74,7 @@ es.aria_on_the_planet.quasar
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ActionButton / ViewModel)
     ├── follows/                    フォロー / フォロワー一覧 (FollowListActivity / Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (MediaViewerActivity / Screen / ViewModel / Args / ページ / DismissibleViewer)
+    ├── hashtag/                    ハッシュタグのタイムライン (HashtagActivity / Screen / ViewModel)
     ├── post/                       ポスト詳細 (PostActivity / Screen / ViewModel / ReplyList)
     └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / ComposerActivity / QuickPostBar /
                                     QuickComposerHost / AttachmentUploads / MediaPickerHost)
@@ -146,6 +147,7 @@ data class Post(
     val statusId: String,          // 本文を持つ Status の ID (ブーストなら中身)。詳細画面・スレッドはこれを使う
     val inReplyToId: String?,      // in_reply_to_id (中身の値)
     val mentions: List<Mention>,   // mentions (id / username / acct / url)。返信の宛先・本文のメンションのタップに使う
+    val tags: List<Hashtag>,       // tags (name / url)。本文のハッシュタグのタップに使う
 )
 
 /** ログイン中ユーザーから見た状態。API では認証時のみ返るため、未認証時はすべて false。 */
@@ -228,6 +230,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
 | 通知 (グループ) | `GET /api/v2/notifications` (要認証、Mastodon 4.3+、既定) |
 | 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
+| ハッシュタグのタイムライン | `GET /api/v1/timelines/tag/:hashtag` (max_id ページング) |
 | ポスト | `GET /api/v1/statuses/:id` |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
 | ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` (要認証) |
@@ -261,7 +264,8 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 * `EmojiText(text: String, emojis: List<CustomEmoji>, isHtml: Boolean, ...)`
   * `isHtml = true` のとき Mastodon の HTML を `AnnotatedString.fromHtml` で変換 (リンク付き)。
   * `:shortcode:` を `emojis` と照合し、`InlineTextContent` + Coil の `AsyncImage` で画像に置換。
-  * `onLinkClick` を渡すとリンクのタップを横取りする (引数は href、未指定なら `LocalUriHandler` で開く)。
+  * `onLinkClick` を渡すとリンクのタップを横取りする (引数は href とリンクの文字列、未指定なら `LocalUriHandler` で開く)。
+    Compose のリスナーにはリンク (href) しか渡らないので、文字列は変換後の AnnotatedString から引いている。
   * `postContent = true` はポストの中身 (本文・CW・投票・通知の抜粋)。絵文字のアニメーションの設定が「本文」と
     「それ以外」(表示名・bio・フィールド等、既定の `false`) で分かれているため。
   * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
@@ -315,11 +319,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * リプライ表示: `inReplyToId` があるポストは、ブースト表示と同じ形 (アイコン + tertiary 色) で「Reply to @acct」を出す。
   acct は `in_reply_to_account_id` を、自分へのリプライなら投稿者、それ以外は `mentions` から引いて求める
   (見つからなければ「Reply」)。Post 画面のスレッドでは縦線で関係が分かるので `showReplyIndicator = false`。
-* 本文のメンション: タップでプロフィール (`onUserClick`)。判定は Mastodon Web と同じく href と `Post.mentions` の `url` の
-  一致 (`findByUrl`、`MentionTest`)。`class="mention"` はハッシュタグにも付き、他実装では付き方が揃わないので見ない。
-  一致しないリンクは今どおりブラウザ。`rememberPostLinkHandler` (`PostLinks.kt`) を PostCard / PostDetail / QuotedPost の本文に渡す。
-  `Mention.asUser()` は ID・acct・サーバだけの `User` (プロフィールを開く用。表示には使わない)。
-  url が一致しない実装 (本文が AP の id を指す等) はブラウザで開く。ハッシュタグ (`Status.tags`) は未対応。
+* 本文のリンク: 行き先は純粋関数 `Post.linkTarget(href, text)` (`domain/model/Hashtag.kt`、`PostLinkTargetTest` / `MentionTest`)
+  で決め、`rememberPostLinkHandler` (`PostLinks.kt`) が PostCard / PostDetail / QuotedPost の本文に渡す。
+  * メンション: href と `Post.mentions` の `url` の一致 (`findByUrl`。Mastodon Web と同じ)。`class="mention"` は
+    ハッシュタグにも付き、他実装では付き方が揃わないので見ない。タップで `onUserClick` (`Mention.asUser()` は ID・acct・
+    サーバだけの `User`。プロフィールを開く用で表示には使わない)。url が一致しない実装 (本文が AP の id を指す等) はブラウザ。
+  * ハッシュタグ: href と `Post.tags` の `url` の一致、またはリンクの文字列 `#名前` と `tags` の名前の一致 (大文字小文字無視)。
+    `tags` の url は接続中サーバのページなので、他サーバ (Misskey 等) のポストは文字列の方で当たる。タップで
+    `onHashtagClick(name)` (`onReply` と同じく PostList / NotificationList / PostScreen 等は中継するだけ。`null` ならブラウザ)。
+  * それ以外はブラウザ。
 * 公開範囲: 投稿者行 (名前 / @acct) と同じ高さの右端に `VisibilityIcon` (公式 Web UI を元に、公開・フォロワー限定は出さず、
   未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
 * 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / 投票 (PollView) /
@@ -473,6 +481,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * アイコン・ヘッダ画像のタップでメディアビューア (`openMediaViewer(MediaViewerArgs.singleImage(...))`、1 枚ずつで左右スワイプ無し)。
     ID は合成 (`avatar:<id>` / `header:<id>`)、読み込み中は static の URL を出す。開く前にピン留めポストのインライン再生を止める。
   * 未実装: 返信のタブ、familiar followers の一覧画面、プロフィール編集。
+* **ハッシュタグ** (`HashtagActivity`): `Context.openHashtag(name)` で起動 (extra は `#` 無しの名前)。
+  `GET /api/v1/timelines/tag/:hashtag` (max_id ページング、`TimelineRepository.fetchHashtag`) を `PostFeed` で読み、
+  `DetailScaffold` (タイトル `#名前`、PTR) + `PostList`。ストリーミングは受けない。返信はプロフィールと同じく `openComposer()`。
+  同じタグのタップでは遷移しない。未実装: タグのフォロー (`POST /api/v1/tags/:id/follow`)・利用状況 (`history`)、
+  複数タグ (`any[]` / `all[]`)、`local` / `only_media` の絞り込み。
 * **フォロー / フォロワー一覧** (`FollowListActivity`): `Context.openFollowList(accountId, tab)` で起動 (extra は ID とタブ)。
   トップバー (表示名 + @acct) の下に `ConnectedTabRow` (Following / Followers) + `HorizontalPager` (スワイプでも切り替え)。
   各タブは開いたときに読み込み、PTR と追加読み込みあり。行は `UserList` (アイコン / 名前 / @acct / bio 3 行)。タップでプロフィール。

@@ -40,6 +40,8 @@ data class Post(
     val inReplyToAcct: String? = null,
     /** 本文でメンションしているアカウント (mentions)。返信の宛先・本文のメンションのタップに使う。 */
     val mentions: List<Mention> = emptyList(),
+    /** 本文のハッシュタグ (tags)。本文のハッシュタグのタップに使う。 */
+    val tags: List<Hashtag> = emptyList(),
 )
 
 /** ポストの公開範囲 (visibility)。 */

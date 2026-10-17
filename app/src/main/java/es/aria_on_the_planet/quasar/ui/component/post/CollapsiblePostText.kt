@@ -34,7 +34,7 @@ fun CollapsiblePostText(
     maxCollapsedLines: Int?,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
-    onLinkClick: ((String) -> Unit)? = null,
+    onLinkClick: ((url: String, text: String?) -> Unit)? = null,
 ) {
     val lineHeight = lineHeightDp(style)
     if (maxCollapsedLines == null || lineHeight == null) {

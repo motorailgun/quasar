@@ -68,6 +68,18 @@ class MastodonApi(
         addQueryParameter("limit", limit.toString())
     }
 
+    /** https://docs.joinmastodon.org/methods/timelines/#tag */
+    suspend fun hashtagTimeline(
+        serverUrl: String,
+        accessToken: String?,
+        hashtag: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): List<StatusDto> = getStatuses(serverUrl, accessToken, "api/v1/timelines/tag/$hashtag") {
+        maxId?.let { addQueryParameter("max_id", it) }
+        addQueryParameter("limit", limit.toString())
+    }
+
     /** https://docs.joinmastodon.org/methods/statuses/#get */
     suspend fun status(serverUrl: String, accessToken: String?, id: String): StatusDto =
         get(serverUrl, accessToken, "api/v1/statuses/$id") {}

@@ -110,6 +110,7 @@ enum class PostCardMode {
  * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (未ログイン時など)。
  * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (未ログイン時など)。
  * @param onReply アクション行のリプライが押されたとき。`null` なら表示のみ。
+ * @param onHashtagClick 本文のハッシュタグが押されたとき (`#` を除いた名前)。`null` ならブラウザで開く。
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
  *   返信関係が別の形で分かる場所では `false` にする。
  * @param mode 表示の種類 ([PostCardMode])。
@@ -127,6 +128,7 @@ fun PostCard(
     onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     onAction: OnPostAction? = null,
     onReply: ((Post) -> Unit)? = null,
+    onHashtagClick: ((String) -> Unit)? = null,
     showReplyIndicator: Boolean = true,
     mode: PostCardMode = PostCardMode.Full,
     authorTrailing: (@Composable () -> Unit)? = null,
@@ -171,7 +173,7 @@ fun PostCard(
                             emojis = post.emojis,
                             stateKey = post.statusId,
                             maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
-                            onLinkClick = rememberPostLinkHandler(post, onUserClick),
+                            onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
                         )
                         if (full) {
                             post.poll?.let { poll ->
@@ -209,6 +211,7 @@ fun PostCard(
                                     maxHeight = mediaHeight,
                                     onPostClick = onPostClick,
                                     onUserClick = onUserClick,
+                                    onHashtagClick = onHashtagClick,
                                     onMediaClick = onMediaClick,
                                     modifier = Modifier.padding(top = 8.dp),
                                 )

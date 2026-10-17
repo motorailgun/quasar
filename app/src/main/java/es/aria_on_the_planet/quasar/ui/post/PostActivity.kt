@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.ui.hashtag.openHashtag
 import es.aria_on_the_planet.quasar.ui.profile.openProfile
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 
@@ -43,6 +44,7 @@ class PostActivity : ComponentActivity() {
                     onUserClick = ::openProfile,
                     onPostClick = { post -> if (post.statusId != statusId) openPost(post) },
                     onMediaClick = ::openMedia,
+                    onHashtagClick = ::openHashtag,
                 )
             }
         }

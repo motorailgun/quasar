@@ -56,6 +56,13 @@ data class MentionDto(
     val url: String = "",
 )
 
+/** https://docs.joinmastodon.org/entities/Status/#Tag */
+@Serializable
+data class StatusTagDto(
+    val name: String,
+    val url: String = "",
+)
+
 /** Status.application: https://docs.joinmastodon.org/entities/Status/#application */
 @Serializable
 data class ApplicationDto(
@@ -260,6 +267,7 @@ data class StatusDto(
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
     @SerialName("in_reply_to_account_id") val inReplyToAccountId: String? = null,
     val mentions: List<MentionDto> = emptyList(),
+    val tags: List<StatusTagDto> = emptyList(),
     @SerialName("replies_count") val repliesCount: Int = 0,
     @SerialName("reblogs_count") val reblogsCount: Int = 0,
     @SerialName("favourites_count") val favouritesCount: Int = 0,

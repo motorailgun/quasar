@@ -30,6 +30,9 @@
             android:name=".ui.follows.FollowListActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.hashtag.HashtagActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.post.PostActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />

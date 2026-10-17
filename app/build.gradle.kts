@@ -55,9 +55,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     // 予測型「戻る」(NavigationBackHandler)
     implementation(libs.androidx.navigationevent.compose)
-    // 設定画面の中の画面遷移
+    // 画面遷移 (Activity は 1 つで、画面の行き来は Navigation 3)。ViewModel は画面 (エントリ) ごと
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     // 設定の保存
     implementation(libs.androidx.datastore.preferences)
     implementation(platform(libs.androidx.compose.bom))

@@ -6,14 +6,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
@@ -23,6 +15,8 @@ import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
+import es.aria_on_the_planet.quasar.ui.navigation.popTransition
+import es.aria_on_the_planet.quasar.ui.navigation.pushTransition
 import kotlinx.serialization.Serializable
 
 /** 設定のページ (Navigation 3 のキー)。トップから各ページへ進む。 */
@@ -67,10 +61,10 @@ class SettingsActivity : ComponentActivity() {
                             ConfirmationSettingsPage(settings.confirmations, update, onBack = back)
                         }
                     },
-                    transitionSpec = { settingsPushTransition() },
-                    popTransitionSpec = { settingsPopTransition() },
+                    transitionSpec = { pushTransition() },
+                    popTransitionSpec = { popTransition() },
                     // 予測型「戻る」はジェスチャの進み具合でこのアニメーションを動かす
-                    predictivePopTransitionSpec = { settingsPopTransition() },
+                    predictivePopTransitionSpec = { popTransition() },
                 )
             }
         }
@@ -80,31 +74,6 @@ class SettingsActivity : ComponentActivity() {
         fun newIntent(context: Context): Intent = Intent(context, SettingsActivity::class.java)
     }
 }
-
-/*
- * ページの切り替え (AOSP の設定画面と同じスライド)。進むときは新しいページが右端から全体で入り、元のページは
- * 左へ少しずれながら薄くなる。戻るときはその逆 (今のページが右へ抜け、下のページが左から戻る)。
- */
-
-/** Material の emphasized の曲線 (AOSP のページ遷移と同じ)。 */
-private val Emphasized = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-private const val TransitionMillis = 450
-
-/** 下になるページがずれる量 (幅に対する割合)。 */
-private const val UnderlapFraction = 4
-
-private fun <T> slideSpec() = tween<T>(TransitionMillis, easing = Emphasized)
-
-private fun settingsPushTransition(): ContentTransform =
-    slideInHorizontally(slideSpec()) { it } togetherWith
-        (slideOutHorizontally(slideSpec()) { -it / UnderlapFraction } + fadeOut(slideSpec()))
-
-/** 戻るときは抜けていく今のページを上に描く (戻り先のページを下に置く)。 */
-private fun settingsPopTransition(): ContentTransform = ContentTransform(
-    targetContentEnter = slideInHorizontally(slideSpec()) { -it / UnderlapFraction } + fadeIn(slideSpec()),
-    initialContentExit = slideOutHorizontally(slideSpec()) { it },
-    targetContentZIndex = -1f,
-)
 
 /** 設定画面を開く。 */
 fun Context.openSettings() {

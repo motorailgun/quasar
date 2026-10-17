@@ -23,12 +23,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- PiP 対応時に再生を途切れさせないよう、画面サイズの変更は自前で受ける (supportsPictureInPicture は未設定) -->
-        <activity
-            android:name=".ui.mediaviewer.MediaViewerActivity"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
-            android:exported="false"
-            android:theme="@style/Theme.Quasar.MediaViewer" />
     </application>
 
 </manifest>

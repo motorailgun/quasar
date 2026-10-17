@@ -1,8 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.navigation
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -23,7 +21,6 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.di.AppContainer
-import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
@@ -35,7 +32,8 @@ import es.aria_on_the_planet.quasar.ui.follows.FollowListViewModel
 import es.aria_on_the_planet.quasar.ui.hashtag.HashtagScreen
 import es.aria_on_the_planet.quasar.ui.hashtag.HashtagViewModel
 import es.aria_on_the_planet.quasar.ui.login.LoginScreen
-import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerActivity
+import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
+import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import es.aria_on_the_planet.quasar.ui.post.PostScreen
 import es.aria_on_the_planet.quasar.ui.post.PostViewModel
@@ -89,6 +87,8 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
             ),
+            // メディアビューアは下の画面に重ねる (それ以外は 1 画面ずつ)
+            sceneStrategies = remember { listOf(OverlaySceneStrategy()) },
             transitionSpec = { pushTransition() },
             popTransitionSpec = { popTransition() },
             predictivePopTransitionSpec = { popTransition() },
@@ -100,6 +100,7 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
                 entry<Route.Hashtag> { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
                 entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
                 entry<Route.Composer> { ComposerEntry(container, navigator) }
+                mediaViewerEntry(container, onBack = navigator::back)
                 settingsEntries(settings ?: AppSettings(), container, navigator) { backStack.add(it) }
             },
         )
@@ -144,18 +145,11 @@ private class BackStackNavigator(
     }
 
     override fun openMedia(click: MediaClick) {
-        if (click.attachment.type == MediaType.Unknown) {
-            click.attachment.originalUrl?.let { url ->
-                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-            }
-            return
-        }
-        openMediaViewer(MediaViewerArgs.from(click))
+        openMedia(context, click, ::openMediaViewer)
     }
 
     override fun openMediaViewer(args: MediaViewerArgs) {
-        // メディアビューアはまだ Activity (移行の段階 2 で重ね表示にする)
-        context.startActivity(MediaViewerActivity.newIntent(context, args))
+        backStack.add(Route.MediaViewer(args))
     }
 
     override fun openSettings() {

@@ -33,8 +33,25 @@ import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyTargetPreview
+import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
-import es.aria_on_the_planet.quasar.ui.mediaviewer.openMediaViewer
+import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
+import es.aria_on_the_planet.quasar.ui.navigation.Navigator
+import es.aria_on_the_planet.quasar.ui.navigation.OverlaySceneStrategy
+import es.aria_on_the_planet.quasar.ui.navigation.Route
+import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
+import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
+import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.User
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
+import kotlinx.serialization.Serializable
 import es.aria_on_the_planet.quasar.ui.profile.ProfileHeader
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 
@@ -61,12 +78,32 @@ class DebugGalleryActivity : ComponentActivity() {
         setContent {
             QuasarAppContent(container) {
                 val settings = LocalDisplaySettings.current.overriddenBy(overrides)
-                CompositionLocalProvider(LocalDisplaySettings provides settings) {
-                    if (scenario == null) {
-                        GalleryIndex(onBack = ::finish, onOpen = { startActivity(newIntent(this, it, overrides)) })
-                    } else {
-                        GalleryScreen(scenario, onBack = ::finish)
-                    }
+                // メディアビューアはアプリ本体と同じく、ギャラリーの画面に重ねて出す
+                val backStack = rememberNavBackStack(GalleryHome)
+                val context = LocalContext.current
+                val navigator = remember(backStack) {
+                    GalleryNavigator(context, backStack, onExit = ::finish)
+                }
+                CompositionLocalProvider(LocalDisplaySettings provides settings, LocalNavigator provides navigator) {
+                    NavDisplay(
+                        backStack = backStack,
+                        onBack = navigator::back,
+                        entryDecorators = listOf(
+                            rememberSaveableStateHolderNavEntryDecorator(),
+                            rememberViewModelStoreNavEntryDecorator(),
+                        ),
+                        sceneStrategies = remember { listOf(OverlaySceneStrategy()) },
+                        entryProvider = entryProvider {
+                            entry<GalleryHome> {
+                                if (scenario == null) {
+                                    GalleryIndex(onBack = ::finish, onOpen = { startActivity(newIntent(this@DebugGalleryActivity, it, overrides)) })
+                                } else {
+                                    GalleryScreen(scenario, onBack = ::finish)
+                                }
+                            }
+                            mediaViewerEntry(container, onBack = navigator::back)
+                        },
+                    )
                 }
             }
         }
@@ -79,6 +116,32 @@ class DebugGalleryActivity : ComponentActivity() {
                 overrides?.let(::putExtras)
                 putExtra(GalleryExtras.Scenario, scenario.id)
             }
+    }
+}
+
+/** ギャラリーの画面 (バックスタックの一番下)。シナリオは Activity の extra で決まる。 */
+@Serializable
+private data object GalleryHome : NavKey
+
+/** ギャラリーの遷移: メディアビューアだけ開く (プロフィール等への遷移はデータ層を通らないので無効)。 */
+private class GalleryNavigator(
+    private val context: Context,
+    private val backStack: NavBackStack<NavKey>,
+    private val onExit: () -> Unit,
+) : Navigator {
+    override fun openProfile(user: User) = Unit
+    override fun openPost(post: Post) = Unit
+    override fun openHashtag(name: String) = Unit
+    override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
+    override fun openComposer() = Unit
+    override fun openSettings() = Unit
+    override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
+    override fun openMediaViewer(args: MediaViewerArgs) {
+        backStack.add(Route.MediaViewer(args))
+    }
+
+    override fun back() {
+        if (backStack.size > 1) backStack.removeLastOrNull() else onExit()
     }
 }
 
@@ -107,6 +170,7 @@ private fun GalleryIndex(onBack: () -> Unit, onOpen: (GalleryScenario) -> Unit) 
 @Composable
 private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
     val context = LocalContext.current
+    val navigator = LocalNavigator.current
     val text = remember(scenario) {
         context.assets.open("gallery/${scenario.fixture}").bufferedReader().use { it.readText() }
     }
@@ -129,8 +193,8 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                 PostList(
                     items = fixture.posts.map(TimelineItem::PostItem),
                     state = listState,
-                    onMediaClick = context::openMedia,
-                    header = { item(key = "header") { ProfileHeader(profile = fixture.profile, onOpenImage = context::openMediaViewer) } },
+                    onMediaClick = navigator::openMedia,
+                    header = { item(key = "header") { ProfileHeader(profile = fixture.profile, onOpenImage = navigator::openMediaViewer) } },
                 )
             }
 
@@ -143,10 +207,10 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                             ReplyTargetPreview(
                                 post = post,
                                 onCancel = {},
-                                onMediaClick = context::openMedia,
+                                onMediaClick = navigator::openMedia,
                                 modifier = Modifier.padding(12.dp),
                             )
-                            ReplyContext(post = post, myAcct = null, onCancel = {}, onMediaClick = context::openMedia)
+                            ReplyContext(post = post, myAcct = null, onCancel = {}, onMediaClick = navigator::openMedia)
                             HorizontalDivider(thickness = 4.dp)
                         }
                     }
@@ -161,7 +225,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                 PostList(
                     items = posts.map(TimelineItem::PostItem),
                     state = listState,
-                    onMediaClick = context::openMedia,
+                    onMediaClick = navigator::openMedia,
                 )
             }
         }

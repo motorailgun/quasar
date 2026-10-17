@@ -31,6 +31,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,7 +70,7 @@ import kotlinx.coroutines.launch
  *
  * 上部バー・再生操作・システムバーはタップで出し入れする。再生中は画面を消さず、背面に回ったら (ON_STOP) 一時停止する。
  *
- * @param onDismissed 閉じるアニメーションが終わった後 (Activity を finish する)。
+ * @param onDismissed 閉じるアニメーションが終わった後 (画面をバックスタックから外す)。
  * @param onSave 保存。受け付けたら保存先、失敗なら `null` を返す (結果はスナックバーで知らせる)。`null` ならメニューに出さない。
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -88,7 +89,7 @@ fun MediaViewerScreen(
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
     // 表示中の画像を拡大している間は、ページ切り替えと上下スワイプで閉じる操作を止める (1 本指は画像の移動に使う)
     var zoomed by remember { mutableStateOf(false) }
-    SystemBarsVisibilityEffect(controlsVisible)
+    SystemBarsEffect(controlsVisible)
     val isPlaying by rememberIsPlaying(viewModel.playback.player)
     val uriHandler = LocalUriHandler.current
     val openUrl: (String) -> Unit = { url -> runCatching { uriHandler.openUri(url) } }
@@ -187,13 +188,32 @@ private val SaveDirectory.folderName: String
         SaveDirectory.Downloads -> "Download"
     }
 
-/** 操作部分と一緒にシステムバーも出し入れする (隠している間は端からのスワイプで一時的に出る)。 */
+/**
+ * 操作部分と一緒にシステムバーも出し入れする (隠している間は端からのスワイプで一時的に出る)。黒い背景の上なので、
+ * 表示中はシステムバーのアイコンを白にする。ビューアは下の画面と同じウィンドウに重ねているので、閉じたら元に戻す。
+ */
 @Composable
-private fun SystemBarsVisibilityEffect(visible: Boolean) {
-    val window = LocalActivity.current?.window ?: return
+private fun SystemBarsEffect(visible: Boolean) {
+    val window = LocalActivity.current?.window
+    DisposableEffect(window) {
+        val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        val lightStatusBars = controller?.isAppearanceLightStatusBars
+        val lightNavigationBars = controller?.isAppearanceLightNavigationBars
+        val behavior = controller?.systemBarsBehavior
+        controller?.isAppearanceLightStatusBars = false
+        controller?.isAppearanceLightNavigationBars = false
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        onDispose {
+            if (controller != null) {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                lightStatusBars?.let { controller.isAppearanceLightStatusBars = it }
+                lightNavigationBars?.let { controller.isAppearanceLightNavigationBars = it }
+                behavior?.let { controller.systemBarsBehavior = it }
+            }
+        }
+    }
     LaunchedEffect(window, visible) {
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) } ?: return@LaunchedEffect
         if (visible) {
             controller.show(WindowInsetsCompat.Type.systemBars())
         } else {

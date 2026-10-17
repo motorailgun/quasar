@@ -149,7 +149,7 @@ class DismissibleViewerState internal constructor(
 
 /**
  * @param target 閉じるときに縮んで戻る先。閉じ始めた時点で呼ぶ。
- * @param onDismissed 閉じるアニメーションが終わった後 (Activity を finish する)。
+ * @param onDismissed 閉じるアニメーションが終わった後 (画面をバックスタックから外す)。
  */
 @Composable
 fun rememberDismissibleViewerState(

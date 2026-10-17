@@ -789,6 +789,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## テーマ / 色
 
 * `QuasarTheme` は dynamic color + `MaterialExpressiveTheme`。
+* **ウィンドウの背景は最上位で決める (各画面・部品で後ろに背景を敷かない)**: Compose が描いていない所 (画面・ページの
+  切り替えで半透明になった間、最初のフレームの前) に見えるのはウィンドウの背景。
+  * Compose が描き始める前: テーマ (`res/values[-night]/themes.xml` の `Theme.Quasar`) の `windowBackground`。端末の
+    dynamic color のニュートラル (ライト `system_neutral1_10` / ダーク `system_neutral1_900`) で、Material 3 の background に近い。
+  * 描き始めたら: `QuasarAppContent` の `SyncWindowBackground()` (`ui/theme/WindowBackground.kt`) がテーマの `background` に合わせる。
+    透過ウィンドウ (`windowIsTranslucent`、メディアビューア) はテーマの属性で見分けて触らない。
+  * 以前はテーマが Light 固定でウィンドウが白く、ダークテーマで設定画面のページ切り替えの間に光っていた。
 * アプリ独自の意味を持つ色は Material 3 の Custom colors として `MaterialTheme.extendedColors` (`ui/theme/ExtendedColors.kt`)
   で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3) を dynamic color の primary に harmonize し、
   ライト/ダークに応じた役割色 (color / onColor / container / onContainer) を MDC の `MaterialColors` で作る。

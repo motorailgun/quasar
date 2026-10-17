@@ -1,5 +1,10 @@
 <resources>
-    <style name="Theme.Quasar" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- ウィンドウの背景は Compose が描き始めるまでの色 (描き始めたら QuasarAppContent がテーマの background に合わせる)。
+         端末の dynamic color のニュートラル (Material 3 の background に近いトーン) にして、ライト / ダークで切り替える
+         (ダークは values-night)。白のままだとダークテーマで画面の出入り・ページ切り替えの間に光る -->
+    <style name="Theme.Quasar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/system_neutral1_10</item>
+    </style>
 
     <!-- メディアビューア: 上下スワイプで閉じるときに元の画面が透けて見えるよう透過にする。
          黒背景と出入りのアニメーションは Compose 側 (DismissibleViewer) で描くので、ウィンドウのアニメーションは無し -->

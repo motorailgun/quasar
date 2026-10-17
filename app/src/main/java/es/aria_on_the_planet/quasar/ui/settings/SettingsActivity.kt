@@ -14,10 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -26,7 +23,6 @@ import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
-import es.aria_on_the_planet.quasar.ui.component.settings.settingsBackgroundColor
 import kotlinx.serialization.Serializable
 
 /** 設定のページ (Navigation 3 のキー)。トップから各ページへ進む。 */
@@ -58,11 +54,6 @@ class SettingsActivity : ComponentActivity() {
                 val update = store::launchUpdate
                 NavDisplay(
                     backStack = backStack,
-                    // 切り替え中はページが半透明になるので、後ろにページと同じ色を敷く。無いとウィンドウの背景
-                    // (テーマが Light 固定なので白) が透けて、ダークテーマで一瞬光る
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(settingsBackgroundColor()),
                     onBack = back,
                     entryProvider = entryProvider {
                         entry<SettingsRoute.Top> { SettingsTopPage(onNavigate = navigate, onBack = back) }

@@ -22,16 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
-
-/** 設定のページの背景色。ページの切り替え中に後ろへ敷く色も同じにする (`SettingsActivity`)。 */
-@Composable
-fun settingsBackgroundColor(): Color = MaterialTheme.colorScheme.surfaceContainer
 
 /**
  * 設定のページの骨組み (AOSP の設定画面の形)。大きいタイトルがスクロールでトップバーに縮み、戻るは丸い面付きのボタン。
@@ -46,7 +41,7 @@ fun SettingsScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val background = settingsBackgroundColor()
+    val background = MaterialTheme.colorScheme.surfaceContainer
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = background,

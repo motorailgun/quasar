@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,7 +41,7 @@ import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
-import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
+import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 
 /**
  * フルの投稿画面。トップバーの Post で送信する。返信中は上に返信先 ([ReplyContext]、✕ で返信をやめる) を出す。
@@ -84,7 +83,6 @@ fun ComposerScreen(
     }
 
     val openMediaPicker = rememberMediaPicker(session)
-    val context = LocalContext.current
     val replyTarget = composer.inReplyTo
 
     val requestClose = {
@@ -147,7 +145,7 @@ fun ComposerScreen(
                         post = target,
                         myAcct = state.account?.screenName,
                         onCancel = session::cancelReply,
-                        onMediaClick = context::openMedia,
+                        onMediaClick = LocalNavigator.current::openMedia,
                     )
                 }
             },

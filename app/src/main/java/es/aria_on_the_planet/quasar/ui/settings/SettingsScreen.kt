@@ -25,6 +25,7 @@ import es.aria_on_the_planet.quasar.ui.component.settings.SettingsScaffold
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSliderItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSplitSwitchItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSwitchItem
+import es.aria_on_the_planet.quasar.ui.navigation.Route
 import kotlin.math.roundToInt
 
 /** 設定を変える (`SettingsStore.launchUpdate`)。 */
@@ -32,32 +33,32 @@ typealias UpdateSettings = ((AppSettings) -> AppSettings) -> Unit
 
 /** トップ: 各ページへの入口。 */
 @Composable
-fun SettingsTopPage(onNavigate: (SettingsRoute) -> Unit, onBack: () -> Unit) {
+fun SettingsTopPage(onNavigate: (Route) -> Unit, onBack: () -> Unit) {
     SettingsScaffold(title = stringResource(R.string.settings), onBack = onBack) {
         SettingsGroup(title = null) {
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_display),
                 summary = stringResource(R.string.settings_display_summary),
                 icon = Icons.Outlined.Palette,
-                onClick = { onNavigate(SettingsRoute.Display) },
+                onClick = { onNavigate(Route.SettingsDisplay) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_timelines),
                 summary = stringResource(R.string.settings_timelines_summary),
                 icon = Icons.Outlined.Sync,
-                onClick = { onNavigate(SettingsRoute.Timelines) },
+                onClick = { onNavigate(Route.SettingsTimelines) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_posting),
                 summary = stringResource(R.string.settings_posting_summary),
                 icon = Icons.Outlined.Edit,
-                onClick = { onNavigate(SettingsRoute.Posting) },
+                onClick = { onNavigate(Route.SettingsPosting) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_confirmations),
                 summary = stringResource(R.string.settings_confirmations_summary),
                 icon = Icons.Outlined.TaskAlt,
-                onClick = { onNavigate(SettingsRoute.Confirmations) },
+                onClick = { onNavigate(Route.SettingsConfirmations) },
             )
         }
     }
@@ -71,7 +72,7 @@ private val MaxFpsChoices = listOf(15, 30, 60, null)
 fun DisplaySettingsPage(
     display: DisplaySettings,
     update: UpdateSettings,
-    onNavigate: (SettingsRoute) -> Unit,
+    onNavigate: (Route) -> Unit,
     onBack: () -> Unit,
 ) {
     fun updateDisplay(transform: DisplaySettings.() -> DisplaySettings) = update { it.copy(display = it.display.transform()) }
@@ -115,7 +116,7 @@ fun DisplaySettingsPage(
                 ),
                 checked = display.animateImages,
                 onCheckedChange = { checked -> updateDisplay { copy(animateImages = checked) } },
-                onClick = { onNavigate(SettingsRoute.Animation) },
+                onClick = { onNavigate(Route.SettingsAnimation) },
             )
             SettingsChoiceItem(
                 title = stringResource(R.string.settings_animation_max_fps),

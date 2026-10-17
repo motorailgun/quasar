@@ -52,7 +52,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -67,6 +66,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.list.scrollToTop
@@ -76,11 +76,7 @@ import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
 import es.aria_on_the_planet.quasar.ui.composer.rememberQuickPostBarState
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
-import es.aria_on_the_planet.quasar.ui.post.openPost
-import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
-import es.aria_on_the_planet.quasar.ui.hashtag.openHashtag
-import es.aria_on_the_planet.quasar.ui.profile.openProfile
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -89,7 +85,6 @@ import kotlin.math.abs
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     onLogout: () -> Unit,
-    onOpenSettings: () -> Unit,
     drafts: DraftStore,
     canPost: Boolean,
 ) {
@@ -101,7 +96,7 @@ fun TimelineScreen(
     val pagerState = rememberPagerState(initialPage = state.available.indexOf(state.selected)) { state.available.size }
     val dragging by pagerState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val navigator = LocalNavigator.current
 
     // スワイプで切り替わったら選択に反映する (ボタンで選んだときは先に select 済み)
     LaunchedEffect(pagerState) {
@@ -135,7 +130,7 @@ fun TimelineScreen(
             barState.requestInput()
         }
     }
-    val onHashtagClick: (String) -> Unit = context::openHashtag
+    val onHashtagClick: (String) -> Unit = navigator::openHashtag
 
     QuickComposerHost(
         drafts = drafts,
@@ -143,7 +138,7 @@ fun TimelineScreen(
         snackbarHostState = snackbarHostState,
         enabled = canPost,
         barState = barState,
-        onMediaClick = context::openMedia,
+        onMediaClick = navigator::openMedia,
     ) { barSpace ->
         // 一覧の上端はヘッダ (ステータスバーを含む) の分だけ空ける。一覧自体は画面の最上端から描き、スクロールすると
         // ステータスバーやヘッダの裏に入る
@@ -197,7 +192,7 @@ fun TimelineScreen(
                         }
                     },
                     onLogout = onLogout,
-                    onOpenSettings = onOpenSettings,
+                    onOpenSettings = navigator::openSettings,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
@@ -220,7 +215,7 @@ private fun ColumnPage(
     onReply: ((Post) -> Unit)?,
     onHashtagClick: ((String) -> Unit)?,
 ) {
-    val context = LocalContext.current
+    val navigator = LocalNavigator.current
     val feed = state.feedOf(column)
     val pullState = rememberPullToRefreshState()
     val isRefreshing = feed.isRefreshing && feed.items.isNotEmpty()
@@ -240,7 +235,7 @@ private fun ColumnPage(
     ) {
         val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
         val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
-        val onMediaClick: (MediaClick) -> Unit = context::openMedia
+        val onMediaClick: (MediaClick) -> Unit = navigator::openMedia
         val timelineType = column.timeline
         when {
             feed.items.isEmpty() && (feed.isRefreshing || !feed.loaded) ->
@@ -259,8 +254,8 @@ private fun ColumnPage(
                 contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
-                onUserClick = context::openProfile,
-                onPostClick = context::openPost,
+                onUserClick = navigator::openProfile,
+                onPostClick = navigator::openPost,
                 onMediaClick = onMediaClick,
                 onVote = onVote,
                 onAction = onAction,
@@ -275,8 +270,8 @@ private fun ColumnPage(
                 contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
-                onUserClick = context::openProfile,
-                onPostClick = context::openPost,
+                onUserClick = navigator::openProfile,
+                onPostClick = navigator::openPost,
                 onVote = onVote,
                 onAction = onAction,
                 onReply = onReply,

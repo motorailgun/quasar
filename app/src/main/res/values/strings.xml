@@ -227,4 +227,81 @@
     <string name="composer_replying_to">Replying to %1$s</string>
     <string name="composer_cancel_reply">Cancel reply</string>
     <string name="account_menu">Account</string>
+    <!-- 操作の前の確認 -->
+    <string name="ok">OK</string>
+    <string name="confirm_post_title">Post this?</string>
+    <string name="confirm_post">Post</string>
+    <string name="confirm_boost_title">Boost this post?</string>
+    <string name="confirm_boost">Boost</string>
+    <string name="confirm_unboost_title">Undo boost?</string>
+    <string name="confirm_unboost">Undo boost</string>
+    <string name="confirm_favourite_title">Favourite this post?</string>
+    <string name="confirm_favourite">Favourite</string>
+    <string name="confirm_unfavourite_title">Remove from favourites?</string>
+    <string name="confirm_bookmark_title">Bookmark this post?</string>
+    <string name="confirm_bookmark">Bookmark</string>
+    <string name="confirm_unbookmark_title">Remove bookmark?</string>
+    <string name="confirm_remove">Remove</string>
+
+    <!-- 設定 -->
+    <string name="settings">Settings</string>
+    <string name="settings_display">Display</string>
+    <string name="settings_display_summary">Long posts, blur, animation</string>
+    <string name="settings_timelines">Timelines</string>
+    <string name="settings_timelines_summary">Auto-update, notifications</string>
+    <string name="settings_posting">Posting</string>
+    <string name="settings_posting_summary">Default visibility, confirm before posting</string>
+    <string name="settings_confirmations">Confirmations</string>
+    <string name="settings_confirmations_summary">Boost, favourite, bookmark</string>
+
+    <string name="settings_posts">Posts</string>
+    <string name="settings_long_post_max_lines">Collapse long posts</string>
+    <string name="settings_off">Off</string>
+    <plurals name="settings_lines">
+        <item quantity="one">After %d line</item>
+        <item quantity="other">After %d lines</item>
+    </plurals>
+    <string name="settings_blur">Blur</string>
+    <string name="settings_blur_radius">Blur strength</string>
+    <string name="settings_blur_radius_value">%d dp</string>
+    <string name="settings_blur_tint">Tint</string>
+    <string name="settings_percent">%d%%</string>
+    <string name="settings_animation">Animation</string>
+    <string name="settings_animate_images">Animate images</string>
+    <string name="settings_animate_images_summary">GIF, APNG and animated WebP</string>
+    <string name="settings_animate_images_off">Images don\'t move</string>
+    <string name="settings_animate_post_emojis">Emojis in posts</string>
+    <string name="settings_animate_post_emojis_summary">Post text, content warnings, polls</string>
+    <string name="settings_animate_other_emojis">Other emojis</string>
+    <string name="settings_animate_other_emojis_summary">Names, profiles, emoji picker</string>
+    <string name="settings_animate_avatars">Avatars</string>
+    <string name="settings_animation_max_fps">Emoji &amp; avatar frame rate</string>
+    <string name="settings_fps">Up to %d fps</string>
+    <string name="settings_no_limit">No limit</string>
+
+    <string name="settings_auto_update">Auto-update</string>
+    <string name="settings_stream_summary">Show new items as they arrive</string>
+    <string name="settings_stream_global_summary">Busy on large servers. Uses more data and battery</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notification_api">Grouping</string>
+    <string name="settings_notification_api_grouped">Grouped</string>
+    <string name="settings_notification_api_grouped_description">Similar notifications are combined by the server (Mastodon 4.3 or later)</string>
+    <string name="settings_notification_api_ungrouped">Individual</string>
+    <string name="settings_notification_api_ungrouped_description">Every notification on its own row</string>
+
+    <string name="settings_default_visibility">Default visibility</string>
+    <string name="settings_visibility_account_default">Account default</string>
+    <string name="settings_visibility_account_default_description">The default set for your account on the server</string>
+    <string name="settings_confirm_post">Confirm before posting</string>
+
+    <string name="settings_confirm_summary">Ask before sending</string>
+    <string name="settings_boost">Boost</string>
+    <string name="settings_favourite">Favourite</string>
+    <string name="settings_bookmark">Bookmark</string>
+    <string name="settings_confirm_boost">Boost</string>
+    <string name="settings_confirm_unboost">Undo boost</string>
+    <string name="settings_confirm_favourite">Favourite</string>
+    <string name="settings_confirm_unfavourite">Undo favourite</string>
+    <string name="settings_confirm_bookmark">Bookmark</string>
+    <string name="settings_confirm_unbookmark">Remove bookmark</string>
 </resources>

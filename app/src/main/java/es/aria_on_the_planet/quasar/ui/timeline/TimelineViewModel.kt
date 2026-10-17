@@ -25,7 +25,17 @@ import es.aria_on_the_planet.quasar.ui.notification.NotificationEntry
 import es.aria_on_the_planet.quasar.ui.notification.appendNotificationPage
 import es.aria_on_the_planet.quasar.ui.notification.mapGroups
 import es.aria_on_the_planet.quasar.ui.notification.nextNotificationMaxId
+import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
+import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -60,6 +70,8 @@ class TimelineViewModel(
     private val statusRepository: StatusRepository,
     private val notificationRepository: NotificationRepository,
     private val streamingClient: StreamingClient,
+    /** 設定 (読み込み後の値の流れ)。自動更新するカラムと通知の取得 API を決める。 */
+    private val settings: Flow<AppSettings>,
 ) : ViewModel() {
 
     /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
@@ -82,7 +94,9 @@ class TimelineViewModel(
         // ストリーム・補完で伸びたら古い側を捨てる (gap は作らない)
         trim = { it.take(MaxNotificationEntries) },
         nextMaxIdOfItems = { entries -> nextNotificationMaxId(entries.flatMap { it.groups }) },
-    ) { maxId -> notificationRepository.fetch(session, maxId) }
+    ) { maxId -> notificationRepository.fetch(session, notificationApi(), maxId) }
+
+    private suspend fun notificationApi(): NotificationApi = settings.first().notificationApi
 
     private val selected = MutableStateFlow(available.first())
 
@@ -100,6 +114,12 @@ class TimelineViewModel(
 
     init {
         refresh(selected.value)
+        // 通知の取得 API を切り替えたら、混ざらないよう読み直す (未読み込みなら開いたときに新しい方で読む)
+        viewModelScope.launch {
+            settings.map { it.notificationApi }.distinctUntilChanged().drop(1).collect {
+                if (notifications.state.value.loaded) notifications.refresh()
+            }
+        }
     }
 
     fun select(column: ColumnType) {
@@ -123,33 +143,42 @@ class TimelineViewModel(
         if (type != null) feeds.getValue(type).loadMore() else notifications.loadMore()
     }
 
-    private val sync = TimelineSync(
+    /** [streaming] の設定で自動更新するカラムだけを扱う [TimelineSync]。 */
+    private fun syncFor(streaming: StreamingSettings, notificationApi: NotificationApi) = TimelineSync(
         scope = viewModelScope,
         timelines = feeds,
-        streamedTimelines = streamChannelsFor(available, includeGlobal = StreamGlobalTimeline)
-            .map { it.timelineType }
-            .filterTo(HashSet()) { it in feeds },
-        notifications = notifications.takeIf { ColumnType.Notifications in available },
+        streamedTimelines = streamedTimelinesFor(available, streaming).filterTo(HashSet()) { it in feeds },
+        notifications = notifications.takeIf {
+            ColumnType.Notifications in available && streaming.isEnabled(ColumnType.Notifications)
+        },
         fetchPosts = { type, maxId, sinceId -> repository.fetch(session, type, maxId = maxId, sinceId = sinceId) },
-        fetchNewerNotifications = { sinceId -> notificationRepository.fetch(session, sinceId = sinceId) },
-        toGroup = notificationRepository::toGroup,
+        fetchNewerNotifications = { sinceId -> notificationRepository.fetch(session, notificationApi, sinceId = sinceId) },
+        toGroup = { notificationRepository.toGroup(it, notificationApi) },
         pageLimit = MastodonApi.DEFAULT_LIMIT,
         onError = { message, error -> Log.w(TAG, message, error) },
     )
 
+    /** gap の読み込み用 (gap はタイムラインにしか無く、自動更新の設定には関わらない)。 */
+    private val gapSync = syncFor(StreamingSettings(home = false, notifications = false, local = false), NotificationApi.Grouped)
+
     /**
      * ストリーミングでカラムを自動更新する。collect している間 (= 画面が前面にある間) だけ接続し、
-     * 呼び出し側のコルーチンがキャンセルされると切断する。グローバルは流量が多いので通常は購読しない。
+     * 呼び出し側のコルーチンがキャンセルされると切断する。自動更新がオフのカラムの分は購読しない。
+     * 設定が変わったら接続し直す (再接続時の補完で、オンにしたカラムの抜けも埋まる)。
      */
     suspend fun stream() {
-        val channels = streamChannelsFor(available, includeGlobal = StreamGlobalTimeline)
-        streamingClient.events(session, channels).collect(sync::handle)
+        settings.map { it.streaming to it.notificationApi }.distinctUntilChanged().collectLatest { (streaming, api) ->
+            val channels = streamChannelsFor(available, streaming)
+            if (channels.isEmpty()) return@collectLatest
+            val sync = syncFor(streaming, api)
+            streamingClient.events(session, channels).collect(sync::handle)
+        }
     }
 
     /** gap (未取得の区間) を上側から 1 ページ分埋める。 */
     fun fillGap(column: ColumnType, gap: TimelineItem.Gap) {
         val type = column.timeline ?: return
-        sync.fillGap(type, gap)
+        gapSync.fillGap(type, gap)
     }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
@@ -180,9 +209,6 @@ class TimelineViewModel(
         const val TAG = "TimelineViewModel"
         /** 通知一覧の最大行数。 */
         const val MaxNotificationEntries = 400
-
-        /** グローバルもストリーミング・補完するか。流量が多いので通常は無効 (動作確認用のスイッチ)。 */
-        const val StreamGlobalTimeline = false
     }
 
     private fun snapshot() = TimelineScreenState(

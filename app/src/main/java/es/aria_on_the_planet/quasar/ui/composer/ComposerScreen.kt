@@ -108,7 +108,7 @@ fun ComposerScreen(
                 },
                 actions = {
                     Button(
-                        onClick = session::submit,
+                        onClick = rememberConfirmedSubmit(session),
                         enabled = canSubmit && !state.sending,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {

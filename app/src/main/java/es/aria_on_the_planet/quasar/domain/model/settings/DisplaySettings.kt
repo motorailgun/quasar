@@ -1,23 +1,16 @@
-package es.aria_on_the_planet.quasar.ui.settings
-
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+package es.aria_on_the_planet.quasar.domain.model.settings
 
 /**
- * 表示に関するユーザー設定。今は既定値のみで、将来は設定画面から変更して永続化する
- * (`AppContainer.displaySettings` を差し替える)。画面からは [LocalDisplaySettings] で読む。
+ * 表示に関するユーザー設定。設定画面で変え、`SettingsStore` が保存する。画面からは `LocalDisplaySettings` で読む。
  */
-@Immutable
 data class DisplaySettings(
     /** タイムライン等でポスト本文を折りたたむ行数。これを超える分はフェードして「Show more」。`null` なら折りたたまない。 */
     val longPostMaxLines: Int? = DefaultLongPostMaxLines,
     /**
-     * 一覧の上に浮かぶ UI (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブ) の背景のぼかしの半径。
+     * 一覧の上に浮かぶ UI (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブ) の背景のぼかしの半径 (dp)。
      * `rememberSurfaceBlurStyle` が使う。閲覧注意メディアのぼかしは別 (隠すためのものなので対象外)。
      */
-    val surfaceBlurRadius: Dp = DefaultSurfaceBlurRadius,
+    val surfaceBlurRadiusDp: Float = DefaultSurfaceBlurRadiusDp,
     /** 同じぼかしに重ねる色味の不透明度 (0〜1)。大きいほど後ろが見えにくい。 */
     val surfaceBlurTintAlpha: Float = DefaultSurfaceBlurTintAlpha,
     /**
@@ -39,10 +32,10 @@ data class DisplaySettings(
 ) {
     companion object {
         const val DefaultLongPostMaxLines = 8
-        val DefaultSurfaceBlurRadius = 6.dp
+        const val DefaultSurfaceBlurRadiusDp = 6f
+        /** ぼかしの半径の上限 (dp)。設定画面のスライダーの範囲。 */
+        const val MaxSurfaceBlurRadiusDp = 16f
         const val DefaultSurfaceBlurTintAlpha = 0.8f
         const val DefaultEmojiAvatarAnimationMaxFps = 30
     }
 }
-
-val LocalDisplaySettings = staticCompositionLocalOf { DisplaySettings() }

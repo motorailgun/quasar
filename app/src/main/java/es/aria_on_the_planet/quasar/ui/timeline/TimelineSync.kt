@@ -6,6 +6,7 @@ import es.aria_on_the_planet.quasar.domain.model.Notification
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
+import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
@@ -30,15 +31,30 @@ val StreamChannel.timelineType: TimelineType
         StreamChannel.Public -> TimelineType.Global
     }
 
+/** [column] の自動更新が設定でオンか。 */
+fun StreamingSettings.isEnabled(column: ColumnType): Boolean = when (column) {
+    ColumnType.Home -> home
+    ColumnType.Notifications -> notifications
+    ColumnType.Local -> local
+    ColumnType.Global -> global
+}
+
 /**
  * 自動更新するカラムに必要なストリーム。Home・通知は `user`、ローカル・グローバルはそれぞれのストリーム。
- * グローバルは流量が多いので [includeGlobal] のときだけ。
+ * [settings] でオフのカラムの分は購読しない (Home と通知の両方がオフなら `user` も購読しない)。
  */
-fun streamChannelsFor(columns: Collection<ColumnType>, includeGlobal: Boolean): Set<StreamChannel> = buildSet {
-    if (ColumnType.Home in columns || ColumnType.Notifications in columns) add(StreamChannel.User)
-    if (ColumnType.Local in columns) add(StreamChannel.Local)
-    if (includeGlobal && ColumnType.Global in columns) add(StreamChannel.Public)
-}
+fun streamChannelsFor(columns: Collection<ColumnType>, settings: StreamingSettings): Set<StreamChannel> =
+    columns.filter(settings::isEnabled).mapTo(HashSet()) { column ->
+        when (column) {
+            ColumnType.Home, ColumnType.Notifications -> StreamChannel.User
+            ColumnType.Local -> StreamChannel.Local
+            ColumnType.Global -> StreamChannel.Public
+        }
+    }
+
+/** 自動更新するタイムライン (通知を除く)。 */
+fun streamedTimelinesFor(columns: Collection<ColumnType>, settings: StreamingSettings): Set<TimelineType> =
+    columns.filter(settings::isEnabled).mapNotNullTo(HashSet()) { it.timeline }
 
 /**
  * ストリーミングによるカラムの自動更新 (イベントの適用・再接続時の補完・gap の読み込み) の段取り。
@@ -46,8 +62,9 @@ fun streamChannelsFor(columns: Collection<ColumnType>, includeGlobal: Boolean): 
  * ここはどのカラムに当てるか・`since_id` に何を使うか・取得の失敗をどう扱うかを決める。
  *
  * @param timelines 全てのタイムラインカラム。削除・編集はストリームしていないカラムにも当てる。
- * @param streamedTimelines ストリームで新着を受け、再接続時に補完するタイムライン。
- * @param notifications 通知カラム。ログインしていなければ `null`。
+ * @param streamedTimelines ストリームで新着を受け、再接続時に補完するタイムライン。それ以外のタイムラインは、
+ *   同じストリームで新着が届いても (Home がオフで通知がオンの `user` 等) 足さない。
+ * @param notifications 自動更新する通知カラム。ログインしていない・自動更新がオフなら `null`。
  * @param fetchPosts `maxId` より古い / `sinceId` より新しいポストを取得する。
  * @param fetchNewerNotifications `sinceId` より新しい通知を取得する。
  * @param toGroup ストリームで届いた通知を、通知一覧と同じキー体系のグループにする。
@@ -71,7 +88,8 @@ class TimelineSync(
             backfill()
             return
         }
-        val target = (event as? StreamEvent.Update)?.channel?.timelineType
+        // 新着は自動更新がオンのカラムにだけ足す (削除・編集はどのカラムにも当てる)
+        val target = (event as? StreamEvent.Update)?.channel?.timelineType?.takeIf { it in streamedTimelines }
         for ((type, feed) in timelines) {
             // 未読み込みのカラムには当てない (初回の読み込みで最新が取れる)
             if (!feed.state.value.loaded) continue

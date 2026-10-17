@@ -55,6 +55,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     // 予測型「戻る」(NavigationBackHandler)
     implementation(libs.androidx.navigationevent.compose)
+    // 設定画面の中の画面遷移
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    // 設定の保存
+    implementation(libs.androidx.datastore.preferences)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)

@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
+import es.aria_on_the_planet.quasar.ui.settings.surfaceBlurRadius
 
 /**
  * 一覧の上に浮かぶ UI の背景のぼかし (Haze)。半径と色味の濃さは [LocalDisplaySettings] の

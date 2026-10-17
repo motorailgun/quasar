@@ -8,7 +8,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
+import es.aria_on_the_planet.quasar.domain.model.settings.confirmTarget
 import es.aria_on_the_planet.quasar.domain.model.toggleOn
+import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
@@ -18,6 +20,7 @@ typealias OnPostAction = (Post, PostActionType) -> Unit
 /**
  * 操作を送る前の確認の差し込み口。確認モーダル (「ブーストしますか?」等) を出す場合はここで表示して結果を待つ。
  * `null` を返すと取りやめ。操作を変えて返してもよい (将来ブーストの公開範囲を選ばせる等)。
+ * 既定は設定に従う確認 ([rememberPostActionConfirmation])。
  */
 fun interface PostActionConfirmation {
     suspend fun confirm(post: Post, action: PostAction): PostAction?
@@ -28,6 +31,15 @@ fun interface PostActionConfirmation {
     }
 }
 
+/** 設定で確認する操作なら、確認のダイアログ ([LocalActionConfirmer]) で答えを待つ。 */
+@Composable
+fun rememberPostActionConfirmation(): PostActionConfirmation {
+    val confirmer = LocalActionConfirmer.current
+    return remember(confirmer) {
+        PostActionConfirmation { _, action -> action.takeIf { confirmer.confirm(action.confirmTarget) } }
+    }
+}
+
 /**
  * アクション行のボタンのハンドラ。押されたときのポストの状態から操作 (済みなら取り消し) を決め、
  * [confirmation] を通してから [perform] (ViewModel) に渡す。
@@ -35,7 +47,7 @@ fun interface PostActionConfirmation {
 @Composable
 fun rememberPostActionHandler(
     perform: (Post, PostAction) -> Unit,
-    confirmation: PostActionConfirmation = PostActionConfirmation.None,
+    confirmation: PostActionConfirmation = rememberPostActionConfirmation(),
 ): OnPostAction {
     val scope = rememberCoroutineScope()
     val currentPerform by rememberUpdatedState(perform)

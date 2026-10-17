@@ -9,6 +9,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.asGroup
+import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
@@ -268,10 +269,49 @@ class TimelineSyncTest {
     @Test
     fun streamChannelsFollowAvailableColumns() {
         val all = ColumnType.entries
-        assertEquals(setOf(StreamChannel.User, StreamChannel.Local), streamChannelsFor(all, includeGlobal = false))
-        assertEquals(setOf(StreamChannel.User, StreamChannel.Local, StreamChannel.Public), streamChannelsFor(all, includeGlobal = true))
+        val defaults = StreamingSettings()
+        assertEquals(setOf(StreamChannel.User, StreamChannel.Local), streamChannelsFor(all, defaults))
+        assertEquals(
+            setOf(StreamChannel.User, StreamChannel.Local, StreamChannel.Public),
+            streamChannelsFor(all, defaults.copy(global = true)),
+        )
         // 未ログイン (Home・通知なし)
-        assertEquals(setOf(StreamChannel.Local), streamChannelsFor(listOf(ColumnType.Local, ColumnType.Global), includeGlobal = false))
+        assertEquals(setOf(StreamChannel.Local), streamChannelsFor(listOf(ColumnType.Local, ColumnType.Global), defaults))
         assertEquals(TimelineType.Home, StreamChannel.User.timelineType)
+    }
+
+    @Test
+    fun streamChannelsFollowSettings() {
+        val all = ColumnType.entries
+        // Home と通知のどちらかがオンなら user を購読する
+        assertEquals(setOf(StreamChannel.User), streamChannelsFor(all, StreamingSettings(home = false, local = false)))
+        assertEquals(setOf(StreamChannel.User), streamChannelsFor(all, StreamingSettings(notifications = false, local = false)))
+        assertEquals(
+            setOf(StreamChannel.Local),
+            streamChannelsFor(all, StreamingSettings(home = false, notifications = false)),
+        )
+        assertEquals(
+            emptySet<StreamChannel>(),
+            streamChannelsFor(all, StreamingSettings(home = false, notifications = false, local = false)),
+        )
+        assertEquals(
+            setOf(TimelineType.Local, TimelineType.Global),
+            streamedTimelinesFor(all, StreamingSettings(home = false, global = true)),
+        )
+    }
+
+    @Test
+    fun updateIsNotAddedToColumnWithAutoUpdateOff() = runBlocking {
+        // Home はオフ・通知はオン: user ストリームで Home 宛ての新着が届いても足さない
+        val server = FakeServer().apply { timelines[TimelineType.Home] = { _, _ -> posts(20, 10) } }
+        val home = feedFor(server, TimelineType.Home).apply { refresh() }
+        val sync = sync(server, mapOf(TimelineType.Home to home), streamed = emptySet())
+
+        sync.handle(StreamEvent.Update(StreamChannel.User, post(30)))
+        assertEquals(listOf("20", "10"), describe(home.state.value.items))
+
+        // 再接続時の補完もしない
+        sync.handle(StreamEvent.Connected)
+        assertTrue(server.postRequests.none { it.third != null })
     }
 }

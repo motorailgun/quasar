@@ -14,6 +14,7 @@ import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
+import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.UploadFailure
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.problems
@@ -22,6 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +58,8 @@ class ComposerSession(
     private val emojiRepository: EmojiRepository,
     private val statusRepository: StatusRepository,
     private val mediaRepository: MediaRepository,
+    /** 設定の「新しい投稿の公開範囲」(`null` ならアカウントの既定)。読み込みを待ってから流れる。 */
+    private val defaultVisibilitySetting: Flow<PostVisibility?>,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
     /** 投稿できた。[DraftStore] がこの下書きを終えて空のものに替える。 */
@@ -91,6 +95,12 @@ class ComposerSession(
     /** 直前に送ろうとした内容と、その Idempotency-Key。同じ内容の再送では同じキーを使い、二重投稿を防ぐ。 */
     private var lastAttempt: Pair<PostDraft, String>? = null
 
+    private var visibilitySetting: PostVisibility? = null
+    private var accountDefaultVisibility: PostVisibility? = null
+
+    /** 最後に自動で入れた公開範囲。今の値がこれと違えば、ユーザーが選び直した (または返信で変わった) ので触らない。 */
+    private var appliedVisibility = composer.visibility
+
     init {
         scope.launch {
             // 取得できなければ既定値のまま (最終的な判定はサーバが行う)
@@ -102,15 +112,29 @@ class ComposerSession(
                 ?.let { emojis -> _state.update { it.copy(emojis = emojis) } }
         }
         scope.launch {
-            val visibilityBefore = composer.visibility
+            defaultVisibilitySetting.collect { setting ->
+                visibilitySetting = setting
+                applyDefaultVisibility()
+            }
+        }
+        scope.launch {
             val sensitiveBefore = composer.sensitive
             runCatchingLogged("account") { accountRepository.fetchMe(session) }?.let { me ->
                 _state.update { it.copy(account = me.user) }
+                accountDefaultVisibility = me.defaultVisibility
+                applyDefaultVisibility()
                 // 取得までの間にユーザーが選んでいたら上書きしない
-                if (composer.visibility == visibilityBefore) composer.visibility = me.defaultVisibility
                 if (composer.sensitive == sensitiveBefore) composer.sensitive = me.defaultSensitive
             }
         }
+    }
+
+    /** 公開範囲の初期値 (設定 → アカウントの既定) を、まだ誰も変えていなければ入れる。設定が変わったときも同様。 */
+    private fun applyDefaultVisibility() {
+        val value = visibilitySetting ?: accountDefaultVisibility ?: return
+        if (composer.visibility != appliedVisibility) return
+        composer.visibility = value
+        appliedVisibility = value
     }
 
     fun submit() {

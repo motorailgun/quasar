@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.ui.login.LoginScreen
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
+import es.aria_on_the_planet.quasar.ui.settings.openSettings
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
 
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
                                 container.statusRepository,
                                 container.notificationRepository,
                                 container.streamingClient,
+                                container.settingsStore.loaded,
                             ) }
                         },
                     )
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
                     TimelineScreen(
                         viewModel = viewModel,
                         onLogout = container.sessionStore::clear,
+                        onOpenSettings = ::openSettings,
                         drafts = container.draftStore,
                         canPost = current.accessToken != null,
                     )

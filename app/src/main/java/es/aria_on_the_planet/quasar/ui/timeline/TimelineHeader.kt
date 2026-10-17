@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -84,6 +85,7 @@ fun TimelineHeader(
     hazeState: HazeState,
     onSelect: (ColumnType) -> Unit,
     onLogout: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val blurStyle = rememberSurfaceBlurStyle()
@@ -94,7 +96,13 @@ fun TimelineHeader(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AccountButton(account = account, hazeState = hazeState, blurStyle = blurStyle, onLogout = onLogout)
+        AccountButton(
+            account = account,
+            hazeState = hazeState,
+            blurStyle = blurStyle,
+            onLogout = onLogout,
+            onOpenSettings = onOpenSettings,
+        )
         Spacer(Modifier.width(10.dp))
         ColumnTabs(
             available = available,
@@ -129,6 +137,7 @@ private fun AccountButton(
     hazeState: HazeState,
     blurStyle: HazeBlurStyle,
     onLogout: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
@@ -174,6 +183,14 @@ private fun AccountButton(
                 }
                 HorizontalDivider()
             }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.settings)) },
+                leadingIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    onOpenSettings()
+                },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.logout)) },
                 leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },

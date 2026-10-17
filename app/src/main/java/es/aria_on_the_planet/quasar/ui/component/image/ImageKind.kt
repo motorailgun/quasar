@@ -1,6 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.image
 
-import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
+import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 
 /** 画像の種類。アニメーションさせるかを [DisplaySettings] のどの項目で決めるかに使う。 */
 enum class ImageKind {

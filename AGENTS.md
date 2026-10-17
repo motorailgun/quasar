@@ -10,6 +10,8 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | UI | Jetpack Compose, `androidx.compose.material3` 1.5.x (Expressive API: `MaterialExpressiveTheme`, `LoadingIndicator` 等) |
 | ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
+| 設定 | Preferences DataStore (`androidx.datastore:datastore-preferences`) |
+| 画面内の遷移 | Navigation 3 (`androidx.navigation3`。今は設定画面の中だけ。他の画面は Activity ごと) |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
@@ -33,6 +35,7 @@ es.aria_on_the_planet.quasar
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
 │   ├── session/SessionStore.kt     サーバ URL / アクセストークン保持
+│   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
@@ -55,6 +58,8 @@ es.aria_on_the_planet.quasar
     │   ├── user/UserList.kt        ユーザーの集合 (LazyColumn) + UserListItem (フォロー / フォロワー一覧)
     │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに)
     │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
+    │   ├── dialog/ActionConfirmation.kt 設定に従う操作前の確認 (ActionConfirmationHost / LocalActionConfirmer)
+    │   ├── settings/               AOSP 風の設定の部品 (SettingsScaffold / SettingsGroup / Switch・Choice・Slider 等の項目)
     │   ├── blur/SurfaceBlur.kt     浮かぶ UI の背景のぼかし (rememberSurfaceBlurStyle。半径・濃さは DisplaySettings)
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  RemoteImage / LocalImage (画像表示の唯一の入口) + ImageKind / BlurHash デコーダ + プレースホルダ Painter
@@ -70,6 +75,7 @@ es.aria_on_the_planet.quasar
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      サーバ URL + トークン入力 (暫定。OAuth は後で)
+    ├── settings/                   設定画面 (SettingsActivity = Navigation 3 / SettingsScreen = 各ページ) + LocalDisplaySettings
     ├── timeline/                   タイムライン画面 + ViewModel
     ├── profile/                    プロフィール (ProfileActivity / Screen / Header / ActionButton / ViewModel)
     ├── follows/                    フォロー / フォロワー一覧 (FollowListActivity / Screen / ViewModel)
@@ -301,7 +307,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     10ms 以下のコマは GIF と同じく 100ms 扱い) で求め、コマが変わる時刻にだけ `scheduleSelf` する (同じ場面で 78fps・12.5%)。
     コマの指定は `seekTo(開始時刻)`。**`seekToFrame` は `loopCount = 0` (無限) で例外を投げる** (ライブラリの不具合) ので使わない。
     `Apng` クラスは Kotlin の `internal` で参照できないため、`ApngDrawable` を「再生させない入れ物」として使っている。
-  * フレームレート上限: `DisplaySettings.emojiAvatarAnimationMaxFps` (既定 30、`null` で上限なし。設定画面で変える想定) を
+  * フレームレート上限: `DisplaySettings.emojiAvatarAnimationMaxFps` (既定 30、`null` で上限なし。設定画面で変える) を
     `DisplaySettings.animationMaxFps(kind)` が絵文字・アイコンにだけ渡し (添付メディア等は上限なし)、リクエストの Extras
     (`animate(enabled, maxFps)`) → `ApngDecoderFactory` → `ApngAnimationDrawable` と届く。次の描き直しの時刻を
     `nextDrawTime` (純粋関数) で時刻 0 起点・`1000 / maxFps` ms の共通の刻みに切り上げるので、1 つあたり上限以下になり、
@@ -379,9 +385,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 流れ: `PostCard(onAction)` → `rememberPostActionHandler(perform, confirmation)` (`ui/component/post/PostActionHandler.kt`)
   → `ViewModel.performAction(post, action)` → `PostActionController` (`ui/feed/PostActions.kt`) → `StatusRepository.perform`。
   画面側は `rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }`。
-* **確認モーダルの差し込み口**: `PostActionConfirmation.confirm(post, action): PostAction?`。今は `PostActionConfirmation.None`
-  (そのまま送る)。ダイアログを出すときはここで表示して結果を待ち、`null` で取りやめ。操作を変えて返してもよい
-  (将来ブーストの公開範囲を選ばせる等)。ViewModel 側は確認の有無を知らない。
+* **確認モーダルの差し込み口**: `PostActionConfirmation.confirm(post, action): PostAction?`。既定は
+  `rememberPostActionConfirmation()` で、設定 (`AppSettings.confirmations`) で確認する操作なら `LocalActionConfirmer` のダイアログで
+  答えを待ち、`null` で取りやめ (下記「設定」)。操作を変えて返してもよい (将来ブーストの公開範囲を選ばせる等)。
+  ViewModel 側は確認の有無を知らない。
 * `PostActionController`: 見込みで反映 (`Post.withAction`) → 送信 → 応答の件数・状態で上書き (`Post.withInteractionsOf`)、
   失敗なら巻き戻し (`withAction(action.inverse())`) + `onError`。同じポスト・同じ種類が送信中の間は次の操作を無視する。
   反映は `statusId` 一致で、ブーストの外側・引用先も含めて、ViewModel が持つ全一覧 (全カラム + 通知、ピン留め、スレッド全体) に当てる。
@@ -520,9 +527,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global。Home と通知はログイン時のみ。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
 * **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
-  * 取得 API は `NotificationRepository.api` で切り替える。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
+  * 取得 API は設定 (`AppSettings.notificationApi`) で切り替え、`NotificationRepository.fetch(session, api, ...)` に渡す。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
     サーバが favourite / reblog / follow を「同じ種類・同じ対象・近い時間帯」でまとめる)。`Ungrouped` は v1 で、
-    各通知を 1 件のグループ (`Notification.asGroup()`) にする。将来は設定画面やサーバのバージョン確認で切り替える。
+    各通知を 1 件のグループ (`Notification.asGroup()`) にする。切り替えたら通知を読み直す。サーバのバージョン確認は未実装。
     グルーピングの仕様はサーバ任せとし、クライアント側で独自にまとめることはしない。
   * 一覧の行は `NotificationEntry` (`Single` = サーバ側グループ 1 つ / `AccountReactions` = 1 人のユーザーが複数ポストに
     した同じ種類のリアクションをクライアント側でまとめたもの「〇〇 favourited 3 of your posts」)。
@@ -699,8 +706,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## 自動更新 (Streaming API)
 
 * `StreamingClient` (`data/streaming/`) が OkHttp の WebSocket で `wss://<configuration.urls.streaming>/api/v1/streaming`
-  に 1 本接続し、`user` (ホーム + 通知) と `public:local` を購読する。グローバル (`public`) は流量が多いので購読しない
-  (`TimelineViewModel.StreamGlobalTimeline` を `true` にすると購読・補完する。gap の動作確認などに使う)。
+  に 1 本接続し、設定 (`StreamingSettings`、カラムごとのオン / オフ) でオンのカラムの分を購読する: `user` (ホーム + 通知。
+  どちらかがオンなら)・`public:local`・`public`。グローバルは流量が多いので既定はオフ。オフのカラムは新着・再接続時の補完を
+  受けない (同じ `user` で Home 宛ての新着が届いても足さない。削除・編集はどのカラムにも当てる)。対応は `streamChannelsFor` /
+  `streamedTimelinesFor`。`stream()` は設定が変わると接続し直す (全部オフなら接続しない)。
   認証は `Authorization: Bearer` (4.2 以降は全ストリームで要ログイン。未ログインでは接続しない)。
 * 切断されたら 1 秒から倍々 (最大 60 秒) で再接続し続け、接続のたびに `StreamEvent.Connected` を流す。
   メッセージの解釈は純粋関数 `parseStreamMessage` (payload は JSON 文字列なので二重デコード)。
@@ -736,20 +745,46 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 設定
 
-* 表示設定は `DisplaySettings` (`ui/settings/`) にまとめ、`AppContainer.displaySettings` (StateFlow) から
-  `QuasarAppContent` が `LocalDisplaySettings` として提供する。各 Activity の setContent は `QuasarAppContent(container)` で包む。
-* 今は既定値のみ。設定画面を作るときは永続化 (DataStore 等) して `displaySettings` を更新する。
-  設定項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
+* 設定全体は `AppSettings` (`domain/model/settings/`): 表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
+  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は空)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
+  アカウントの既定 `source.privacy`。ダイレクトは選べない)。
+* 保存は `SettingsStore` (`data/settings/`、Preferences DataStore、`AppContainer.settingsStore`)。項目ごとに 1 キーで、
+  対応表は `SettingsPreferences.kt` の `SettingFields` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはここに 1 行足す**。
+  * キーが無ければ既定値。書き込みは変わった項目だけ (`writeSettingsChanges`)。`null` を値に持つ項目は番兵値
+    (折りたたみ・fps は 0、公開範囲は `"account"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
+    `null` 自体が値なので、decode は「読めない」と区別するため `Decoded` で包んで返す。
+  * 読み込みは非同期: `settings: StateFlow<AppSettings?>` は読み込み前 `null` (起動時から読み始める)。`QuasarAppContent` は
+    読み込みまで中身を描かない (既定値で描いてから切り替わらない)。UI 以外は `loaded` (Flow) / `current()` で待つ
+    (`TimelineViewModel` の自動更新・通知 API、`ComposerSession` の公開範囲)。
+* `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`) と `ActionConfirmationHost` を提供する。各 Activity の
+  setContent は `QuasarAppContent(container)` で包む。
+  表示設定の項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
   `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
-  `surfaceBlurRadius` / `surfaceBlurTintAlpha`
-  (一覧の上に浮かぶ UI の背景のぼかしの半径と色味の濃さ。既定 6dp / 0.8)。
+  `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) / `surfaceBlurTintAlpha`
+  (一覧の上に浮かぶ UI の背景のぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`emojiAvatarAnimationMaxFps`。
+* **操作前の確認**: `LocalActionConfirmer.current.confirm(target)` (suspend) が、設定で確認する操作ならダイアログ
+  (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
+  取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
+  投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン) から使う。
+* **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
+  (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
+* **設定画面** (`ui/settings/SettingsActivity`、`Context.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP
+  (Android 16) の設定画面の形。ページ (`SettingsRoute`: Top / Display / Animation / Timelines / Posting / Confirmations) の行き来は
+  Navigation 3 (`NavDisplay` + `rememberNavBackStack`。「戻る」は navigationevent 経由で予測型「戻る」のアニメーション付き)。
+  変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
+  * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
+    (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
+    `SettingsSwitchItem` / `SettingsSplitSwitchItem` (左は詳細ページ、縦線の右はスイッチ) / `SettingsNavigationItem` /
+    `SettingsChoiceItem` (ラジオのダイアログ) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。
+  * 面の色は surfaceBright (背景は surfaceContainer)。`SegmentedListItem` の checked 版は選択中の色・形に変わるので、
+    selected 系の色と `selectedShape` を通常と同じにしている (AOSP は面の色でオン / オフを示さない)。
+  * 未ログインでの利用は考慮しない (ログイン必須の項目もそのまま出す。非ログインの経路は今後なくす方針)。
 * **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取る**。半径・濃さを
   個別に書かない (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブで共通)。部品ごとに変えてよいのは色味の色だけ
   (クイック投稿バーは surfaceContainer、他は既定の surfaceContainerHigh)。下地の surface もここで敷く。
   ぼかした面に縁を付けるときは `surfaceBlurBorder()` (outlineVariant 0.5 の 1dp) を使う。
   閲覧注意メディアの `Modifier.blur` は隠すためのものなので対象外。
-* 同様に通知の取得 API (`NotificationRepository.api`) も将来の設定項目候補。
 
 ## テーマ / 色
 
@@ -872,8 +907,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   変わるので、実データで版どうしを比べるときは同じ状態のうちに交互に測る。条件を揃えたいならギャラリーを使う。
 * 特定の条件の投稿・ユーザー (アニメ絵文字・アイコン等) をタイムラインで探し回らない。まずギャラリーにシナリオを足す。
 * 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
-* gap の動作確認は流量のあるグローバルで行う: `TimelineViewModel.StreamGlobalTimeline = true` にして、別画面を
-  開いて (= 切断) 8 分ほど待ってから戻る。確認後は必ず `false` に戻す。
+* gap の動作確認は流量のあるグローバルで行う: 設定 (Timelines → Auto-update) でグローバルをオンにして、別画面を
+  開いて (= 切断) 8 分ほど待ってから戻る。確認後はオフに戻す。
+* 設定を既定に戻すには (debug): `adb shell am force-stop <pkg>` → `adb shell run-as <pkg> rm files/datastore/settings.preferences_pb`。
 * ストリームの接続状況は logcat の `StreamingClient` (接続・切断・受信イベントの種類と文字数のみ。トークンや本文は出さない)。
 
 ## 未対応・今後の課題
@@ -881,12 +917,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **認証**: OAuth 未実装。アクセストークンを手入力し、`SessionStore` (SharedPreferences) に**平文**で保存している。
   OAuth (`/api/v1/apps` + `/oauth/authorize`) と暗号化保存が必要。
 * **操作**: 投稿はテキスト・CW・投票・公開範囲・メディア添付・リプライ (リプライは実機で未確認)。投票・お気に入り・ブースト・ブックマークは送信できる (実機では未確認)。
-  操作失敗時の UI 通知、確認モーダル (差し込み口のみ)、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
+  操作失敗時の UI 通知、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
-* **設定画面**: 未実装。候補は `DisplaySettings.longPostMaxLines` と `NotificationRepository.api` (v1 / v2)。
+* **設定**: アカウントごとの設定 (今はアプリ全体で 1 つ)、サーバ側の既定の公開範囲 (`update_credentials`) との同期は無い。
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
-* **自動更新**: グローバルは購読しない、通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
+* **自動更新**: 通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。
 * **プロフィール**: 返信のタブ、プロフィール編集、一覧の行ごとのフォローボタン、フォロー失敗時の UI 通知。
 * **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
@@ -895,6 +931,6 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   上限なし 82〜88fps・16%、上限 30fps で 41fps (ピッカー 30 + 後ろの画面の GIF 約 10)・11%。アイコンが動くタイムラインの
   1 画面 1.4fps・0.9%、スクロール中のジャンク 0。GIF / WebP のフレームレート上限は実装しない方針 (Coil = ImageDecoder に任せる。
   上限を掛けるには再生の置き換えが要る: GIF は android-gif-drawable、WebP は Fresco の animated-webp 等が候補だった)。
-  設定画面が無いので切り替えは `DisplaySettings` の既定値で確かめる。
+  切り替えは設定画面 (Display → Animation) で確かめる。
 * **ローカライズ**: 文字列は英語のみ。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

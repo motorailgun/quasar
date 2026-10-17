@@ -1,6 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.image
 
-import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
+import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

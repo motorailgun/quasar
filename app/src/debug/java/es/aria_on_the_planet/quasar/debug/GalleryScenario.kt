@@ -3,7 +3,7 @@ package es.aria_on_the_planet.quasar.debug
 import android.os.Bundle
 import androidx.annotation.StringRes
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
+import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 
 /**
  * ギャラリーで開ける画面。[id] は adb から指定する名前 (`--es scenario <id>`)、[fixture] は `assets/gallery/` の JSON。

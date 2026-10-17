@@ -15,11 +15,15 @@ import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SessionStore
+import es.aria_on_the_planet.quasar.data.settings.SettingsStore
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
-import es.aria_on_the_planet.quasar.ui.settings.DisplaySettings
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 
@@ -36,8 +40,11 @@ class AppContainer(context: Context) {
 
     val sessionStore = SessionStore(context)
 
-    /** 表示設定。今は既定値固定で、設定画面を作ったら永続化した値で更新する。 */
-    val displaySettings = MutableStateFlow(DisplaySettings())
+    /** アプリ全体のコルーチン (プロセスと同じ寿命)。 */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** 設定。ここで作った時点 (起動時) から読み込み始める。 */
+    val settingsStore = SettingsStore(context, appScope)
     val timelineRepository = TimelineRepository(api)
     val accountRepository = AccountRepository(api)
     val statusRepository = StatusRepository(api)
@@ -64,6 +71,7 @@ class AppContainer(context: Context) {
             emojiRepository = emojiRepository,
             statusRepository = statusRepository,
             mediaRepository = mediaRepository,
+            defaultVisibilitySetting = settingsStore.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
             openUploadSource = ::uploadSource,
             onPublished = onPublished,
         )

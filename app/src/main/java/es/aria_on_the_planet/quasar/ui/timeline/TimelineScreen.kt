@@ -89,6 +89,7 @@ import kotlin.math.abs
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     onLogout: () -> Unit,
+    onOpenSettings: () -> Unit,
     drafts: DraftStore,
     canPost: Boolean,
 ) {
@@ -196,6 +197,7 @@ fun TimelineScreen(
                         }
                     },
                     onLogout = onLogout,
+                    onOpenSettings = onOpenSettings,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },

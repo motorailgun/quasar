@@ -16,7 +16,7 @@ enum class StreamChannel(val apiName: String) {
     /** ローカルタイムライン。 */
     Local("public:local"),
 
-    /** グローバル (連合) タイムライン。流量が多いので通常は購読しない (`TimelineViewModel.StreamGlobalTimeline`)。 */
+    /** グローバル (連合) タイムライン。流量が多いので既定では購読しない (設定の自動更新で有効にする)。 */
     Public("public"),
     ;
 

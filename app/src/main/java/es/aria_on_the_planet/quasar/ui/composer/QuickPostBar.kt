@@ -252,7 +252,7 @@ fun QuickPostBar(
                     .onFocusChanged { focused = it.isFocused },
             )
             Spacer(Modifier.width(8.dp))
-            SendButton(enabled = canSubmit && enabled, sending = state.sending, onClick = session::submit)
+            SendButton(enabled = canSubmit && enabled, sending = state.sending, onClick = rememberConfirmedSubmit(session))
         }
         AnimatedVisibility(focused || !isEmpty) {
             ComposerToolbar(leading = { CharacterCounter(used = characterCount, max = limits.maxCharacters) }) {

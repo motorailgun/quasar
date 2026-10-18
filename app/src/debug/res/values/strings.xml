@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- debug ビルドだけの文字列 (ギャラリー) -->
 <resources>
+    <string name="app_name_debug" translatable="false">Quasar Debug</string>
     <string name="gallery_name">Quasar Gallery</string>
     <string name="gallery_animated_emoji">Animated emoji</string>
     <string name="gallery_animated_avatars">Animated avatars</string>

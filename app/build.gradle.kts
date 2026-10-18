@@ -4,6 +4,14 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// OAuth の戻り先のスキーム (applicationId 由来の逆ドメイン。スキームに `_` は使えないので `-`)。
+// debug / benchmark は applicationId が別なので、スキームも分けないと release と戻りを取り合う
+val oauthRedirectScheme = "es.aria-on-the-planet.quasar"
+fun com.android.build.api.dsl.VariantDimension.oauthRedirectScheme(scheme: String) {
+    manifestPlaceholders["oauthRedirectScheme"] = scheme
+    buildConfigField("String", "OAUTH_REDIRECT_SCHEME", "\"$scheme\"")
+}
+
 android {
     namespace = "es.aria_on_the_planet.quasar"
     compileSdk {
@@ -20,6 +28,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        manifestPlaceholders["appLabel"] = "@string/app_name"
+        oauthRedirectScheme(oauthRedirectScheme)
     }
 
     // リリース鍵は環境変数から読む (CI の release ワークフローが入れる)。無ければ release は未署名で作る。
@@ -37,6 +48,12 @@ android {
     }
 
     buildTypes {
+        // 開発用のビルドは release と別のアプリ (.debug) にして、release を入れた端末にも横に並べて入れられるようにする
+        debug {
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "@string/app_name_debug"
+            oauthRedirectScheme("$oauthRedirectScheme.debug")
+        }
         release {
             if (releaseKeystore != null) {
                 signingConfig = signingConfigs.getByName("release")
@@ -45,12 +62,15 @@ android {
                 enable = true
             }
         }
-        // 性能の測定用 (release と同じ設定で、debug 鍵で署名する。applicationId が同じなので debug と入れ替えてもデータは残る)。
+        // 性能の測定用 (release と同じ設定で、debug 鍵で署名する。applicationId は debug と同じなので入れ替えてもデータは残る)。
         // 測定にデバッグ用のギャラリーを使えるよう、ソースは debug と共有する (src/debug)
         create("benchmark") {
             initWith(getByName("release"))
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += "release"
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "@string/app_name_debug"
+            oauthRedirectScheme("$oauthRedirectScheme.debug")
         }
     }
     sourceSets {
@@ -62,6 +82,12 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    // per-app language: res の values-xx から locales_config.xml を作り、manifest の localeConfig に入れる。
+    // 既定の言語 (values/) は res/resources.properties の unqualifiedResLocale
+    androidResources {
+        generateLocaleConfig = true
     }
 }
 

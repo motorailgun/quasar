@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.data.auth
 
+import es.aria_on_the_planet.quasar.BuildConfig
 import kotlinx.serialization.Serializable
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.net.URI
@@ -19,8 +20,9 @@ object OAuthConfig {
     /**
      * 認可後に戻ってくる先。manifest の MainActivity の intent-filter と合わせる。スキームは他のアプリと
      * 被らないよう applicationId に由来する逆ドメイン (RFC 8252 7.1。スキームに `_` は使えないので `-`)。
+     * debug / benchmark は別のアプリ (`.debug`) なのでスキームも別 (build.gradle.kts の `oauthRedirectScheme`)。
      */
-    const val RedirectUri = "es.aria-on-the-planet.quasar://oauth"
+    const val RedirectUri = "${BuildConfig.OAUTH_REDIRECT_SCHEME}://oauth"
 
     /** `push` は今は使わないが、Web Push の対応時に再ログインを求めずに済むよう含めておく。 */
     const val Scopes = "read write push"

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Quasar</string>
+    <string name="app_name" translatable="false">Quasar</string>
     <string name="logout">Log out</string>
     <string name="logout_confirm_title">Log out?</string>
     <string name="logout_confirm_message">You\'ll need to log in again from your browser to use this account.</string>
@@ -81,7 +81,7 @@
     <string name="follow_list_followers">Followers</string>
     <string name="follow_list_empty">Nothing to show</string>
     <string name="follow_list_error">Failed to load: %1$s</string>
-    <string name="hashtag_title">#%1$s</string>
+    <string name="hashtag_title" translatable="false">#%1$s</string>
     <string name="hashtag_empty">No posts yet</string>
     <string name="hashtag_error">Failed to load: %1$s</string>
     <string name="post_title">Post</string>
@@ -133,9 +133,9 @@
     <string name="player_mute">Mute</string>
     <string name="player_unmute">Unmute</string>
     <!-- 再生時間「現在 / 全体」 -->
-    <string name="player_time">%1$s / %2$s</string>
-    <string name="player_time_unknown">--:--</string>
-    <string name="media_viewer_position">%1$d / %2$d</string>
+    <string name="player_time" translatable="false">%1$s / %2$s</string>
+    <string name="player_time_unknown" translatable="false">--:--</string>
+    <string name="media_viewer_position" translatable="false">%1$d / %2$d</string>
     <string name="player_error">Can\'t play this media</string>
     <string name="media_viewer_close">Close</string>
     <string name="media_viewer_menu">More options</string>
@@ -205,7 +205,7 @@
     <string name="composer_poll_multiple">Multiple choice</string>
     <string name="composer_poll_duration">Poll duration</string>
     <string name="composer_media_remove">Remove</string>
-    <string name="composer_media_alt">ALT</string>
+    <string name="composer_media_alt" translatable="false">ALT</string>
     <string name="composer_media_alt_description">Edit image description</string>
     <string name="composer_media_failed">Tap to retry</string>
     <string name="composer_media_processing">Processing</string>
@@ -244,7 +244,7 @@
     <string name="composer_cancel_reply">Cancel reply</string>
     <string name="account_menu">Account</string>
     <!-- 操作の前の確認 -->
-    <string name="ok">OK</string>
+    <string name="ok" translatable="false">OK</string>
     <string name="confirm_post_title">Post this?</string>
     <string name="confirm_post">Post</string>
     <string name="confirm_boost_title">Boost this post?</string>
@@ -286,9 +286,9 @@
     <string name="settings_blur_enabled">Blur behind floating bars</string>
     <string name="settings_blur_enabled_summary">Always off while Battery Saver is on</string>
     <string name="settings_blur_radius">Blur strength</string>
-    <string name="settings_blur_radius_value">%d dp</string>
+    <string name="settings_blur_radius_value" translatable="false">%d dp</string>
     <string name="settings_blur_tint">Tint</string>
-    <string name="settings_percent">%d%%</string>
+    <string name="settings_percent" translatable="false">%d%%</string>
     <string name="settings_animation">Animation</string>
     <string name="settings_animate_images">Animate images</string>
     <string name="settings_animate_images_summary">GIF, APNG and animated WebP</string>

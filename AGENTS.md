@@ -867,6 +867,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテストのみ。instrumentation / UI テストは無い)。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
 * 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
+* **debug / benchmark は release と別のアプリ** (`applicationIdSuffix = ".debug"` → `es.aria_on_the_planet.quasar.debug`、
+  ランチャーでは「Quasar Debug」)。release を普段使いしている端末にも横に並べて入れられる (ログインは別)。
+  * OAuth の戻り先のスキームも分けている (debug は `es.aria-on-the-planet.quasar.debug://oauth`)。同じスキームを 2 つのアプリが
+    登録すると戻りを取り合う。スキームは `build.gradle.kts` の `oauthRedirectScheme` が manifest の placeholder と
+    `BuildConfig.OAUTH_REDIRECT_SCHEME` (→ `OAuthConfig.RedirectUri`) の両方に入れる。
+  * adb で `-n <pkg>/.Foo` と書くと `.Foo` は applicationId からの相対になるので、debug ではクラス名を省略せずに書く
+    (`es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.MainActivity`)。
+  * アプリの言語は adb で切り替えられる: `adb shell cmd locale set-app-locales es.aria_on_the_planet.quasar.debug --locales ja-JP`
+    (`--locales` を空にすると端末の言語に戻る)。
 * Expressive API は `@OptIn(ExperimentalMaterial3ExpressiveApi::class)` が必要。material3 は BOM ではなく 1.5.x を個別指定。
 * **できる限り pure Jetpack Compose で、モダンな書き方にする**。XML は Android の仕組み上 Compose で代わりがきかないもの
   (manifest、Activity のテーマ = ウィンドウ属性、文字列リソース等) に限る。
@@ -875,7 +884,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (画面遷移は Navigation 3 の `NavDisplay` の transitionSpec、メディアビューアの出入りは `DismissibleViewer` で描く)。
   * 「戻る」の横取りは `androidx.navigationevent` の `NavigationBackHandler` (予測型「戻る」の進み具合も取れる) を使い、
     `BackHandler` / `OnBackPressedCallback` は使わない。manifest で `enableOnBackInvokedCallback="true"`。
-* 文字列リソースは `res/values/strings.xml` に置く (今は英語のみ)。
+* 文字列リソースは `res/values/strings.xml` (英語、既定) と `res/values-ja/strings.xml` (日本語) に置く。**文字列を足すときは両方に足す**。
+  言語に依らないもの (アプリ名・`%1$s / %2$s` 等) は values/ で `translatable="false"` にして ja には書かない (訳漏れは release の
+  lintVital で MissingTranslation のエラーになる)。文言は Mastodon 公式 Web の訳 (`app/javascript/mastodon/locales/ja.json`) に合わせ、無いものは X に倣う
+  (投票 = アンケート、編集の保存 = 更新、サーバー・ヘッダーは長音付き、疑問符は全角、表示名・acct には「さん」)。
+  * per-app language (Android 13+ の「アプリの言語」) に対応: `androidResources.generateLocaleConfig = true` が values-xx から
+    `locales_config.xml` を作って manifest に入れる。values/ の言語は `res/resources.properties` の `unqualifiedResLocale=en-US`。
+    言語を足すときは `values-xx/strings.xml` を置くだけでよい。
 * コミットはユーザーが行う。エージェントはコミットしない (頼まれた場合を除く)。
 
 ### デバッグ用ギャラリー (`app/src/debug/`)
@@ -885,7 +900,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * adb から開く (`--activity-clear-task` を付ける。付けないと開いている間に別のシナリオを指定しても切り替わらない。
   Android 16 の実機では、同じ Activity への intent が「届けた」扱いのまま `onNewIntent` が呼ばれなかった):
   ```
-  adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar/.debug.DebugGalleryActivity \
+  adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.debug.DebugGalleryActivity \
       --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60]
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
@@ -976,7 +991,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **`./gradlew connectedDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
   計測をするなら `installDebug` / `installDebugAndroidTest` + `adb shell am instrument` を使う。
 * 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleBenchmark`。
-  release と同じ設定 + debug 鍵の署名 + ギャラリー入り。applicationId が同じなので debug と入れ替えてもデータは残る) を入れ、
+  release と同じ設定 + debug 鍵の署名 + ギャラリー入り。applicationId が debug と同じなので入れ替えてもデータは残る) を入れ、
   `scripts/perf/measure.sh <label> <秒> [swipe]` で測る (端末が複数なら `ADB="adb -t 3"`)。終わったら debug を入れ直す。
   benchmark は debuggable ではないので `run-as` は使えない (`profileable` なので Perfetto の CPU プロファイルは取れる)。
   benchmark には composition tracing (`runtime-tracing` + `tracing-perfetto-binary`) が入っている。Composable 単位の区間を
@@ -1018,5 +1033,5 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   1 画面 1.4fps・0.9%、スクロール中のジャンク 0。GIF / WebP のフレームレート上限は実装しない方針 (Coil = ImageDecoder に任せる。
   上限を掛けるには再生の置き換えが要る: GIF は android-gif-drawable、WebP は Fresco の animated-webp 等が候補だった)。
   切り替えは設定画面 (Display → Animation) で確かめる。
-* **ローカライズ**: 文字列は英語のみ。
+* **ローカライズ**: 英語・日本語。相対時刻 (`relativeTime` の 3m 等) は言語に依らず英語の略記のまま。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

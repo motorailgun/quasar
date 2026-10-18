@@ -5,13 +5,14 @@
 #
 # - 端末は adb の既定 (複数あるときは ANDROID_SERIAL か ADB="adb -t 3" のように指定)。
 # - 測る前に目的の画面を開いておく。ギャラリーなら:
-#     adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar/.debug.DebugGalleryActivity \
+#     adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.debug.DebugGalleryActivity \
 #         --es scenario emoji-picker [--ez animate_images false] [--ei max_fps 60]
 # - 性能は debug ビルドでは測らない (Compose が最適化されず数倍遅い)。AGENTS.md の「実機での確認」を参照。
 # - CPU% は 1 コア比。fps は gfxinfo の値で、プロセス内の全ウィンドウ (ボトムシート等) の合計。
 # - swipe を付けると、測っている間 上下にスクロールし続ける。
 set -u
-PKG=${PKG:-es.aria_on_the_planet.quasar}
+# benchmark ビルドは debug と同じ applicationId (.debug)。release を測るなら PKG=es.aria_on_the_planet.quasar
+PKG=${PKG:-es.aria_on_the_planet.quasar.debug}
 ADB=${ADB:-adb}
 label=$1; secs=$2; mode=${3:-}
 P=$($ADB shell pidof $PKG)

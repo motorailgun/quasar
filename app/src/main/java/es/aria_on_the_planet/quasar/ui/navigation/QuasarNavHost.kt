@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -77,19 +78,26 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
 
     val context = LocalContext.current
     val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, onExit) }
+    val backDamping = remember { PredictiveBackDamping() }
+    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
+    SideEffect { settings?.let { backDamping.settings = it.predictiveBack } }
     CompositionLocalProvider(LocalNavigator provides navigator) {
         NavDisplay(
             backStack = backStack,
-            onBack = navigator::back,
+            onBack = {
+                backDamping.onBack()
+                navigator.back()
+            },
             entryDecorators = listOf(
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
+                rememberPredictiveBackDampingDecorator(backDamping),
             ),
             // メディアビューアは下の画面に重ねる (それ以外は 1 画面ずつ)
             sceneStrategies = remember { listOf(OverlaySceneStrategy()) },
             transitionSpec = { pushTransition() },
             popTransitionSpec = { popTransition() },
-            predictivePopTransitionSpec = { popTransition() },
+            predictivePopTransitionSpec = { predictivePopTransition(backDamping.settings.transitionMillis) },
             entryProvider = entryProvider {
                 entry<Route.Login> { LoginScreen(container.oauthLogin) }
                 entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }

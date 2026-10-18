@@ -14,6 +14,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
+import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
 
 /**
  * [AppSettings] と DataStore (Preferences) の対応。項目ごとに 1 つのキーを持つ。
@@ -73,6 +74,18 @@ private fun confirm(name: String, target: ConfirmTarget) =
     boolean(name, { target in it.confirmations }) { s, v ->
         s.copy(confirmations = if (v) s.confirmations + target else s.confirmations - target)
     }
+
+/** [range] の中だけ読める小数。 */
+private fun float(
+    name: String,
+    range: ClosedFloatingPointRange<Float>,
+    get: (AppSettings) -> Float,
+    set: (AppSettings, Float) -> AppSettings,
+) = SettingField(
+    floatPreferencesKey(name), get, set,
+    encode = { it },
+    decode = { stored -> stored.takeIf { it in range }?.let(::Decoded) },
+)
 
 private inline fun <reified E : Enum<E>> enumOrNull(name: String): E? = enumValues<E>().firstOrNull { it.name == name }
 
@@ -148,5 +161,26 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
                 enumOrNull<PostVisibility>(stored)?.takeIf { it in DefaultVisibilityChoices }?.let(::Decoded)
             }
         },
+    ),
+    float(
+        "predictive_back_max_drag_fraction",
+        PredictiveBackSettings.MaxDragFractionRange,
+        { it.predictiveBack.maxDragFraction },
+    ) { s, v ->
+        s.copy(predictiveBack = s.predictiveBack.copy(maxDragFraction = v))
+    },
+    float(
+        "predictive_back_drag_log_steepness",
+        PredictiveBackSettings.DragLogSteepnessRange,
+        { it.predictiveBack.dragLogSteepness },
+    ) { s, v ->
+        s.copy(predictiveBack = s.predictiveBack.copy(dragLogSteepness = v))
+    },
+    SettingField(
+        intPreferencesKey("predictive_back_transition_millis"),
+        { it.predictiveBack.transitionMillis },
+        { s, v -> s.copy(predictiveBack = s.predictiveBack.copy(transitionMillis = v)) },
+        encode = { it },
+        decode = { stored -> stored.takeIf { it in PredictiveBackSettings.TransitionMillisRange }?.let(::Decoded) },
     ),
 )

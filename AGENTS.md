@@ -78,7 +78,7 @@ es.aria_on_the_planet.quasar
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      ログイン画面 (サーバを入力 → ブラウザで OAuth)
     ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
-    │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド)
+    │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド / PredictiveBackDamping = 予測型「戻る」の動きを抑える)
     ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
     ├── timeline/                   タイムライン画面 + ViewModel
     ├── profile/                    プロフィール (Screen / Header / ActionButton / ViewModel)
@@ -468,8 +468,16 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     別の画面を開くと止まり、戻ると再開する。
   * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。書きかけの投稿 (`DraftStore`) は
     `QuasarNavHost` がセッションごとに開く。
-  * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ。予測型「戻る」も同じ動き)。メディアビューアだけは
-    `OverlaySceneStrategy` で下の画面に重ね、出入りは自分で描く。
+  * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ)。メディアビューアだけは `OverlaySceneStrategy` で
+    下の画面に重ね、出入りは自分で描く。
+  * 予測型「戻る」も同じ向きのスライドだが、指で引いている間は引いた量に対して log で伸び、幅いっぱい引いても
+    `PredictiveBackSettings.maxDragFraction` (既定 20%) までしかずれない。離すと残りを抜ける (`PredictiveBackDamping.kt`)。
+    * NavDisplay は引いた量をそのまま遷移の進み具合として seek し、離した後は同じ遷移の残りを等速で再生するだけ
+      (Nav3 1.2.0 のソースで確認。ドキュメントには無い)。なので遷移 (`predictivePopTransition`) は直線にし、引いている間だけ
+      NavEntryDecorator で各画面に補正の translationX を足して、離したら NavDisplay と同じ時間で 0 に戻す。
+    * 補正は NavDisplay がジェスチャを受けているとき (dispatcher の `history` の今の情報が `SceneInfo`) だけ。画面の中の
+      `NavigationBackHandler` (下記) が受けたジェスチャには効かない。
+    * **Nav3 を上げたら、引いている間・離した後・取り消しの動きを実機で確かめる**。
   * 画面の中の `NavigationBackHandler` (投稿の破棄確認・クイック投稿バーのフル画面・ビューア) は `NavDisplay` より先に「戻る」を受ける。
 * **Profile** (`Route.Profile(accountId)`)。
   * X のプロフィールを参考にした構成: ヘッダ画像 + 半分重なるアイコン (UserIcon, 88dp) / 表示名 (EmojiText) +
@@ -801,7 +809,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 * 設定全体は `AppSettings` (`domain/model/settings/`): 表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
   (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
-  アカウントの既定 `source.privacy`。ダイレクトは選べない)。
+  アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
+  log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
 * 保存は `SettingsStore` (`data/settings/`、Preferences DataStore、`AppContainer.settingsStore`)。項目ごとに 1 キーで、
   対応表は `SettingsPreferences.kt` の `SettingFields` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはここに 1 行足す**。
   * 確認する操作は 1 つのキー (`confirm_targets`) にまとめるが、既定でオンのもの (`DefaultConfirmations`) だけは個別の
@@ -812,8 +821,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 読み込みは非同期: `settings: StateFlow<AppSettings?>` は読み込み前 `null` (起動時から読み始める)。`QuasarAppContent` は
     読み込みまで中身を描かない (既定値で描いてから切り替わらない)。UI 以外は `loaded` (Flow) / `current()` で待つ
     (`TimelineViewModel` の自動更新・通知 API、`ComposerSession` の公開範囲)。
-* `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`) と `ActionConfirmationHost` を提供する。Activity の
-  setContent は `QuasarAppContent(container)` で包む (MainActivity とデバッグ用ギャラリー)。
+* `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`)・`LocalUriHandler` (外部リンク、`NewTaskUriHandler`) と
+  `ActionConfirmationHost` を提供する。Activity の setContent は `QuasarAppContent(container)` で包む (MainActivity とデバッグ用ギャラリー)。
   表示設定の項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
   `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、

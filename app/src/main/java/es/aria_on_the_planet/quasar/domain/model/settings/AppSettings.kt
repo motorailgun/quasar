@@ -13,6 +13,7 @@ data class AppSettings(
     val confirmations: Set<ConfirmTarget> = DefaultConfirmations,
     /** 新しい投稿の公開範囲。`null` ならアカウントの既定 (`verify_credentials` の `source.privacy`)。 */
     val defaultVisibility: PostVisibility? = null,
+    val predictiveBack: PredictiveBackSettings = PredictiveBackSettings(),
 )
 
 /** 通知の取得に使う API。 */

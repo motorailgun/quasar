@@ -13,6 +13,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
+import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,6 +37,7 @@ class SettingsPreferencesTest {
         streaming = StreamingSettings(home = false, notifications = false, local = false, global = true),
         confirmations = setOf(ConfirmTarget.Post, ConfirmTarget.Unboost),
         defaultVisibility = PostVisibility.Private,
+        predictiveBack = PredictiveBackSettings(maxDragFraction = 0.5f, dragLogSteepness = 5f, transitionMillis = 200),
     )
 
     private fun written(before: AppSettings, after: AppSettings) =
@@ -99,12 +101,15 @@ class SettingsPreferencesTest {
             floatPreferencesKey("surface_blur_radius_dp") to 100f,
             stringSetPreferencesKey("confirm_targets") to setOf("Boost", "Removed"),
             booleanPreferencesKey("stream_local") to false,
+            floatPreferencesKey("predictive_back_max_drag_fraction") to 0f,
+            intPreferencesKey("predictive_back_transition_millis") to 0,
         )
         val settings = prefs.toAppSettings()
         assertEquals(NotificationApi.Grouped, settings.notificationApi)
         // ダイレクトは既定にできない
         assertEquals(null, settings.defaultVisibility)
         assertEquals(DisplaySettings(), settings.display)
+        assertEquals(PredictiveBackSettings(), settings.predictiveBack)
         // 個別のキーで持つもの (既定でオン) はキーが無いので既定値
         assertEquals(setOf(ConfirmTarget.Boost) + DefaultConfirmations, settings.confirmations)
         // 読める項目はそのまま

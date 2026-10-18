@@ -23,6 +23,7 @@ import es.aria_on_the_planet.quasar.domain.model.isEmpty
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.ComposerState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -116,6 +117,9 @@ class ComposerSession(
     private val _state = MutableStateFlow(ComposerScreenState())
     val state: StateFlow<ComposerScreenState> = _state.asStateFlow()
 
+    /** サーバの上限の取得を終えた (失敗しても既定値で終える)。 */
+    private val limitsLoaded = CompletableDeferred<Unit>()
+
     /** 直前に送ろうとした内容と、その Idempotency-Key。同じ内容の再送では同じキーを使い、二重投稿を防ぐ。 */
     private var lastAttempt: Pair<PostDraft, String>? = null
 
@@ -130,6 +134,7 @@ class ComposerSession(
             // 取得できなければ既定値のまま (最終的な判定はサーバが行う)
             runCatchingLogged("instance") { instanceRepository.instance(session.serverUrl) }
                 ?.let { info -> _state.update { it.copy(limits = info.composeLimits) } }
+            limitsLoaded.complete(Unit)
         }
         scope.launch {
             runCatchingLogged("emojis") { emojiRepository.pickerEmojis(session.serverUrl) }
@@ -163,6 +168,15 @@ class ComposerSession(
         if (composer.visibility != appliedVisibility) return
         composer.visibility = value
         appliedVisibility = value
+    }
+
+    /**
+     * サーバの上限 (取得できなければ既定値) を待って返す。添付の枚数・サイズの検査は追加した時点の上限で行うので、
+     * 開いた直後に添付するとき (共有で受けたメディア) は取得前の既定値で判定しないようにこれを待つ。
+     */
+    suspend fun awaitLimits(): ComposeLimits {
+        limitsLoaded.await()
+        return _state.value.limits
     }
 
     /** 閉じると失うものがあるか (新しい投稿なら何か書いたか、編集なら元の内容から変えたか)。スナップショットから読む。 */

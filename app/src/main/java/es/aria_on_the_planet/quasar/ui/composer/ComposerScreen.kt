@@ -52,7 +52,8 @@ import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
  * @param onClose 下書きを残したまま閉じる。
  * @param onFinish 破棄した (下書きを終えて閉じる)。呼び出し側は [DraftStore.finish] する。
  * @param keepDraftOnClose `true` なら × / 戻るはそのまま [onClose] (クイック投稿バーに下書きが残るので確認は要らない)。
- *   `false` なら変更があるとき ([ComposerSession.hasChanges]) は破棄の確認を出す (下書きを残さない使い方。編集)。
+ *   `false` なら変更があるとき ([ComposerSession.hasChanges]) は破棄の確認を出す (下書きを残さない使い方。編集・共有)。
+ * @param notice スナックバーで知らせること (共有で添付できなかったメディアの件数等)。出したら [onNoticeShown]。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -62,6 +63,8 @@ fun ComposerScreen(
     onFinish: () -> Unit,
     keepDraftOnClose: Boolean,
     modifier: Modifier = Modifier,
+    notice: String? = null,
+    onNoticeShown: () -> Unit = {},
 ) {
     val state by session.state.collectAsStateWithLifecycle()
     val composer = session.composer
@@ -81,6 +84,13 @@ fun ComposerScreen(
         if (errorText != null) {
             snackbarHostState.showSnackbar(errorText)
             session.errorShown()
+        }
+    }
+
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            snackbarHostState.showSnackbar(notice)
+            onNoticeShown()
         }
     }
 

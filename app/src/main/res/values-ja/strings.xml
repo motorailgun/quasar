@@ -309,4 +309,9 @@
     <string name="settings_my_posts">自分の投稿</string>
     <string name="settings_confirm_edit_post">投稿の更新</string>
     <string name="settings_confirm_delete_post">削除</string>
+    <string name="share_not_logged_in">Mastodon に共有するにはログインしてください。</string>
+    <string name="share_posted">投稿しました</string>
+    <plurals name="share_media_skipped">
+        <item quantity="other">%1$d 件のファイルを添付できませんでした</item>
+    </plurals>
 </resources>

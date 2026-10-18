@@ -331,4 +331,10 @@
     <string name="settings_my_posts">My posts</string>
     <string name="settings_confirm_edit_post">Save edits</string>
     <string name="settings_confirm_delete_post">Delete</string>
+    <string name="share_not_logged_in">Log in to share to Mastodon.</string>
+    <string name="share_posted">Posted</string>
+    <plurals name="share_media_skipped">
+        <item quantity="one">%1$d file couldn\'t be attached</item>
+        <item quantity="other">%1$d files couldn\'t be attached</item>
+    </plurals>
 </resources>

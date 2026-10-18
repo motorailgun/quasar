@@ -12,7 +12,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 設定 | Preferences DataStore (`androidx.datastore:datastore-preferences`) |
-| 画面遷移 | Navigation 3 (`androidx.navigation3` + `lifecycle-viewmodel-navigation3`)。Activity は MainActivity 1 つ |
+| 画面遷移 | Navigation 3 (`androidx.navigation3` + `lifecycle-viewmodel-navigation3`)。Activity は MainActivity 1 つ (他アプリからの共有の受け口 `ShareActivity` だけ別) |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
@@ -25,7 +25,7 @@ DI フレームワークは現時点では使わず、`AppContainer` (手動 DI)
 
 ```
 es.aria_on_the_planet.quasar
-├── QuasarApplication.kt / MainActivity.kt   MainActivity が唯一の Activity (中身は QuasarNavHost)
+├── QuasarApplication.kt / MainActivity.kt   MainActivity が主の Activity (中身は QuasarNavHost)。共有の受け口は ui/share/ShareActivity
 ├── di/AppContainer.kt              手動 DI
 ├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
 ├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody、
@@ -88,8 +88,9 @@ es.aria_on_the_planet.quasar
     ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── hashtag/                    ハッシュタグのタイムライン (Screen / ViewModel)
     ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
-    └── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
-                                    QuickComposerHost / AttachmentUploads / MediaPickerHost)
+    ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
+    │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
+    └── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -468,7 +469,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 画面
 
-* **画面遷移** (`ui/navigation/`): Activity は MainActivity 1 つで、画面の行き来は Navigation 3 (`QuasarNavHost` の `NavDisplay`)。
+* **画面遷移** (`ui/navigation/`): Activity は MainActivity 1 つ (共有の `ShareActivity` を除く。下記「他アプリからの共有」) で、画面の行き来は Navigation 3 (`QuasarNavHost` の `NavDisplay`)。
   計画と経緯は [docs/navigation3-migration.md](docs/navigation3-migration.md)。
   * 画面のキーは `Route` (`@Serializable`。引数は開き直すのに要る最小限 = ID 等。`rememberNavBackStack` がプロセスの再生成でも
     復元する)。画面からは `Navigator` (`openProfile` / `openPost` / `openMedia` 等、`LocalNavigator`) で遷移する。
@@ -774,6 +775,25 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     ✕ で外した自動の返信は、その下書きの間は同じポストに付け直さない (`dismissedAutoReplyId`)。
   * ポスト画面はストリーミングを受けないので、自分の返信は `published` から `insertReply` (`ReplyList.kt`、深さ優先の順で
     返信先の子孫の末尾へ) で足し、返信先のリプライ数を +1 する。
+* **他アプリからの共有** (`ui/share/`): `ACTION_SEND` (`text/plain` / `image/*` / `video/*`) と `ACTION_SEND_MULTIPLE`
+  (`image/*` / `video/*`) を `ShareActivity` で受け、`ComposerScreen` を出す。
+  * **MainActivity とは別の Activity**: 標準の launchMode なので共有元のタスクに積まれ、投稿・破棄で `finish()` すると共有元に
+    戻る (MainActivity は singleTask で、受けると Quasar のタスクに移ってしまう)。`taskAffinity=""` は共有元が `NEW_TASK` を
+    付けてきたときに MainActivity のタスクに積まれないため。投稿できたら Toast「Posted」。
+  * **下書きは `DraftStore` と別** (`ShareViewModel` が `container.composerSession` で作る)。書きかけの投稿・返信先と混ざらない。
+    閉じるときは変更があれば破棄の確認 (`keepDraftOnClose = false`)。プロセスの再生成では intent から入れ直す。
+  * 中身の解釈は純粋関数 (`SharedContent.kt`、`SharedContentTest`): 本文は `EXTRA_SUBJECT` (ページのタイトル) + 改行 +
+    `EXTRA_TEXT` (含まれていれば本文だけ)。メディアは `EXTRA_STREAM` (無ければ ClipData)、重複を除いて順を保つ。
+    `text/` の共有では URI を使わない (共有シートのサムネイル用に ClipData に画像が入っていることがある)。
+  * **URI は `content://` で自分の provider でないものだけ** (`isSafeSharedUri`)。`file://` や自分の provider の URI を受けると、
+    共有元が読めないこのアプリのデータ (トークン等) をこちらの権限で読んでサーバに送ってしまう。捨てた分と上限の枚数を
+    超えた分は「N 件のファイルを添付できませんでした」(`ComposerScreen(notice = ...)`)。extra が壊れていても落とさない。
+  * 添付の枚数・サイズの検査は追加した時点の上限で行うので、`ComposerSession.awaitLimits()` (サーバ情報の取得を待つ) の後に添付する。
+  * URI を読める (一時的な許可) のは `ShareActivity` が生きている間なので、開いたらすぐアップロードする (Photo Picker と同じ)。
+  * 未ログインはログインを促し、MainActivity を開く (共有の中身は引き継がない)。
+  * 確認: `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "hello" -n <pkg>/es.aria_on_the_planet.quasar.ui.share.ShareActivity`。
+    adb から渡した `content://` は shell の権限なので読めない (メディアの経路は実際のアプリから共有して確かめる)。
+  * 未実装: Direct Share (共有シートのおすすめ)、音声の共有、共有した下書きを `DraftStore` に移して後で続ける。
 * **未実装**: 下書き保存、
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。

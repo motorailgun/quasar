@@ -33,6 +33,26 @@
                     android:scheme="${oauthRedirectScheme}" />
             </intent-filter>
         </activity>
+        <!-- 他のアプリからの共有 (ui/share/ShareActivity)。共有元のタスクに積み、投稿したら共有元に戻る -->
+        <activity
+            android:name=".ui.share.ShareActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>

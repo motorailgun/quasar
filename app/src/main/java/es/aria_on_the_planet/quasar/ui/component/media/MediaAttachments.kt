@@ -84,7 +84,10 @@ fun MediaAttachments(
     Row(
         modifier = modifier
             .horizontalFadingEdges(width = FadingEdgeWidth, start = { startFade }, end = { endFade })
-            .horizontalScroll(scrollState),
+            // 収まっているときはスクロールを切る。有効なままだと横のドラッグをこの Row が取り、離したときの
+            // 速さが親の HorizontalPager に届かない (Pager の pageNestedScrollConnection が子のフリングを
+            // 消費する) ので、速く払ってもカラムが切り替わらなくなる。maxValue はレイアウトで決まる
+            .horizontalScroll(scrollState, enabled = scrollState.maxValue > 0),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         attachments.forEach { attachment ->

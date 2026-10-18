@@ -26,10 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.outlined.Poll
-import androidx.compose.material.icons.outlined.WarningAmber
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -358,7 +355,7 @@ private fun SendButton(enabled: Boolean, sending: Boolean, onClick: () -> Unit) 
             if (sending) {
                 LoadingIndicator(Modifier.size(24.dp))
             } else {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = description)
+                Icon(Symbols.Filled.Send, contentDescription = description)
             }
         }
     } else {
@@ -369,7 +366,7 @@ private fun SendButton(enabled: Boolean, sending: Boolean, onClick: () -> Unit) 
                 Modifier.size(40.dp).background(colors.disabledContainerColor, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = description, tint = colors.disabledContentColor)
+                Icon(Symbols.Filled.Send, contentDescription = description, tint = colors.disabledContentColor)
             }
         }
     }
@@ -387,14 +384,14 @@ private fun DraftExtras(hasPoll: Boolean, hasContentWarning: Boolean, onClick: (
             AssistChip(
                 onClick = onClick,
                 label = { Text(stringResource(R.string.quick_post_has_cw)) },
-                leadingIcon = { Icon(Icons.Outlined.WarningAmber, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                leadingIcon = { Icon(Symbols.Outlined.Warning, null, Modifier.size(AssistChipDefaults.IconSize)) },
             )
         }
         if (hasPoll) {
             AssistChip(
                 onClick = onClick,
                 label = { Text(stringResource(R.string.quick_post_has_poll)) },
-                leadingIcon = { Icon(Icons.Outlined.Poll, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                leadingIcon = { Icon(Symbols.Outlined.Poll, null, Modifier.size(AssistChipDefaults.IconSize)) },
             )
         }
     }

@@ -7,8 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +38,7 @@ fun ShowMoreToggle(expanded: Boolean, onToggle: () -> Unit, modifier: Modifier =
             color = MaterialTheme.colorScheme.primary,
         )
         Icon(
-            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            Symbols.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier
@@ -56,7 +55,7 @@ fun ChevronToggle(expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = 
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         FilledTonalIconButton(onClick = onToggle) {
             Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                Symbols.Filled.KeyboardArrowRight,
                 contentDescription = stringResource(if (expanded) R.string.collapse else R.string.expand),
                 modifier = Modifier.rotate(rotation),
             )

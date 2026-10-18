@@ -6,8 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -105,7 +104,7 @@ fun ComposerScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = requestClose, enabled = !state.sending) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.composer_close))
+                        Icon(Symbols.Filled.Close, contentDescription = stringResource(R.string.composer_close))
                     }
                 },
                 actions = {

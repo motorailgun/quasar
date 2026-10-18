@@ -21,8 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Search
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -83,7 +82,7 @@ fun EmojiPicker(
                 .padding(horizontal = 16.dp)
                 .onFocusChanged { if (it.isFocused) onSearchFocused() },
             placeholder = { Text(stringResource(R.string.emoji_picker_search)) },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+            leadingIcon = { Icon(Symbols.Outlined.Search, contentDescription = null) },
             lineLimits = TextFieldLineLimits.SingleLine,
             // ショートコードは ASCII のみなので英字入力を求める (IME_FLAG_FORCE_ASCII)。Gboard 等は従うが、
             // Mozc 系 (Arte 等) は無視してかなのままになる (URI 種別にしても同じだった)

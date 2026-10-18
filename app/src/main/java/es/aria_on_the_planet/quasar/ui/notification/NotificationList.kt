@@ -20,18 +20,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.FormatQuote
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material.icons.outlined.Poll
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.Star
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -441,9 +430,9 @@ private fun AccountRow(user: User, onUserClick: (User) -> Unit) {
 
 /** コンパクト表示用の塗りアイコン。 */
 private fun NotificationType.filledIcon(): ImageVector = when (this) {
-    NotificationType.Favourite -> Icons.Filled.Star
-    NotificationType.Reblog -> Icons.Filled.Repeat
-    NotificationType.Follow, NotificationType.FollowRequest -> Icons.Filled.Person
+    NotificationType.Favourite -> Symbols.Filled.Star
+    NotificationType.Reblog -> Symbols.Filled.Repeat
+    NotificationType.Follow, NotificationType.FollowRequest -> Symbols.Filled.Person
     else -> icon()
 }
 
@@ -457,15 +446,15 @@ private fun NotificationType.accentColor(): Color = when (this) {
 }
 
 private fun NotificationType.icon(): ImageVector = when (this) {
-    NotificationType.Mention -> Icons.Outlined.AlternateEmail
-    NotificationType.Status -> Icons.Outlined.Notifications
-    NotificationType.Reblog -> Icons.Outlined.Repeat
-    NotificationType.Follow, NotificationType.FollowRequest -> Icons.Outlined.PersonAdd
-    NotificationType.Favourite -> Icons.Outlined.Star
-    NotificationType.Poll -> Icons.Outlined.Poll
-    NotificationType.Update, NotificationType.QuotedUpdate -> Icons.Outlined.Edit
-    NotificationType.Quote -> Icons.Outlined.FormatQuote
-    NotificationType.Unknown -> Icons.Outlined.Notifications
+    NotificationType.Mention -> Symbols.Outlined.AlternateEmail
+    NotificationType.Status -> Symbols.Outlined.Notifications
+    NotificationType.Reblog -> Symbols.Outlined.Repeat
+    NotificationType.Follow, NotificationType.FollowRequest -> Symbols.Outlined.PersonAdd
+    NotificationType.Favourite -> Symbols.Outlined.Star
+    NotificationType.Poll -> Symbols.Outlined.Poll
+    NotificationType.Update, NotificationType.QuotedUpdate -> Symbols.Outlined.Edit
+    NotificationType.Quote -> Symbols.Outlined.FormatQuote
+    NotificationType.Unknown -> Symbols.Outlined.Notifications
 }
 
 /** ユーザー単位の行の説明文 (「〇〇 favourited N of your posts」)。 */

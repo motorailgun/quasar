@@ -8,6 +8,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 用途 | ライブラリ |
 | --- | --- |
 | UI | Jetpack Compose, `androidx.compose.material3` 1.5.x (Expressive API: `MaterialExpressiveTheme`, `LoadingIndicator` 等) |
+| アイコン | Material Symbols (Rounded・weight 300) を `scripts/icons/generate.py` で ImageVector にしたもの (`ui/component/icon/Symbols.kt`)。material-icons-extended は使わない |
 | ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 設定 | Preferences DataStore (`androidx.datastore:datastore-preferences`) |
@@ -44,6 +45,7 @@ es.aria_on_the_planet.quasar
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
+    │   ├── icon/Symbols.kt         アイコン (Material Symbols Rounded・weight 300 の生成物。Outlined = FILL 0 / Filled = FILL 1)
     │   ├── text/EmojiText.kt       カスタム絵文字対応テキスト (Text のラッパー)
     │   ├── post/PostCard.kt        ポスト 1 件 (+ PostActionRow)
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
@@ -99,7 +101,7 @@ es.aria_on_the_planet.quasar.debug  DebugGalleryActivity / GalleryScenario (+ �
 assets/gallery/                     固定データ (API と同じ形の JSON + 画像)。scripts/gallery/generate.py が生成
 ```
 
-`scripts/gallery/generate.py` (ギャラリーの固定データの生成)、`scripts/perf/measure.sh` (描画の負荷の測定)。
+`scripts/gallery/generate.py` (ギャラリーの固定データの生成)、`scripts/icons/generate.py` (アイコンの生成)、`scripts/perf/measure.sh` (描画の負荷の測定)。
 
 ## ドメインモデル
 
@@ -273,6 +275,13 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 `MastodonApi.accountRelations`)。`nextMaxId == null` で終端。`ensureLoaded()` はタブを初めて開いたとき用。
 
 ## 再利用 UI コンポーネント
+
+### アイコン (`ui/component/icon/Symbols.kt`)
+* アイコンは**`Icons.*` (material-icons) を使わず必ず `Symbols.Outlined.*` / `Symbols.Filled.*` を使う**。Material Symbols の
+  Rounded・weight 300 (GRAD 0・opsz 24)。未リアクション等の通常は Outlined (FILL 0)、リアクション済み・選択中等は Filled (FILL 1)。
+* `Symbols.kt` は生成物で手で編集しない。足すときは `scripts/icons/generate.py` の `ICONS` に 1 行足して実行する
+  (fonts.gstatic.com から SVG を取る)。名前は Material Symbols の名前の PascalCase。向きのあるもの (矢印・返信・送信等) は
+  `autoMirror` で RTL では反転する (呼び出し側で反転しない)。
 
 ### EmojiText (`ui/component/text/EmojiText.kt`)
 アカウント名・ポスト本文・プロフィール文はカスタム絵文字 `:shortcode:` を含みうるため、**`Text` を直接使わず必ず `EmojiText` を使う**。
@@ -506,7 +515,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     フォロー・リクエスト送信・解除・取り下げはどれも `ConfirmDialog` で確認してから `ProfileViewModel.setFollowing`。
     成功したら応答の関係で置き換え (鍵アカウントへの follow は `requested = true` で返る)、フォロワー数を手元で ±1。失敗はログのみで元に戻す。
   * **引っ越し済みのアカウント** (`Account.moved` → `Profile.movedTo`): ヘッダ画像の上に「Moved to:」(引っ越し先:) と、その下に
-    ↳ (`SubdirectoryArrowRight`。AutoMirrored 版が無いので RTL では自前で反転) + 引っ越し先のアイコン・表示名・@acct の行 (`MovedTo`)。行全体のタップで引っ越し先のプロフィール (`onUserClick`)。フォローボタンは
+    ↳ (`SubdirectoryArrowRight`) + 引っ越し先のアイコン・表示名・@acct の行 (`MovedTo`)。行全体のタップで引っ越し先のプロフィール (`onUserClick`)。フォローボタンは
     NotFollowing なら押せない Follow (フォロー中・リクエスト中なら解除・取り下げはできる)。フォロー / フォロワー一覧はそのまま開ける。
   * @acct の横に相手 → 自分の関係のラベル: `requested_by` (Mastodon 4.1+) なら「Requested to follow you」、`followed_by` なら「Follows you」。
     リクエストの承認・拒否は未実装。

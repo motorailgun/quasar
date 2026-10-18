@@ -20,9 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Settings
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -155,7 +153,7 @@ private fun AccountButton(
                     .clickable(role = Role.Button) { menuOpen = true },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.Person, contentDescription = stringResource(R.string.account_menu))
+                Icon(Symbols.Outlined.Person, contentDescription = stringResource(R.string.account_menu))
             }
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -179,7 +177,7 @@ private fun AccountButton(
             }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.settings)) },
-                leadingIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                leadingIcon = { Icon(Symbols.Outlined.Settings, contentDescription = null) },
                 onClick = {
                     menuOpen = false
                     onOpenSettings()

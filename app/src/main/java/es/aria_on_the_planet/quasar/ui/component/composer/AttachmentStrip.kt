@@ -19,12 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Refresh
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -154,7 +149,7 @@ fun AttachmentThumbnail(
                 val retryable = state.reason == UploadFailure.Failed
                 Overlay(onClick = if (retryable) onRetry else null) {
                     Icon(
-                        if (retryable) Icons.Outlined.Refresh else Icons.Outlined.ErrorOutline,
+                        if (retryable) Symbols.Outlined.Refresh else Symbols.Outlined.Error,
                         contentDescription = null,
                         tint = MediaOverlayColors.Content,
                     )
@@ -183,7 +178,7 @@ fun AttachmentThumbnail(
             ),
         ) {
             Icon(
-                Icons.Filled.Close,
+                Symbols.Filled.Close,
                 contentDescription = stringResource(R.string.composer_media_remove),
                 modifier = Modifier.size(18.dp),
             )
@@ -227,7 +222,7 @@ private fun MediaKindBadge(gif: Boolean, modifier: Modifier = Modifier) {
         if (gif) {
             Text("GIF", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
         } else {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(2.dp).size(16.dp))
+            Icon(Symbols.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(2.dp).size(16.dp))
         }
     }
 }
@@ -260,7 +255,7 @@ private fun AddAttachmentTile(onClick: () -> Unit, modifier: Modifier = Modifier
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Outlined.AddPhotoAlternate,
+            Symbols.Outlined.AddPhotoAlternate,
             contentDescription = stringResource(R.string.composer_add_media),
             tint = MaterialTheme.colorScheme.primary,
         )

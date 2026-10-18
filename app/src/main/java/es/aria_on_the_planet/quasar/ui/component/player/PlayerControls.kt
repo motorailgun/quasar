@@ -23,11 +23,7 @@ import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.VolumeOff
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -325,7 +321,7 @@ private fun PlayPauseToggle(player: Player, onClick: () -> Unit, modifier: Modif
         modifier = modifier,
     ) {
         Icon(
-            imageVector = if (state.showPlay) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+            imageVector = if (state.showPlay) Symbols.Filled.PlayArrow else Symbols.Filled.Pause,
             contentDescription = stringResource(if (state.showPlay) R.string.player_play else R.string.player_pause),
             tint = MediaOverlayColors.Content,
         )
@@ -353,7 +349,7 @@ private fun MuteToggle(
         modifier = modifier,
     ) {
         Icon(
-            imageVector = if (state.showMuted) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Outlined.VolumeUp,
+            imageVector = if (state.showMuted) Symbols.Outlined.VolumeOff else Symbols.Outlined.VolumeUp,
             contentDescription = stringResource(if (state.showMuted) R.string.player_unmute else R.string.player_mute),
             tint = MediaOverlayColors.Content,
             modifier = Modifier.size(iconSize),

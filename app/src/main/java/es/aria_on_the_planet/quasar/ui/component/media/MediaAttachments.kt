@@ -20,12 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.AudioFile
-import androidx.compose.material.icons.outlined.BrokenImage
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -216,7 +211,7 @@ private fun BoxScope.MediaThumbnail(attachment: MediaAttachment, hidden: Boolean
         )
     } else {
         Icon(
-            imageVector = if (attachment.type == MediaType.Audio) Icons.Outlined.AudioFile else Icons.Outlined.BrokenImage,
+            imageVector = if (attachment.type == MediaType.Audio) Symbols.Outlined.AudioFile else Symbols.Outlined.BrokenImage,
             contentDescription = attachment.description,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(32.dp),
@@ -254,7 +249,7 @@ private fun SensitiveToggle(hidden: Boolean, onToggle: () -> Unit, modifier: Mod
     ) {
         Icon(
             // ぼかし中は「表示する」、表示中は「隠す」
-            imageVector = if (hidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+            imageVector = if (hidden) Symbols.Outlined.Visibility else Symbols.Outlined.VisibilityOff,
             contentDescription = stringResource(if (hidden) R.string.media_show else R.string.media_hide),
             tint = MediaOverlayColors.Content,
             modifier = Modifier.size(18.dp),
@@ -273,7 +268,7 @@ private fun PlayButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Filled.PlayArrow,
+            Symbols.Filled.PlayArrow,
             contentDescription = stringResource(R.string.player_play),
             tint = MediaOverlayColors.Content,
             modifier = Modifier

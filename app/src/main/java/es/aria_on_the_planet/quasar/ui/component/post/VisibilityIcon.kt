@@ -1,11 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.MailOutline
-import androidx.compose.material.icons.outlined.Nightlight
-import androidx.compose.material.icons.outlined.Public
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
@@ -37,18 +33,18 @@ fun VisibilityIcon(
 val PostVisibility.hasIcon: Boolean get() = icon() != null
 
 private fun PostVisibility.icon(): Pair<ImageVector, Int>? = when (this) {
-    PostVisibility.Unlisted -> Icons.Outlined.Nightlight to R.string.post_visibility_unlisted
-    PostVisibility.Direct -> Icons.Outlined.MailOutline to R.string.post_visibility_direct
+    PostVisibility.Unlisted -> Symbols.Outlined.Nightlight to R.string.post_visibility_unlisted
+    PostVisibility.Direct -> Symbols.Outlined.Mail to R.string.post_visibility_direct
     PostVisibility.Public, PostVisibility.Private -> null
 }
 
 /** 公開範囲を選ぶ場面 (投稿画面) 用の、すべての公開範囲に付くアイコン。 */
 val PostVisibility.selectorIcon: ImageVector
     get() = when (this) {
-        PostVisibility.Public -> Icons.Outlined.Public
-        PostVisibility.Unlisted -> Icons.Outlined.Nightlight
-        PostVisibility.Private -> Icons.Outlined.Lock
-        PostVisibility.Direct -> Icons.Outlined.MailOutline
+        PostVisibility.Public -> Symbols.Outlined.Public
+        PostVisibility.Unlisted -> Symbols.Outlined.Nightlight
+        PostVisibility.Private -> Symbols.Outlined.Lock
+        PostVisibility.Direct -> Symbols.Outlined.Mail
     }
 
 /** 公開範囲の名前 (文字列リソース)。 */

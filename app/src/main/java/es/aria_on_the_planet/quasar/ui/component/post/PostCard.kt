@@ -26,7 +26,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,15 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Reply
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.StarOutline
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -317,7 +308,7 @@ private fun RowScope.AuthorNameAndTime(post: Post, onAuthorClick: () -> Unit) {
 private fun ReplyToLabel(acct: String?, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.AutoMirrored.Outlined.Reply,
+            Symbols.Outlined.Reply,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.tertiary,
@@ -337,7 +328,7 @@ private fun ReplyToLabel(acct: String?, modifier: Modifier = Modifier) {
 internal fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.Outlined.Repeat,
+            Symbols.Outlined.Repeat,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.tertiary,
@@ -358,7 +349,7 @@ internal fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
 private fun PinnedLabel(modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.Outlined.PushPin,
+            Symbols.Outlined.PushPin,
             contentDescription = null,
             modifier = Modifier.size(12.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -399,36 +390,45 @@ fun PostActionRow(
                 }
             },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp - ActionPaddingHorizontal * 2),
     ) {
-        PostActionButton(
-            icon = Icons.AutoMirrored.Outlined.Reply,
-            label = stringResource(R.string.post_replies),
-            count = post.repliesCount,
-            toggle = false,
-            onClick = onReply?.let { { it(post) } },
-        )
-        PostActionButton(
-            icon = if (viewer.reblogged) Icons.Filled.Repeat else Icons.Outlined.Repeat,
-            label = stringResource(R.string.post_boosts),
-            count = post.boostsCount,
-            active = viewer.reblogged,
-            activeColor = MaterialTheme.extendedColors.reblog.color,
-            // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
-            enabled = post.visibility.boostable || viewer.reblogged,
-            onClick = onAction?.let { { it(post, PostActionType.Boost) } },
-        )
-        PostActionButton(
-            icon = if (viewer.favourited) Icons.Filled.Star else Icons.Outlined.StarOutline,
-            label = stringResource(R.string.post_reactions),
-            count = post.reactionsCount,
-            active = viewer.favourited,
-            activeColor = MaterialTheme.extendedColors.favourite.color,
-            onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
-        )
+        // 5 個分の等幅の枠があるとして、リプライ・ブースト・お気に入りを左の 3 つ (幅の 3/5) の左端に置き、
+        // ブックマークは右端。件数の桁が変わってもアイコンの位置は動かない
+        Row(Modifier.fillMaxWidth(ActionGroupFraction), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) {
+                PostActionButton(
+                    icon = Symbols.Outlined.Reply,
+                    label = stringResource(R.string.post_replies),
+                    count = post.repliesCount,
+                    toggle = false,
+                    onClick = onReply?.let { { it(post) } },
+                )
+            }
+            Box(Modifier.weight(1f)) {
+                PostActionButton(
+                    icon = if (viewer.reblogged) Symbols.Filled.Repeat else Symbols.Outlined.Repeat,
+                    label = stringResource(R.string.post_boosts),
+                    count = post.boostsCount,
+                    active = viewer.reblogged,
+                    activeColor = MaterialTheme.extendedColors.reblog.color,
+                    // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
+                    enabled = post.visibility.boostable || viewer.reblogged,
+                    onClick = onAction?.let { { it(post, PostActionType.Boost) } },
+                )
+            }
+            Box(Modifier.weight(1f)) {
+                PostActionButton(
+                    icon = if (viewer.favourited) Symbols.Filled.Star else Symbols.Outlined.Star,
+                    label = stringResource(R.string.post_reactions),
+                    count = post.reactionsCount,
+                    active = viewer.favourited,
+                    activeColor = MaterialTheme.extendedColors.favourite.color,
+                    onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
+                )
+            }
+        }
         Spacer(Modifier.weight(1f))
         PostActionButton(
-            icon = if (viewer.bookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            icon = if (viewer.bookmarked) Symbols.Filled.Bookmark else Symbols.Outlined.Bookmark,
             label = stringResource(R.string.post_bookmark),
             active = viewer.bookmarked,
             activeColor = MaterialTheme.colorScheme.secondary,
@@ -436,6 +436,9 @@ fun PostActionRow(
         )
     }
 }
+
+/** アクション行のうちリプライ・ブースト・お気に入りが占める幅の割合 (5 等分のうち 3 つ)。 */
+private const val ActionGroupFraction = 3f / 5f
 
 /** アクション行のボタンの左右の余白 (押せる範囲)。 */
 private val ActionPaddingHorizontal = 6.dp

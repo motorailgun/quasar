@@ -13,8 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -120,7 +119,7 @@ private fun PollResults(poll: Poll) {
                     if (own) {
                         Spacer(Modifier.width(6.dp))
                         Icon(
-                            Icons.Rounded.CheckCircle,
+                            Symbols.Filled.CheckCircle,
                             contentDescription = stringResource(R.string.poll_your_choice),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp),

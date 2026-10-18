@@ -19,12 +19,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Public
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -291,10 +286,10 @@ private fun CenteredMessage(message: String) {
 
 
 internal fun ColumnType.icon() = when (this) {
-    ColumnType.Home -> Icons.Outlined.Home
-    ColumnType.Notifications -> Icons.Outlined.Notifications
-    ColumnType.Local -> Icons.Outlined.Groups
-    ColumnType.Global -> Icons.Outlined.Public
+    ColumnType.Home -> Symbols.Outlined.Home
+    ColumnType.Notifications -> Symbols.Outlined.Notifications
+    ColumnType.Local -> Symbols.Outlined.Groups
+    ColumnType.Global -> Symbols.Outlined.Public
 }
 
 internal fun ColumnType.label() = when (this) {

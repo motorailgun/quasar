@@ -17,12 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material.icons.outlined.Verified
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,9 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -187,10 +179,10 @@ fun ProfileHeader(
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (profile.locked) {
-                        BadgeIcon(Icons.Outlined.Lock, stringResource(R.string.profile_locked))
+                        BadgeIcon(Symbols.Outlined.Lock, stringResource(R.string.profile_locked))
                     }
                     if (profile.bot) {
-                        BadgeIcon(Icons.Outlined.SmartToy, stringResource(R.string.profile_bot))
+                        BadgeIcon(Symbols.Outlined.SmartToy, stringResource(R.string.profile_bot))
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -244,15 +236,12 @@ private fun MovedTo(target: User, onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // 見出しから引っ越し先へ下りる矢印 (↳)。その分アカウントを右へ寄せる。AutoMirrored 版が無いので RTL では自分で反転する
-            val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+            // 見出しから引っ越し先へ下りる矢印 (↳)。その分アカウントを右へ寄せる。RTL ではアイコン側が反転する (autoMirror)
             Icon(
-                Icons.Outlined.SubdirectoryArrowRight,
+                Symbols.Outlined.SubdirectoryArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(24.dp)
-                    .graphicsLayer { scaleX = if (rtl) -1f else 1f },
+                modifier = Modifier.size(24.dp),
             )
             Spacer(Modifier.width(12.dp))
             UserIcon(target, size = 40.dp)
@@ -345,7 +334,7 @@ private fun ProfileFields(fields: List<ProfileField>, emojis: List<CustomEmoji>)
                 ) {
                     if (verified) {
                         Icon(
-                            Icons.Outlined.Verified,
+                            Symbols.Outlined.Verified,
                             contentDescription = stringResource(R.string.profile_verified),
                             tint = MaterialTheme.colorScheme.tertiary,
                         )
@@ -363,7 +352,7 @@ private fun JoinedDate(createdAt: Instant) {
     val date = DateTimeFormatter.ofPattern(pattern, locale).withZone(ZoneId.systemDefault()).format(createdAt)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.Outlined.CalendarMonth,
+            Symbols.Outlined.CalendarMonth,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),

@@ -1,11 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.settings
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.TaskAlt
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,25 +47,25 @@ fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: (
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_display),
                 summary = stringResource(R.string.settings_display_summary),
-                icon = Icons.Outlined.Palette,
+                icon = Symbols.Outlined.Palette,
                 onClick = { onNavigate(Route.SettingsDisplay) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_timelines),
                 summary = stringResource(R.string.settings_timelines_summary),
-                icon = Icons.Outlined.Sync,
+                icon = Symbols.Outlined.Sync,
                 onClick = { onNavigate(Route.SettingsTimelines) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_posting),
                 summary = stringResource(R.string.settings_posting_summary),
-                icon = Icons.Outlined.Edit,
+                icon = Symbols.Outlined.Edit,
                 onClick = { onNavigate(Route.SettingsPosting) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_confirmations),
                 summary = stringResource(R.string.settings_confirmations_summary),
-                icon = Icons.Outlined.TaskAlt,
+                icon = Symbols.Outlined.TaskAlt,
                 onClick = { onNavigate(Route.SettingsConfirmations) },
             )
         }
@@ -78,7 +73,7 @@ fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: (
             SettingsActionItem(
                 title = stringResource(R.string.logout),
                 summary = serverUrl?.toHttpUrlOrNull()?.host,
-                icon = Icons.AutoMirrored.Outlined.Logout,
+                icon = Symbols.Outlined.Logout,
                 destructive = true,
                 onClick = { confirmLogout = true },
             )

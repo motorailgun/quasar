@@ -11,11 +11,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Poll
-import androidx.compose.material.icons.outlined.WarningAmber
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,7 +74,7 @@ fun AttachMediaButton(
     enabled: Boolean = true,
 ) {
     IconButton(onClick = onClick, modifier = modifier, enabled = enabled, colors = composerIconColors(active)) {
-        Icon(Icons.Outlined.Image, contentDescription = stringResource(R.string.composer_add_media))
+        Icon(Symbols.Outlined.Image, contentDescription = stringResource(R.string.composer_add_media))
     }
 }
 
@@ -95,7 +91,7 @@ fun EmojiButton(
     enabled: Boolean = true,
 ) {
     IconButton(onClick = onClick, modifier = modifier, enabled = enabled, colors = composerIconColors(active)) {
-        Icon(Icons.Outlined.EmojiEmotions, contentDescription = stringResource(R.string.composer_emoji))
+        Icon(Symbols.Outlined.EmojiEmotions, contentDescription = stringResource(R.string.composer_emoji))
     }
 }
 
@@ -115,7 +111,7 @@ fun PollButton(
         colors = composerToggleColors(),
     ) {
         val description = if (checked) R.string.composer_remove_poll else R.string.composer_add_poll
-        Icon(Icons.Outlined.Poll, contentDescription = stringResource(description))
+        Icon(Symbols.Outlined.Poll, contentDescription = stringResource(description))
     }
 }
 
@@ -134,7 +130,7 @@ fun ContentWarningButton(
         enabled = enabled,
         colors = composerToggleColors(),
     ) {
-        Icon(Icons.Outlined.WarningAmber, contentDescription = stringResource(R.string.composer_content_warning))
+        Icon(Symbols.Outlined.Warning, contentDescription = stringResource(R.string.composer_content_warning))
     }
 }
 

@@ -8,12 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Schedule
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -74,7 +69,7 @@ fun PollEditor(
         ) {
             if (poll.options.size < limits.maxPollOptions) {
                 TextButton(onClick = { onChange(poll.copy(options = poll.options + "")) }) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Symbols.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Text(stringResource(R.string.composer_poll_add_option), modifier = Modifier.padding(start = 6.dp))
                 }
             }
@@ -88,7 +83,7 @@ fun PollEditor(
                 onClick = { onChange(poll.copy(multiple = !poll.multiple)) },
                 label = { Text(stringResource(R.string.composer_poll_multiple)) },
                 leadingIcon = if (poll.multiple) {
-                    { Icon(Icons.Filled.Check, contentDescription = null, Modifier.size(FilterChipDefaults.IconSize)) }
+                    { Icon(Symbols.Filled.Check, contentDescription = null, Modifier.size(FilterChipDefaults.IconSize)) }
                 } else {
                     null
                 },
@@ -122,7 +117,7 @@ private fun PollOptionField(
         trailingIcon = onRemove?.let {
             {
                 IconButton(onClick = it) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.composer_poll_remove_option))
+                    Icon(Symbols.Filled.Close, contentDescription = stringResource(R.string.composer_poll_remove_option))
                 }
             }
         },
@@ -143,13 +138,13 @@ private fun PollDurationChip(
             label = { Text(durationLabel(selected)) },
             leadingIcon = {
                 Icon(
-                    Icons.Outlined.Schedule,
+                    Symbols.Outlined.Schedule,
                     contentDescription = stringResource(R.string.composer_poll_duration),
                     modifier = Modifier.size(FilterChipDefaults.IconSize),
                 )
             },
             trailingIcon = {
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(FilterChipDefaults.IconSize))
+                Icon(Symbols.Filled.ArrowDropDown, contentDescription = null, Modifier.size(FilterChipDefaults.IconSize))
             },
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -161,7 +156,7 @@ private fun PollDurationChip(
                         onSelect(duration)
                     },
                     trailingIcon = if (duration == selected) {
-                        { Icon(Icons.Filled.Check, contentDescription = null) }
+                        { Icon(Symbols.Filled.Check, contentDescription = null) }
                     } else {
                         null
                     },

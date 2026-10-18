@@ -8,8 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowDownward
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -115,7 +114,7 @@ private fun GapRow(gap: TimelineItem.Gap, onClick: () -> Unit) {
             LoadingIndicator(Modifier.size(40.dp))
         } else {
             FilledTonalButton(onClick = onClick) {
-                Icon(Icons.Rounded.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Symbols.Filled.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.timeline_load_gap))
             }

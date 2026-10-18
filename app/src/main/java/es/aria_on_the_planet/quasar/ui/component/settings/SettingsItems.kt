@@ -9,10 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemColors
@@ -121,7 +118,7 @@ fun SettingsNavigationItem(
         leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         supportingContent = Summary(summary),
         trailingContent = if (showChevron) {
-            { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
+            { Icon(Symbols.Filled.KeyboardArrowRight, contentDescription = null) }
         } else {
             null
         },
@@ -197,7 +194,7 @@ fun SettingsSplitSwitchItem(
         supportingContent = Summary(summary),
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                Icon(Symbols.Filled.KeyboardArrowRight, contentDescription = null)
                 VerticalDivider(
                     Modifier
                         .padding(horizontal = 16.dp)
@@ -226,7 +223,7 @@ fun SettingsSwitch(
         enabled = enabled,
         thumbContent = {
             Icon(
-                if (checked) Icons.Filled.Check else Icons.Filled.Close,
+                if (checked) Symbols.Filled.Check else Symbols.Filled.Close,
                 contentDescription = null,
                 modifier = Modifier.size(SwitchDefaults.IconSize),
             )

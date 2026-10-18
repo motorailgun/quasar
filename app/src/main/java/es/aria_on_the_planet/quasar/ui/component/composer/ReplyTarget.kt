@@ -9,8 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -163,7 +162,7 @@ fun ReplyingToLabel(accts: List<String>, modifier: Modifier = Modifier) {
 private fun CancelReplyButton(onClick: () -> Unit, size: Dp) {
     IconButton(onClick = onClick, modifier = Modifier.size(size)) {
         Icon(
-            Icons.Filled.Close,
+            Symbols.Filled.Close,
             contentDescription = stringResource(R.string.composer_cancel_reply),
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,

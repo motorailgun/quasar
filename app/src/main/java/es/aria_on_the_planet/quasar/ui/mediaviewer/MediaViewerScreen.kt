@@ -16,11 +16,7 @@ import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.MoreVert
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -241,7 +237,7 @@ private fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.Outlined.Close, stringResource(R.string.media_viewer_close), tint = MediaOverlayColors.Content)
+            Icon(Symbols.Outlined.Close, stringResource(R.string.media_viewer_close), tint = MediaOverlayColors.Content)
         }
         if (count > 1) {
             Text(
@@ -267,13 +263,13 @@ private fun MediaViewerMenu(
     val originalUrl = media.originalUrl
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Outlined.MoreVert, stringResource(R.string.media_viewer_menu), tint = MediaOverlayColors.Content)
+            Icon(Symbols.Outlined.MoreVert, stringResource(R.string.media_viewer_menu), tint = MediaOverlayColors.Content)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (onSave != null && originalUrl != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.media_viewer_save)) },
-                    leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                    leadingIcon = { Icon(Symbols.Outlined.Download, contentDescription = null) },
                     onClick = {
                         expanded = false
                         onSave(media)
@@ -283,7 +279,7 @@ private fun MediaViewerMenu(
             if (originalUrl != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.media_viewer_open_in_browser)) },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
+                    leadingIcon = { Icon(Symbols.Outlined.OpenInNew, contentDescription = null) },
                     onClick = {
                         expanded = false
                         onOpenUrl(originalUrl)

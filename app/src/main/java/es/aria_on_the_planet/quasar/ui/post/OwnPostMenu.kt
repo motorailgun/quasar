@@ -2,10 +2,7 @@ package es.aria_on_the_planet.quasar.ui.post
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MoreVert
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -45,7 +42,7 @@ fun OwnPostMenu(
                 LoadingIndicator(Modifier.size(24.dp))
             } else {
                 Icon(
-                    Icons.Outlined.MoreVert,
+                    Symbols.Outlined.MoreVert,
                     contentDescription = stringResource(R.string.post_menu),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -54,7 +51,7 @@ fun OwnPostMenu(
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.post_edit)) },
-                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                leadingIcon = { Icon(Symbols.Outlined.Edit, contentDescription = null) },
                 onClick = {
                     expanded = false
                     onEdit()
@@ -63,7 +60,7 @@ fun OwnPostMenu(
             val error = MaterialTheme.colorScheme.error
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.post_delete)) },
-                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                leadingIcon = { Icon(Symbols.Outlined.Delete, contentDescription = null) },
                 onClick = {
                     expanded = false
                     onDelete()

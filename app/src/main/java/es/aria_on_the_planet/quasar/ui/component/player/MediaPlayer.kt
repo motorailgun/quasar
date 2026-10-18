@@ -11,8 +11,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AudioFile
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -127,7 +126,7 @@ fun AudioArtwork(artworkUrl: String?, rotating: Boolean, modifier: Modifier = Mo
             )
         } else {
             Icon(
-                Icons.Outlined.AudioFile,
+                Symbols.Outlined.AudioFile,
                 contentDescription = null,
                 tint = MediaOverlayColors.Content,
                 modifier = Modifier.size(size * 0.5f),

@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ArrowDropDown
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -57,7 +55,7 @@ fun VisibilityButton(
             if (!compact) {
                 Spacer(Modifier.width(6.dp))
                 Text(label, style = MaterialTheme.typography.labelLarge)
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                Icon(Symbols.Filled.ArrowDropDown, contentDescription = null)
             }
         }
         VisibilityMenu(
@@ -97,7 +95,7 @@ private fun VisibilityMenu(
                 trailingIcon = {
                     // 選択の有無で幅が変わらないよう枠は常に確保する
                     Box(Modifier.size(24.dp)) {
-                        if (visibility == selected) Icon(Icons.Filled.Check, contentDescription = null)
+                        if (visibility == selected) Icon(Symbols.Filled.Check, contentDescription = null)
                     }
                 },
             )

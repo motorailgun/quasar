@@ -7,10 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.HelpOutline
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.BrokenImage
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -108,7 +105,7 @@ fun ImagePage(
         }
         if (failed && !loaded) {
             Icon(
-                Icons.Outlined.BrokenImage,
+                Symbols.Outlined.BrokenImage,
                 contentDescription = stringResource(R.string.media_viewer_load_error),
                 tint = MediaOverlayColors.Content,
                 modifier = Modifier.size(48.dp),
@@ -164,7 +161,7 @@ fun UnknownPage(media: MediaAttachment, onOpen: (String) -> Unit, modifier: Modi
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
-            Icons.AutoMirrored.Outlined.HelpOutline,
+            Symbols.Outlined.Help,
             contentDescription = null,
             tint = MediaOverlayColors.Content,
             modifier = Modifier.size(48.dp),
@@ -180,7 +177,7 @@ fun UnknownPage(media: MediaAttachment, onOpen: (String) -> Unit, modifier: Modi
                 onClick = { onOpen(url) },
                 colors = ButtonDefaults.buttonColors(containerColor = MediaOverlayColors.Content, contentColor = MediaOverlayColors.Background),
             ) {
-                Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Symbols.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text(stringResource(R.string.media_viewer_open_in_browser), modifier = Modifier.padding(start = 8.dp))
             }
         }

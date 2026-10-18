@@ -65,6 +65,7 @@ es.aria_on_the_planet.quasar
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  RemoteImage / LocalImage (画像表示の唯一の入口) + ImageKind / BlurHash デコーダ + プレースホルダ Painter
     │   │   └── loader/             Coil の ImageLoader とデコーダ (AnimationGate / APNG のデコーダ・再生・時刻計算・ヘッダの判定)
+    │   ├── link/NewTaskUriHandler.kt 外部リンクを開く (NEW_TASK 付き。LocalUriHandler として提供)
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
@@ -325,6 +326,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     共有しているが、空けた後も再生・展開し直しとも問題ないことを実機で確認済み (`am send-trim-memory <pkg> BACKGROUND`)。
   * Bitmap 以外 (アニメーション) の結果は Coil のメモリキャッシュに入らない (1 つの Drawable は 1 箇所でしか再生できない
     ため)。GIF / WebP は表示のたびにデコードされるが、ImageDecoder は少しずつ読むので軽い。
+
+### 外部リンク (`ui/component/link/NewTaskUriHandler.kt`)
+* 外部のリンクは `LocalUriHandler.current.openUri(url)` で開く (`QuasarAppContent` が `NewTaskUriHandler` を提供)。
+  `Intent` を直接投げるときは `externalViewIntent(url)` を使う。どちらも `FLAG_ACTIVITY_NEW_TASK` を付ける。
+  付けないと、受け口が standard の Activity のアプリ (Pixiv 等) が Quasar のタスクに積まれ、recents で 1 枚にまとまる。
 
 ### PostCard (`ui/component/post/PostCard.kt`)
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。

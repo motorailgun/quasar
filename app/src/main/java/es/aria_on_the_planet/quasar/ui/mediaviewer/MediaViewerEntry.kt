@@ -1,8 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.mediaviewer
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -12,6 +10,7 @@ import androidx.navigation3.runtime.NavKey
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.domain.model.mediaSaveTarget
+import es.aria_on_the_planet.quasar.ui.component.link.externalViewIntent
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.player.createMediaPlayer
 import es.aria_on_the_planet.quasar.ui.navigation.OverlaySceneStrategy
@@ -44,7 +43,7 @@ fun EntryProviderScope<NavKey>.mediaViewerEntry(container: AppContainer, onBack:
 fun openMedia(context: Context, click: MediaClick, openViewer: (MediaViewerArgs) -> Unit) {
     if (click.attachment.type == MediaType.Unknown) {
         click.attachment.originalUrl?.let { url ->
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            runCatching { context.startActivity(externalViewIntent(url)) }
         }
         return
     }

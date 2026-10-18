@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SmartToy
@@ -31,6 +32,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -38,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
@@ -77,6 +82,7 @@ private val AvatarRing = 4.dp
  * @param actions アイコンの右 (ヘッダ画像の下) に置くボタン (フォロー / プロフィール編集)。
  * @param onFollowingClick / [onFollowersClick] 統計のフォロー数・フォロワー数のタップ (一覧を開く)。
  * @param onOpenImage アイコン・ヘッダ画像のタップ (メディアビューアを開く)。`null` ならタップできない。
+ * @param onUserClick 引っ越し先のアカウントのタップ (プロフィールを開く)。
  */
 @Composable
 fun ProfileHeader(
@@ -87,6 +93,7 @@ fun ProfileHeader(
     onFollowingClick: () -> Unit = {},
     onFollowersClick: () -> Unit = {},
     onOpenImage: ((MediaViewerArgs) -> Unit)? = null,
+    onUserClick: (User) -> Unit = {},
     actions: @Composable () -> Unit = {},
 ) {
     val user = profile.user
@@ -103,6 +110,7 @@ fun ProfileHeader(
         }
     }
     Column(modifier.fillMaxWidth()) {
+        profile.movedTo?.let { MovedTo(it, onClick = { onUserClick(it) }) }
         Box {
             Box(
                 Modifier
@@ -216,6 +224,56 @@ fun ProfileHeader(
             FollowersYouFollow(followersYouFollow)
         }
         HorizontalDivider()
+    }
+}
+
+/** 引っ越し先のアカウント。行全体のタップでそのプロフィールを開く。 */
+@Composable
+private fun MovedTo(target: User, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.profile_moved_to),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // 見出しから引っ越し先へ下りる矢印 (↳)。その分アカウントを右へ寄せる。AutoMirrored 版が無いので RTL では自分で反転する
+            val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+            Icon(
+                Icons.Outlined.SubdirectoryArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer { scaleX = if (rtl) -1f else 1f },
+            )
+            Spacer(Modifier.width(12.dp))
+            UserIcon(target, size = 40.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                EmojiText(
+                    text = target.displayName.ifBlank { target.screenName },
+                    emojis = target.emojis,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "@${target.fullScreenName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

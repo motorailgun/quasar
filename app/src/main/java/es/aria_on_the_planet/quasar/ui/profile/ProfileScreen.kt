@@ -136,6 +136,7 @@ fun ProfileScreen(
                         onFollowingClick = onFollowingClick,
                         onFollowersClick = onFollowersClick,
                         onOpenImage = onOpenImage,
+                        onUserClick = onUserClick,
                         actions = {
                             ProfileActionButton(
                                 state = state.button,

@@ -68,6 +68,7 @@
     <string name="profile_request_follow_confirm_message">This account reviews follow requests. You\'ll be following them once they approve.</string>
     <string name="profile_blocking">Blocked</string>
     <string name="profile_follows_you">Follows you</string>
+    <string name="profile_moved_to">Moved to:</string>
     <string name="profile_requested_to_follow_you">Requested to follow you</string>
     <string name="profile_unfollow_confirm_title">Unfollow %1$s?</string>
     <string name="profile_unfollow_confirm_message">Their posts will no longer appear in your home timeline.</string>

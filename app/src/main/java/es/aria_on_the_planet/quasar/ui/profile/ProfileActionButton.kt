@@ -21,6 +21,7 @@ import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
  * プロフィールのヘッダのボタン。自分ならプロフィール編集、他人ならフォローの状態 ([FollowState]) に応じて
  * Follow (鍵アカウントは Request to follow = リクエスト送信) / Requested (送信済み) / Following / Blocked。
  * フォロー・リクエスト送信・解除・リクエストの取り下げは、どれも確認ダイアログを経てから [onSetFollowing] を呼ぶ。
+ * 引っ越し済みのアカウント ([Profile.movedTo]) は新たにフォローできない (フォロー中・リクエスト中なら解除・取り下げはできる)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -59,6 +60,12 @@ private fun FollowButton(
     val shapes = ButtonDefaults.shapes()
 
     when (followState) {
+        // 引っ越し済みのアカウントはフォローさせない (引っ越し先をフォローしてもらう)
+        FollowState.NotFollowing if profile.movedTo != null ->
+            Button(onClick = {}, modifier = modifier, enabled = false, shapes = shapes) {
+                Text(stringResource(R.string.profile_follow))
+            }
+
         FollowState.NotFollowing ->
             Button(onClick = { confirming = true }, modifier = modifier, enabled = enabled, shapes = shapes) {
                 Text(

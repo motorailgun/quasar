@@ -112,6 +112,14 @@ class MappersTest {
     }
 
     @Test
+    fun mapsMovedAccount() {
+        assertNull(alice.toProfile().movedTo)
+        val moved = alice.copy(moved = bob).toProfile()
+        assertEquals("2", moved.movedTo?.inServerId)
+        assertEquals("bob", moved.movedTo?.screenName)
+    }
+
+    @Test
     fun mapsProfile() {
         val profile = alice.copy(
             header = "https://remote.example/headers/original/missing.png",

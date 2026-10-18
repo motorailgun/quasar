@@ -38,6 +38,8 @@ data class AccountDto(
     val fields: List<FieldDto> = emptyList(),
     /** verify_credentials (CredentialAccount) のときだけ返る。 */
     val source: AccountSourceDto? = null,
+    /** 引っ越し先のアカウント (引っ越し済みのときだけ)。 */
+    val moved: AccountDto? = null,
 )
 
 /** https://docs.joinmastodon.org/entities/Account/#source */

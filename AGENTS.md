@@ -131,6 +131,7 @@ data class Profile(
     val createdAt: Instant?,
     val locked: Boolean,
     val bot: Boolean,
+    val movedTo: User? = null,     // moved (引っ越し先)。引っ越していなければ null
 )
 
 data class ProfileField(val name: String, val value: String /* HTML */, val verifiedAt: Instant?)
@@ -504,6 +505,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     * Blocking / BlockedBy: 押せないボタン (ブロック解除は未実装)。
     フォロー・リクエスト送信・解除・取り下げはどれも `ConfirmDialog` で確認してから `ProfileViewModel.setFollowing`。
     成功したら応答の関係で置き換え (鍵アカウントへの follow は `requested = true` で返る)、フォロワー数を手元で ±1。失敗はログのみで元に戻す。
+  * **引っ越し済みのアカウント** (`Account.moved` → `Profile.movedTo`): ヘッダ画像の上に「Moved to:」(引っ越し先:) と、その下に
+    ↳ (`SubdirectoryArrowRight`。AutoMirrored 版が無いので RTL では自前で反転) + 引っ越し先のアイコン・表示名・@acct の行 (`MovedTo`)。行全体のタップで引っ越し先のプロフィール (`onUserClick`)。フォローボタンは
+    NotFollowing なら押せない Follow (フォロー中・リクエスト中なら解除・取り下げはできる)。フォロー / フォロワー一覧はそのまま開ける。
   * @acct の横に相手 → 自分の関係のラベル: `requested_by` (Mastodon 4.1+) なら「Requested to follow you」、`followed_by` なら「Follows you」。
     リクエストの承認・拒否は未実装。
   * **構成**: `CollapsingHeaderLayout` で 上からヘッダ (`ProfileHeader`) / タブ (`ConnectedTabRow`) / `HorizontalPager`

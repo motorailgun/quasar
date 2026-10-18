@@ -15,6 +15,8 @@ data class Profile(
     val createdAt: Instant?,
     val locked: Boolean,
     val bot: Boolean,
+    /** 引っ越し先のアカウント (`moved`)。引っ越していなければ `null`。 */
+    val movedTo: User? = null,
 )
 
 /** プロフィールの追加情報 (key: value)。いずれもカスタム絵文字を含みうる。 */

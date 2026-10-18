@@ -69,6 +69,7 @@
     <string name="profile_request_follow_confirm_message">このアカウントは承認制アカウントです。相手が承認するまでフォローは完了しません。</string>
     <string name="profile_blocking">ブロック中</string>
     <string name="profile_follows_you">フォローされています</string>
+    <string name="profile_moved_to">引っ越し先:</string>
     <string name="profile_requested_to_follow_you">フォローリクエストされています</string>
     <string name="profile_unfollow_confirm_title">%1$s さんのフォローを解除しますか？</string>
     <string name="profile_unfollow_confirm_message">ホームタイムラインにこのアカウントの投稿が表示されなくなります。</string>

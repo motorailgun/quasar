@@ -69,6 +69,7 @@ fun AccountDto.toProfile() = Profile(
     createdAt = createdAt?.let { parseInstantOrNull(it) },
     locked = locked,
     bot = bot,
+    movedTo = moved?.toDomain(),
 )
 
 fun RelationshipDto.toDomain() = Relationship(

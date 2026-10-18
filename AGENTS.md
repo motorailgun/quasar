@@ -787,8 +787,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 最大件数: ストリーム・補完で一覧が伸びたら (`PagedFeed.updateList` の後の `trim`) 古い側を捨てる。ポストは
   `MaxTimelinePosts` = 400 件 (`trimTimeline`、gap は数えず末尾に残った gap も捨てる)、通知は 400 行。捨てたら次ページの
   `max_id` を残った末尾から求め直すので、下へスクロールすれば読み直せる。読み進めて伸ばした分 (loadMore) は捨てない。
-* 表示: 先頭にいるときに先頭へ新着が入ったら `StickToTopEffect` で先頭へスクロールして見せる。読み進めている途中は
-  LazyColumn がキーで位置を保つ。項目の出入りは `Modifier.animateItem()`。
+* 表示: 先頭にいるときに先頭へ新着が入ったら `StickToTopEffect` で先頭に留まって見せる (新着は `animateItem` で現れ、
+  下の項目が押し下げられる)。読み進めている途中は LazyColumn がキーで位置を保つ。項目の出入りは `Modifier.animateItem()`。
 * 未対応: グローバルの自動更新、背面での受信 (Web Push)、通知の gap、通知の削除イベント。
 
 ## 設定
@@ -957,7 +957,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   まとめるかキーに接頭辞を付ける。重複キーはクラッシュする。
 * テキスト内リンクのタッチ判定は最低 48dp に広がるため、本文先頭のリンクの直上 (投稿者行・時刻) のタップで
   リンクが開くことがある (既知の挙動)。
-* `StickToTopEffect` はコンポジション中に LazyListState を読んで「直前に先頭にいたか」を判定している。
+* `StickToTopEffect` は先頭キーが変わったコンポジションの `SideEffect` (反映直後・レイアウト前) で「直前に先頭にいたか」を
+  読み、`requestScrollToItem(0)` で次のレイアウトから先頭を指定する。レイアウト後に `animateScrollToItem` で戻す方式は、
+  LazyColumn がキーで元の先頭を保つため「1 件分上へずれる → スクロールで戻る」の 2 段の動きになっていた (実機の録画で確認)。
   一覧の先頭キーの決め方を変えるときは挙動を確認する。
 * **MainActivity は manifest で `android:windowSoftInputMode="adjustResize"` にしておく** (入力欄のある画面がすべてここに載る)。未指定だと OS が `adjustPan` を選ぶことがあり、ウィンドウごと押し上げられた上に Compose の
   `WindowInsets.ime` の分も持ち上がって、クイック投稿バーがキーボードの高さ 1 つ分上 (画面の上端付近) に飛ぶ。

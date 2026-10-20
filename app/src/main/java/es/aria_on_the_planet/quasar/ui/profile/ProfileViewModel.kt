@@ -49,8 +49,15 @@ sealed interface ProfileButtonState {
     /** 自分のプロフィール。編集画面は未実装なので押しても何もしない。 */
     data object EditProfile : ProfileButtonState
 
-    /** 他人のプロフィール。[isUpdating] はフォロー / 解除の送信中。 */
-    data class Follow(val relationship: Relationship, val isUpdating: Boolean = false) : ProfileButtonState
+    /**
+     * 他人のプロフィール。[isUpdating] はフォロー / 解除の送信中、[answering] は相手からのフォローリクエストへの
+     * 返事の送信中 (`true` = 承認、`false` = 拒否、`null` = 送信していない)。
+     */
+    data class Follow(
+        val relationship: Relationship,
+        val isUpdating: Boolean = false,
+        val answering: Boolean? = null,
+    ) : ProfileButtonState
 }
 
 data class ProfileScreenState(
@@ -133,7 +140,8 @@ class ProfileViewModel(
         viewModelScope.launch {
             try {
                 val updated = repository.setFollowing(session, accountId, follow)
-                button.value = ProfileButtonState.Follow(updated)
+                // フォローリクエストへの返事を送信中でも、その状態は残す
+                button.update { (it as? ProfileButtonState.Follow)?.copy(relationship = updated, isUpdating = false) ?: it }
                 // フォロワー数はプロフィールを読み直さずに手元で合わせる (リクエスト中は数えない)
                 val delta = updated.following.toInt() - current.relationship.following.toInt()
                 if (delta != 0) {
@@ -145,7 +153,29 @@ class ProfileViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to ${if (follow) "follow" else "unfollow"}", e)
-                button.value = current
+                button.update { (it as? ProfileButtonState.Follow)?.copy(isUpdating = false) ?: it }
+            }
+        }
+    }
+
+    /** 相手から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。確認は画面側で済ませてから呼ぶ。 */
+    fun answerFollowRequest(accept: Boolean) {
+        val current = button.value as? ProfileButtonState.Follow ?: return
+        if (current.answering != null || !current.relationship.requestedBy) return
+        button.value = current.copy(answering = accept)
+        viewModelScope.launch {
+            try {
+                val updated = repository.answerFollowRequest(session, accountId, accept)
+                button.update { (it as? ProfileButtonState.Follow)?.copy(relationship = updated, answering = null) ?: it }
+                // 承認したら相手のフォロー数が 1 増える (プロフィールを読み直さずに手元で合わせる)
+                if (accept && updated.followedBy && !current.relationship.followedBy) {
+                    profile.update { s -> s.copy(profile = s.profile?.let { it.copy(followingCount = it.followingCount + 1) }) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to ${if (accept) "accept" else "reject"} follow request", e)
+                button.update { (it as? ProfileButtonState.Follow)?.copy(answering = null) ?: it }
             }
         }
     }

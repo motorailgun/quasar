@@ -75,6 +75,7 @@ private val AvatarRing = 4.dp
  * @param onFollowingClick / [onFollowersClick] 統計のフォロー数・フォロワー数のタップ (一覧を開く)。
  * @param onOpenImage アイコン・ヘッダ画像のタップ (メディアビューアを開く)。`null` ならタップできない。
  * @param onUserClick 引っ越し先のアカウントのタップ (プロフィールを開く)。
+ * @param followRequest 統計の下に置く、相手からのフォローリクエストへの返事 ([FollowRequestCard])。
  */
 @Composable
 fun ProfileHeader(
@@ -87,6 +88,7 @@ fun ProfileHeader(
     onOpenImage: ((MediaViewerArgs) -> Unit)? = null,
     onUserClick: (User) -> Unit = {},
     actions: @Composable () -> Unit = {},
+    followRequest: @Composable () -> Unit = {},
 ) {
     val user = profile.user
     val windowSize = LocalWindowInfo.current.containerSize
@@ -214,6 +216,8 @@ fun ProfileHeader(
             ProfileStats(profile, onFollowingClick, onFollowersClick)
 
             FollowersYouFollow(followersYouFollow)
+
+            followRequest()
         }
         HorizontalDivider()
     }
@@ -266,14 +270,11 @@ private fun MovedTo(target: User, onClick: () -> Unit) {
     }
 }
 
-/** 相手 → 自分の関係 (X の「Follows you」)。リクエストが来ていればそちらを優先する。 */
+/** 相手 → 自分の関係 (X の「Follows you」)。フォローリクエストが来ているときは [FollowRequestCard] で出す。 */
 @Composable
 private fun RelationshipLabel(relationship: Relationship) {
-    val text = when {
-        relationship.requestedBy -> R.string.profile_requested_to_follow_you
-        relationship.followedBy -> R.string.profile_follows_you
-        else -> return
-    }
+    if (!relationship.followedBy) return
+    val text = R.string.profile_follows_you
     Text(
         text = stringResource(text),
         style = MaterialTheme.typography.labelSmall,

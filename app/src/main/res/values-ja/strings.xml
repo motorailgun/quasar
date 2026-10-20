@@ -70,7 +70,9 @@
     <string name="profile_blocking">ブロック中</string>
     <string name="profile_follows_you">フォローされています</string>
     <string name="profile_moved_to">引っ越し先:</string>
-    <string name="profile_requested_to_follow_you">フォローリクエストされています</string>
+    <string name="profile_follow_request_message">%1$sさんからフォローリクエストが届いています</string>
+    <string name="profile_follow_request_accept">承認</string>
+    <string name="profile_follow_request_reject">拒否</string>
     <string name="profile_unfollow_confirm_title">%1$s さんのフォローを解除しますか？</string>
     <string name="profile_unfollow_confirm_message">ホームタイムラインにこのアカウントの投稿が表示されなくなります。</string>
     <string name="profile_withdraw_request_title">%1$s さんのフォローリクエストを取り消しますか？</string>
@@ -252,6 +254,9 @@
     <string name="confirm_delete_post_title">投稿を削除しますか？</string>
     <string name="confirm_delete_post_message">この操作は元に戻せません。</string>
     <string name="confirm_delete_post">削除</string>
+    <string name="confirm_reject_follow_request_title">フォローリクエストを拒否しますか？</string>
+    <string name="confirm_reject_follow_request_message">フォローするには、もう一度リクエストを送ってもらう必要があります。</string>
+    <string name="confirm_reject_follow_request">拒否</string>
 
     <!-- 設定 -->
     <string name="settings">設定</string>
@@ -316,6 +321,8 @@
     <string name="settings_my_posts">自分の投稿</string>
     <string name="settings_confirm_edit_post">投稿の更新</string>
     <string name="settings_confirm_delete_post">削除</string>
+    <string name="settings_follow_requests">フォローリクエスト</string>
+    <string name="settings_confirm_reject_follow_request">拒否</string>
     <string name="share_not_logged_in">Mastodon に共有するにはログインしてください。</string>
     <string name="share_posted">投稿しました</string>
     <plurals name="share_media_skipped">

@@ -12,7 +12,8 @@ class AppSettingsTest {
             listOf(PostAction(type, undo = false), PostAction(type, undo = true))
         }.map { it.confirmTarget }
         assertEquals(targets.size, targets.toSet().size)
-        val nonPostActions = setOf(ConfirmTarget.Post, ConfirmTarget.EditPost, ConfirmTarget.DeletePost)
+        val nonPostActions =
+            setOf(ConfirmTarget.Post, ConfirmTarget.EditPost, ConfirmTarget.DeletePost, ConfirmTarget.RejectFollowRequest)
         assertEquals(ConfirmTarget.entries.toSet() - nonPostActions, targets.toSet())
         assertEquals(ConfirmTarget.Unboost, PostAction(PostActionType.Boost, undo = true).confirmTarget)
         assertEquals(ConfirmTarget.Favourite, PostAction(PostActionType.Favourite, undo = false).confirmTarget)

@@ -69,7 +69,9 @@
     <string name="profile_blocking">Blocked</string>
     <string name="profile_follows_you">Follows you</string>
     <string name="profile_moved_to">Moved to:</string>
-    <string name="profile_requested_to_follow_you">Requested to follow you</string>
+    <string name="profile_follow_request_message">%1$s has requested to follow you</string>
+    <string name="profile_follow_request_accept">Accept</string>
+    <string name="profile_follow_request_reject">Reject</string>
     <string name="profile_unfollow_confirm_title">Unfollow %1$s?</string>
     <string name="profile_unfollow_confirm_message">Their posts will no longer appear in your home timeline.</string>
     <string name="profile_withdraw_request_title">Withdraw your follow request to %1$s?</string>
@@ -273,6 +275,9 @@
     <string name="confirm_delete_post_title">Delete this post?</string>
     <string name="confirm_delete_post_message">This can\'t be undone.</string>
     <string name="confirm_delete_post">Delete</string>
+    <string name="confirm_reject_follow_request_title">Reject this follow request?</string>
+    <string name="confirm_reject_follow_request_message">They\'ll need to send a new request to follow you.</string>
+    <string name="confirm_reject_follow_request">Reject</string>
 
     <!-- 設定 -->
     <string name="settings">Settings</string>
@@ -340,6 +345,8 @@
     <string name="settings_my_posts">My posts</string>
     <string name="settings_confirm_edit_post">Save edits</string>
     <string name="settings_confirm_delete_post">Delete</string>
+    <string name="settings_follow_requests">Follow requests</string>
+    <string name="settings_confirm_reject_follow_request">Reject</string>
     <string name="share_not_logged_in">Log in to share to Mastodon.</string>
     <string name="share_posted">Posted</string>
     <plurals name="share_media_skipped">

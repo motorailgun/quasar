@@ -1,6 +1,14 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
+import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
+import kotlinx.coroutines.CoroutineStart
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.derivedStateOf
@@ -85,6 +93,7 @@ fun ProfileScreen(
     val pagerState = rememberPagerState { tabs.size }
     val headerState = rememberCollapsingHeaderState()
     val scope = rememberCoroutineScope()
+    val confirmer = LocalActionConfirmer.current
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
     val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
@@ -137,6 +146,28 @@ fun ProfileScreen(
                         onFollowersClick = onFollowersClick,
                         onOpenImage = onOpenImage,
                         onUserClick = onUserClick,
+                        followRequest = {
+                            val follow = state.button as? ProfileButtonState.Follow
+                            val motion = MaterialTheme.motionScheme
+                            AnimatedVisibility(
+                                visible = follow?.relationship?.requestedBy == true,
+                                enter = expandVertically(motion.defaultSpatialSpec()) + fadeIn(motion.defaultEffectsSpec()),
+                                exit = shrinkVertically(motion.defaultSpatialSpec()) + fadeOut(motion.defaultEffectsSpec()),
+                            ) {
+                                FollowRequestCard(
+                                    user = profile.user,
+                                    answering = follow?.answering,
+                                    onAnswer = { accept ->
+                                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                                            // 拒否は取り消せない (相手に申請し直してもらうしかない) ので、設定に従って確認する
+                                            if (accept || confirmer.confirm(ConfirmTarget.RejectFollowRequest)) {
+                                                viewModel.answerFollowRequest(accept)
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                        },
                         actions = {
                             ProfileActionButton(
                                 state = state.button,

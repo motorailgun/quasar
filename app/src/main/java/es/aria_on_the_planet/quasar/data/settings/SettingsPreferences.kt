@@ -148,6 +148,7 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
     ),
     confirm("confirm_edit_post", ConfirmTarget.EditPost),
     confirm("confirm_delete_post", ConfirmTarget.DeletePost),
+    confirm("confirm_reject_follow_request", ConfirmTarget.RejectFollowRequest),
     SettingField(
         stringPreferencesKey("default_visibility"),
         { it.defaultVisibility },

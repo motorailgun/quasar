@@ -83,9 +83,10 @@ class SettingsPreferencesTest {
     @Test
     fun defaultOnConfirmationsAreStoredPerTarget() {
         // 既定でオンのものを切ったら、まとめたキーではなく個別のキーに書く
-        val prefs = written(AppSettings(), AppSettings(confirmations = setOf(ConfirmTarget.EditPost)))
+        val confirmations = DefaultConfirmations - ConfirmTarget.DeletePost
+        val prefs = written(AppSettings(), AppSettings(confirmations = confirmations))
         assertEquals(setOf("confirm_delete_post"), prefs.asMap().keys.map { it.name }.toSet())
-        assertEquals(setOf(ConfirmTarget.EditPost), prefs.toAppSettings().confirmations)
+        assertEquals(confirmations, prefs.toAppSettings().confirmations)
         // まとめたキーだけを保存していた (追加より前の) ユーザーにも既定値でオンになる
         val legacy = mutablePreferencesOf(stringSetPreferencesKey("confirm_targets") to setOf("Post"))
         assertEquals(setOf(ConfirmTarget.Post) + DefaultConfirmations, legacy.toAppSettings().confirmations)

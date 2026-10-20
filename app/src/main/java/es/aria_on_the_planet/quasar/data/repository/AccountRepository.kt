@@ -85,6 +85,12 @@ class AccountRepository(
         return api.follow(session.serverUrl, token, accountId, follow).toDomain()
     }
 
+    /** [accountId] から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。要認証。更新後の関係を返す。 */
+    suspend fun answerFollowRequest(session: Session, accountId: String, accept: Boolean): Relationship {
+        val token = checkNotNull(session.accessToken) { "Not logged in" }
+        return api.answerFollowRequest(session.serverUrl, token, accountId, accept).toDomain()
+    }
+
     /** ピン留めされたポスト。サーバによっては多いため [MaxPinnedPosts] 件で打ち切る。 */
     suspend fun fetchPinnedPosts(session: Session, accountId: String): List<Post> =
         api.accountStatuses(session.serverUrl, session.accessToken, accountId, limit = MaxPinnedPosts, pinned = true)

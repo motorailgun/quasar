@@ -1,6 +1,20 @@
 package es.aria_on_the_planet.quasar.debug
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import es.aria_on_the_planet.quasar.domain.model.Relationship
+import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
+import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
+import es.aria_on_the_planet.quasar.ui.profile.FollowRequestCard
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -216,6 +230,43 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                     onMediaClick = navigator::openMedia,
                     header = { item(key = "header") { ProfileHeader(profile = fixture.profile, onOpenImage = navigator::openMediaViewer) } },
                 )
+            }
+
+            GalleryScenario.FollowRequest -> {
+                // 押すと送信中の表示になり、もう一度押す代わりに 2 秒で消えて「返事済み」になる (データ層は通らない)
+                val fixture = remember(text) { GalleryFixtures.profile(text) }
+                var answering by remember { mutableStateOf<Boolean?>(null) }
+                var answered by remember { mutableStateOf(false) }
+                val confirmer = LocalActionConfirmer.current
+                val scope = rememberCoroutineScope()
+                LaunchedEffect(answering) {
+                    if (answering != null) {
+                        delay(2000)
+                        answering = null
+                        answered = true
+                    }
+                }
+                LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                    item(key = "header") {
+                        ProfileHeader(
+                            profile = fixture.profile,
+                            relationship = Relationship(following = false, requested = false, followedBy = answered, requestedBy = !answered),
+                            followRequest = {
+                                AnimatedVisibility(visible = !answered, exit = shrinkVertically() + fadeOut()) {
+                                    FollowRequestCard(
+                                        user = fixture.profile.user,
+                                        answering = answering,
+                                        onAnswer = { accept ->
+                                            scope.launch {
+                                                if (accept || confirmer.confirm(ConfirmTarget.RejectFollowRequest)) answering = accept
+                                            }
+                                        },
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
             }
 
             GalleryScenario.Reply -> {

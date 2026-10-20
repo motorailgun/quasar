@@ -20,6 +20,8 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     Reply("reply", R.string.gallery_reply, "post-variety.json"),
     /** 通知のユーザー単位のまとめの中身。データは profile (アカウント + ポスト) を使い回す。 */
     AccountReactions("account-reactions", R.string.gallery_account_reactions, "profile.json"),
+    /** 相手からのフォローリクエストが来ているプロフィールのヘッダ。データは profile を使い回す。 */
+    FollowRequest("follow-request", R.string.gallery_follow_request, "profile.json"),
     ;
 
     companion object {

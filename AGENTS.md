@@ -242,6 +242,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | フォロー / フォロワー一覧 | `GET /api/v1/accounts/:id/following` / `followers` (**Link ヘッダ**でページング。下記) |
 | 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` (要認証) |
 | フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (要認証。鍵アカウントは `requested` になる) |
+| 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (要認証。応答は Relationship) |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
 | 通知 (グループ) | `GET /api/v2/notifications` (要認証、Mastodon 4.3+、既定) |
 | 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
@@ -519,8 +520,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * **引っ越し済みのアカウント** (`Account.moved` → `Profile.movedTo`): ヘッダ画像の上に「Moved to:」(引っ越し先:) と、その下に
     ↳ (`SubdirectoryArrowRight`) + 引っ越し先のアイコン・表示名・@acct の行 (`MovedTo`)。行全体のタップで引っ越し先のプロフィール (`onUserClick`)。フォローボタンは
     NotFollowing なら押せない Follow (フォロー中・リクエスト中なら解除・取り下げはできる)。フォロー / フォロワー一覧はそのまま開ける。
-  * @acct の横に相手 → 自分の関係のラベル: `requested_by` (Mastodon 4.1+) なら「Requested to follow you」、`followed_by` なら「Follows you」。
-    リクエストの承認・拒否は未実装。
+  * @acct の横に相手 → 自分の関係のラベル: `followed_by` なら「Follows you」。
+  * **相手からのフォローリクエスト** (`requested_by`、Mastodon 4.1+): 統計の下に `FollowRequestCard` (`OutlinedCard` に
+    「**名前** has requested to follow you」+ Expressive の `ButtonGroup` で承認 (`Button`) / 拒否 (`OutlinedButton`)、どちらも
+    `ButtonDefaults.shapes()`)。送信中は押した方のアイコンを `LoadingIndicator` にし、もう片方を無効にする。拒否は設定
+    (`ConfirmTarget.RejectFollowRequest`、既定でオン) で確認する。`ProfileViewModel.answerFollowRequest` が応答の関係で置き換え、
+    承認なら相手のフォロー数を手元で +1。カードは `AnimatedVisibility` (motionScheme) で閉じ、フォローボタンは「Follow back」等に変わる。
+    失敗はログのみで、ボタンが押せる状態に戻る。follow_request の通知のタップはこれまでどおりプロフィール。
+    フォローリクエストの一覧画面 (`GET /api/v1/follow_requests`) は未実装。
   * **構成**: `CollapsingHeaderLayout` で 上からヘッダ (`ProfileHeader`) / タブ (`ConnectedTabRow`) / `HorizontalPager`
     (タブごとの `PostList`、それぞれ別の LazyListState)。一覧を上へスクロールするとまずヘッダが畳まれ (nested scroll の
     pre-scroll)、タブは上端に残る。下へは一覧が先頭に着いてからヘッダが開き、開き切った余りが pull-to-refresh へ回る。
@@ -847,7 +854,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## 設定
 
 * 設定全体は `AppSettings` (`domain/model/settings/`): 表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
-  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
+  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
   アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
   log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
 * 保存は `SettingsStore` (`data/settings/`、Preferences DataStore、`AppContainer.settingsStore`)。項目ごとに 1 キーで、
@@ -871,7 +878,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
   投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン。編集なら `EditPost`)、削除はポスト画面から使う。
-  設定画面の Confirmations の「My posts」で編集・削除の確認を切り替える。
+  設定画面の Confirmations の「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP
@@ -958,7 +965,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
       --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60]
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / account-reactions (通知のまとめの中身。データは profile を
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す)。
   表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む

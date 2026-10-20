@@ -45,10 +45,17 @@ enum class ConfirmTarget {
 
     /** 自分のポストの削除。 */
     DeletePost,
+
+    /** 相手から自分へのフォローリクエストの拒否。 */
+    RejectFollowRequest,
 }
 
-/** 既定で確認する操作。取り消せない (削除) ・やり直しが面倒な (編集) 自分のポストへの操作。 */
-val DefaultConfirmations: Set<ConfirmTarget> = setOf(ConfirmTarget.EditPost, ConfirmTarget.DeletePost)
+/**
+ * 既定で確認する操作。取り消せない (削除・フォローリクエストの拒否) ・やり直しが面倒な (編集) 操作。
+ * 足すときは `SettingsPreferences.kt` に個別のキーも足す (まとめたキーには入れない)。
+ */
+val DefaultConfirmations: Set<ConfirmTarget> =
+    setOf(ConfirmTarget.EditPost, ConfirmTarget.DeletePost, ConfirmTarget.RejectFollowRequest)
 
 /** この操作に対応する確認の対象。 */
 val PostAction.confirmTarget: ConfirmTarget

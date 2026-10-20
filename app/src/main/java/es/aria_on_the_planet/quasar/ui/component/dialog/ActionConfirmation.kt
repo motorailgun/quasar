@@ -93,4 +93,10 @@ private val ConfirmTarget.texts: ConfirmationTexts
             message = R.string.confirm_delete_post_message,
             destructive = true,
         )
+        ConfirmTarget.RejectFollowRequest -> ConfirmationTexts(
+            R.string.confirm_reject_follow_request_title,
+            R.string.confirm_reject_follow_request,
+            message = R.string.confirm_reject_follow_request_message,
+            destructive = true,
+        )
     }

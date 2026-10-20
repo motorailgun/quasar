@@ -326,6 +326,13 @@ class MastodonApi(
     suspend fun follow(serverUrl: String, accessToken: String, id: String, follow: Boolean): RelationshipDto =
         post(serverUrl, accessToken, "api/v1/accounts/$id/${if (follow) "follow" else "unfollow"}") {}
 
+    /**
+     * 相手 [id] から自分へのフォローリクエストを承認する (https://docs.joinmastodon.org/methods/follow_requests/#accept) /
+     * 拒否する (https://docs.joinmastodon.org/methods/follow_requests/#reject)。要認証。更新後の関係を返す。
+     */
+    suspend fun answerFollowRequest(serverUrl: String, accessToken: String, id: String, accept: Boolean): RelationshipDto =
+        post(serverUrl, accessToken, "api/v1/follow_requests/$id/${if (accept) "authorize" else "reject"}") {}
+
     /** https://docs.joinmastodon.org/methods/accounts/#familiar_followers (要認証) */
     suspend fun familiarFollowers(
         serverUrl: String,

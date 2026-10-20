@@ -300,7 +300,7 @@ fun PostingSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: (
     }
 }
 
-/** 確認: ブースト・お気に入り・ブックマーク (とそれぞれの取り消し)・自分のポストの編集・削除の前に確認するか。 */
+/** 確認: ブースト・お気に入り・ブックマーク (とそれぞれの取り消し)・自分のポストの編集・削除・フォローリクエストの拒否の前に確認するか。 */
 @Composable
 fun ConfirmationSettingsPage(confirmations: Set<ConfirmTarget>, update: UpdateSettings, onBack: () -> Unit) {
     val summary = stringResource(R.string.settings_confirm_summary)
@@ -323,6 +323,9 @@ fun ConfirmationSettingsPage(confirmations: Set<ConfirmTarget>, update: UpdateSe
         SettingsGroup(title = stringResource(R.string.settings_my_posts)) {
             Item(R.string.settings_confirm_edit_post, ConfirmTarget.EditPost)
             Item(R.string.settings_confirm_delete_post, ConfirmTarget.DeletePost)
+        }
+        SettingsGroup(title = stringResource(R.string.settings_follow_requests)) {
+            Item(R.string.settings_confirm_reject_follow_request, ConfirmTarget.RejectFollowRequest)
         }
     }
 }

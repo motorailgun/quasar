@@ -633,7 +633,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
-  * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct・
+  * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct (タップで自分のプロフィール)・
     設定。未取得 / 未ログインは汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。

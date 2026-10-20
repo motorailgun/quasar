@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.navigation
 
 import androidx.navigation3.runtime.NavKey
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import kotlinx.serialization.Serializable
@@ -24,6 +25,16 @@ sealed interface Route : NavKey {
 
     /** ハッシュタグのタイムライン。[name] は `#` 無し。 */
     @Serializable data class Hashtag(val name: String) : Route
+
+    /**
+     * 通知のユーザー単位のまとめの中身: [accountId] が [statusIds] のポストにした [type] (お気に入り / ブースト)。
+     * [statusIds] は通知と同じ新しい順。
+     */
+    @Serializable data class AccountReactions(
+        val accountId: String,
+        val type: NotificationType,
+        val statusIds: List<String>,
+    ) : Route
 
     /** ポストの詳細。ブーストなら中身の ID。 */
     @Serializable data class Post(val statusId: String) : Route

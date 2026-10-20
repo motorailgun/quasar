@@ -10,4 +10,5 @@
     <string name="gallery_profile">Profile</string>
     <string name="gallery_post_variety">Post variety</string>
     <string name="gallery_reply">Reply targets</string>
+    <string name="gallery_account_reactions">Reactions on multiple posts</string>
 </resources>

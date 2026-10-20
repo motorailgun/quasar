@@ -42,6 +42,7 @@ import es.aria_on_the_planet.quasar.ui.navigation.OverlaySceneStrategy
 import es.aria_on_the_planet.quasar.ui.navigation.Route
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -53,6 +54,8 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import kotlinx.serialization.Serializable
 import es.aria_on_the_planet.quasar.ui.profile.ProfileHeader
+import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsContent
+import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsState
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 
 /**
@@ -133,6 +136,7 @@ private class GalleryNavigator(
     override fun openPost(post: Post) = Unit
     override fun openHashtag(name: String) = Unit
     override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
+    override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) = Unit
     override fun openComposer() = Unit
     override fun openSettings() = Unit
     override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
@@ -173,6 +177,22 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
     val navigator = LocalNavigator.current
     val text = remember(scenario) {
         context.assets.open("gallery/${scenario.fixture}").bufferedReader().use { it.readText() }
+    }
+    if (scenario == GalleryScenario.AccountReactions) {
+        // 画面の骨組みごと本物を使う (トップバーの文言も確かめたいので、ギャラリーの DetailScaffold には載せない)
+        val fixture = remember(text) { GalleryFixtures.profile(text) }
+        AccountReactionsContent(
+            state = AccountReactionsState(account = fixture.profile.user, posts = fixture.posts.take(3), loaded = true),
+            type = NotificationType.Favourite,
+            postCount = 3,
+            onBack = onBack,
+            onRefresh = {},
+            onUserClick = {},
+            onPostClick = {},
+            onMediaClick = navigator::openMedia,
+            onHashtagClick = {},
+        )
+        return
     }
     val listState = rememberLazyListState()
     DetailScaffold(
@@ -216,6 +236,8 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                     }
                 }
             }
+
+            GalleryScenario.AccountReactions -> Unit
 
             GalleryScenario.AnimatedEmoji,
             GalleryScenario.AnimatedAvatars,

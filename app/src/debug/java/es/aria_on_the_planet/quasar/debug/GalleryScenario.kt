@@ -18,6 +18,8 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     PostVariety("post-variety", R.string.gallery_post_variety, "post-variety.json"),
     /** 返信先の表示 (バーの縮小版 / フル画面の X 風)。データは post-variety を使い回す。 */
     Reply("reply", R.string.gallery_reply, "post-variety.json"),
+    /** 通知のユーザー単位のまとめの中身。データは profile (アカウント + ポスト) を使い回す。 */
+    AccountReactions("account-reactions", R.string.gallery_account_reactions, "profile.json"),
     ;
 
     companion object {

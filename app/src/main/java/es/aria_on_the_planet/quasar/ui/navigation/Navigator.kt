@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.navigation
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
@@ -18,6 +19,9 @@ interface Navigator {
     /** [name] は `#` 無し。 */
     fun openHashtag(name: String)
     fun openFollowList(accountId: String, tab: FollowListTab)
+
+    /** 通知のユーザー単位のまとめ ([account] が [posts] にした [type]) の中身。 */
+    fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>)
 
     /** 投稿画面 (下書きは共有)。 */
     fun openComposer()

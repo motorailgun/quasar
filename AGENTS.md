@@ -90,6 +90,7 @@ es.aria_on_the_planet.quasar
     ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
+    ├── reactions/                  通知のユーザー単位のまとめの中身 (AccountReactionsScreen / ViewModel)
     └── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
 ```
 
@@ -245,7 +246,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 通知 (グループ) | `GET /api/v2/notifications` (要認証、Mastodon 4.3+、既定) |
 | 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
 | ハッシュタグのタイムライン | `GET /api/v1/timelines/tag/:hashtag` (max_id ページング) |
-| ポスト | `GET /api/v1/statuses/:id` |
+| ポスト | `GET /api/v1/statuses/:id` (まとめの中身は 1 件ずつ・同時 4 件まで。`StatusRepository.fetchPosts`) |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
 | ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` (要認証) |
 | お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` (要認証) |
@@ -609,6 +610,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     グルーピングの仕様はサーバ任せとし、クライアント側で独自にまとめることはしない。
   * 一覧の行は `NotificationEntry` (`Single` = サーバ側グループ 1 つ / `AccountReactions` = 1 人のユーザーが複数ポストに
     した同じ種類のリアクションをクライアント側でまとめたもの「〇〇 favourited 3 of your posts」)。
+  * `AccountReactions` の行のタップで `Route.AccountReactions(accountId, type, statusIds)` (`Navigator.openAccountReactions`)。
+    `DetailScaffold` (タイトルは表示名 +「Favourited N of your posts」) + `PostList` でまとめたポストを通知と同じ新しい順に並べ、
+    末尾 (`PostList(footer = ...)`) にそのユーザーの要約 (`UserSummary`: タイムラインと同じ大きさのアイコン / 太字の表示名 /
+    控えめな色・小さめのプロフィール文。タップでプロフィール)。ポストは通知の一覧から受け取らず ID で取り直す (プロセスの
+    再生成でも開き直せるように)。消された・見られないポスト (4xx) は飛ばす。開いた後に届いた分は反映しない。
   * 一覧の組み立ては純粋関数 `appendNotificationPage(current, page)` (`ui/notification/NotificationGrouping.kt`) が行い、
     `PagedFeed(append = ...)` から呼ぶ。refresh は空の一覧に足す。手順:
     1. ページ境界で分かれたサーバ側グループの続き (同じ `group_key`) は既存行の中で `NotificationGroup.mergeOlder` で統合
@@ -952,7 +958,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
       --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60]
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す)。
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / account-reactions (通知のまとめの中身。データは profile を
+  使い回し、`AccountReactionsContent` を骨組みごと出す)。
   表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と

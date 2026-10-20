@@ -78,6 +78,7 @@ fun NotificationList(
     onAction: OnPostAction? = null,
     onReply: ((Post) -> Unit)? = null,
     onHashtagClick: ((String) -> Unit)? = null,
+    onAccountReactionsClick: (NotificationEntry.AccountReactions) -> Unit = {},
 ) {
     LoadMoreEffect(state, onLoadMore)
     // 先頭にいるときにストリーミングの新着が入ったら見せる
@@ -86,7 +87,11 @@ fun NotificationList(
         items(entries, key = { it.key }, contentType = { it.contentType }) { entry ->
             Column(Modifier.animateItem()) {
                 when (entry) {
-                    is NotificationEntry.AccountReactions -> AccountReactionsItem(entry, onUserClick = onUserClick, onPostClick = onPostClick)
+                    is NotificationEntry.AccountReactions -> AccountReactionsItem(
+                        entry,
+                        onUserClick = onUserClick,
+                        onClick = { onAccountReactionsClick(entry) },
+                    )
                     is NotificationEntry.Single -> NotificationItem(
                         group = entry.group,
                         onUserClick = onUserClick,
@@ -265,20 +270,21 @@ private fun CompactNotification(
 
 /**
  * 1 人のユーザーが複数のポストにしたリアクションをまとめた行 (「〇〇 favourited 3 of your posts」)。
- * 見た目はコンパクト表示と同じで、抜粋とサムネイルは最も新しいポストのもの。行のタップでそのポストを開く。
+ * 見た目はコンパクト表示と同じで、抜粋とサムネイルは最も新しいポストのもの。行のタップで [onClick]
+ * (まとめたポストの一覧を開く)。
  */
 @Composable
 private fun AccountReactionsItem(
     entry: NotificationEntry.AccountReactions,
     onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
+    onClick: () -> Unit,
 ) {
     val account = entry.account
     val post = entry.latestPost
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { if (post != null) onPostClick(post) else onUserClick(account) }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Box(Modifier.width(40.dp), contentAlignment = Alignment.TopEnd) {

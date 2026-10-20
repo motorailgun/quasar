@@ -165,6 +165,13 @@
     <plurals name="notification_reblog_posts">
         <item quantity="other">%1$sさんがあなたの投稿%2$d件をブーストしました</item>
     </plurals>
+    <plurals name="account_reactions_favourite_title">
+        <item quantity="other">あなたの投稿%1$d件をお気に入り</item>
+    </plurals>
+    <plurals name="account_reactions_reblog_title">
+        <item quantity="other">あなたの投稿%1$d件をブースト</item>
+    </plurals>
+    <string name="account_reactions_empty">投稿は削除されたか、表示できません</string>
     <string name="notification_unknown">%1$sさんからの通知</string>
     <string name="compose">新しい投稿</string>
     <string name="composer_placeholder">今なにしてる？</string>

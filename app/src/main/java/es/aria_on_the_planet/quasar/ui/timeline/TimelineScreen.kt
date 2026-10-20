@@ -256,6 +256,9 @@ private fun ColumnPage(
                 onAction = onAction,
                 onReply = onReply,
                 onHashtagClick = onHashtagClick,
+                onAccountReactionsClick = { entry ->
+                    navigator.openAccountReactions(entry.account, entry.type, entry.members.mapNotNull { it.post })
+                },
             )
 
             else -> PostList(

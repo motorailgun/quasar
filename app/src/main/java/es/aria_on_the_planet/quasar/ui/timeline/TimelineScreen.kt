@@ -186,6 +186,7 @@ fun TimelineScreen(
                             scope.launch { pagerState.animateScrollToPage(index, animationSpec = pageSpring) }
                         }
                     },
+                    onOpenProfile = navigator::openProfile,
                     onOpenSettings = navigator::openSettings,
                     modifier = Modifier
                         .align(Alignment.TopCenter)

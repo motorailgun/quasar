@@ -66,7 +66,7 @@ import kotlin.math.abs
  * (icon)  [⌂ Home ][🔔][👥][🌐]
  * ```
  *
- * * 左: ログイン中のアカウントのアイコン。タップでメニュー (名前・@acct・設定)。未取得・未ログインは汎用のアイコン。
+ * * 左: ログイン中のアカウントのアイコン。タップでメニュー (名前・@acct = タップで自分のプロフィール・設定)。未取得・未ログインは汎用のアイコン。
  * * 右: カラムの切り替え (Expressive の連結 `ToggleButton`)。全体の後ろに後ろの一覧をぼかしたカプセルを 1 枚敷き
  *   ([hazeState])、未選択のボタンは透明、選択中は primary で塗る。選択中のみラベルを出し、幅はページ位置 (小数) から
  *   決めてスワイプに追従する。選択中のボタンを押したときも [onSelect] を呼ぶ (画面側で一覧を先頭へスクロールする)。
@@ -80,6 +80,7 @@ fun TimelineHeader(
     pagerState: PagerState,
     hazeState: HazeState,
     onSelect: (ColumnType) -> Unit,
+    onOpenProfile: (User) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -95,6 +96,7 @@ fun TimelineHeader(
             account = account,
             hazeState = hazeState,
             blurStyle = blurStyle,
+            onOpenProfile = onOpenProfile,
             onOpenSettings = onOpenSettings,
         )
         Spacer(Modifier.width(10.dp))
@@ -130,6 +132,7 @@ private fun AccountButton(
     account: User?,
     hazeState: HazeState,
     blurStyle: SurfaceBlurStyle,
+    onOpenProfile: (User) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -158,7 +161,16 @@ private fun AccountButton(
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             if (account != null) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                // 名前の部分のタップで自分のプロフィール
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button) {
+                            menuOpen = false
+                            onOpenProfile(account)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
                     Text(
                         description.orEmpty(),
                         style = MaterialTheme.typography.titleSmall,

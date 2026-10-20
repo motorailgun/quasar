@@ -22,6 +22,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.di.AppContainer
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
@@ -40,6 +41,8 @@ import es.aria_on_the_planet.quasar.ui.post.PostScreen
 import es.aria_on_the_planet.quasar.ui.post.PostViewModel
 import es.aria_on_the_planet.quasar.ui.profile.ProfileScreen
 import es.aria_on_the_planet.quasar.ui.profile.ProfileViewModel
+import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsScreen
+import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsViewModel
 import es.aria_on_the_planet.quasar.ui.settings.AnimationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.ConfirmationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettingsPage
@@ -104,6 +107,9 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
                 entry<Route.Profile> { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
                 entry<Route.FollowList> { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
                 entry<Route.Hashtag> { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
+                entry<Route.AccountReactions> { key ->
+                    WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
+                }
                 entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
                 entry<Route.Composer> { ComposerEntry(container, navigator) }
                 mediaViewerEntry(container, onBack = navigator::back)
@@ -144,6 +150,10 @@ private class BackStackNavigator(
 
     override fun openFollowList(accountId: String, tab: FollowListTab) {
         backStack.add(Route.FollowList(accountId, tab))
+    }
+
+    override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) {
+        backStack.add(Route.AccountReactions(account.inServerId, type, posts.map { it.statusId }.distinct()))
     }
 
     override fun openComposer() {
@@ -249,6 +259,38 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
         onMediaClick = navigator::openMedia,
         // 同じハッシュタグからは遷移しない
         onHashtagClick = { tag -> if (!tag.equals(key.name, ignoreCase = true)) navigator.openHashtag(tag) },
+        onReply = replyInComposer(container, session, navigator).takeIf { viewModel.canInteract },
+    )
+}
+
+@Composable
+private fun AccountReactionsEntry(
+    container: AppContainer,
+    session: Session,
+    key: Route.AccountReactions,
+    navigator: Navigator,
+) {
+    val viewModel: AccountReactionsViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                AccountReactionsViewModel(
+                    session = session,
+                    accountId = key.accountId,
+                    type = key.type,
+                    statusIds = key.statusIds,
+                    accountRepository = container.accountRepository,
+                    statusRepository = container.statusRepository,
+                )
+            }
+        },
+    )
+    AccountReactionsScreen(
+        viewModel = viewModel,
+        onBack = navigator::back,
+        onUserClick = navigator::openProfile,
+        onPostClick = navigator::openPost,
+        onMediaClick = navigator::openMedia,
+        onHashtagClick = navigator::openHashtag,
         onReply = replyInComposer(container, session, navigator).takeIf { viewModel.canInteract },
     )
 }

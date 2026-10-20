@@ -38,6 +38,7 @@ import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
  * ポストの集合。タイムライン・プロフィールの投稿一覧などで再利用する。
  * 要素は [TimelineItem] (ポストか、未取得の区間の読み込みボタン)。
  * データ取得は行わず、末尾付近までスクロールされたら [onLoadMore]、読み込みボタンで [onGapClick] を呼ぶ。
+ * [header] / [footer] は一覧の先頭 / 末尾 (追加読み込みの表示より後) に置くアイテム。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -58,6 +59,7 @@ fun PostList(
     onHashtagClick: ((String) -> Unit)? = null,
     onGapClick: (TimelineItem.Gap) -> Unit = {},
     header: (LazyListScope.() -> Unit)? = null,
+    footer: (LazyListScope.() -> Unit)? = null,
 ) {
     LoadMoreEffect(state, onLoadMore, LoadMoreThreshold)
     // 先頭にいるときにストリーミングの新着が入ったら見せる
@@ -95,6 +97,7 @@ fun PostList(
                 }
             }
         }
+        footer?.invoke(this)
     }
 }
 

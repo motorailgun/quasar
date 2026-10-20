@@ -21,7 +21,7 @@ class GalleryFixturesTest {
     @Test
     fun postFixturesParseAndUseKnownEmojis() {
         val lists = GalleryScenario.entries
-            .filter { it != GalleryScenario.EmojiPicker && it != GalleryScenario.Profile }
+            .filter { it.fixture != GalleryScenario.EmojiPicker.fixture && it.fixture != GalleryScenario.Profile.fixture }
             .associate { it.fixture to GalleryFixtures.posts(read(it.fixture)) }
         lists.forEach { (name, posts) ->
             assertTrue(name, posts.isNotEmpty())

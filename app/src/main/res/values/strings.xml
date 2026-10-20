@@ -179,6 +179,15 @@
         <item quantity="one">%1$s boosted %2$d of your posts</item>
         <item quantity="other">%1$s boosted %2$d of your posts</item>
     </plurals>
+    <plurals name="account_reactions_favourite_title">
+        <item quantity="one">Favourited %1$d of your posts</item>
+        <item quantity="other">Favourited %1$d of your posts</item>
+    </plurals>
+    <plurals name="account_reactions_reblog_title">
+        <item quantity="one">Boosted %1$d of your posts</item>
+        <item quantity="other">Boosted %1$d of your posts</item>
+    </plurals>
+    <string name="account_reactions_empty">These posts are no longer available</string>
     <string name="notification_unknown">Notification from %1$s</string>
     <string name="compose">New post</string>
     <string name="composer_placeholder">What\'s on your mind?</string>

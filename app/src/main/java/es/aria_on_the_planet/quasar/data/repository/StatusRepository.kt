@@ -4,6 +4,7 @@ import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.mapper.toEditFormParams
 import es.aria_on_the_planet.quasar.data.mapper.toFormParams
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
+import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.PostAction
@@ -12,7 +13,10 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import es.aria_on_the_planet.quasar.domain.model.StatusSource
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /** 1 つのポストと、その前後のスレッド。 */
 data class PostThread(
@@ -34,6 +38,25 @@ class StatusRepository(
             post = status.await().toDomain(),
             descendants = context.await().descendants.map { it.toDomain() },
         )
+    }
+
+    /**
+     * [statusIds] のポストを 1 件ずつ取得し、同じ順で返す (同時に [MaxParallelFetches] 件まで)。
+     * 消された・見られなくなったポスト (404 等、429 以外の 4xx) は飛ばす。通信エラー・5xx は投げる。
+     */
+    suspend fun fetchPosts(session: Session, statusIds: List<String>): List<Post> = coroutineScope {
+        val permits = Semaphore(MaxParallelFetches)
+        statusIds.map { id ->
+            async {
+                permits.withPermit {
+                    try {
+                        api.status(session.serverUrl, session.accessToken, id).toDomain()
+                    } catch (e: MastodonApiException) {
+                        if (e.code in 400..499 && e.code != 429) null else throw e
+                    }
+                }
+            }
+        }.awaitAll().filterNotNull()
     }
 
     /** 投票して更新後の [Poll] を返す。未認証では投票できない。 */
@@ -79,6 +102,8 @@ class StatusRepository(
         api.deleteStatus(session.serverUrl, token, statusId)
     }
 }
+
+private const val MaxParallelFetches = 4
 
 private val PostAction.endpoint: String
     get() = when (type) {

@@ -119,3 +119,42 @@ fun UserListItem(
         }
     }
 }
+
+/**
+ * ユーザーの要約 (アイコン / 太字の表示名 / プロフィール文)。アイコンはタイムラインのポストと同じ大きさで、
+ * プロフィール文は控えめな色・小さめの文字。行全体のタップで [onClick]。
+ */
+@Composable
+fun UserSummary(
+    user: User,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        UserIcon(user = user)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            EmojiText(
+                text = user.displayName.ifBlank { user.screenName },
+                emojis = user.emojis,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (user.note.isNotBlank()) {
+                EmojiText(
+                    text = user.note,
+                    emojis = user.emojis,
+                    isHtml = true,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}

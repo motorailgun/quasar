@@ -1,0 +1,114 @@
+package es.aria_on_the_planet.quasar.ui.reactions
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.repository.StatusRepository
+import es.aria_on_the_planet.quasar.data.repository.withPoll
+import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
+import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostAction
+import es.aria_on_the_planet.quasar.domain.model.User
+import es.aria_on_the_planet.quasar.ui.feed.PostActionController
+import es.aria_on_the_planet.quasar.ui.feed.submitVote
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class AccountReactionsState(
+    /** リアクションしたユーザー (プロフィール文込み)。取得前・失敗時は `null`。 */
+    val account: User? = null,
+    /** リアクションされたポスト。通知と同じ新しい順。 */
+    val posts: List<Post> = emptyList(),
+    val loaded: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+)
+
+/**
+ * 通知のユーザー単位のまとめ (1 人が複数のポストにした同じ種類のリアクション) の中身。
+ * ポストは [statusIds] を 1 件ずつ取り直す (通知の一覧から受け取らないのは、プロセスの再生成でも開き直せるように)。
+ */
+class AccountReactionsViewModel(
+    private val session: Session,
+    private val accountId: String,
+    val type: NotificationType,
+    private val statusIds: List<String>,
+    private val accountRepository: AccountRepository,
+    private val statusRepository: StatusRepository,
+) : ViewModel() {
+
+    /** まとめられたポストの数 (読み込み前のタイトル用)。 */
+    val postCount: Int = statusIds.size
+
+    /** 投票・ブースト・お気に入り・ブックマーク・返信ができるか (要ログイン)。 */
+    val canInteract: Boolean = session.accessToken != null
+
+    private val _state = MutableStateFlow(AccountReactionsState())
+    val state: StateFlow<AccountReactionsState> = _state.asStateFlow()
+
+    private var loading: Job? = null
+
+    init {
+        refresh()
+    }
+
+    fun refresh() {
+        if (loading?.isActive == true) return
+        _state.update { it.copy(isRefreshing = true, error = null) }
+        loading = viewModelScope.launch {
+            // ユーザーは補助情報なので、取れなくてもポストは出す
+            val account = async {
+                try {
+                    accountRepository.fetchProfile(session, accountId).user
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to load account", e)
+                    null
+                }
+            }
+            try {
+                val posts = statusRepository.fetchPosts(session, statusIds)
+                _state.update { it.copy(posts = posts, account = account.await() ?: it.account) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load posts", e)
+                _state.update { it.copy(account = account.await() ?: it.account, error = e.message ?: e.javaClass.simpleName) }
+            } finally {
+                _state.update { it.copy(loaded = true, isRefreshing = false) }
+            }
+        }
+    }
+
+    suspend fun vote(post: Post, choices: List<Int>): Boolean =
+        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+            updatePosts { it.withPoll(poll) }
+        }
+
+    private val postActions = PostActionController(
+        scope = viewModelScope,
+        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        update = ::updatePosts,
+        onError = { message, error -> Log.w(TAG, message, error) },
+    )
+
+    /** ブースト・お気に入り・ブックマーク (またはその取り消し) を行う。 */
+    fun performAction(post: Post, action: PostAction) = postActions.perform(post, action)
+
+    private fun updatePosts(transform: (Post) -> Post) {
+        _state.update { it.copy(posts = it.posts.map(transform)) }
+    }
+
+    private companion object {
+        const val TAG = "AccountReactionsVM"
+    }
+}

@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -74,6 +76,7 @@ private val AvatarTopY = ThreadLineDefaults.AvatarTopY
  * 開き (下書きとは別の投稿欄 [PostViewModel.editor])、保存したら本体を差し替える。削除したら画面を閉じる。
  * どちらも設定に従って確認する (保存の確認は投稿画面の送信ボタンが行う)。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PostScreen(
     viewModel: PostViewModel,
@@ -165,7 +168,7 @@ fun PostScreen(
             DetailScaffold(
                 onBack = onBack,
                 listState = listState,
-                isRefreshing = state.isLoading && thread != null,
+                isRefreshing = state.isRefreshing && thread != null,
                 onRefresh = viewModel::refresh,
                 revealTitleAfterIndex = mainIndex,
                 title = { Text(stringResource(R.string.post_title)) },
@@ -239,10 +242,15 @@ fun PostScreen(
                                             .padding(24.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Text(
-                                            stringResource(R.string.post_no_replies),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        // キャッシュの本体を出してスレッドを取っている間
+                                        if (state.isLoading) {
+                                            LoadingIndicator()
+                                        } else {
+                                            Text(
+                                                stringResource(R.string.post_no_replies),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }

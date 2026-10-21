@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.ui.post
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.PostThread
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
@@ -31,7 +32,10 @@ data class PostScreenState(
     val thread: PostThread? = null,
     /** リプライを一列に並べた行。 */
     val replies: List<ReplyRow> = emptyList(),
+    /** 取得中 (キャッシュを出している間の裏の取得を含む)。 */
     val isLoading: Boolean = false,
+    /** 引っ張って更新した取得の最中 (インジケータを出す)。 */
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     /** ログイン中のアカウントの ID。取得前・未ログインは `null`。 */
     val myAccountId: String? = null,
@@ -75,7 +79,7 @@ class PostViewModel(
     val events: Flow<PostScreenEvent> = _events.receiveAsFlow()
 
     init {
-        refresh()
+        load(force = false)
         if (canInteract) {
             viewModelScope.launch {
                 val me = try {
@@ -188,24 +192,43 @@ class PostViewModel(
         }
     }
 
-    fun refresh() {
+    /** 引っ張って更新: 本体もスレッドも取り直す。 */
+    fun refresh() = load(force = true)
+
+    /**
+     * スレッドを読む。初めて開いたときはキャッシュにあるもの (タイムライン等で取った本体・前に開いたときのスレッド) を
+     * 先に出し、本体が期限内なら本体は取らずにスレッド (`/context`) だけを取る ([force] なら両方)。
+     */
+    private fun load(force: Boolean) {
         if (_state.value.isLoading) return
-        _state.update { it.copy(isLoading = true, error = null) }
+        _state.update { it.copy(isLoading = true, isRefreshing = force, error = null) }
         viewModelScope.launch {
             try {
-                val thread = repository.fetchThread(session, statusId)
-                _state.update {
-                    PostScreenState(
-                        thread = thread,
-                        replies = linearReplies(thread.descendants),
-                        myAccountId = it.myAccountId,
-                        ownPostBusy = it.ownPostBusy,
-                    )
+                val cached = if (_state.value.thread == null) repository.cachedThread(statusId) else null
+                if (cached != null) {
+                    _state.update { it.copy(thread = cached.thread, replies = linearReplies(cached.thread.descendants)) }
+                }
+                val reuse = cached?.takeIf { it.isPostFresh && !force }?.thread?.post
+                val fetched = repository.fetchThread(session, statusId, post = reuse)
+                _state.update { s ->
+                    // 本体を取らなかったときは、取得中に行った操作 (お気に入り等) の反映を残す
+                    val thread = if (reuse != null) fetched.copy(post = s.thread?.post ?: reuse) else fetched
+                    s.copy(thread = thread, replies = linearReplies(thread.descendants), isLoading = false, isRefreshing = false)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: e.toString()) }
+                // 消された・見られなくなったなら、キャッシュから出していた分も消す
+                val gone = e is MastodonApiException && (e.code == 404 || e.code == 410)
+                _state.update {
+                    it.copy(
+                        thread = if (gone) null else it.thread,
+                        replies = if (gone) emptyList() else it.replies,
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = e.message ?: e.toString(),
+                    )
+                }
             }
         }
     }

@@ -27,7 +27,10 @@ import kotlinx.coroutines.launch
 
 data class ProfileState(
     val profile: Profile? = null,
+    /** 取得中 (キャッシュを出している間の裏の取得を含む)。 */
     val isLoading: Boolean = false,
+    /** 引っ張って更新した取得の最中 (インジケータを出す)。 */
+    val isRefreshing: Boolean = false,
     val error: String? = null,
 )
 
@@ -111,13 +114,16 @@ class ProfileViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileScreenState())
 
     init {
-        refresh()
+        load(force = false)
     }
 
-    fun refresh() {
-        loadProfile()
+    /** 引っ張って更新: プロフィール・関係もキャッシュの期限に関わらず取り直す。 */
+    fun refresh() = load(force = true)
+
+    private fun load(force: Boolean) {
+        loadProfile(force)
         loadExtras()
-        loadRelationship()
+        loadRelationship(force)
         posts.refresh()
         // 開いたことのないタブは読まない
         if (media.state.value.loaded) media.refresh()
@@ -201,17 +207,27 @@ class ProfileViewModel(
     /** ブースト・お気に入り・ブックマーク (またはその取り消し) を行う。 */
     fun performAction(post: Post, action: PostAction) = postActions.perform(post, action)
 
-    private fun loadProfile() {
+    /**
+     * プロフィールを読む。初めて開いたときはキャッシュにあるもの (ポストの投稿者・通知等で取ったものを含む) を先に出し、
+     * 期限内なら取りに行かない ([force] なら取り直す)。
+     */
+    private fun loadProfile(force: Boolean) {
         if (profile.value.isLoading) return
-        profile.update { it.copy(isLoading = true, error = null) }
+        profile.update { it.copy(isLoading = true, isRefreshing = force, error = null) }
         viewModelScope.launch {
             try {
+                val cached = if (profile.value.profile == null) repository.cachedProfile(accountId) else null
+                if (cached != null) profile.update { it.copy(profile = cached.value) }
+                if (cached?.isFresh == true && !force) {
+                    profile.update { it.copy(isLoading = false, isRefreshing = false) }
+                    return@launch
+                }
                 val loaded = repository.fetchProfile(session, accountId)
-                profile.update { it.copy(profile = loaded, isLoading = false) }
+                profile.update { it.copy(profile = loaded, isLoading = false, isRefreshing = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                profile.update { it.copy(isLoading = false, error = e.message ?: e.toString()) }
+                profile.update { it.copy(isLoading = false, isRefreshing = false, error = e.message ?: e.toString()) }
             }
         }
     }
@@ -227,8 +243,11 @@ class ProfileViewModel(
         }
     }
 
-    /** 自分のプロフィールか、相手との関係を読む。未ログインなら何もしない (ボタンを出さない)。 */
-    private fun loadRelationship() {
+    /**
+     * 自分のプロフィールか、相手との関係を読む。未ログインなら何もしない (ボタンを出さない)。
+     * 関係はキャッシュにあれば先に出し、期限内なら取りに行かない ([force] なら取り直す)。
+     */
+    private fun loadRelationship(force: Boolean) {
         if (!canInteract) return
         viewModelScope.launch {
             val me = runOptional("current account") { repository.fetchMe(session) } ?: return@launch
@@ -236,10 +255,21 @@ class ProfileViewModel(
                 button.value = ProfileButtonState.EditProfile
                 return@launch
             }
+            if (!force) {
+                val cached = runOptional("cached relationship") { repository.cachedRelationship(accountId) }
+                cached?.let { showRelationship(it.value) }
+                if (cached?.isFresh == true) return@launch
+            }
             val relationship = runOptional("relationship") { repository.fetchRelationship(session, accountId) }
                 ?: return@launch
-            // 送信中なら、その応答で上書きされるので触らない
-            button.update { if (it is ProfileButtonState.Follow && it.isUpdating) it else ProfileButtonState.Follow(relationship) }
+            showRelationship(relationship)
+        }
+    }
+
+    /** 関係を出す。フォロー・フォローリクエストへの返事の送信中なら、その応答で上書きされるので触らない。 */
+    private fun showRelationship(relationship: Relationship) {
+        button.update {
+            if (it is ProfileButtonState.Follow && (it.isUpdating || it.answering != null)) it else ProfileButtonState.Follow(relationship)
         }
     }
 

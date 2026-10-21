@@ -3,6 +3,8 @@ package es.aria_on_the_planet.quasar.di
 import android.content.Context
 import android.net.Uri
 import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
+import es.aria_on_the_planet.quasar.data.cache.CacheDatabase
+import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
 import es.aria_on_the_planet.quasar.data.media.MediaDownloader
 import es.aria_on_the_planet.quasar.data.media.SystemMediaDownloader
@@ -28,6 +30,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -40,6 +44,9 @@ class AppContainer(context: Context) {
         ignoreUnknownKeys = true
         coerceInputValues = true
     }
+
+    /** API の結果のキャッシュ (Room)。 */
+    private val cache = EntityCache(CacheDatabase.create(context).cacheDao(), json)
 
     private val api = MastodonApi(okHttpClient, json)
 
@@ -55,10 +62,24 @@ class AppContainer(context: Context) {
 
     /** 設定。ここで作った時点 (起動時) から読み込み始める。 */
     val settingsStore = SettingsStore(context, appScope)
-    val timelineRepository = TimelineRepository(api)
-    val accountRepository = AccountRepository(api)
-    val statusRepository = StatusRepository(api)
-    val notificationRepository = NotificationRepository(api)
+    val timelineRepository = TimelineRepository(api, cache)
+    val accountRepository = AccountRepository(api, cache)
+    val statusRepository = StatusRepository(api, cache)
+    val notificationRepository = NotificationRepository(api, cache)
+
+    init {
+        appScope.launch {
+            // 起動時に上限を超えた古い分を消す
+            cache.trim()
+            // ログアウト・別のアカウントでのログインで消す (起動時の今のセッションでは消さない)。キャッシュの中身は
+            // ログイン中のユーザーから見た状態 (お気に入りしたか・関係・非公開のポスト) なので、別のユーザーに見せない
+            sessionStore.session
+                .map { it?.serverUrl to it?.accessToken }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { cache.clear() }
+        }
+    }
     val instanceRepository = InstanceRepository(api)
     val emojiRepository = EmojiRepository(api)
     val mediaRepository = MediaRepository(api)
@@ -97,5 +118,5 @@ class AppContainer(context: Context) {
         onPublished = onPublished,
     )
 
-    val streamingClient = StreamingClient(okHttpClient, json, instanceRepository)
+    val streamingClient = StreamingClient(okHttpClient, json, instanceRepository, cache)
 }

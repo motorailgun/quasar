@@ -57,6 +57,22 @@ class StreamEventTest {
     }
 
     @Test
+    fun decodedMessagesCarryWhatToWriteToTheCache() {
+        val update = decodeStreamMessage(json, message("user", "status.update", status("10", "edited")))!!
+        assertEquals(listOf("10"), update.statuses.map { it.id })
+        assertNull(update.deletedStatusId)
+
+        val notification = """{"id":"500","type":"mention","created_at":"2026-10-15T00:00:00.000Z","account":$account,"status":${status("11")}}"""
+        val decoded = decodeStreamMessage(json, message("user", "notification", notification))!!
+        assertEquals(listOf("11"), decoded.statuses.map { it.id })
+        assertEquals(listOf("1"), decoded.accounts.map { it.id })
+
+        val delete = decodeStreamMessage(json, message("user", "delete", "99"))!!
+        assertEquals("99", delete.deletedStatusId)
+        assertTrue(delete.statuses.isEmpty())
+    }
+
+    @Test
     fun ignoresUnknownAndMalformedMessages() {
         assertNull(parseStreamMessage(json, message("user", "filters_changed", null)))
         assertNull(parseStreamMessage(json, message("user", "announcement", "{}")))

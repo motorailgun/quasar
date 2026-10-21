@@ -122,7 +122,7 @@ fun ProfileScreen(
         // ヘッダが畳まれたらトップバーに名前を出す
         titleRevealed = headerState.isCollapsed,
         // タブを初めて開いたときの読み込みは一覧側に出すので、引っ張って更新したときだけ出す
-        isRefreshing = profile != null && (state.profile.isLoading || (feed.isRefreshing && feed.loaded)),
+        isRefreshing = profile != null && (state.profile.isRefreshing || (feed.isRefreshing && feed.loaded)),
         onRefresh = viewModel::refresh,
         revealedTitle = profile?.let { { ProfileTitle(it) } },
     ) {

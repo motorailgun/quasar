@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.streaming
 
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
+import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.domain.model.Notification
@@ -55,18 +56,43 @@ internal data class StreamMessageDto(
  * WebSocket のテキストメッセージを [StreamEvent] にする。未対応・解釈できないメッセージは `null`。
  * https://docs.joinmastodon.org/methods/streaming/#events
  */
-internal fun parseStreamMessage(json: Json, text: String): StreamEvent? {
+internal fun parseStreamMessage(json: Json, text: String): StreamEvent? = decodeStreamMessage(json, text)?.event
+
+/**
+ * 解釈したメッセージ。[event] は画面に流すもの、[statuses] / [accounts] はキャッシュに書くもの、
+ * [deletedStatusId] はキャッシュから消すもの。
+ */
+internal data class DecodedStreamMessage(
+    val event: StreamEvent,
+    val statuses: List<StatusDto> = emptyList(),
+    val accounts: List<AccountDto> = emptyList(),
+    val deletedStatusId: String? = null,
+)
+
+/** [parseStreamMessage] の、キャッシュに書く DTO も返す版。 */
+internal fun decodeStreamMessage(json: Json, text: String): DecodedStreamMessage? {
     val message = runCatching { json.decodeFromString<StreamMessageDto>(text) }.getOrNull() ?: return null
     val payload = message.payload ?: return null
     return runCatching {
         when (message.event) {
             "update" -> {
                 val channel = message.stream.firstNotNullOfOrNull(StreamChannel::fromApiName) ?: return null
-                StreamEvent.Update(channel, json.decodeFromString<StatusDto>(payload).toDomain())
+                val status = json.decodeFromString<StatusDto>(payload)
+                DecodedStreamMessage(StreamEvent.Update(channel, status.toDomain()), statuses = listOf(status))
             }
-            "delete" -> StreamEvent.Delete(payload)
-            "status.update" -> StreamEvent.StatusUpdate(json.decodeFromString<StatusDto>(payload).toDomain())
-            "notification" -> StreamEvent.NotificationReceived(json.decodeFromString<NotificationDto>(payload).toDomain())
+            "delete" -> DecodedStreamMessage(StreamEvent.Delete(payload), deletedStatusId = payload)
+            "status.update" -> {
+                val status = json.decodeFromString<StatusDto>(payload)
+                DecodedStreamMessage(StreamEvent.StatusUpdate(status.toDomain()), statuses = listOf(status))
+            }
+            "notification" -> {
+                val notification = json.decodeFromString<NotificationDto>(payload)
+                DecodedStreamMessage(
+                    StreamEvent.NotificationReceived(notification.toDomain()),
+                    statuses = listOfNotNull(notification.status),
+                    accounts = listOf(notification.account),
+                )
+            }
             else -> null
         }
     }.getOrNull()

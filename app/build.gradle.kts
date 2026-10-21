@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.room)
 }
 
 // OAuth の戻り先のスキーム (applicationId 由来の逆ドメイン。スキームに `_` は使えないので `-`)。
@@ -91,6 +93,11 @@ android {
     }
 }
 
+// Room のスキーマ (版ごとの JSON)。キャッシュなので移行は書かず作り直すが、変更の履歴として残す
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -104,6 +111,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     // 設定の保存
     implementation(libs.androidx.datastore.preferences)
+    // API の結果のキャッシュ (ポスト・アカウント等。data/cache/)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     // OAuth のログイン画面を開く (Custom Tabs)
     implementation(libs.androidx.browser)
     implementation(platform(libs.androidx.compose.bom))

@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.streaming
 
 import android.util.Log
+import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
 import es.aria_on_the_planet.quasar.data.session.Session
 import kotlinx.coroutines.CancellationException
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -27,6 +29,7 @@ class StreamingClient(
     okHttpClient: OkHttpClient,
     private val json: Json,
     private val instanceRepository: InstanceRepository,
+    private val cache: EntityCache,
 ) {
     // 長時間の接続なので読み取りタイムアウトは無効にし、ping で生存確認する
     private val client = okHttpClient.newBuilder()
@@ -83,9 +86,18 @@ class StreamingClient(
                     }
 
                     override fun onMessage(webSocket: WebSocket, text: String) {
-                        val event = parseStreamMessage(json, text)
-                        Log.d(TAG, "Received ${event?.javaClass?.simpleName ?: "unhandled"} (${text.length} chars)")
-                        event?.let { trySend(it) }
+                        val decoded = decodeStreamMessage(json, text)
+                        Log.d(TAG, "Received ${decoded?.event?.javaClass?.simpleName ?: "unhandled"} (${text.length} chars)")
+                        decoded ?: return
+                        trySend(decoded.event)
+                        // 版は受け取った時点 (それより前に出した取得の結果では上書きしない)
+                        val version = cache.issue()
+                        launch {
+                            decoded.deletedStatusId?.let { cache.deleteStatus(it) }
+                            if (decoded.statuses.isNotEmpty() || decoded.accounts.isNotEmpty()) {
+                                cache.putStatuses(decoded.statuses, version, decoded.accounts)
+                            }
+                        }
                     }
 
                     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {

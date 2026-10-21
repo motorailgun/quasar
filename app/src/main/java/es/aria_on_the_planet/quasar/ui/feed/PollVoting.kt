@@ -23,7 +23,7 @@ internal suspend fun CoroutineScope.submitVote(
     val pollId = post.poll?.id ?: return false
     return async {
         try {
-            apply(repository.vote(session, pollId, choices))
+            apply(repository.vote(session, post.statusId, pollId, choices))
             true
         } catch (e: CancellationException) {
             throw e

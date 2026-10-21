@@ -34,7 +34,8 @@ data class AccountReactionsState(
 
 /**
  * 通知のユーザー単位のまとめ (1 人が複数のポストにした同じ種類のリアクション) の中身。
- * ポストは [statusIds] を 1 件ずつ取り直す (通知の一覧から受け取らないのは、プロセスの再生成でも開き直せるように)。
+ * ポストは [statusIds] で引く (通知の一覧から受け取らないのは、プロセスの再生成でも開き直せるように)。通知を取ったときに
+ * キャッシュに入っているので、普段は期限切れの分だけを取り直す。
  */
 class AccountReactionsViewModel(
     private val session: Session,
@@ -57,26 +58,30 @@ class AccountReactionsViewModel(
     private var loading: Job? = null
 
     init {
-        refresh()
+        load(force = false)
     }
 
-    fun refresh() {
+    /** 引っ張って更新: キャッシュの期限に関わらず全部取り直す。 */
+    fun refresh() = load(force = true)
+
+    /**
+     * ユーザーとポストを読む。キャッシュ (通知・タイムライン等で取ったもの) にあれば先に出し、期限切れ・無いものだけを
+     * 取る ([force] なら全部)。取り直したのに返らなかったポスト (消された等) は、キャッシュにあっても出さない。
+     */
+    private fun load(force: Boolean) {
         if (loading?.isActive == true) return
-        _state.update { it.copy(isRefreshing = true, error = null) }
+        _state.update { it.copy(isRefreshing = force, error = null) }
         loading = viewModelScope.launch {
             // ユーザーは補助情報なので、取れなくてもポストは出す
-            val account = async {
-                try {
-                    accountRepository.fetchProfile(session, accountId).user
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to load account", e)
-                    null
-                }
-            }
+            val account = async { loadAccount(force) }
             try {
-                val posts = statusRepository.fetchPosts(session, statusIds)
+                val cached = if (force) emptyMap() else statusRepository.cachedPosts(statusIds)
+                if (cached.isNotEmpty()) {
+                    _state.update { it.copy(posts = statusIds.mapNotNull { id -> cached[id]?.value }) }
+                }
+                val stale = statusIds.filter { cached[it]?.isFresh != true }
+                val fetched = if (stale.isEmpty()) emptyMap() else statusRepository.fetchPosts(session, stale).associateBy { it.statusId }
+                val posts = statusIds.mapNotNull { id -> if (id in stale) fetched[id] else cached[id]?.value }
                 _state.update { it.copy(posts = posts, account = account.await() ?: it.account) }
             } catch (e: CancellationException) {
                 throw e
@@ -87,6 +92,18 @@ class AccountReactionsViewModel(
                 _state.update { it.copy(loaded = true, isRefreshing = false) }
             }
         }
+    }
+
+    /** ユーザー (キャッシュにあれば先に出し、期限内ならそれを使う)。取れなければ `null`。 */
+    private suspend fun loadAccount(force: Boolean): User? = try {
+        val cached = if (force) null else accountRepository.cachedProfile(accountId)
+        cached?.let { hit -> _state.update { it.copy(account = hit.value.user) } }
+        if (cached?.isFresh == true) cached.value.user else accountRepository.fetchProfile(session, accountId).user
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(TAG, "Failed to load account", e)
+        null
     }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =

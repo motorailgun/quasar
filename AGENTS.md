@@ -12,6 +12,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 設定 | Preferences DataStore (`androidx.datastore:datastore-preferences`) |
+| キャッシュ | Room 2.8 (KSP。API の結果の JSON を持つ。`data/cache/`) |
 | 画面遷移 | Navigation 3 (`androidx.navigation3` + `lifecycle-viewmodel-navigation3`)。Activity は MainActivity 1 つ (他アプリからの共有の受け口 `ShareActivity` だけ別) |
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
@@ -31,6 +32,7 @@ es.aria_on_the_planet.quasar
 ├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody、
 │                                   メディアの保存 (MediaDownloader / SystemMediaDownloader = DownloadManager)
 ├── data/
+│   ├── cache/                      API の結果のキャッシュ (Room: CacheDatabase / CacheDao / EntityCache。版で比べて書く CAS)
 │   ├── remote/
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
@@ -811,6 +813,43 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 
+## キャッシュ (`data/cache/`)
+
+* Room の 1 テーブル (`cache_entries`: 種類 + ID → API の JSON (DTO そのまま)・版・取得時刻)。種類 (`CacheKind`) は
+  Status (ブーストは中身だけ) / Account / Relationship (ID は相手) / Context (スレッドの ID の並び)。
+  スキーマが変わったら移行せず作り直す (`fallbackToDestructiveMigration`)。スキーマの JSON は `app/schemas/`。
+  * 置き場所は `cacheDir/api-cache/api-cache.db` (`CacheDatabase.create`)。設定画面では「キャッシュ」に数えられ、「キャッシュを削除」・
+    容量不足のときの OS の削除の対象 (バックアップ・端末間の移行の対象外)。本体・`-wal`・`-shm` がばらけて消されないよう、
+    ディレクトリに `StorageManager.setCacheBehaviorGroup` を付けている。起動中に消されても落ちず (開いたままのファイルを使い続ける)、
+    次の起動で作り直すことをエミュレーターで確認済み (`adb shell pm trim-caches 999G`)。
+  * 耐久性は要らないので WAL + `synchronous = OFF` (コールバック `onOpen` で設定。fsync しない)。`synchronous` は接続ごとの設定で、
+    書き込みに使う主接続だけが OFF になる (WAL の読み取り用の接続は端末の既定のまま。書かないので関係ない)。確かめるときは
+    トランザクションの中で `PRAGMA synchronous` を読む (外で読むと読み取り用の接続の値が返る)。
+* **書き込み**: Repository が取得・操作の結果を `EntityCache` に書く。タイムライン・ハッシュタグ・通知 (一覧はキャッシュ
+  しないが中のポスト・アカウントは書く)・プロフィールの投稿 / ピン留め・フォロー一覧・スレッド・関係・投稿 / 編集の応答。
+  ストリーミングは `StreamingClient` が DTO のうちに書く (`decodeStreamMessage`。update / status.update / notification の中身。
+  版は受け取った時点、delete はキャッシュから消す)。
+  * **版 (CAS)**: リクエストを出す直前に `cache.issue()` (`VersionClock`: 実時刻ミリ秒、プロセス内で必ず増える) で版を取り、
+    結果を書くときは保存済みより版が新しいときだけ書く (`selectNewer` / `CacheDao.putNewer`)。先に出した取得の応答が後から
+    届いても、その後の操作の結果を巻き戻さない。Mastodon の応答には「いつの状態か」が無いので、出した順で決める。
+    **書く経路は必ず版を通す** (どれか 1 つでも素通しで書くと古い値が入る)。
+  * 操作 (ブースト・お気に入り・ブックマーク・投票) は**成功した応答だけ**を書く。見込みの反映は今までどおり各 ViewModel の
+    一覧 (`PostActionController`) で、Room には書かない。
+  * 関係が変わった (フォロー・フォローリクエストへの返事) ら相手のアカウントを無効化 (`fetchedAt = 0`、中身は残す)。
+  * 失敗 (DB・JSON) は `EntityCache` の中でログに出して握りつぶす (API の結果は使える)。読めない値は無かったことにする。
+* **読み**: ポスト画面・プロフィール・通知のまとめの中身。初めて開いたときにキャッシュを先に出し、期限
+  (`CachePolicy`: ポスト 1 分・アカウント 5 分・関係 2 分) 内なら取りに行かない。引っ張って更新は期限に関わらず取り直す。
+  * ポスト画面: 本体が期限内ならスレッド (`/context`) だけを取る (スレッドは開くたびに取る)。取得中は返信欄にインジケータ。
+    404 / 410 ならキャッシュからも消して「読み込めない」表示に戻す。裏の取得では引っ張って更新のインジケータは出さない
+    (`isRefreshing` と `isLoading` を分けている。プロフィールも同じ)。
+  * プロフィール: アカウントはポストの投稿者・通知等で入っていることが多い。投稿一覧・ピン留め・familiar followers は毎回取る。
+  * まとめの中身: 通知を取ったときにポストが入っているので、期限切れ・無いものだけを取る。
+* 上限: 起動時に種類ごとに古い分を消す (`CachePolicy.MaxEntries`)。ログアウト・別のセッションへの切り替えで全部消す
+  (`AppContainer`。中身はログイン中のユーザーから見た状態なので)。
+* テスト: 純粋関数は `CacheMergeTest` / `VersionClockTest`、SQL は計装テストの `CacheDaoTest` (下記「開発メモ」)。
+* 未対応: 一覧 (タイムライン・通知) は Room を見ない (画面をまたいだ操作の反映は揃わない)、起動時に前回の一覧を出すこと。
+  削除は消すだけで印を残さないので、削除の前に出した取得の応答が後から届くと書き戻されうる (次に開いたときの 404 で消える)。
+
 ## 自動更新 (Streaming API)
 
 * `StreamingClient` (`data/streaming/`) が OkHttp の WebSocket で `wss://<configuration.urls.streaming>/api/v1/streaming`
@@ -925,7 +964,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 * ビルド: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug`
   (システムに Java が無いので Android Studio 同梱の JBR を使う)
-* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテストのみ。instrumentation / UI テストは無い)。
+* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテスト)。計装テストは Room の SQL (`CacheDaoTest`) だけで、
+  エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (終わるとアプリが消えるので、
+  ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
 * 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
 * **debug / benchmark は release と別のアプリ** (`applicationIdSuffix = ".debug"` → `es.aria_on_the_planet.quasar.debug`、

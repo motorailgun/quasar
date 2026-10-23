@@ -81,6 +81,10 @@
     <string name="profile_tab_posts">投稿</string>
     <string name="profile_tab_media">メディア</string>
     <string name="profile_no_media">メディアがありません</string>
+    <string name="profile_tab_favourites">お気に入り</string>
+    <string name="profile_no_favourites">お気に入りがありません</string>
+    <string name="profile_tab_bookmarks">ブックマーク</string>
+    <string name="profile_no_bookmarks">ブックマークがありません</string>
     <string name="follow_list_following">フォロー</string>
     <string name="follow_list_followers">フォロワー</string>
     <string name="follow_list_empty">表示するものがありません</string>

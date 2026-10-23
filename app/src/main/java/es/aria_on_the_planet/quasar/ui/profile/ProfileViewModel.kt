@@ -41,8 +41,19 @@ data class ProfileExtras(
     val followersYouFollow: List<User> = emptyList(),
 )
 
-/** プロフィールの投稿一覧のタブ。 */
-enum class ProfileTab { Posts, Media }
+/**
+ * プロフィールの投稿一覧のタブ。[Favourites] / [Bookmarks] は自分のプロフィールだけ (他人のものを取る API は無い)。
+ */
+enum class ProfileTab {
+    Posts,
+    Media,
+    Favourites,
+    Bookmarks,
+    ;
+
+    /** 自分のプロフィールにだけ出すタブ。 */
+    val ownOnly: Boolean get() = this == Favourites || this == Bookmarks
+}
 
 /** ヘッダ右側のボタン。 */
 sealed interface ProfileButtonState {
@@ -68,11 +79,27 @@ data class ProfileScreenState(
     val extras: ProfileExtras = ProfileExtras(),
     val posts: PostFeedState = PostFeedState(),
     val media: PostFeedState = PostFeedState(),
+    val favourites: PostFeedState = PostFeedState(),
+    val bookmarks: PostFeedState = PostFeedState(),
     val tab: ProfileTab = ProfileTab.Posts,
     val button: ProfileButtonState = ProfileButtonState.None,
 ) {
+    /** 自分のプロフィールか。 */
+    val isMe: Boolean get() = button == ProfileButtonState.EditProfile
+
+    /** 出すタブ。お気に入り・ブックマークは自分のプロフィールだけ。 */
+    val tabs: List<ProfileTab> get() = if (isMe) ProfileTab.entries else ProfileTab.entries.filterNot { it.ownOnly }
+
+    /** [tab] の一覧。 */
+    fun feedOf(tab: ProfileTab): PostFeedState = when (tab) {
+        ProfileTab.Posts -> posts
+        ProfileTab.Media -> media
+        ProfileTab.Favourites -> favourites
+        ProfileTab.Bookmarks -> bookmarks
+    }
+
     /** 選択中のタブの一覧。 */
-    val selectedFeed: PostFeedState get() = if (tab == ProfileTab.Media) media else posts
+    val selectedFeed: PostFeedState get() = feedOf(tab)
 }
 
 class ProfileViewModel(
@@ -104,13 +131,35 @@ class ProfileViewModel(
         repository.fetchPosts(session = session, accountId = accountId, maxId = maxId, limit = PageSize, onlyMedia = true)
     }
 
+    /** 自分がお気に入りにしたポスト (自分のプロフィールのお気に入りのタブ)。初めて開いたときに読み込む。 */
+    private val favourites = PostFeed.linked(viewModelScope) { maxId ->
+        repository.fetchFavourites(session = session, maxId = maxId, limit = PageSize)
+    }
+
+    /** 自分がブックマークしたポスト (自分のプロフィールのブックマークのタブ)。初めて開いたときに読み込む。 */
+    private val bookmarks = PostFeed.linked(viewModelScope) { maxId ->
+        repository.fetchBookmarks(session = session, maxId = maxId, limit = PageSize)
+    }
+
+    private val feeds = ProfileTab.entries.associateWith { tab ->
+        when (tab) {
+            ProfileTab.Posts -> posts
+            ProfileTab.Media -> media
+            ProfileTab.Favourites -> favourites
+            ProfileTab.Bookmarks -> bookmarks
+        }
+    }
+
+    private fun feedOf(tab: ProfileTab): PostFeed = feeds.getValue(tab)
+
     val state: StateFlow<ProfileScreenState> = combine(
         combine(profile, extras, ::Pair),
-        posts.state,
-        media.state,
+        combine(posts.state, media.state, favourites.state, bookmarks.state) { p, m, f, b -> listOf(p, m, f, b) },
         tab,
         button,
-    ) { (profile, extras), posts, media, tab, button -> ProfileScreenState(profile, extras, posts, media, tab, button) }
+    ) { (profile, extras), (posts, media, favourites, bookmarks), tab, button ->
+        ProfileScreenState(profile, extras, posts, media, favourites, bookmarks, tab, button)
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileScreenState())
 
     init {
@@ -126,16 +175,16 @@ class ProfileViewModel(
         loadRelationship(force)
         posts.refresh()
         // 開いたことのないタブは読まない
-        if (media.state.value.loaded) media.refresh()
+        for (feed in feeds.values) if (feed !== posts && feed.state.value.loaded) feed.refresh()
     }
 
     /** [tab] の一覧の続きを読む (ページャの各ページから呼ぶ)。 */
-    fun loadMore(tab: ProfileTab) = if (tab == ProfileTab.Media) media.loadMore() else posts.loadMore()
+    fun loadMore(tab: ProfileTab) = feedOf(tab).loadMore()
 
     /** 表示中のタブ (ページャのページ)。初めて開いたタブは読み込む。 */
     fun selectTab(selected: ProfileTab) {
         tab.value = selected
-        if (selected == ProfileTab.Media) media.ensureLoaded()
+        if (selected != ProfileTab.Posts) feedOf(selected).ensureLoaded()
     }
 
     /** フォローする (`follow = false` ならフォロー / リクエストをやめる)。確認は画面側で済ませてから呼ぶ。 */
@@ -188,8 +237,7 @@ class ProfileViewModel(
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
         viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
-            posts.updatePosts { it.withPoll(poll) }
-            media.updatePosts { it.withPoll(poll) }
+            feeds.values.forEach { feed -> feed.updatePosts { it.withPoll(poll) } }
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map { it.withPoll(poll) }) }
         }
 
@@ -197,8 +245,7 @@ class ProfileViewModel(
         scope = viewModelScope,
         send = { statusId, action -> statusRepository.perform(session, statusId, action) },
         update = { transform ->
-            posts.updatePosts(transform)
-            media.updatePosts(transform)
+            feeds.values.forEach { it.updatePosts(transform) }
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map(transform)) }
         },
         onError = { message, error -> Log.w(TAG, message, error) },

@@ -12,4 +12,6 @@
     <string name="gallery_reply">Reply targets</string>
     <string name="gallery_account_reactions">Reactions on multiple posts</string>
     <string name="gallery_follow_request">Follow request on profile</string>
+    <string name="gallery_my_profile">Own profile (tabs)</string>
+    <string name="gallery_other_profile">Other profile (tabs)</string>
 </resources>

@@ -5,7 +5,9 @@ import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.mapper.postVisibility
 import es.aria_on_the_planet.quasar.data.mapper.toProfile
+import es.aria_on_the_planet.quasar.data.remote.LinkedPage
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
+import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Page
@@ -81,6 +83,22 @@ class AccountRepository(
         val statuses = api.accountStatuses(session.serverUrl, session.accessToken, accountId, maxId, limit, onlyMedia = onlyMedia)
         cache.putStatuses(statuses, version)
         return statuses.map { it.toDomain() }
+    }
+
+    /** ログイン中のユーザーがお気に入りにしたポスト (要認証)。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchFavourites(session: Session, maxId: String? = null, limit: Int): Page<Post> =
+        fetchOwnStatuses(session) { token -> api.favourites(session.serverUrl, token, maxId, limit) }
+
+    /** ログイン中のユーザーがブックマークしたポスト (要認証)。`max_id` はブックマークの ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchBookmarks(session: Session, maxId: String? = null, limit: Int): Page<Post> =
+        fetchOwnStatuses(session) { token -> api.bookmarks(session.serverUrl, token, maxId, limit) }
+
+    private suspend fun fetchOwnStatuses(session: Session, fetch: suspend (token: String) -> LinkedPage<StatusDto>): Page<Post> {
+        val token = checkNotNull(session.accessToken) { "Not logged in" }
+        val version = cache.issue()
+        val page = fetch(token)
+        cache.putStatuses(page.items, version)
+        return Page(page.items.map { it.toDomain() }, page.nextMaxId)
     }
 
     /** [accountId] がフォローしているアカウント。`max_id` はフォロー関係の ID なので [Page.nextMaxId] を使う。 */

@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -62,13 +63,15 @@ import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
+import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTab
 import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTabRow
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import kotlinx.coroutines.launch
 
 /**
- * プロフィール画面。上からヘッダ / タブ (Posts・Media) / タブごとの投稿一覧 (HorizontalPager)。
+ * プロフィール画面。上からヘッダ / タブ (Posts・Media、自分なら Favourites・Bookmarks も) / タブごとの投稿一覧 (HorizontalPager)。
  * 一覧を上へスクロールするとヘッダが畳まれ、タブは上端に残る ([CollapsingHeaderLayout])。
  * タブはボタンでも左右スワイプでも切り替わり、各タブは一覧とスクロール位置を別々に持つ。
  */
@@ -87,19 +90,61 @@ fun ProfileScreen(
     onHashtagClick: ((String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    ProfileContent(
+        state = state,
+        onBack = onBack,
+        onRefresh = viewModel::refresh,
+        onSelectTab = viewModel::selectTab,
+        onLoadMore = viewModel::loadMore,
+        onSetFollowing = viewModel::setFollowing,
+        onAnswerFollowRequest = viewModel::answerFollowRequest,
+        onUserClick = onUserClick,
+        onPostClick = onPostClick,
+        onMediaClick = onMediaClick,
+        onFollowingClick = onFollowingClick,
+        onFollowersClick = onFollowersClick,
+        onOpenImage = onOpenImage,
+        onReply = onReply,
+        onHashtagClick = onHashtagClick,
+        onVote = if (viewModel.canInteract) viewModel::vote else null,
+        onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract },
+    )
+}
+
+/** プロフィール画面の中身。ViewModel を通さずに状態とコールバックだけで描く (デバッグ用ギャラリーからも使う)。 */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ProfileContent(
+    state: ProfileScreenState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelectTab: (ProfileTab) -> Unit,
+    onLoadMore: (ProfileTab) -> Unit,
+    onSetFollowing: (Boolean) -> Unit,
+    onAnswerFollowRequest: (Boolean) -> Unit,
+    onUserClick: (User) -> Unit,
+    onPostClick: (Post) -> Unit,
+    onMediaClick: (MediaClick) -> Unit,
+    onFollowingClick: () -> Unit,
+    onFollowersClick: () -> Unit,
+    onOpenImage: (MediaViewerArgs) -> Unit,
+    onReply: ((Post) -> Unit)? = null,
+    onHashtagClick: ((String) -> Unit)? = null,
+    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
+    onAction: OnPostAction? = null,
+) {
     val profile = state.profile.profile
     val feed = state.selectedFeed
-    val tabs = ProfileTab.entries
+    val tabs = state.tabs
     val pagerState = rememberPagerState { tabs.size }
     val headerState = rememberCollapsingHeaderState()
     val scope = rememberCoroutineScope()
     val confirmer = LocalActionConfirmer.current
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
-    val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
-    val tabLabels = tabs.map { stringResource(it.label()) }
+    val tabItems = tabs.map { ConnectedTab(stringResource(it.label()), it.icon(), it.selectedIcon()) }
     // ページごとの一覧の位置。タブの背景 (スクロールしたらぼかし) の判定にも使うのでここで持つ
-    val listStates = tabs.associateWith { rememberLazyListState() }
+    // タブの数は自分かどうかが分かると変わるので、出しうる全タブ分を持つ
+    val listStates = ProfileTab.entries.associateWith { rememberLazyListState() }
     val hazeState = rememberHazeState()
     val tabsBlurStyle = rememberSurfaceBlurStyle()
     val density = LocalDensity.current
@@ -114,7 +159,7 @@ fun ProfileScreen(
 
     // スワイプでもボタンでも、行き先のタブを選択として扱う (初めて開くタブはここで読み込む)
     LaunchedEffect(pagerState.targetPage) {
-        viewModel.selectTab(tabs[pagerState.targetPage])
+        onSelectTab(tabs[pagerState.targetPage])
     }
 
     DetailScaffold(
@@ -123,7 +168,7 @@ fun ProfileScreen(
         titleRevealed = headerState.isCollapsed,
         // タブを初めて開いたときの読み込みは一覧側に出すので、引っ張って更新したときだけ出す
         isRefreshing = profile != null && (state.profile.isRefreshing || (feed.isRefreshing && feed.loaded)),
-        onRefresh = viewModel::refresh,
+        onRefresh = onRefresh,
         revealedTitle = profile?.let { { ProfileTitle(it) } },
     ) {
         when {
@@ -161,7 +206,7 @@ fun ProfileScreen(
                                         scope.launch(start = CoroutineStart.UNDISPATCHED) {
                                             // 拒否は取り消せない (相手に申請し直してもらうしかない) ので、設定に従って確認する
                                             if (accept || confirmer.confirm(ConfirmTarget.RejectFollowRequest)) {
-                                                viewModel.answerFollowRequest(accept)
+                                                onAnswerFollowRequest(accept)
                                             }
                                         }
                                     },
@@ -172,7 +217,7 @@ fun ProfileScreen(
                             ProfileActionButton(
                                 state = state.button,
                                 profile = profile,
-                                onSetFollowing = viewModel::setFollowing,
+                                onSetFollowing = onSetFollowing,
                                 // プロフィール編集は未実装
                                 onEditProfile = {},
                             )
@@ -181,7 +226,7 @@ fun ProfileScreen(
                 },
                 pinned = {
                     ConnectedTabRow(
-                        labels = tabLabels,
+                        tabs = tabItems,
                         selectedIndex = pagerState.targetPage,
                         onSelect = { index ->
                             scope.launch {
@@ -217,9 +262,9 @@ fun ProfileScreen(
                             tab = tab,
                             listState = listStates.getValue(tab),
                             topPadding = tabsHeight,
-                            feed = if (tab == ProfileTab.Media) state.media else state.posts,
+                            feed = state.feedOf(tab),
                             pinnedPosts = if (tab == ProfileTab.Posts) state.extras.pinnedPosts else emptyList(),
-                            onLoadMore = { viewModel.loadMore(tab) },
+                            onLoadMore = { onLoadMore(tab) },
                             onUserClick = onUserClick,
                             onPostClick = onPostClick,
                             onMediaClick = onMediaClick,
@@ -235,7 +280,10 @@ fun ProfileScreen(
     }
 }
 
-/** タブ 1 つ分の投稿一覧。Media は `only_media` で絞り込んだポストを同じ形で出すだけ。 */
+/**
+ * タブ 1 つ分の投稿一覧。Media は `only_media` で絞り込んだポスト、Favourites / Bookmarks は自分のお気に入り・
+ * ブックマークを同じ形で出すだけ。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ProfileTabPage(
@@ -296,7 +344,7 @@ private fun ProfileTabPage(
                             !feed.loaded || feed.isRefreshing -> LoadingIndicator()
                             feed.error != null -> Text(stringResource(R.string.timeline_error, feed.error))
                             else -> Text(
-                                stringResource(if (tab == ProfileTab.Media) R.string.profile_no_media else R.string.profile_no_posts),
+                                stringResource(tab.emptyMessage()),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -310,6 +358,29 @@ private fun ProfileTabPage(
 private fun ProfileTab.label(): Int = when (this) {
     ProfileTab.Posts -> R.string.profile_tab_posts
     ProfileTab.Media -> R.string.profile_tab_media
+    ProfileTab.Favourites -> R.string.profile_tab_favourites
+    ProfileTab.Bookmarks -> R.string.profile_tab_bookmarks
+}
+
+private fun ProfileTab.icon(): ImageVector = when (this) {
+    ProfileTab.Posts -> Symbols.Outlined.Article
+    ProfileTab.Media -> Symbols.Outlined.Image
+    ProfileTab.Favourites -> Symbols.Outlined.Star
+    ProfileTab.Bookmarks -> Symbols.Outlined.Bookmark
+}
+
+private fun ProfileTab.selectedIcon(): ImageVector = when (this) {
+    ProfileTab.Posts -> Symbols.Filled.Article
+    ProfileTab.Media -> Symbols.Filled.Image
+    ProfileTab.Favourites -> Symbols.Filled.Star
+    ProfileTab.Bookmarks -> Symbols.Filled.Bookmark
+}
+
+private fun ProfileTab.emptyMessage(): Int = when (this) {
+    ProfileTab.Posts -> R.string.profile_no_posts
+    ProfileTab.Media -> R.string.profile_no_media
+    ProfileTab.Favourites -> R.string.profile_no_favourites
+    ProfileTab.Bookmarks -> R.string.profile_no_bookmarks
 }
 
 @Composable

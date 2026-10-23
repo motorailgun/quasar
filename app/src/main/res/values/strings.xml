@@ -80,6 +80,10 @@
     <string name="profile_tab_posts">Posts</string>
     <string name="profile_tab_media">Media</string>
     <string name="profile_no_media">No media yet</string>
+    <string name="profile_tab_favourites">Favourites</string>
+    <string name="profile_no_favourites">No favourites yet</string>
+    <string name="profile_tab_bookmarks">Bookmarks</string>
+    <string name="profile_no_bookmarks">No bookmarks yet</string>
     <string name="follow_list_following">Following</string>
     <string name="follow_list_followers">Followers</string>
     <string name="follow_list_empty">Nothing to show</string>

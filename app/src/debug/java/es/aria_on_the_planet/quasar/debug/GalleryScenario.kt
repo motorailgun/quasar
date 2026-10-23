@@ -22,6 +22,10 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     AccountReactions("account-reactions", R.string.gallery_account_reactions, "profile.json"),
     /** 相手からのフォローリクエストが来ているプロフィールのヘッダ。データは profile を使い回す。 */
     FollowRequest("follow-request", R.string.gallery_follow_request, "profile.json"),
+    /** 自分のプロフィール (タブに Favourites・Bookmarks が出る)。どちらの一覧も post-variety のポスト。 */
+    MyProfile("my-profile", R.string.gallery_my_profile, "profile.json"),
+    /** 他人のプロフィール (Favourites・Bookmarks のタブは出ない)。 */
+    OtherProfile("other-profile", R.string.gallery_other_profile, "profile.json"),
     ;
 
     companion object {

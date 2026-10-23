@@ -312,6 +312,36 @@ class MastodonApi(
         return LinkedPage(items, nextMaxIdFromLinkHeader(headers["Link"]))
     }
 
+    /**
+     * ログイン中のユーザーがお気に入りにしたポスト (https://docs.joinmastodon.org/methods/favourites/#get)。要認証。
+     * 他人のお気に入りを取る API は無い。`max_id` はお気に入りの ID なので、次ページの `max_id` は Link ヘッダから取る。
+     */
+    suspend fun favourites(serverUrl: String, accessToken: String, maxId: String? = null, limit: Int = DEFAULT_LIMIT) =
+        linkedStatuses(serverUrl, accessToken, "api/v1/favourites", maxId, limit)
+
+    /**
+     * ログイン中のユーザーがブックマークしたポスト (https://docs.joinmastodon.org/methods/bookmarks/#get)。要認証。
+     * `max_id` はブックマークの ID なので、次ページの `max_id` は Link ヘッダから取る。
+     */
+    suspend fun bookmarks(serverUrl: String, accessToken: String, maxId: String? = null, limit: Int = DEFAULT_LIMIT) =
+        linkedStatuses(serverUrl, accessToken, "api/v1/bookmarks", maxId, limit)
+
+    private suspend fun linkedStatuses(
+        serverUrl: String,
+        accessToken: String,
+        path: String,
+        maxId: String?,
+        limit: Int,
+    ): LinkedPage<StatusDto> {
+        val url = serverUrl.toHttpUrl().newBuilder()
+            .addPathSegments(path)
+            .apply { maxId?.let { addQueryParameter("max_id", it) } }
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        val (items, headers) = executeWithHeaders<List<StatusDto>>(Request.Builder().url(url), accessToken)
+        return LinkedPage(items, nextMaxIdFromLinkHeader(headers["Link"]))
+    }
+
     /** https://docs.joinmastodon.org/methods/accounts/#relationships (要認証) */
     suspend fun relationships(serverUrl: String, accessToken: String, ids: List<String>): List<RelationshipDto> =
         get(serverUrl, accessToken, "api/v1/accounts/relationships") {

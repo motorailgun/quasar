@@ -67,7 +67,13 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import kotlinx.serialization.Serializable
+import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.profile.ProfileButtonState
+import es.aria_on_the_planet.quasar.ui.profile.ProfileContent
 import es.aria_on_the_planet.quasar.ui.profile.ProfileHeader
+import es.aria_on_the_planet.quasar.ui.profile.ProfileScreenState
+import es.aria_on_the_planet.quasar.ui.profile.ProfileState
+import es.aria_on_the_planet.quasar.ui.profile.ProfileTab
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsContent
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsState
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
@@ -192,6 +198,46 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
     val text = remember(scenario) {
         context.assets.open("gallery/${scenario.fixture}").bufferedReader().use { it.readText() }
     }
+    if (scenario == GalleryScenario.MyProfile || scenario == GalleryScenario.OtherProfile) {
+        // タブ付きの画面を骨組みごと本物で出す (一覧は固定データ。追加読み込み・更新は無い)
+        val fixture = remember(text) { GalleryFixtures.profile(text) }
+        // お気に入り・ブックマークは post-variety のポスト (ブックマークは逆順)
+        val favourites = remember {
+            val variety = context.assets.open("gallery/post-variety.json").bufferedReader().use { it.readText() }
+            GalleryFixtures.posts(variety).map { it.copy(viewer = it.viewer.copy(favourited = true)) }
+        }
+        var tab by remember { mutableStateOf(ProfileTab.Posts) }
+        fun feed(posts: List<Post>) = PostFeedState(items = posts.map(TimelineItem::PostItem), loaded = true, endReached = true)
+        val state = ProfileScreenState(
+            profile = ProfileState(profile = fixture.profile),
+            posts = feed(fixture.posts),
+            media = feed(fixture.posts.filter { it.mediaAttachments.isNotEmpty() }),
+            favourites = feed(favourites),
+            bookmarks = feed(favourites.reversed().map { it.copy(viewer = it.viewer.copy(bookmarked = true)) }),
+            tab = tab,
+            button = if (scenario == GalleryScenario.MyProfile) {
+                ProfileButtonState.EditProfile
+            } else {
+                ProfileButtonState.Follow(Relationship(following = true, requested = false, followedBy = true))
+            },
+        )
+        ProfileContent(
+            state = state,
+            onBack = onBack,
+            onRefresh = {},
+            onSelectTab = { tab = it },
+            onLoadMore = {},
+            onSetFollowing = {},
+            onAnswerFollowRequest = {},
+            onUserClick = {},
+            onPostClick = {},
+            onMediaClick = navigator::openMedia,
+            onFollowingClick = {},
+            onFollowersClick = {},
+            onOpenImage = navigator::openMediaViewer,
+        )
+        return
+    }
     if (scenario == GalleryScenario.AccountReactions) {
         // 画面の骨組みごと本物を使う (トップバーの文言も確かめたいので、ギャラリーの DetailScaffold には載せない)
         val fixture = remember(text) { GalleryFixtures.profile(text) }
@@ -288,7 +334,9 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                 }
             }
 
-            GalleryScenario.AccountReactions -> Unit
+            GalleryScenario.AccountReactions,
+            GalleryScenario.MyProfile,
+            GalleryScenario.OtherProfile -> Unit
 
             GalleryScenario.AnimatedEmoji,
             GalleryScenario.AnimatedAvatars,

@@ -61,7 +61,9 @@ es.aria_on_the_planet.quasar
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem、インライン再生) + MediaClick
     │   ├── user/UserList.kt        ユーザーの集合 (LazyColumn) + UserListItem (フォロー / フォロワー一覧)
-    │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに)
+    │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに。
+    │                               各タブは `ConnectedTab(label, icon, selectedIcon)`。幅は `layoutTabs`: 等幅で収まれば
+    │                               ラベル、収まらなければ選択中だけラベル + 他はアイコン、それでもはみ出せば横スクロール + 端のフェード)
     │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
     │   ├── dialog/ActionConfirmation.kt 設定に従う操作前の確認 (ActionConfirmationHost / LocalActionConfirmer)
     │   ├── settings/               AOSP 風の設定の部品 (SettingsScaffold / SettingsGroup / Switch・Choice・Slider 等の項目)
@@ -241,6 +243,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
 | メディア一覧 | `GET /api/v1/accounts/:id/statuses?only_media=true` (40 件ずつ。ブーストは含まれない) |
+| 自分のお気に入り / ブックマーク | `GET /api/v1/favourites` / `bookmarks` (要認証。**Link ヘッダ**でページング。他人のものを取る API は無い) |
 | フォロー / フォロワー一覧 | `GET /api/v1/accounts/:id/following` / `followers` (**Link ヘッダ**でページング。下記) |
 | 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` (要認証) |
 | フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (要認証。鍵アカウントは `requested` になる) |
@@ -538,11 +541,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (ページャが `hazeSource`、`backgroundColor` 必須は他と同様)。表示中のページの一覧が先頭から動いていない間は不透明な
     surface を重ねて今までどおりに見せ、スクロールしたらそれを消してぼかしにする。トップバーは不透明のまま。ヘッダが畳まれ切ったらトップバーに名前
     (`DetailScaffold(titleRevealed = ...)`)。ヘッダの畳み具合は両タブで共有し、タブごとのスクロール位置とは同期しない (X と同じ)。
-  * **タブ** (Posts / Media): ボタンでも左右スワイプでも切り替わる (`pagerState.targetPage` を `selectTab` に渡す)。
+  * **タブ** (Posts / Media / Favourites / Bookmarks): ボタンでも左右スワイプでも切り替わる (`pagerState.targetPage` を `selectTab` に渡す)。
     表示中のタブをもう一度押すとその一覧を先頭へ (`scrollToTop`)。ヘッダは開かない (畳み具合は nested scroll でしか
     動かず、プログラムからのスクロールは届かない。開くなら `CollapsingHeaderState.offset` を別に 0 へ動かす)。Media は
     `only_media=true` で絞り込んだポストの一覧 (別の `PostFeed`。初めて開いたときに読む) を同じ `PostList` で出すだけ。
-    ピン留めは Posts のみ。投票・ブースト等の反映は両方の一覧に当てる。
+    ピン留めは Posts のみ。投票・ブースト等の反映は全タブの一覧に当てる。
+    Favourites / Bookmarks は**自分のプロフィールだけ** (`ProfileTab.ownOnly`・`ProfileScreenState.tabs`。`fetchMe` で自分と
+    分かってから右端に足す) で、`GET /api/v1/favourites` / `bookmarks` を `PostFeed.linked` (`max_id` はお気に入り・
+    ブックマークの ID なので Link ヘッダの次ページ) で読む。ここで外しても一覧からは消さない (Mastodon Web と同じ)。
   * フォロー数・フォロワー数のタップで `openFollowList(accountId, tab)`。
   * アイコン・ヘッダ画像のタップでメディアビューア (`openMediaViewer(MediaViewerArgs.singleImage(...))`、1 枚ずつで左右スワイプ無し)。
     ID は合成 (`avatar:<id>` / `header:<id>`)、読み込み中は static の URL を出す。開く前にピン留めポストのインライン再生を止める。
@@ -1007,7 +1013,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す)。
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。
   表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -24,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,6 +31,8 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailRefreshBox
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
+import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTab
 import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTabRow
 import es.aria_on_the_planet.quasar.ui.component.user.UserList
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
@@ -84,7 +86,7 @@ fun FollowListScreen(
                 .padding(padding),
         ) {
             ConnectedTabRow(
-                labels = tabs.map { stringResource(it.label()) },
+                tabs = tabs.map { ConnectedTab(stringResource(it.label()), it.icon(), it.selectedIcon()) },
                 selectedIndex = pagerState.targetPage,
                 onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index, animationSpec = spatialSpec) } },
             )
@@ -155,4 +157,14 @@ private fun FollowListPage(
 private fun FollowListTab.label(): Int = when (this) {
     FollowListTab.Following -> R.string.follow_list_following
     FollowListTab.Followers -> R.string.follow_list_followers
+}
+
+private fun FollowListTab.icon(): ImageVector = when (this) {
+    FollowListTab.Following -> Symbols.Outlined.PersonCheck
+    FollowListTab.Followers -> Symbols.Outlined.Groups
+}
+
+private fun FollowListTab.selectedIcon(): ImageVector = when (this) {
+    FollowListTab.Following -> Symbols.Filled.PersonCheck
+    FollowListTab.Followers -> Symbols.Filled.Groups
 }

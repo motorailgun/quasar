@@ -4,6 +4,7 @@ import androidx.navigation3.runtime.NavKey
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
 import kotlinx.serialization.Serializable
 
 /**
@@ -38,6 +39,9 @@ sealed interface Route : NavKey {
 
     /** ポストの詳細。ブーストなら中身の ID。 */
     @Serializable data class Post(val statusId: String) : Route
+
+    /** ポストをブースト / お気に入りにしたユーザーの一覧。[statusId] はブーストなら中身の ID。 */
+    @Serializable data class PostReactions(val statusId: String, val tab: PostReactionsTab) : Route
 
     /** 投稿画面 (クイック投稿バーの無い画面からの返信用)。下書きは共有。 */
     @Serializable data object Composer : Route

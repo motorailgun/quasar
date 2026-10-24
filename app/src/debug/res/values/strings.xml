@@ -14,4 +14,5 @@
     <string name="gallery_follow_request">Follow request on profile</string>
     <string name="gallery_my_profile">Own profile (tabs)</string>
     <string name="gallery_other_profile">Other profile (tabs)</string>
+    <string name="gallery_post_detail">Post detail (reactions)</string>
 </resources>

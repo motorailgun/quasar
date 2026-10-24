@@ -61,6 +61,7 @@ es.aria_on_the_planet.quasar
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem、インライン再生) + MediaClick
     │   ├── user/UserList.kt        ユーザーの集合 (LazyColumn) + UserListItem (フォロー / フォロワー一覧)
+    │   ├── user/UserFeedList.kt    FeedState<User> の UserList + PTR + 空・読み込み中・失敗の表示 (タブ 1 つ分)
     │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに。
     │                               各タブは `ConnectedTab(label, icon, selectedIcon)`。幅は `layoutTabs`: 等幅で収まれば
     │                               ラベル、収まらなければ選択中だけラベル + 他はアイコン、それでもはみ出せば横スクロール + 端のフェード)
@@ -94,7 +95,8 @@ es.aria_on_the_planet.quasar
     ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
-    ├── reactions/                  通知のユーザー単位のまとめの中身 (AccountReactionsScreen / ViewModel)
+    ├── reactions/                  通知のユーザー単位のまとめの中身 (AccountReactionsScreen / ViewModel) /
+    │                               ポストをブースト・お気に入りにしたユーザーの一覧 (PostReactionsScreen / ViewModel)
     └── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
 ```
 
@@ -245,6 +247,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | メディア一覧 | `GET /api/v1/accounts/:id/statuses?only_media=true` (40 件ずつ。ブーストは含まれない) |
 | 自分のお気に入り / ブックマーク | `GET /api/v1/favourites` / `bookmarks` (要認証。**Link ヘッダ**でページング。他人のものを取る API は無い) |
 | フォロー / フォロワー一覧 | `GET /api/v1/accounts/:id/following` / `followers` (**Link ヘッダ**でページング。下記) |
+| ポストをブースト / お気に入りにしたユーザー | `GET /api/v1/statuses/:id/reblogged_by` / `favourited_by` (**Link ヘッダ**でページング。`StatusRepository.fetchRebloggedBy` / `fetchFavouritedBy`) |
 | 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` (要認証) |
 | フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (要認証。鍵アカウントは `requested` になる) |
 | 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (要認証。応答は Relationship) |
@@ -378,6 +381,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ブックマーク=secondary) で表示する。
   ブースト・お気に入り・ブックマークは押せる (`onAction`、未ログインなら `null` で表示のみ)。リプライは `onReply`
   (トグルではないので `PostAction` とは別の口。`PostList` / `NotificationList` / `PostDetail` 等は中継するだけ。「投稿」の「返信」)。
+* `PostActionRow(reactionDetail = true)` (ポスト詳細の `PostDetail(reactionDetail = true)` から): X の一時期の詳細画面の形で、
+  リプライ / ブーストのアイコン +「N boosts」/ お気に入りのアイコン +「M favourites」(件数の文字は labelLarge = Medium・onSurfaceVariant、plurals) / 右端に
+  ブックマーク。アイコンのタップは通常の操作、件数のタップは `onReactionCountClick(PostActionType.Boost / Favourite)` で
+  リアクションしたユーザーの一覧 (`Route.PostReactions`)。
 * `Post` 以外の状態を持たない (stateless)。
 
 ### PostList (`ui/component/post/PostList.kt`)
@@ -574,6 +581,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。
+  * 本体のアクション行は `reactionDetail = true`。件数のタップで **リアクションしたユーザーの一覧** (`Route.PostReactions(statusId, tab)`、
+    `Navigator.openPostReactions`): トップバー「Reactions」の下に `ConnectedTabRow` (Boosts / Favourites) + `HorizontalPager`。
+    中身はフォロー一覧と同じ `UserFeedList` (各タブは開いたときに読む、PTR・追加読み込みあり)。タップでプロフィール。
+    画面は `PostReactionsScreen` (ViewModel を持つ) → `PostReactionsContent` (状態とコールバックだけ。ギャラリーからも使う)。
   * **自分のポストの編集・削除**: 本体が自分のポスト (`fetchMe` の ID と投稿者が一致) なら、`PostDetail(menu = ...)` で投稿者行の
     右端に︙ (`OwnPostMenu`: 編集 / error 色の削除)。
     * 編集: `PostViewModel.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
@@ -1013,7 +1024,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。 / post-detail (ポスト詳細の本体を
+  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
   表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
@@ -1091,6 +1103,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   benchmark ビルドで動作 (起動・画面遷移・プロセス再生成後の復元・APNG) を確かめる。
 
 ### 実機での確認 (adb)
+* **開発環境のメモリに余裕があるとき (`free -g` の available が 8GB 以上が目安) は、エミュレーターで動作確認する**。
+  つながっている端末が無い・寝ているときに確認を諦めたりユーザーに頼んだりせず、自分で立ち上げる:
+  `~/Android/Sdk/emulator/emulator -list-avds` で AVD (今は `Pixel_10a`) を確かめ、
+  `emulator -avd Pixel_10a -no-snapshot-save -no-audio -no-boot-anim -no-window` をバックグラウンドで起動 →
+  `adb wait-for-device` の後 `sys.boot_completed` が 1 になるまで待つ → `installDebug`。
+  エミュレーターは未ログインのことが多い。ログインが要る画面は、まずギャラリーにシナリオを足して確かめ、それでも足りない
+  (実際の API・遷移を通したい) ときはその旨をユーザーに伝える。メモリに余裕が無いときは下記の実機を使う。
 * 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。
   `adb devices` の先頭の device を使う。切断・ロック・スリープは頻繁に起きる → 実機が寝ていて (`dumpsys power` の
   `mWakefulness=Asleep`) エミュレータが起きているなら、エミュレータで動作確認する。どちらも使えなければユーザーに解除を頼む。

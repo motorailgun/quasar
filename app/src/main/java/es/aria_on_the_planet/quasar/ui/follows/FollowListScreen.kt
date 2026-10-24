@@ -1,41 +1,32 @@
 package es.aria_on_the_planet.quasar.ui.follows
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailRefreshBox
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTab
 import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTabRow
-import es.aria_on_the_planet.quasar.ui.component.user.UserList
-import es.aria_on_the_planet.quasar.ui.feed.FeedState
+import es.aria_on_the_planet.quasar.ui.component.user.UserFeedList
 import kotlinx.coroutines.launch
 
 /**
@@ -96,7 +87,7 @@ fun FollowListScreen(
                 key = { tabs[it] },
             ) { page ->
                 val tab = tabs[page]
-                FollowListPage(
+                UserFeedList(
                     feed = state.feed(tab),
                     onRefresh = { viewModel.refresh(tab) },
                     onLoadMore = { viewModel.loadMore(tab) },
@@ -104,53 +95,6 @@ fun FollowListScreen(
                 )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun FollowListPage(
-    feed: FeedState<User>,
-    onRefresh: () -> Unit,
-    onLoadMore: () -> Unit,
-    onUserClick: (User) -> Unit,
-) {
-    DetailRefreshBox(
-        // 初回の読み込みは一覧側に出すので、引っ張って更新したときだけ出す
-        isRefreshing = feed.isRefreshing && feed.loaded,
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        UserList(
-            users = feed.items,
-            modifier = Modifier.fillMaxSize(),
-            state = rememberLazyListState(),
-            isLoadingMore = feed.isLoadingMore,
-            onLoadMore = onLoadMore,
-            onUserClick = onUserClick,
-            header = {
-                if (feed.items.isEmpty()) {
-                    item(key = "status", contentType = "status") {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            when {
-                                !feed.loaded || feed.isRefreshing -> LoadingIndicator()
-                                feed.error != null -> Text(stringResource(R.string.follow_list_error, feed.error))
-                                // 一覧を隠しているアカウントも空で返る
-                                else -> Text(
-                                    stringResource(R.string.follow_list_empty),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-        )
     }
 }
 

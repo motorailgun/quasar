@@ -7,6 +7,7 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
 
 /**
  * 画面からの遷移の口。画面 (`ProfileScreen` 等) はコールバックで遷移を受けるので、コールバックはここから組み立てる。
@@ -22,6 +23,9 @@ interface Navigator {
 
     /** 通知のユーザー単位のまとめ ([account] が [posts] にした [type]) の中身。 */
     fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>)
+
+    /** [post] (ブーストなら中身) をブースト / お気に入りにしたユーザーの一覧。 */
+    fun openPostReactions(post: Post, tab: PostReactionsTab)
 
     /** 投稿画面 (下書きは共有)。 */
     fun openComposer()

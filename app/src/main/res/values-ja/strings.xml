@@ -31,6 +31,13 @@
     <string name="post_visibility_private_description">フォロワーのみ</string>
     <string name="post_visibility_direct_description">本文で指定した相手のみ</string>
     <string name="post_reactions">お気に入り</string>
+    <string name="post_reactions_title">リアクション</string>
+    <plurals name="post_detail_boosts">
+        <item quantity="other">%d ブースト</item>
+    </plurals>
+    <plurals name="post_detail_favourites">
+        <item quantity="other">%d お気に入り</item>
+    </plurals>
     <string name="post_pinned">固定</string>
     <string name="post_reply_to">%1$s さんへの返信</string>
     <string name="post_reply">返信</string>
@@ -87,8 +94,8 @@
     <string name="profile_no_bookmarks">ブックマークがありません</string>
     <string name="follow_list_following">フォロー</string>
     <string name="follow_list_followers">フォロワー</string>
-    <string name="follow_list_empty">表示するものがありません</string>
-    <string name="follow_list_error">読み込めませんでした: %1$s</string>
+    <string name="user_list_empty">表示するものがありません</string>
+    <string name="user_list_error">読み込めませんでした: %1$s</string>
     <string name="hashtag_empty">このハッシュタグはまだ使われていません</string>
     <string name="hashtag_error">読み込めませんでした: %1$s</string>
     <string name="post_title">投稿</string>

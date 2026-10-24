@@ -8,12 +8,14 @@ import es.aria_on_the_planet.quasar.data.mapper.toFormParams
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
 import es.aria_on_the_planet.quasar.domain.model.StatusSource
+import es.aria_on_the_planet.quasar.domain.model.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -99,6 +101,21 @@ class StatusRepository(
         }.awaitAll().filterNotNull()
         cache.putStatuses(statuses, version)
         statuses.map { it.toDomain() }
+    }
+
+    /** [statusId] をブーストしたアカウント。`max_id` はブーストの ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchRebloggedBy(session: Session, statusId: String, maxId: String? = null): Page<User> =
+        fetchReactors(session, statusId, "reblogged_by", maxId)
+
+    /** [statusId] をお気に入りにしたアカウント。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchFavouritedBy(session: Session, statusId: String, maxId: String? = null): Page<User> =
+        fetchReactors(session, statusId, "favourited_by", maxId)
+
+    private suspend fun fetchReactors(session: Session, statusId: String, reaction: String, maxId: String?): Page<User> {
+        val version = cache.issue()
+        val page = api.statusReactors(session.serverUrl, session.accessToken, statusId, reaction, maxId)
+        cache.putAccounts(page.items, version)
+        return Page(page.items.map { it.toDomain() }, page.nextMaxId)
     }
 
     /** キャッシュにある [statusIds] のポスト (ID → 値)。無いものは含まない。 */

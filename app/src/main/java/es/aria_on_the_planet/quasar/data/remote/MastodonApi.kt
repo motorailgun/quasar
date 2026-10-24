@@ -302,9 +302,32 @@ class MastodonApi(
         relation: String,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
+    ): LinkedPage<AccountDto> = linkedAccounts(serverUrl, accessToken, "api/v1/accounts/$id/$relation", maxId, limit)
+
+    /**
+     * ポストをブーストした (https://docs.joinmastodon.org/methods/statuses/#reblogged_by) /
+     * お気に入りにした (https://docs.joinmastodon.org/methods/statuses/#favourited_by) アカウント。
+     * [reaction] は `reblogged_by` か `favourited_by`。`max_id` はブースト・お気に入りの ID なので、次ページの `max_id` は
+     * Link ヘッダから取る。
+     */
+    suspend fun statusReactors(
+        serverUrl: String,
+        accessToken: String?,
+        statusId: String,
+        reaction: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): LinkedPage<AccountDto> = linkedAccounts(serverUrl, accessToken, "api/v1/statuses/$statusId/$reaction", maxId, limit)
+
+    private suspend fun linkedAccounts(
+        serverUrl: String,
+        accessToken: String?,
+        path: String,
+        maxId: String?,
+        limit: Int,
     ): LinkedPage<AccountDto> {
         val url = serverUrl.toHttpUrl().newBuilder()
-            .addPathSegments("api/v1/accounts/$id/$relation")
+            .addPathSegments(path)
             .apply { maxId?.let { addQueryParameter("max_id", it) } }
             .addQueryParameter("limit", limit.toString())
             .build()

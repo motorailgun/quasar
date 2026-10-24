@@ -48,6 +48,17 @@ import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyTargetPreview
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsContent
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsState
+import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
+import es.aria_on_the_planet.quasar.ui.feed.FeedState
+import es.aria_on_the_planet.quasar.domain.model.PostActionType
+import es.aria_on_the_planet.quasar.domain.model.toggleOn
+import es.aria_on_the_planet.quasar.domain.model.withAction
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
@@ -157,6 +168,7 @@ private class GalleryNavigator(
     override fun openHashtag(name: String) = Unit
     override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
     override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) = Unit
+    override fun openPostReactions(post: Post, tab: PostReactionsTab) = Unit
     override fun openComposer() = Unit
     override fun openSettings() = Unit
     override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
@@ -236,6 +248,10 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             onFollowersClick = {},
             onOpenImage = navigator::openMediaViewer,
         )
+        return
+    }
+    if (scenario == GalleryScenario.PostDetail) {
+        PostDetailGallery(text, onBack)
         return
     }
     if (scenario == GalleryScenario.AccountReactions) {
@@ -335,6 +351,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             }
 
             GalleryScenario.AccountReactions,
+            GalleryScenario.PostDetail,
             GalleryScenario.MyProfile,
             GalleryScenario.OtherProfile -> Unit
 
@@ -348,6 +365,62 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                     state = listState,
                     onMediaClick = navigator::openMedia,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * ポスト詳細の本体を `reactionDetail` で並べる。ブースト等は手元で反映するだけ (件数の動きも確かめられる)。
+ * 件数のタップでリアクションしたユーザーの一覧 ([PostReactionsContent]) に切り替え、「戻る」で戻る。
+ */
+@Composable
+private fun PostDetailGallery(text: String, onBack: () -> Unit) {
+    val navigator = LocalNavigator.current
+    var posts by remember(text) { mutableStateOf(GalleryFixtures.posts(text)) }
+    var reactions by remember { mutableStateOf<PostReactionsTab?>(null) }
+    reactions?.let { tab ->
+        val users = remember(posts) { posts.map { it.author }.distinctBy { it.inServerId } }
+        fun feed(users: List<User>) = FeedState(items = users, loaded = true, endReached = true)
+        NavigationBackHandler(state = rememberNavigationEventState(NavigationEventInfo.None), onBackCompleted = { reactions = null })
+        PostReactionsContent(
+            // ブーストは空 (空の表示の確認)、お気に入りは投稿者たち
+            state = PostReactionsState(boosts = feed(emptyList()), favourites = feed(users)),
+            initialTab = tab,
+            onTabShown = {},
+            onRefresh = {},
+            onLoadMore = {},
+            onBack = { reactions = null },
+            onUserClick = {},
+        )
+        return
+    }
+    val listState = rememberLazyListState()
+    DetailScaffold(
+        onBack = onBack,
+        listState = listState,
+        isRefreshing = false,
+        onRefresh = {},
+        title = { Text(stringResource(GalleryScenario.PostDetail.title)) },
+    ) {
+        LazyColumn(Modifier.fillMaxSize(), state = listState) {
+            items(posts, key = { it.id }) { post ->
+                Column {
+                    PostDetail(
+                        post = post,
+                        onMediaClick = navigator::openMedia,
+                        onAction = { target, type ->
+                            val action = type.toggleOn(target)
+                            posts = posts.map { it.withAction(target.statusId, action) }
+                        },
+                        onReply = {},
+                        reactionDetail = true,
+                        onReactionCountClick = { _, type ->
+                            reactions = if (type == PostActionType.Boost) PostReactionsTab.Boosts else PostReactionsTab.Favourites
+                        },
+                    )
+                    HorizontalDivider(thickness = 4.dp)
+                }
             }
         }
     }

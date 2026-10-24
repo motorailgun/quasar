@@ -42,6 +42,7 @@ import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurSource
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
@@ -86,6 +87,7 @@ fun PostScreen(
     onPostClick: (Post) -> Unit,
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
+    onReactionCountClick: (Post, PostActionType) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val draft by drafts.current.collectAsStateWithLifecycle()
@@ -231,6 +233,8 @@ fun PostScreen(
                                     onReply = onReply,
                                     onHashtagClick = onHashtagClick,
                                     menu = ownPostMenu,
+                                    reactionDetail = true,
+                                    onReactionCountClick = onReactionCountClick,
                                 )
                                 HorizontalDivider()
                             }

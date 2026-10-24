@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -366,6 +367,10 @@ private fun PinnedLabel(modifier: Modifier = Modifier) {
 /**
  * リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。
  * [onAction] があればブースト・お気に入り・ブックマークを、[onReply] があればリプライを押せる。
+ *
+ * @param reactionDetail ポスト詳細用の表示。ブースト・お気に入りの件数をアイコンの横に「N boosts」「M favourites」と
+ *   出し (X の一時期の詳細画面の形)、アイコンのタップは通常の操作、件数のタップは [onReactionCountClick]
+ *   (リアクションしたユーザーの一覧へ。引数は [PostActionType.Boost] か [PostActionType.Favourite])。
  */
 @Composable
 fun PostActionRow(
@@ -373,8 +378,12 @@ fun PostActionRow(
     modifier: Modifier = Modifier,
     onAction: OnPostAction? = null,
     onReply: ((Post) -> Unit)? = null,
+    reactionDetail: Boolean = false,
+    onReactionCountClick: ((PostActionType) -> Unit)? = null,
 ) {
     val viewer = post.viewer
+    // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
+    val boostEnabled = post.visibility.boostable || viewer.reblogged
     Row(
         // 押せる範囲を広げた分 (左右の余白) だけ外にはみ出させ、アイコンの位置は余白なしのときと揃える
         modifier = modifier
@@ -391,6 +400,52 @@ fun PostActionRow(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (reactionDetail) {
+            // リプライ / ブースト + 件数 / お気に入り + 件数 を左から詰めて並べ、ブックマークは右端
+            PostActionButton(
+                icon = Symbols.Outlined.Reply,
+                label = stringResource(R.string.post_replies),
+                count = post.repliesCount,
+                toggle = false,
+                onClick = onReply?.let { { it(post) } },
+            )
+            Spacer(Modifier.width(ReactionDetailGap))
+            PostActionButton(
+                icon = if (viewer.reblogged) Symbols.Filled.Repeat else Symbols.Outlined.Repeat,
+                label = stringResource(R.string.post_boosts),
+                active = viewer.reblogged,
+                activeColor = MaterialTheme.extendedColors.reblog.color,
+                enabled = boostEnabled,
+                onClick = onAction?.let { { it(post, PostActionType.Boost) } },
+            )
+            ReactionCountLabel(
+                count = post.boostsCount,
+                text = { pluralStringResource(R.plurals.post_detail_boosts, it, it) },
+                onClick = onReactionCountClick?.let { { it(PostActionType.Boost) } },
+            )
+            Spacer(Modifier.width(ReactionDetailGap))
+            PostActionButton(
+                icon = if (viewer.favourited) Symbols.Filled.Star else Symbols.Outlined.Star,
+                label = stringResource(R.string.post_reactions),
+                active = viewer.favourited,
+                activeColor = MaterialTheme.extendedColors.favourite.color,
+                onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
+            )
+            ReactionCountLabel(
+                count = post.reactionsCount,
+                text = { pluralStringResource(R.plurals.post_detail_favourites, it, it) },
+                onClick = onReactionCountClick?.let { { it(PostActionType.Favourite) } },
+            )
+            Spacer(Modifier.weight(1f))
+            PostActionButton(
+                icon = if (viewer.bookmarked) Symbols.Filled.Bookmark else Symbols.Outlined.Bookmark,
+                label = stringResource(R.string.post_bookmark),
+                active = viewer.bookmarked,
+                activeColor = MaterialTheme.colorScheme.secondary,
+                onClick = onAction?.let { { it(post, PostActionType.Bookmark) } },
+            )
+            return@Row
+        }
         // 5 個分の等幅の枠があるとして、リプライ・ブースト・お気に入りを左の 3 つ (幅の 3/5) の左端に置き、
         // ブックマークは右端。件数の桁が変わってもアイコンの位置は動かない
         Row(Modifier.fillMaxWidth(ActionGroupFraction), verticalAlignment = Alignment.CenterVertically) {
@@ -410,8 +465,7 @@ fun PostActionRow(
                     count = post.boostsCount,
                     active = viewer.reblogged,
                     activeColor = MaterialTheme.extendedColors.reblog.color,
-                    // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
-                    enabled = post.visibility.boostable || viewer.reblogged,
+                    enabled = boostEnabled,
                     onClick = onAction?.let { { it(post, PostActionType.Boost) } },
                 )
             }
@@ -436,6 +490,55 @@ fun PostActionRow(
         )
     }
 }
+
+/**
+ * 詳細表示 ([PostActionRow] の `reactionDetail`) のリアクションの件数「N boosts」(Medium・onSurfaceVariant)。[onClick] があれば押せる
+ * (リアクションしたユーザーの一覧へ)。件数は [PostActionButton] と同じく増えたら上へ、減ったら下へ入れ替わる。
+ */
+@Composable
+private fun ReactionCountLabel(
+    count: Int,
+    text: @Composable (Int) -> String,
+    onClick: (() -> Unit)?,
+) {
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(horizontal = ActionPaddingHorizontal, vertical = 4.dp),
+    ) {
+        AnimatedCount(count) { value ->
+            Text(
+                text = text(value),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** 件数の入れ替わり: 増えたら下から上へ、減ったら上から下へ。 */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AnimatedCount(count: Int, content: @Composable (Int) -> Unit) {
+    val motion = MaterialTheme.motionScheme
+    AnimatedContent(
+        targetState = count,
+        transitionSpec = {
+            val direction = if (targetState > initialState) 1 else -1
+            (slideInVertically(motion.fastSpatialSpec()) { it * direction } + fadeIn(motion.fastEffectsSpec()))
+                .togetherWith(
+                    slideOutVertically(motion.fastSpatialSpec()) { -it * direction } + fadeOut(motion.fastEffectsSpec()),
+                )
+                .using(SizeTransform(clip = false))
+        },
+        label = "postActionCount",
+    ) { value -> content(value) }
+}
+
+/** 詳細表示のアクション行の項目 (リプライ / ブースト / お気に入り) の間隔。 */
+private val ReactionDetailGap = 12.dp
 
 /** アクション行のうちリプライ・ブースト・お気に入りが占める幅の割合 (5 等分のうち 3 つ)。 */
 private const val ActionGroupFraction = 3f / 5f
@@ -553,19 +656,7 @@ private fun PostActionButton(
         )
         if (count != null) {
             Spacer(Modifier.width(4.dp))
-            AnimatedContent(
-                targetState = count,
-                transitionSpec = {
-                    // 増えたら下から上へ、減ったら上から下へ
-                    val direction = if (targetState > initialState) 1 else -1
-                    (slideInVertically(motion.fastSpatialSpec()) { it * direction } + fadeIn(motion.fastEffectsSpec()))
-                        .togetherWith(
-                            slideOutVertically(motion.fastSpatialSpec()) { -it * direction } + fadeOut(motion.fastEffectsSpec()),
-                        )
-                        .using(SizeTransform(clip = false))
-                },
-                label = "postActionCount",
-            ) { value ->
+            AnimatedCount(count) { value ->
                 Text(text = value.toString(), style = MaterialTheme.typography.labelMedium, color = color)
             }
         }

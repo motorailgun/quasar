@@ -24,6 +24,7 @@ import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
@@ -43,6 +44,9 @@ import es.aria_on_the_planet.quasar.ui.profile.ProfileScreen
 import es.aria_on_the_planet.quasar.ui.profile.ProfileViewModel
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsScreen
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsViewModel
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsScreen
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
+import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsViewModel
 import es.aria_on_the_planet.quasar.ui.settings.AnimationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.ConfirmationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettingsPage
@@ -110,6 +114,9 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
                 entry<Route.AccountReactions> { key ->
                     WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
                 }
+                entry<Route.PostReactions> { key ->
+                    WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
+                }
                 entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
                 entry<Route.Composer> { ComposerEntry(container, navigator) }
                 mediaViewerEntry(container, onBack = navigator::back)
@@ -154,6 +161,10 @@ private class BackStackNavigator(
 
     override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) {
         backStack.add(Route.AccountReactions(account.inServerId, type, posts.map { it.statusId }.distinct()))
+    }
+
+    override fun openPostReactions(post: Post, tab: PostReactionsTab) {
+        backStack.add(Route.PostReactions(post.statusId, tab))
     }
 
     override fun openComposer() {
@@ -318,6 +329,25 @@ private fun PostEntry(container: AppContainer, session: Session, key: Route.Post
         onPostClick = { post -> if (post.statusId != key.statusId) navigator.openPost(post) },
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
+        onReactionCountClick = { post, type ->
+            val tab = if (type == PostActionType.Boost) PostReactionsTab.Boosts else PostReactionsTab.Favourites
+            navigator.openPostReactions(post, tab)
+        },
+    )
+}
+
+@Composable
+private fun PostReactionsEntry(container: AppContainer, session: Session, key: Route.PostReactions, navigator: Navigator) {
+    val viewModel: PostReactionsViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { PostReactionsViewModel(session, key.statusId, container.statusRepository) }
+        },
+    )
+    PostReactionsScreen(
+        viewModel = viewModel,
+        initialTab = key.tab,
+        onBack = navigator::back,
+        onUserClick = navigator::openProfile,
     )
 }
 

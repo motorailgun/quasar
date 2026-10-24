@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
@@ -44,6 +45,8 @@ object PostDetailDefaults {
  * ポスト詳細画面の主役となるポスト。[PostCard] と同じ要素を、本文を大きく・詳細な投稿日時付きで表示する。
  *
  * @param menu 投稿者の行の右端 (公開範囲のアイコンの右) に出すもの (自分のポストのメニュー)。
+ * @param reactionDetail アクション行のブースト・お気に入りの件数を「N boosts」「M favourites」で出し、件数のタップで
+ *   [onReactionCountClick] (リアクションしたユーザーの一覧) を呼ぶ ([PostActionRow] の同名の引数)。
  */
 @Composable
 fun PostDetail(
@@ -58,6 +61,8 @@ fun PostDetail(
     onReply: ((Post) -> Unit)? = null,
     onHashtagClick: ((String) -> Unit)? = null,
     menu: (@Composable () -> Unit)? = null,
+    reactionDetail: Boolean = false,
+    onReactionCountClick: ((Post, PostActionType) -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -189,6 +194,12 @@ fun PostDetail(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
-        PostActionRow(post, onAction = onAction, onReply = onReply)
+        PostActionRow(
+            post,
+            onAction = onAction,
+            onReply = onReply,
+            reactionDetail = reactionDetail,
+            onReactionCountClick = onReactionCountClick?.let { click -> { type -> click(post, type) } },
+        )
     }
 }

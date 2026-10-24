@@ -26,6 +26,11 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     MyProfile("my-profile", R.string.gallery_my_profile, "profile.json"),
     /** 他人のプロフィール (Favourites・Bookmarks のタブは出ない)。 */
     OtherProfile("other-profile", R.string.gallery_other_profile, "profile.json"),
+    /**
+     * ポスト詳細の本体 (`reactionDetail`: 「N boosts」「M favourites」)。アイコンで操作 (手元だけ)、件数のタップで
+     * リアクションしたユーザーの一覧 (ユーザーは post-variety の投稿者)。
+     */
+    PostDetail("post-detail", R.string.gallery_post_detail, "post-variety.json"),
     ;
 
     companion object {

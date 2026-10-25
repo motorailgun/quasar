@@ -291,6 +291,8 @@ def build_fixtures(e, avatars, header, media, tall):
     quoted = st.make(carol, p("引用される投稿 :wobble_webp:"), ems("wobble_webp"))
     reply_target = st.make(alice, p("リプライ先"))
     post_variety = [
+        # 本文の空行は段落の切れ目 (</p><p>) で来る。空行として表示されるか
+        st.make(bob, p("1 段落目") + p("空行の後の 2 段落目<br>改行だけの行") + p("3 段落目")),
         st.make(alice, p("添付 4 枚"), media_attachments=[mediaj(i, u) for i, u in enumerate(media)]),
         st.make(alice, p("閲覧注意の添付 (ぼかし)"), sensitive=True,
                 media_attachments=[mediaj(10, stripes), mediaj(11, tall, 600, 900)]),

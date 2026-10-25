@@ -280,6 +280,9 @@
     <string name="settings_confirmations">確認</string>
     <string name="settings_confirmations_summary">ブースト・お気に入り・ブックマーク・自分の投稿</string>
 
+    <string name="settings_scale">大きさ</string>
+    <string name="settings_ui_scale">UI の大きさ</string>
+    <string name="settings_font_scale">文字の大きさ</string>
     <string name="settings_posts">投稿</string>
     <string name="settings_long_post_max_lines">長い投稿を折りたたむ</string>
     <string name="settings_off">オフ</string>

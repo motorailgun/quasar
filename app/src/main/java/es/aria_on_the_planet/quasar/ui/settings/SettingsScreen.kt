@@ -29,6 +29,7 @@ import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSplitSwitchIte
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSwitchItem
 import es.aria_on_the_planet.quasar.ui.navigation.Route
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** 設定を変える (`SettingsStore.launchUpdate`)。 */
@@ -98,7 +99,7 @@ fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: (
 private val LongPostMaxLinesChoices = listOf(null, 4, 6, 8, 12, 16)
 private val MaxFpsChoices = listOf(15, 30, 60, null)
 
-/** 表示: 長文の折りたたみ・ぼかし・アニメーション。 */
+/** 表示: UI・文字の倍率・長文の折りたたみ・ぼかし・アニメーション。 */
 @Composable
 fun DisplaySettingsPage(
     display: DisplaySettings,
@@ -108,6 +109,18 @@ fun DisplaySettingsPage(
 ) {
     fun updateDisplay(transform: DisplaySettings.() -> DisplaySettings) = update { it.copy(display = it.display.transform()) }
     SettingsScaffold(title = stringResource(R.string.settings_display), onBack = onBack) {
+        SettingsGroup(title = stringResource(R.string.settings_scale)) {
+            ScaleSliderItem(
+                title = stringResource(R.string.settings_ui_scale),
+                value = display.uiScale,
+                onValueChange = { value -> updateDisplay { copy(uiScale = value) } },
+            )
+            ScaleSliderItem(
+                title = stringResource(R.string.settings_font_scale),
+                value = display.fontScale,
+                onValueChange = { value -> updateDisplay { copy(fontScale = value) } },
+            )
+        }
         SettingsGroup(title = stringResource(R.string.settings_posts)) {
             SettingsChoiceItem(
                 title = stringResource(R.string.settings_long_post_max_lines),
@@ -170,6 +183,25 @@ fun DisplaySettingsPage(
         }
     }
 }
+
+/** UI・文字の倍率 ([DisplaySettings.ScaleRange] を [DisplaySettings.ScaleStep] 刻み)。 */
+@Composable
+private fun ScaleSliderItem(title: String, value: Float, onValueChange: (Float) -> Unit) {
+    val range = DisplaySettings.ScaleRange
+    val stepsPerUnit = 1 / DisplaySettings.ScaleStep
+    SettingsSliderItem(
+        title = title,
+        value = value,
+        valueRange = range,
+        steps = ((range.endInclusive - range.start) * stepsPerUnit).roundToInt() - 1,
+        valueLabel = { stringResource(R.string.settings_scale_value, formatScale(it)) },
+        onValueChange = { onValueChange((it * stepsPerUnit).roundToInt() / stepsPerUnit) },
+    )
+}
+
+/** 倍率の表記 (「x1.0」「x1.05」「x1.025」)。末尾の 0 は落とすが小数点以下は 1 桁残す。 */
+private fun formatScale(scale: Float): String =
+    "%.3f".format(Locale.ROOT, scale).trimEnd('0').let { if (it.endsWith('.')) it + "0" else it }
 
 /** アニメーション: 画像のアニメーション全体と、種類ごとのオン / オフ。 */
 @Composable

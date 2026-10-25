@@ -121,6 +121,18 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         { it.display.emojiAvatarAnimationMaxFps },
         { s, v -> s.copy(display = s.display.copy(emojiAvatarAnimationMaxFps = v)) },
     ),
+    float(
+        "ui_scale",
+        DisplaySettings.ScaleRange,
+        { it.display.uiScale },
+        { s, v -> s.copy(display = s.display.copy(uiScale = v)) },
+    ),
+    float(
+        "font_scale",
+        DisplaySettings.ScaleRange,
+        { it.display.fontScale },
+        { s, v -> s.copy(display = s.display.copy(fontScale = v)) },
+    ),
     SettingField(
         stringPreferencesKey("notification_api"),
         { it.notificationApi },

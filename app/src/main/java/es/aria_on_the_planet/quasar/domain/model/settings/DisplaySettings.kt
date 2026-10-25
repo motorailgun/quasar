@@ -34,6 +34,13 @@ data class DisplaySettings(
      * 今は APNG のみに効く (GIF / Motion WebP は Android の再生が自分でコマを進めるため)。
      */
     val emojiAvatarAnimationMaxFps: Int? = DefaultEmojiAvatarAnimationMaxFps,
+    /**
+     * アプリ全体の UI の倍率 (dp と sp の両方に掛かる)。`QuasarAppContent` が `LocalDensity` を差し替えて効かせる。
+     * Compose の外で描くもの (埋め込みの Photo Picker 等) には効かない。
+     */
+    val uiScale: Float = 1f,
+    /** 文字だけの倍率 ([uiScale] と端末の文字サイズの設定に重ねて掛かる)。 */
+    val fontScale: Float = 1f,
 ) {
     companion object {
         const val DefaultLongPostMaxLines = 8
@@ -42,5 +49,9 @@ data class DisplaySettings(
         const val MaxSurfaceBlurRadiusDp = 16f
         const val DefaultSurfaceBlurTintAlpha = 0.8f
         const val DefaultEmojiAvatarAnimationMaxFps = 30
+        /** [uiScale] / [fontScale] の範囲。 */
+        val ScaleRange = 0.75f..1.25f
+        /** 設定画面のスライダーの [uiScale] / [fontScale] の刻み。 */
+        const val ScaleStep = 0.025f
     }
 }

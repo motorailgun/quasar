@@ -303,6 +303,10 @@
     <string name="settings_confirmations">Confirmations</string>
     <string name="settings_confirmations_summary">Boost, favourite, bookmark, my posts</string>
 
+    <string name="settings_scale">Size</string>
+    <string name="settings_ui_scale">UI scale</string>
+    <string name="settings_font_scale">Text scale</string>
+    <string name="settings_scale_value" translatable="false">x%1$s</string>
     <string name="settings_posts">Posts</string>
     <string name="settings_long_post_max_lines">Collapse long posts</string>
     <string name="settings_off">Off</string>

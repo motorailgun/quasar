@@ -87,7 +87,6 @@ import es.aria_on_the_planet.quasar.ui.profile.ProfileState
 import es.aria_on_the_planet.quasar.ui.profile.ProfileTab
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsContent
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsState
-import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 
 /**
  * debug ビルドだけにあるギャラリー。固定データ (`assets/gallery/`) で本物の部品を組み立てて表示する。
@@ -96,7 +95,7 @@ import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
  * adb から開く例 (表示設定は extra で上書きできる。[GalleryExtras]):
  * ```
  * adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar/.debug.DebugGalleryActivity \
- *     --es scenario animated-emoji --ez animate_images false --ei max_fps 60
+ *     --es scenario animated-emoji --ez animate_images false --ei max_fps 60 --ef ui_scale 1.2
  * ```
  * `scenario` が無ければシナリオの一覧を出す。`--activity-clear-task` を付けないと、開いている間に別のシナリオを
  * 指定しても切り替わらない (同じ Activity への intent は「届けた」扱いになるが、Android 16 の実機では
@@ -110,15 +109,15 @@ class DebugGalleryActivity : ComponentActivity() {
         val scenario = GalleryScenario.of(intent.getStringExtra(GalleryExtras.Scenario))
         val overrides = intent.extras
         setContent {
-            QuasarAppContent(container) {
-                val settings = LocalDisplaySettings.current.overriddenBy(overrides)
+            // 表示設定の上書き (倍率を含む) は QuasarAppContent に渡す
+            QuasarAppContent(container, display = { it.overriddenBy(overrides) }) {
                 // メディアビューアはアプリ本体と同じく、ギャラリーの画面に重ねて出す
                 val backStack = rememberNavBackStack(GalleryHome)
                 val context = LocalContext.current
                 val navigator = remember(backStack) {
                     GalleryNavigator(context, backStack, onExit = ::finish)
                 }
-                CompositionLocalProvider(LocalDisplaySettings provides settings, LocalNavigator provides navigator) {
+                CompositionLocalProvider(LocalNavigator provides navigator) {
                     NavDisplay(
                         backStack = backStack,
                         onBack = navigator::back,

@@ -48,12 +48,18 @@ internal object GalleryExtras {
 
     /** 絵文字・アイコンのアニメーションの上限 (fps)。0 以下なら上限なし。 */
     const val MaxFps = "max_fps"
+
+    /** UI・文字の倍率 (`--ef ui_scale 1.2`)。 */
+    const val UiScale = "ui_scale"
+    const val FontScale = "font_scale"
 }
 
 /** [extras] で指定された項目だけ上書きする (指定の無い項目はアプリの設定のまま)。 */
 internal fun DisplaySettings.overriddenBy(extras: Bundle?): DisplaySettings {
     if (extras == null) return this
     fun flag(key: String, current: Boolean) = if (extras.containsKey(key)) extras.getBoolean(key) else current
+    fun scale(key: String, current: Float) =
+        if (extras.containsKey(key)) extras.getFloat(key).coerceIn(DisplaySettings.ScaleRange) else current
     return copy(
         animateImages = flag(GalleryExtras.AnimateImages, animateImages),
         animatePostEmojis = flag(GalleryExtras.AnimatePostEmojis, animatePostEmojis),
@@ -64,5 +70,7 @@ internal fun DisplaySettings.overriddenBy(extras: Bundle?): DisplaySettings {
         } else {
             emojiAvatarAnimationMaxFps
         },
+        uiScale = scale(GalleryExtras.UiScale, uiScale),
+        fontScale = scale(GalleryExtras.FontScale, fontScale),
     )
 }

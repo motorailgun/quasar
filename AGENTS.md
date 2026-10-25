@@ -930,6 +930,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
   `surfaceBlur` (一覧の上に浮かぶ UI の背景をぼかすか。既定オン) / `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) /
   `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`emojiAvatarAnimationMaxFps`。
+  `uiScale` (UI 全体の倍率) / `fontScale` (文字だけの倍率、`uiScale` と端末の文字サイズに重ねて掛かる)。どちらも 0.75〜1.25 を
+  0.025 刻み (`DisplaySettings.ScaleRange` / `ScaleStep`、表記は「x1.0」「x1.025」)。`QuasarAppContent` が `LocalDensity` を `Density(density * uiScale, fontScale * fontScale)` に
+  差し替えて効かせるので、Activity の作り直しは要らない。Compose の外で描くもの (埋め込みの Photo Picker) には効かない。
+  倍率ごとのレイアウトの崩れはまだ直していない (タブ・アクション行等)。
 * **操作前の確認**: `LocalActionConfirmer.current.confirm(target)` (suspend) が、設定で確認する操作ならダイアログ
   (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
@@ -1020,13 +1024,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   Android 16 の実機では、同じ Activity への intent が「届けた」扱いのまま `onNewIntent` が呼ばれなかった):
   ```
   adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.debug.DebugGalleryActivity \
-      --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60]
+      --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60] [--ef ui_scale 1.2]
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。 / post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
-  表示設定の extra (`GalleryExtras`) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし)、ビルドし直さずに比べられる。
+  表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
   APNG のデコーダもそのまま通る)。手で編集せず `python3 scripts/gallery/generate.py` で作り直す (中身は毎回同じ)。

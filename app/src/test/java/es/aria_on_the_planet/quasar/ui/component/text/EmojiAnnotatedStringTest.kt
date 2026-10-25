@@ -45,4 +45,13 @@ class EmojiAnnotatedStringTest {
         val misskey = """本文<br><br><span class="quote-inline">RE: <a href="https://m/notes/1">https://m/notes/1</a></span>"""
         assertEquals("本文", simplifyMastodonHtml(misskey))
     }
+
+    @Test
+    fun keepsBlankLineBetweenParagraphs() {
+        assertEquals("<p>a<br><br>b<br>c</p>", simplifyMastodonHtml("<p>a</p><p>b<br>c</p>"))
+        assertEquals("<p>a<br><br>b</p>", simplifyMastodonHtml("<p>a</p>\n<p class=\"x\">b</p>"))
+        // 引用のフォールバックを除いた後に残る段落は 1 つ
+        val quoted = """<p class="quote-inline">RE: <a href="https://e/@a/1">e/@a/1</a></p><p>a</p><p>b</p>"""
+        assertEquals("<p>a<br><br>b</p>", simplifyMastodonHtml(quoted))
+    }
 }

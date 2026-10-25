@@ -42,10 +42,17 @@ private val InvisibleSpanRegex = Regex("""<span class="invisible">[^<]*</span>""
 private val EllipsisSpanRegex = Regex("""<span class="ellipsis">([^<]*)</span>""")
 
 /**
+ * 段落の切れ目。`AnnotatedString.fromHtml` (`FROM_HTML_MODE_COMPACT`) は段落の間に改行を 1 つしか入れず空行が消えるので、
+ * `<br><br>` にして空行を残す (Mastodon は本文の空行で段落を分ける)。
+ */
+private val ParagraphBreakRegex = Regex("""</p>\s*<p(?:\s[^>]*)?>""")
+
+/**
  * Mastodon の HTML を表示用に整形する。
- * URL 短縮表示用の invisible / ellipsis span の処理と、引用のフォールバック段落の除去を行う。
+ * URL 短縮表示用の invisible / ellipsis span の処理、引用のフォールバック段落の除去、段落の切れ目を空行にする。
  */
 internal fun simplifyMastodonHtml(html: String): String = html
     .replace(QuoteInlineRegex, "")
     .replace(InvisibleSpanRegex, "")
     .replace(EllipsisSpanRegex, "$1…")
+    .replace(ParagraphBreakRegex, "<br><br>")

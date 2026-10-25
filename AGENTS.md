@@ -299,6 +299,8 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
 
 * `EmojiText(text: String, emojis: List<CustomEmoji>, isHtml: Boolean, ...)`
   * `isHtml = true` のとき Mastodon の HTML を `AnnotatedString.fromHtml` で変換 (リンク付き)。
+    `fromHtml` は `FROM_HTML_MODE_COMPACT` で段落の間に改行を 1 つしか入れず空行が消えるので、`simplifyMastodonHtml` が
+    段落の切れ目 (`</p><p>`) を `<br><br>` にしている (本文の空行は Mastodon では段落の切れ目になる)。
   * `:shortcode:` を `emojis` と照合し、`InlineTextContent` + Coil の `AsyncImage` で画像に置換。
   * `onLinkClick` を渡すとリンクのタップを横取りする (引数は href とリンクの文字列、未指定なら `LocalUriHandler` で開く)。
     Compose のリスナーにはリンク (href) しか渡らないので、文字列は変換後の AnnotatedString から引いている。

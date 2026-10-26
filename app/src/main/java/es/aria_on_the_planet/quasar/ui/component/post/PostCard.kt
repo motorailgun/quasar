@@ -71,9 +71,6 @@ import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
-import java.time.Duration
-import java.time.Instant
-import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
 
 object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
@@ -300,7 +297,7 @@ private fun RowScope.AuthorNameAndTime(post: Post, onAuthorClick: () -> Unit) {
     }
     Spacer(Modifier.width(8.dp))
     Text(
-        text = relativeTime(post.createdAt, LocalNow.current),
+        text = postTimeText(post.createdAt),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -673,13 +670,3 @@ private const val PressedIconScale = 0.8f
 
 /** タップでオンになったときに弾ませる最大の拡大率。 */
 private const val PopIconScale = 1.3f
-
-internal fun relativeTime(instant: Instant, now: Instant = Instant.now()): String {
-    val d = Duration.between(instant, now)
-    return when {
-        d.toMinutes() < 1 -> "${d.seconds.coerceAtLeast(0)}s"
-        d.toHours() < 1 -> "${d.toMinutes()}m"
-        d.toDays() < 1 -> "${d.toHours()}h"
-        else -> "${d.toDays()}d"
-    }
-}

@@ -400,7 +400,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
 
 ### 相対時刻の更新 (`ui/component/time/Now.kt`)
-* 「3m」等の相対時刻・投票の残り時間は `LocalNow.current` を現在時刻として計算する (`relativeTime(at, LocalNow.current)`、
+* 一覧の時刻は `postTimeText(at)` (`ui/component/post/PostTime.kt`)。1 週間未満は「3m」等の経過時間、それ以上は日付
+  (今年なら `Aug 18` / `8/18`、去年以前は `Apr 10, 2023` / `2023/04/10`)。中身は純粋関数 `relativeTime` (`PostTimeTest`)。
+* 相対時刻・投票の残り時間は `LocalNow.current` を現在時刻として計算する (`postTimeText(at)` の中、
   `timeLeft(expiresAt, LocalNow.current)`)。`Instant.now()` を直接使うと時間が経っても表示が進まない。
 * `QuasarAppContent` が `rememberTickingNow()` で `NowTickIntervalMillis` (15 秒) ごとに進めて提供する。
   前面 (STARTED) の間だけ進め、前面に戻ったら即更新する。間隔はこの定数で調整する。
@@ -1187,5 +1189,5 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   1 画面 1.4fps・0.9%、スクロール中のジャンク 0。GIF / WebP のフレームレート上限は実装しない方針 (Coil = ImageDecoder に任せる。
   上限を掛けるには再生の置き換えが要る: GIF は android-gif-drawable、WebP は Fresco の animated-webp 等が候補だった)。
   切り替えは設定画面 (Display → Animation) で確かめる。
-* **ローカライズ**: 英語・日本語。相対時刻 (`relativeTime` の 3m 等) は言語に依らず英語の略記のまま。
+* **ローカライズ**: 英語・日本語。相対時刻 (`relativeTime` の 3m 等) は言語に依らず英語の略記のまま (1 週間以上の日付は英語 / 日本語で書式を分けている)。
 * **テスト**: Composable の UI テスト・スクリーンショットテストは無い。

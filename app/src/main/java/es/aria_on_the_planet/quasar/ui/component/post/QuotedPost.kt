@@ -40,7 +40,6 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
-import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
 
 private val QuoteShape = RoundedCornerShape(16.dp)
 private val QuoteFadeHeight = 32.dp
@@ -166,7 +165,7 @@ internal fun QuoteHeader(post: Post, modifier: Modifier = Modifier) {
         )
         // 長い acct で時刻が隠れないよう別にする
         Text(
-            text = " · ${relativeTime(post.createdAt, LocalNow.current)}",
+            text = " · ${postTimeText(post.createdAt)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,

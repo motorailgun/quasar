@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.navigation
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +21,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
@@ -38,6 +40,9 @@ import es.aria_on_the_planet.quasar.ui.login.LoginScreen
 import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.openlink.OpenLinkScreen
+import es.aria_on_the_planet.quasar.ui.openlink.OpenLinkViewModel
+import es.aria_on_the_planet.quasar.ui.openlink.hashtagOfUrl
 import es.aria_on_the_planet.quasar.ui.post.PostScreen
 import es.aria_on_the_planet.quasar.ui.post.PostViewModel
 import es.aria_on_the_planet.quasar.ui.profile.ProfileScreen
@@ -55,6 +60,8 @@ import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * アプリの全画面。画面の行き来は Navigation 3 のバックスタック ([Route]) で、Activity は MainActivity 1 つ。
@@ -65,10 +72,12 @@ import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
  *   (ストリーミング・インライン再生は今までの「別の Activity を開くと止まる」と同じく止まる)。
  * * 書きかけの投稿 (`DraftStore`) はセッションごとにここで開く (どの画面から復元されても使えるように)。
  *
+ * @param externalLinks 他のアプリから「Quasar で開く」に共有された URL・`@user@domain` (`linkQueryOf`)。
+ *   ログイン中なら今の画面の上に開く。
  * @param onExit 一番下の画面で「戻る」(Activity を閉じる)。
  */
 @Composable
-fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
+fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFlow(), onExit: () -> Unit) {
     val session by container.sessionStore.session.collectAsStateWithLifecycle()
     val current = session
     val backStack = rememberNavBackStack(if (current == null) Route.Login else Route.Timeline)
@@ -84,6 +93,17 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
     }
 
     val context = LocalContext.current
+    LaunchedEffect(externalLinks) {
+        externalLinks.collect { query ->
+            if (container.sessionStore.session.value?.accessToken == null) {
+                Toast.makeText(context, R.string.open_link_not_logged_in, Toast.LENGTH_SHORT).show()
+            } else {
+                // タグのページは検索では引けないので URL から直接開く。同じものを続けて共有されたら積まない
+                val route = hashtagOfUrl(query)?.let(Route::Hashtag) ?: Route.OpenLink(query)
+                if (backStack.lastOrNull() != route) backStack.add(route)
+            }
+        }
+    }
     val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, onExit) }
     val backDamping = remember { PredictiveBackDamping() }
     val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
@@ -118,6 +138,11 @@ fun QuasarNavHost(container: AppContainer, onExit: () -> Unit) {
                     WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
                 }
                 entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
+                entry<Route.OpenLink> { key ->
+                    WithSession(current) { session ->
+                        OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
+                    }
+                }
                 entry<Route.Composer> { ComposerEntry(container, navigator) }
                 mediaViewerEntry(container, onBack = navigator::back)
                 settingsEntries(container, navigator) { backStack.add(it) }
@@ -135,6 +160,19 @@ private fun WithSession(session: Session?, content: @Composable (Session) -> Uni
 private fun NavBackStack<NavKey>.resetTo(root: Route) {
     clear()
     add(root)
+}
+
+/**
+ * [from] を [to] に置き換える ([from] が既に無ければ何もしない)。すぐ下が [to] なら [from] を外すだけ
+ * (同じキーを隣り合わせに積まない。開いていたポストを共有から開き直したとき)。
+ */
+private fun NavBackStack<NavKey>.replace(from: Route, to: Route) {
+    val index = lastIndexOf(from)
+    when {
+        index < 0 -> Unit
+        getOrNull(index - 1) == to -> removeAt(index)
+        else -> set(index, to)
+    }
 }
 
 /** [Navigator] の本体: バックスタックに積む。 */
@@ -349,6 +387,23 @@ private fun PostReactionsEntry(container: AppContainer, session: Session, key: R
         onBack = navigator::back,
         onUserClick = navigator::openProfile,
     )
+}
+
+/** 共有された URL を開く途中の画面。引けたら行き先の画面に置き換える ([onResolved])。 */
+@Composable
+private fun OpenLinkEntry(
+    container: AppContainer,
+    session: Session,
+    key: Route.OpenLink,
+    navigator: Navigator,
+    onResolved: (Route) -> Unit,
+) {
+    val viewModel: OpenLinkViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { OpenLinkViewModel(session, key.query, container.searchRepository) }
+        },
+    )
+    OpenLinkScreen(viewModel = viewModel, onBack = navigator::back, onResolved = onResolved)
 }
 
 /** 投稿画面 (単独)。投稿できたら閉じる。閉じても下書きは残す。 */

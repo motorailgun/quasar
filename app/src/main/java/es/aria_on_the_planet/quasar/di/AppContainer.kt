@@ -15,6 +15,7 @@ import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
 import es.aria_on_the_planet.quasar.data.repository.MediaRepository
 import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
+import es.aria_on_the_planet.quasar.data.repository.SearchRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SecureStorage
@@ -66,6 +67,7 @@ class AppContainer(context: Context) {
     val accountRepository = AccountRepository(api, cache)
     val statusRepository = StatusRepository(api, cache)
     val notificationRepository = NotificationRepository(api, cache)
+    val searchRepository = SearchRepository(api, cache)
 
     init {
         appScope.launch {

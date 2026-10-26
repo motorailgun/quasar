@@ -1005,6 +1005,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
 * 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
+* **動作確認用の連合環境** (`testbed/`。使い方・設定・セットアップは [docs/testbed.md](docs/testbed.md)、環境の構成は
+  [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) を立てて連合させ、bots が
+  投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れ、手元だけで
+  アプリにユーザーの CA を信頼させれば (`network_security_config`。**コミットしない**) debug ビルドからログインできる。
+  版ごとの API の違い (3.5 には v2 通知が無い等) はここで確かめる。
 * **debug / benchmark は release と別のアプリ** (`applicationIdSuffix = ".debug"` → `es.aria_on_the_planet.quasar.debug`、
   ランチャーでは「Quasar Debug」)。release を普段使いしている端末にも横に並べて入れられる (ログインは別)。
   * OAuth の戻り先のスキームも分けている (debug は `es.aria-on-the-planet.quasar.debug://oauth`)。同じスキームを 2 つのアプリが
@@ -1160,7 +1165,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## 未対応・今後の課題
 
 * **認証**: 複数アカウント無し (ログインは 1 つ)。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
-  OAuth のログインの往復 (ブラウザでの認可 → 戻り) は実機・エミュレータでまだ確認していない。
+  OAuth のログインの往復 (ブラウザでの認可 → 戻り) はエミュレータ + testbed (3.5.19) で確認済み (実機は未確認)。
   * **将来: 戻り先を App Links (検証済みの https URL) にする**。今のカスタムスキーム (`es.aria-on-the-planet.quasar://oauth`) は
     他のアプリが同じスキームを登録すると戻りを横取りされうる (PKCE があるので盗まれたコードはトークンにできないが、
     横取り自体は防げない。RFC 8252 7.2)。管理するドメインに `/.well-known/assetlinks.json` (パッケージ名 + 署名の

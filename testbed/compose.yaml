@@ -1,0 +1,208 @@
+# Quasar の動作確認用の連合環境。直接 up せず ./testbed.sh を使う (初期化の順番があるため)。
+#
+#   alpha.quasar.test   Mastodon nightly (latest alpha)
+#   stable.quasar.test  Mastodon latest stable
+#   legacy.quasar.test  Mastodon 3.5.19
+#
+# Mastodon と Postgres / Redis / bots は外に出られない internal ネットワークだけに繋ぐ。
+# proxy (nginx) だけが外向きのネットワークにも繋がり、3 つのドメインの別名を持って TLS を終端する。
+name: quasar-testbed
+
+x-mastodon-env: &mastodon-env
+  RAILS_ENV: production
+  NODE_ENV: production
+  RAILS_SERVE_STATIC_FILES: "true"
+  RAILS_LOG_LEVEL: warn
+  BIND: 0.0.0.0
+  DB_HOST: db
+  DB_PORT: "5432"
+  ES_ENABLED: "false"
+  SMTP_DELIVERY_METHOD: test
+  # 連合先はすべてこのネットワーク内 (プライベートアドレス) にいる
+  ALLOWED_PRIVATE_ADDRESSES: 172.31.89.0/24
+  # 自前の CA を信頼させる (Ruby / Node とも OpenSSL がこれを読む)
+  SSL_CERT_FILE: /testbed/state/certs/ca-bundle.crt
+  NODE_EXTRA_CA_CERTS: /testbed/state/certs/ca.crt
+  WEB_CONCURRENCY: "1"
+  MAX_THREADS: "5"
+  STREAMING_CLUSTER_NUM: "1"
+
+x-mastodon-volumes: &mastodon-volumes
+  - ./state:/testbed/state:ro
+  - ./mastodon:/testbed/mastodon:ro
+
+x-alpha: &alpha
+  image: ghcr.io/mastodon/mastodon:${ALPHA_TAG}
+  env_file: [{ path: ./state/secrets/alpha.env, required: false }]
+  environment:
+    <<: *mastodon-env
+    LOCAL_DOMAIN: alpha.quasar.test
+    DB_NAME: mastodon_alpha
+    DB_USER: mastodon_alpha
+    REDIS_HOST: alpha-redis
+  networks: [fediverse]
+  restart: unless-stopped
+  depends_on: { db: { condition: service_healthy }, alpha-redis: { condition: service_healthy } }
+
+x-stable: &stable
+  image: ghcr.io/mastodon/mastodon:${STABLE_TAG}
+  env_file: [{ path: ./state/secrets/stable.env, required: false }]
+  environment:
+    <<: *mastodon-env
+    LOCAL_DOMAIN: stable.quasar.test
+    DB_NAME: mastodon_stable
+    DB_USER: mastodon_stable
+    REDIS_HOST: stable-redis
+  networks: [fediverse]
+  restart: unless-stopped
+  depends_on: { db: { condition: service_healthy }, stable-redis: { condition: service_healthy } }
+
+x-legacy: &legacy
+  image: ghcr.io/mastodon/mastodon:${LEGACY_TAG}
+  env_file: [{ path: ./state/secrets/legacy.env, required: false }]
+  environment:
+    <<: *mastodon-env
+    LOCAL_DOMAIN: legacy.quasar.test
+    DB_NAME: mastodon_legacy
+    DB_USER: mastodon_legacy
+    REDIS_HOST: legacy-redis
+  networks: [fediverse]
+  restart: unless-stopped
+  depends_on: { db: { condition: service_healthy }, legacy-redis: { condition: service_healthy } }
+
+x-redis: &redis
+  image: redis:7.4-alpine
+  networks: [fediverse]
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+
+x-web-healthcheck: &web-healthcheck
+  test: ["CMD-SHELL", "wget -q --spider --proxy=off localhost:3000/health || curl -sf --noproxy localhost localhost:3000/health || exit 1"]
+  interval: 10s
+  start_period: 60s
+
+services:
+  # state/ (CA・証明書・秘密の値) を作る。testbed.sh が最初に 1 回だけ走らせる
+  init:
+    build: ./init
+    profiles: [tools]
+    network_mode: none
+    volumes: [./state:/state]
+
+  db:
+    image: postgres:16-alpine
+    env_file: [{ path: ./state/secrets/postgres.env, required: false }]
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+      - ./state:/testbed/state:ro
+    networks: [fediverse]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+
+  alpha-redis: *redis
+  stable-redis: *redis
+  legacy-redis: *redis
+
+  alpha-web:
+    <<: *alpha
+    command: bundle exec puma -C config/puma.rb
+    volumes: [alpha-system:/opt/mastodon/public/system, ./state:/testbed/state:ro, ./mastodon:/testbed/mastodon:ro]
+    healthcheck: *web-healthcheck
+  alpha-sidekiq:
+    <<: *alpha
+    command: bundle exec sidekiq
+    volumes: [alpha-system:/opt/mastodon/public/system, ./state:/testbed/state:ro, ./mastodon:/testbed/mastodon:ro]
+  alpha-streaming:
+    <<: *alpha
+    image: ghcr.io/mastodon/mastodon-streaming:${ALPHA_TAG}
+    volumes: *mastodon-volumes
+
+  stable-web:
+    <<: *stable
+    command: bundle exec puma -C config/puma.rb
+    volumes: [stable-system:/opt/mastodon/public/system, ./state:/testbed/state:ro, ./mastodon:/testbed/mastodon:ro]
+    healthcheck: *web-healthcheck
+  stable-sidekiq:
+    <<: *stable
+    command: bundle exec sidekiq
+    volumes: [stable-system:/opt/mastodon/public/system, ./state:/testbed/state:ro, ./mastodon:/testbed/mastodon:ro]
+  stable-streaming:
+    <<: *stable
+    image: ghcr.io/mastodon/mastodon-streaming:${STABLE_TAG}
+    volumes: *mastodon-volumes
+
+  # 3.5 は Web とストリーミングが同じイメージ
+  legacy-web:
+    <<: *legacy
+    command: bundle exec puma -C config/puma.rb
+    volumes: [legacy-system:/opt/mastodon/public/system, ./state:/testbed/state:ro, ./mastodon:/testbed/mastodon:ro]
+    healthcheck: *web-healthcheck
+  legacy-sidekiq:
+    <<: *legacy
+    command: bundle exec sidekiq
+    volumes: [legacy-system:/opt/mastodon/public/system, ./state:/testbed/state:ro, ./mastodon:/testbed/mastodon:ro]
+  legacy-streaming:
+    <<: *legacy
+    command: node ./streaming
+    volumes: *mastodon-volumes
+
+  proxy:
+    image: nginx:1.29-alpine
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./state:/testbed/state:ro
+    networks:
+      fediverse:
+        ipv4_address: 172.31.89.10
+        aliases: [alpha.quasar.test, stable.quasar.test, legacy.quasar.test]
+      edge: {}
+    ports:
+      - "${TESTBED_BIND:-127.0.0.1}:${TESTBED_HTTPS_PORT:-443}:443"
+    restart: unless-stopped
+
+  # 端末用の DNS (README「端末から繋ぐ」)。エミュレーターは -dns-server 127.0.0.1 で使う
+  dns:
+    image: alpine:3.22
+    command: >-
+      sh -c "apk add --no-cache dnsmasq >/dev/null &&
+      exec dnsmasq -k -C /etc/dnsmasq.d/testbed.conf --address=/quasar.test/${DEVICE_HOST_ADDR:-10.0.2.2}"
+    volumes: [./dns/dnsmasq.conf:/etc/dnsmasq.d/testbed.conf:ro]
+    networks: [edge]
+    ports:
+      - "${TESTBED_BIND:-127.0.0.1}:53:53/udp"
+      - "${TESTBED_BIND:-127.0.0.1}:53:53/tcp"
+    restart: unless-stopped
+
+  # 10 アカウント x 3 サーバで投稿・リアクションし合う。./testbed.sh bots start で動かす
+  bots:
+    image: python:3.13-alpine
+    profiles: [bots]
+    working_dir: /bots
+    command: python -u bots.py run
+    environment:
+      SSL_CERT_FILE: /testbed/state/certs/ca-bundle.crt
+      PYTHONDONTWRITEBYTECODE: "1"
+      BOT_INTERVAL: ${BOT_INTERVAL:-12}
+    volumes:
+      - ./bots:/bots:ro
+      - ./state:/testbed/state:ro
+    networks: [fediverse]
+    restart: unless-stopped
+
+networks:
+  fediverse:
+    internal: true
+    ipam:
+      config: [{ subnet: 172.31.89.0/24 }]
+  edge: {}
+
+volumes:
+  db:
+  alpha-system:
+  stable-system:
+  legacy-system:

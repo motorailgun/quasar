@@ -65,6 +65,14 @@ data class StatusTagDto(
     val url: String = "",
 )
 
+/** https://docs.joinmastodon.org/entities/Search/ (ハッシュタグは名前と URL だけ使う) */
+@Serializable
+data class SearchResultsDto(
+    val accounts: List<AccountDto> = emptyList(),
+    val statuses: List<StatusDto> = emptyList(),
+    val hashtags: List<StatusTagDto> = emptyList(),
+)
+
 /** Status.application: https://docs.joinmastodon.org/entities/Status/#application */
 @Serializable
 data class ApplicationDto(

@@ -33,10 +33,24 @@
                     android:scheme="${oauthRedirectScheme}" />
             </intent-filter>
         </activity>
+        <!-- 他のアプリから共有された URL を開く (ui/openlink/OpenLink.kt)。共有シートで「投稿」とは別の項目として出る。
+             MainActivity (singleTask) で受けるので、Quasar のタスクで開く。名前は isOpenLinkShare と合わせる -->
+        <activity-alias
+            android:name=".OpenLink"
+            android:exported="true"
+            android:label="@string/share_target_open"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
         <!-- 他のアプリからの共有 (ui/share/ShareActivity)。共有元のタスクに積み、投稿したら共有元に戻る -->
         <activity
             android:name=".ui.share.ShareActivity"
             android:exported="true"
+            android:label="@string/share_target_post"
             android:taskAffinity=""
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

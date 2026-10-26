@@ -342,4 +342,13 @@
     <plurals name="share_media_skipped">
         <item quantity="other">%1$d 件のファイルを添付できませんでした</item>
     </plurals>
+    <string name="share_target_post">Quasar で投稿</string>
+    <string name="share_target_open">Quasar で開く</string>
+    <string name="open_link_title">リンクを開く</string>
+    <string name="open_link_not_found">サーバーで見つかりませんでした。非公開か、相手のサーバーに接続できない可能性があります。</string>
+    <string name="open_link_failed">リンクを開けませんでした: %1$s</string>
+    <string name="open_link_retry">再試行</string>
+    <string name="open_link_open_in_browser">ブラウザで開く</string>
+    <string name="open_link_no_link">開けるリンクがありません。</string>
+    <string name="open_link_not_logged_in">Quasar でリンクを開くにはログインしてください。</string>
 </resources>

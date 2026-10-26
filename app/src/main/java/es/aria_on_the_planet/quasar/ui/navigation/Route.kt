@@ -43,6 +43,12 @@ sealed interface Route : NavKey {
     /** ポストをブースト / お気に入りにしたユーザーの一覧。[statusId] はブーストなら中身の ID。 */
     @Serializable data class PostReactions(val statusId: String, val tab: PostReactionsTab) : Route
 
+    /**
+     * 他のアプリから共有された URL・`@user@domain` ([query]) を接続中サーバで引いている途中。引けたら行き先の画面
+     * (ポスト・プロフィール・ハッシュタグ) に置き換わる。
+     */
+    @Serializable data class OpenLink(val query: String) : Route
+
     /** 投稿画面 (クイック投稿バーの無い画面からの返信用)。下書きは共有。 */
     @Serializable data object Composer : Route
 

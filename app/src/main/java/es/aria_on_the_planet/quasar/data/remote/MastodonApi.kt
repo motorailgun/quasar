@@ -11,6 +11,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RegisteredAppDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
+import es.aria_on_the_planet.quasar.data.remote.dto.SearchResultsDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusSourceDto
 import es.aria_on_the_planet.quasar.data.remote.dto.TokenDto
@@ -363,6 +364,22 @@ class MastodonApi(
             .build()
         val (items, headers) = executeWithHeaders<List<StatusDto>>(Request.Builder().url(url), accessToken)
         return LinkedPage(items, nextMaxIdFromLinkHeader(headers["Link"]))
+    }
+
+    /**
+     * https://docs.joinmastodon.org/methods/search/#v2 (`resolve` は要認証)。
+     * [resolve] なら、URL・`user@domain` で接続中サーバがまだ知らないものを ActivityPub / WebFinger で取りに行く。
+     */
+    suspend fun search(
+        serverUrl: String,
+        accessToken: String,
+        query: String,
+        resolve: Boolean,
+        limit: Int,
+    ): SearchResultsDto = get(serverUrl, accessToken, "api/v2/search") {
+        addQueryParameter("q", query)
+        addQueryParameter("resolve", resolve.toString())
+        addQueryParameter("limit", limit.toString())
     }
 
     /** https://docs.joinmastodon.org/methods/accounts/#relationships (要認証) */

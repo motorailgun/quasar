@@ -41,7 +41,7 @@ es.aria_on_the_planet.quasar
 │   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
 │   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
-│                                   MediaRepository
+│                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
 │                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag)
 └── ui/
@@ -97,7 +97,8 @@ es.aria_on_the_planet.quasar
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
     ├── reactions/                  通知のユーザー単位のまとめの中身 (AccountReactionsScreen / ViewModel) /
     │                               ポストをブースト・お気に入りにしたユーザーの一覧 (PostReactionsScreen / ViewModel)
-    └── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
+    ├── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
+    └── openlink/                   共有された URL を開く (OpenLink = intent・文字列の解釈 / OpenLinkScreen / ViewModel)
 ```
 
 レイヤ依存は `ui → domain ← data` の一方向。UI は DTO を直接触らない。
@@ -269,6 +270,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (認証不要。`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
+| URL・`@user@domain` を引く | `GET /api/v2/search?q=...&resolve=true&limit=1` (`resolve` は要認証。サーバが知らなければ AP / WebFinger で取りに行く。`SearchRepository.resolve`) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 | OAuth クライアントの登録 | `POST /api/v1/apps` (ログインのたびに登録) |
 | 認可 / トークン / 無効化 | `GET /oauth/authorize` (ブラウザ) / `POST /oauth/token` (PKCE) / `POST /oauth/revoke` (ログアウト時) |
@@ -828,6 +830,17 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 確認: `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "hello" -n <pkg>/es.aria_on_the_planet.quasar.ui.share.ShareActivity`。
     adb から渡した `content://` は shell の権限なので読めない (メディアの経路は実際のアプリから共有して確かめる)。
   * 未実装: Direct Share (共有シートのおすすめ)、音声の共有、共有した下書きを `DraftStore` に移して後で続ける。
+* **共有された URL を開く** (`ui/openlink/`): 共有シートに「Quasar で開く」(manifest の `<activity-alias android:name=".OpenLink">`、
+  MainActivity の別名) を「Quasar で投稿」(`ShareActivity`) と別の項目として出す (Instagram の「ストーリーズ / フィード」と同じ仕組み)。
+  * 受けるのは MainActivity (singleTask) なので Quasar のタスクで開き、「戻る」は元の画面 (タイムライン等) に戻る。別名で
+    来たかは `intent.component` のクラス名 (`isOpenLinkShare`)。`text/plain` は URL かどうかで絞れないので、URL の無い共有でも
+    項目は出る (開くものが無ければ Toast)。
+  * 開く対象は純粋関数 `linkQueryOf` (`OpenLinkTest`): `EXTRA_TEXT` → `EXTRA_SUBJECT` の順で最初の http(s) の URL、無ければ
+    `@user@domain`。タグのページ (`/tags/名前`・`/tag/名前`) は検索で引けないので `hashtagOfUrl` で直接 `Route.Hashtag`。
+  * それ以外は `Route.OpenLink(query)` を積み、`/api/v2/search` (`resolve=true`) で引けたら自分を `Route.Post` / `Route.Profile` /
+    `Route.Hashtag` に置き換える (すぐ下が同じ画面なら外すだけ)。見つからない・失敗はその画面で理由 + ブラウザで開く (+ 再試行)。
+  * MainActivity → `QuasarNavHost(externalLinks)` は Channel (画面ができる前に受けた分も溜まる)。未ログインなら Toast。
+  * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
 * **未実装**: 下書き保存、
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。

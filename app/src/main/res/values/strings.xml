@@ -370,4 +370,13 @@
         <item quantity="one">%1$d file couldn\'t be attached</item>
         <item quantity="other">%1$d files couldn\'t be attached</item>
     </plurals>
+    <string name="share_target_post">Post on Quasar</string>
+    <string name="share_target_open">Open in Quasar</string>
+    <string name="open_link_title">Open link</string>
+    <string name="open_link_not_found">Couldn\'t find this on your server. It may be private or the server may be unreachable.</string>
+    <string name="open_link_failed">Couldn\'t open the link: %1$s</string>
+    <string name="open_link_retry">Retry</string>
+    <string name="open_link_open_in_browser">Open in browser</string>
+    <string name="open_link_no_link">There\'s no link to open.</string>
+    <string name="open_link_not_logged_in">Log in to open links in Quasar.</string>
 </resources>

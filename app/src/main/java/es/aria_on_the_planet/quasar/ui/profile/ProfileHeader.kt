@@ -219,7 +219,6 @@ fun ProfileHeader(
 
             followRequest()
         }
-        HorizontalDivider()
     }
 }
 

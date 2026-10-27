@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.debug
 import android.os.Bundle
 import androidx.annotation.StringRes
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 
 /**
@@ -57,6 +58,9 @@ internal object GalleryExtras {
 
     /** 長文の折りたたみの行数 (`--ei long_post_max_lines 3`)。0 以下なら折りたたまない。 */
     const val LongPostMaxLines = "long_post_max_lines"
+
+    /** アイコンの形 (`--es avatar_shape RoundedSquare`。`AvatarShape` の名前)。 */
+    const val AvatarShape = "avatar_shape"
 }
 
 /** [extras] で指定された項目だけ上書きする (指定の無い項目はアプリの設定のまま)。 */
@@ -82,5 +86,8 @@ internal fun DisplaySettings.overriddenBy(extras: Bundle?): DisplaySettings {
         } else {
             longPostMaxLines
         },
+        avatarShape = extras.getString(GalleryExtras.AvatarShape)
+            ?.let { name -> AvatarShape.entries.firstOrNull { it.name == name } }
+            ?: avatarShape,
     )
 }

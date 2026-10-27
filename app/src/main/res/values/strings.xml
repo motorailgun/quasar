@@ -314,7 +314,7 @@
     <!-- 設定 -->
     <string name="settings">Settings</string>
     <string name="settings_display">Display</string>
-    <string name="settings_display_summary">Long posts, blur, animation</string>
+    <string name="settings_display_summary">Long posts, avatar shape, blur, animation</string>
     <string name="settings_timelines">Timelines</string>
     <string name="settings_timelines_summary">Auto-update, notifications</string>
     <string name="settings_posting">Posting</string>
@@ -333,6 +333,10 @@
         <item quantity="one">After %d line</item>
         <item quantity="other">After %d lines</item>
     </plurals>
+    <string name="settings_avatars">Avatars</string>
+    <string name="settings_avatar_shape">Avatar shape</string>
+    <string name="settings_avatar_shape_circle">Circle</string>
+    <string name="settings_avatar_shape_rounded_square">Rounded square</string>
     <string name="settings_blur">Blur</string>
     <string name="settings_blur_enabled">Blur behind floating bars</string>
     <string name="settings_blur_enabled_summary">Always off while Battery Saver is on</string>

@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
@@ -98,8 +99,9 @@ fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: (
 
 private val LongPostMaxLinesChoices = listOf(null, 4, 6, 8, 12, 16)
 private val MaxFpsChoices = listOf(15, 30, 60, null)
+private val AvatarShapeChoices = AvatarShape.entries
 
-/** 表示: UI・文字の倍率・長文の折りたたみ・ぼかし・アニメーション。 */
+/** 表示: UI・文字の倍率・長文の折りたたみ・アイコンの形・ぼかし・アニメーション。 */
 @Composable
 fun DisplaySettingsPage(
     display: DisplaySettings,
@@ -131,6 +133,22 @@ fun DisplaySettingsPage(
                     else pluralStringResource(R.plurals.settings_lines, lines, lines)
                 },
                 onSelect = { updateDisplay { copy(longPostMaxLines = it) } },
+            )
+        }
+        SettingsGroup(title = stringResource(R.string.settings_avatars)) {
+            SettingsChoiceItem(
+                title = stringResource(R.string.settings_avatar_shape),
+                options = AvatarShapeChoices,
+                selected = display.avatarShape,
+                label = { shape ->
+                    stringResource(
+                        when (shape) {
+                            AvatarShape.Circle -> R.string.settings_avatar_shape_circle
+                            AvatarShape.RoundedSquare -> R.string.settings_avatar_shape_rounded_square
+                        },
+                    )
+                },
+                onSelect = { updateDisplay { copy(avatarShape = it) } },
             )
         }
         SettingsGroup(title = stringResource(R.string.settings_blur)) {

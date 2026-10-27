@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
@@ -34,6 +35,7 @@ class SettingsPreferencesTest {
             emojiAvatarAnimationMaxFps = null,
             uiScale = 1.25f,
             fontScale = 0.9f,
+            avatarShape = AvatarShape.RoundedSquare,
         ),
         notificationApi = NotificationApi.Ungrouped,
         streaming = StreamingSettings(home = false, notifications = false, local = false, global = true),
@@ -98,6 +100,7 @@ class SettingsPreferencesTest {
     fun unreadableValuesFallBackToDefaultsPerField() {
         val prefs = mutablePreferencesOf(
             stringPreferencesKey("notification_api") to "Something",
+            stringPreferencesKey("avatar_shape") to "Hexagon",
             stringPreferencesKey("default_visibility") to "Direct",
             intPreferencesKey("long_post_max_lines") to -3,
             floatPreferencesKey("surface_blur_tint_alpha") to 3f,

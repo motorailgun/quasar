@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -78,6 +79,7 @@ import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
+import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
 
 object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
@@ -238,8 +240,9 @@ private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Bool
     }
 }
 
+/** ユーザーのアイコン。[shape] は既定で設定のアイコンの形 ([avatarShape])。 */
 @Composable
-fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
+fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp, shape: Shape = avatarShape()) {
     RemoteImage(
         url = user.iconUrl,
         staticUrl = user.iconStaticUrl,
@@ -247,7 +250,7 @@ fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp) {
         contentDescription = user.screenName,
         modifier = modifier
             .size(size)
-            .clip(CircleShape),
+            .clip(shape),
     )
 }
 

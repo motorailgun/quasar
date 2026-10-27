@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
@@ -132,6 +133,13 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         DisplaySettings.ScaleRange,
         { it.display.fontScale },
         { s, v -> s.copy(display = s.display.copy(fontScale = v)) },
+    ),
+    SettingField(
+        stringPreferencesKey("avatar_shape"),
+        { it.display.avatarShape },
+        { s, v -> s.copy(display = s.display.copy(avatarShape = v)) },
+        encode = { it.name },
+        decode = { stored -> enumOrNull<AvatarShape>(stored)?.let(::Decoded) },
     ),
     SettingField(
         stringPreferencesKey("notification_api"),

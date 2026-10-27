@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,6 +20,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
 
 private const val MaxIcons = 3
 private const val MaxNames = 2
@@ -41,7 +41,7 @@ fun FollowersYouFollow(users: List<User>, modifier: Modifier = Modifier) {
                     Modifier
                         .offset(x = IconOverlapStep * index)
                         .zIndex((icons.size - index).toFloat())
-                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .background(MaterialTheme.colorScheme.surface, avatarShape(ring = IconRing))
                         .padding(IconRing),
                 ) {
                     UserIcon(user = user, size = IconSize)

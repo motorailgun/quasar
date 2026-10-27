@@ -41,6 +41,8 @@ data class DisplaySettings(
     val uiScale: Float = 1f,
     /** 文字だけの倍率 ([uiScale] と端末の文字サイズの設定に重ねて掛かる)。 */
     val fontScale: Float = 1f,
+    /** ユーザーのアイコンの切り取りの形。 */
+    val avatarShape: AvatarShape = AvatarShape.Circle,
 ) {
     companion object {
         const val DefaultLongPostMaxLines = 8
@@ -55,3 +57,6 @@ data class DisplaySettings(
         const val ScaleStep = 0.025f
     }
 }
+
+/** ユーザーのアイコンの切り取りの形。描くときの形は `ui/component/user/AvatarShape.kt`。 */
+enum class AvatarShape { Circle, RoundedSquare }

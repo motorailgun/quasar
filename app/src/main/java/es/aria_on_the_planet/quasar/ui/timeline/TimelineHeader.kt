@@ -140,6 +140,8 @@ private fun AccountButton(
             UserIcon(
                 user = account,
                 size = AccountIconSize,
+                // ヘッダのアイコンは設定のアイコンの形に関わらず円
+                shape = CircleShape,
                 modifier = Modifier
                     // 影は凸形 (円) で付ける。凹みのある形の影は RenderThread での計算が非常に重い (AGENTS.md)
                     .shadow(HeaderShadowElevation, CircleShape)

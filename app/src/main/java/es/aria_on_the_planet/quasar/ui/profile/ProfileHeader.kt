@@ -82,7 +82,7 @@ private val AvatarRing = 4.dp
 /**
  * プロフィール上部 (ヘッダ画像・アイコン・名前・bio・フィールド・統計)。
  *
- * @param relationship 相手との関係。@acct の横に「Follows you」等を出す。未ログイン・取得前は `null`。
+ * @param relationship 相手との関係。@acct の横に「Follows you」等を出す。取得前・失敗時は `null`。
  * @param actions アイコンの右 (ヘッダ画像の下) に置くボタン (フォロー / プロフィール編集)。
  * @param onFollowingClick / [onFollowersClick] 統計のフォロー数・フォロワー数のタップ (一覧を開く)。
  * @param onOpenImage アイコン・ヘッダ画像のタップ (メディアビューアを開く)。`null` ならタップできない。

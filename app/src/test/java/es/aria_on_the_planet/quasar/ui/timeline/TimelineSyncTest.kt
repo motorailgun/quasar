@@ -267,36 +267,32 @@ class TimelineSyncTest {
     // --- ストリームとカラムの対応 ---------------------------------------------------------------
 
     @Test
-    fun streamChannelsFollowAvailableColumns() {
-        val all = ColumnType.entries
+    fun streamChannelsForColumns() {
         val defaults = StreamingSettings()
-        assertEquals(setOf(StreamChannel.User, StreamChannel.Local), streamChannelsFor(all, defaults))
+        assertEquals(setOf(StreamChannel.User, StreamChannel.Local), streamChannelsFor(defaults))
         assertEquals(
             setOf(StreamChannel.User, StreamChannel.Local, StreamChannel.Public),
-            streamChannelsFor(all, defaults.copy(global = true)),
+            streamChannelsFor(defaults.copy(global = true)),
         )
-        // 未ログイン (Home・通知なし)
-        assertEquals(setOf(StreamChannel.Local), streamChannelsFor(listOf(ColumnType.Local, ColumnType.Global), defaults))
         assertEquals(TimelineType.Home, StreamChannel.User.timelineType)
     }
 
     @Test
     fun streamChannelsFollowSettings() {
-        val all = ColumnType.entries
         // Home と通知のどちらかがオンなら user を購読する
-        assertEquals(setOf(StreamChannel.User), streamChannelsFor(all, StreamingSettings(home = false, local = false)))
-        assertEquals(setOf(StreamChannel.User), streamChannelsFor(all, StreamingSettings(notifications = false, local = false)))
+        assertEquals(setOf(StreamChannel.User), streamChannelsFor(StreamingSettings(home = false, local = false)))
+        assertEquals(setOf(StreamChannel.User), streamChannelsFor(StreamingSettings(notifications = false, local = false)))
         assertEquals(
             setOf(StreamChannel.Local),
-            streamChannelsFor(all, StreamingSettings(home = false, notifications = false)),
+            streamChannelsFor(StreamingSettings(home = false, notifications = false)),
         )
         assertEquals(
             emptySet<StreamChannel>(),
-            streamChannelsFor(all, StreamingSettings(home = false, notifications = false, local = false)),
+            streamChannelsFor(StreamingSettings(home = false, notifications = false, local = false)),
         )
         assertEquals(
             setOf(TimelineType.Local, TimelineType.Global),
-            streamedTimelinesFor(all, StreamingSettings(home = false, global = true)),
+            streamedTimelinesFor(StreamingSettings(home = false, global = true)),
         )
     }
 

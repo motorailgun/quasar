@@ -16,7 +16,7 @@ sealed interface Route : NavKey {
     /** メイン画面 (タイムライン)。ログイン中のルート。 */
     @Serializable data object Timeline : Route
 
-    /** ログイン (サーバ URL + トークン)。ログインしていないときのルート。 */
+    /** ログイン (サーバを入力して OAuth)。ログインしていないときのルート。 */
     @Serializable data object Login : Route
 
     /** プロフィール。[accountId] は接続中サーバ内の ID。 */

@@ -149,11 +149,10 @@ class OAuthLogin(
         val session = sessionStore.session.value
         val client = sessionStore.client
         sessionStore.clear()
-        val token = session?.accessToken ?: return
-        client ?: return
+        if (session == null || client == null) return
         scope.launch {
             try {
-                api.revokeToken(session.serverUrl, client.clientId, client.clientSecret, token)
+                api.revokeToken(session.serverUrl, client.clientId, client.clientSecret, session.accessToken)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

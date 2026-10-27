@@ -51,7 +51,6 @@ enum class ColumnType(val timeline: TimelineType?) {
 
 data class TimelineScreenState(
     val selected: ColumnType,
-    val available: List<ColumnType>,
     val timelines: Map<TimelineType, PostFeedState>,
     val notifications: FeedState<NotificationEntry>,
 ) {
@@ -74,15 +73,7 @@ class TimelineViewModel(
     private val settings: Flow<AppSettings>,
 ) : ViewModel() {
 
-    /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
-    val canInteract: Boolean = session.accessToken != null
-
-    /** Home と通知はログイン時のみ。 */
-    private val available = ColumnType.entries.filter {
-        session.accessToken != null || (it != ColumnType.Home && it != ColumnType.Notifications)
-    }
-
-    private val feeds: Map<TimelineType, PostFeed> = available.mapNotNull { it.timeline }.associateWith { type ->
+    private val feeds: Map<TimelineType, PostFeed> = ColumnType.entries.mapNotNull { it.timeline }.associateWith { type ->
         PostFeed(viewModelScope) { maxId -> repository.fetch(session, type, maxId) }
     }
 
@@ -98,7 +89,7 @@ class TimelineViewModel(
 
     private suspend fun notificationApi(): NotificationApi = settings.first().notificationApi
 
-    private val selected = MutableStateFlow(available.first())
+    private val selected = MutableStateFlow(ColumnType.Home)
 
     val state: StateFlow<TimelineScreenState> = combine(
         listOf(selected, notifications.state) + feeds.values.map { it.state },
@@ -106,7 +97,6 @@ class TimelineViewModel(
         @Suppress("UNCHECKED_CAST")
         TimelineScreenState(
             selected = values[0] as ColumnType,
-            available = available,
             timelines = feeds.keys.zip(values.drop(2).map { it as PostFeedState }).toMap(),
             notifications = values[1] as FeedState<NotificationEntry>,
         )
@@ -147,10 +137,8 @@ class TimelineViewModel(
     private fun syncFor(streaming: StreamingSettings, notificationApi: NotificationApi) = TimelineSync(
         scope = viewModelScope,
         timelines = feeds,
-        streamedTimelines = streamedTimelinesFor(available, streaming).filterTo(HashSet()) { it in feeds },
-        notifications = notifications.takeIf {
-            ColumnType.Notifications in available && streaming.isEnabled(ColumnType.Notifications)
-        },
+        streamedTimelines = streamedTimelinesFor(streaming),
+        notifications = notifications.takeIf { streaming.isEnabled(ColumnType.Notifications) },
         fetchPosts = { type, maxId, sinceId -> repository.fetch(session, type, maxId = maxId, sinceId = sinceId) },
         fetchNewerNotifications = { sinceId -> notificationRepository.fetch(session, notificationApi, sinceId = sinceId) },
         toGroup = { notificationRepository.toGroup(it, notificationApi) },
@@ -168,7 +156,7 @@ class TimelineViewModel(
      */
     suspend fun stream() {
         settings.map { it.streaming to it.notificationApi }.distinctUntilChanged().collectLatest { (streaming, api) ->
-            val channels = streamChannelsFor(available, streaming)
+            val channels = streamChannelsFor(streaming)
             if (channels.isEmpty()) return@collectLatest
             val sync = syncFor(streaming, api)
             streamingClient.events(session, channels).collect(sync::handle)
@@ -213,7 +201,6 @@ class TimelineViewModel(
 
     private fun snapshot() = TimelineScreenState(
         selected = selected.value,
-        available = available,
         timelines = feeds.mapValues { it.value.state.value },
         notifications = notifications.state.value,
     )

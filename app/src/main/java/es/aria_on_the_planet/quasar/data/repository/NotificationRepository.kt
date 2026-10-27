@@ -19,23 +19,22 @@ class NotificationRepository(
     private val mastodonApi: MastodonApi,
     private val cache: EntityCache,
 ) {
-    /** [maxId] より古い (または [sinceId] より新しい) 通知を [api] で取得する。要ログイン。 */
+    /** [maxId] より古い (または [sinceId] より新しい) 通知を [api] で取得する。 */
     suspend fun fetch(
         session: Session,
         api: NotificationApi,
         maxId: String? = null,
         sinceId: String? = null,
     ): List<NotificationGroup> {
-        val token = requireNotNull(session.accessToken) { "Notifications require login" }
         val version = cache.issue()
         return when (api) {
             NotificationApi.Grouped -> {
-                val results = mastodonApi.groupedNotifications(session.serverUrl, token, maxId, sinceId = sinceId)
+                val results = mastodonApi.groupedNotifications(session.serverUrl, session.accessToken, maxId, sinceId = sinceId)
                 cache.putStatuses(results.statuses, version, results.accounts)
                 results.toDomain()
             }
             NotificationApi.Ungrouped -> {
-                val notifications = mastodonApi.notifications(session.serverUrl, token, maxId, sinceId = sinceId)
+                val notifications = mastodonApi.notifications(session.serverUrl, session.accessToken, maxId, sinceId = sinceId)
                 cache.putStatuses(notifications.mapNotNull { it.status }, version, notifications.map { it.account })
                 notifications.map { it.toDomain().asGroup() }
             }

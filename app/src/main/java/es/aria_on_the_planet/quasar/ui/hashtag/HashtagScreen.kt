@@ -39,8 +39,8 @@ fun HashtagScreen(
 ) {
     val feed by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
-    val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
+    val onVote: suspend (Post, List<Int>) -> Boolean = viewModel::vote
+    val onAction = rememberPostActionHandler(viewModel::performAction)
 
     DetailScaffold(
         onBack = onBack,

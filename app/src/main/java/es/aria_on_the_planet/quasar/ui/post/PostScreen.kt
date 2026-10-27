@@ -90,8 +90,7 @@ fun PostScreen(
     onReactionCountClick: (Post, PostActionType) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val draft by drafts.current.collectAsStateWithLifecycle()
-    val composer = draft.takeIf { viewModel.canInteract }
+    val composer = drafts.current.collectAsStateWithLifecycle().value
     val barState = rememberQuickPostBarState()
     val hazeState = rememberHazeState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -125,7 +124,7 @@ fun PostScreen(
     }
     val confirmer = LocalActionConfirmer.current
     val scope = rememberCoroutineScope()
-    val ownPostMenu: (@Composable () -> Unit)? = if (state.isMine && viewModel.canInteract) {
+    val ownPostMenu: (@Composable () -> Unit)? = if (state.isMine) {
         {
             OwnPostMenu(
                 onEdit = viewModel::startEdit,
@@ -145,8 +144,8 @@ fun PostScreen(
 
     val listState = rememberLazyListState()
     val thread = state.thread
-    val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
-    val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
+    val onVote: suspend (Post, List<Int>) -> Boolean = viewModel::vote
+    val onAction = rememberPostActionHandler(viewModel::performAction)
     val mainIndex = thread?.ancestors?.size ?: 0
 
     // 初回表示時は祖先ではなく本体のポストを先頭に出す
@@ -163,7 +162,6 @@ fun PostScreen(
             drafts = drafts,
             hazeState = hazeState,
             snackbarHostState = snackbarHostState,
-            enabled = viewModel.canInteract,
             barState = barState,
             onMediaClick = onMediaClick,
         ) { barSpace ->

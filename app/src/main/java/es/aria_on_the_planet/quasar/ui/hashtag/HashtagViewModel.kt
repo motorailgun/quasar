@@ -23,8 +23,6 @@ class HashtagViewModel(
     private val statusRepository: StatusRepository,
 ) : ViewModel() {
 
-    /** 投票・ブースト・お気に入り・ブックマーク・返信ができるか (要ログイン)。 */
-    val canInteract: Boolean = session.accessToken != null
 
     private val posts = PostFeed(viewModelScope) { maxId -> repository.fetchHashtag(session, hashtag, maxId) }
 

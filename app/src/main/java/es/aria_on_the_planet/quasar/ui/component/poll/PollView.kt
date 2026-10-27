@@ -63,7 +63,7 @@ fun PollView(
         if (showResults) {
             PollResults(poll)
         } else {
-            PollChoices(poll, onVote!!)
+            PollChoices(poll, onVote)
         }
         PollFooter(poll)
     }

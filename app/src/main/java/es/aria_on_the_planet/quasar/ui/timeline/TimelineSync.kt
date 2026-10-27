@@ -43,8 +43,8 @@ fun StreamingSettings.isEnabled(column: ColumnType): Boolean = when (column) {
  * 自動更新するカラムに必要なストリーム。Home・通知は `user`、ローカル・グローバルはそれぞれのストリーム。
  * [settings] でオフのカラムの分は購読しない (Home と通知の両方がオフなら `user` も購読しない)。
  */
-fun streamChannelsFor(columns: Collection<ColumnType>, settings: StreamingSettings): Set<StreamChannel> =
-    columns.filter(settings::isEnabled).mapTo(HashSet()) { column ->
+fun streamChannelsFor(settings: StreamingSettings): Set<StreamChannel> =
+    ColumnType.entries.filter(settings::isEnabled).mapTo(HashSet()) { column ->
         when (column) {
             ColumnType.Home, ColumnType.Notifications -> StreamChannel.User
             ColumnType.Local -> StreamChannel.Local
@@ -53,8 +53,8 @@ fun streamChannelsFor(columns: Collection<ColumnType>, settings: StreamingSettin
     }
 
 /** 自動更新するタイムライン (通知を除く)。 */
-fun streamedTimelinesFor(columns: Collection<ColumnType>, settings: StreamingSettings): Set<TimelineType> =
-    columns.filter(settings::isEnabled).mapNotNullTo(HashSet()) { it.timeline }
+fun streamedTimelinesFor(settings: StreamingSettings): Set<TimelineType> =
+    ColumnType.entries.filter(settings::isEnabled).mapNotNullTo(HashSet()) { it.timeline }
 
 /**
  * ストリーミングによるカラムの自動更新 (イベントの適用・再接続時の補完・gap の読み込み) の段取り。
@@ -64,7 +64,7 @@ fun streamedTimelinesFor(columns: Collection<ColumnType>, settings: StreamingSet
  * @param timelines 全てのタイムラインカラム。削除・編集はストリームしていないカラムにも当てる。
  * @param streamedTimelines ストリームで新着を受け、再接続時に補完するタイムライン。それ以外のタイムラインは、
  *   同じストリームで新着が届いても (Home がオフで通知がオンの `user` 等) 足さない。
- * @param notifications 自動更新する通知カラム。ログインしていない・自動更新がオフなら `null`。
+ * @param notifications 自動更新する通知カラム。自動更新がオフなら `null`。
  * @param fetchPosts `maxId` より古い / `sinceId` より新しいポストを取得する。
  * @param fetchNewerNotifications `sinceId` より新しい通知を取得する。
  * @param toGroup ストリームで届いた通知を、通知一覧と同じキー体系のグループにする。

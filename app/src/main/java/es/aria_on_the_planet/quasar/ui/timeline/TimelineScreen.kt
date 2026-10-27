@@ -81,21 +81,20 @@ import kotlin.math.abs
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     drafts: DraftStore,
-    canPost: Boolean,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // カラムごとにスクロール位置を保持する
     val listStates = ColumnType.entries.associateWith { rememberLazyListState() }
     val pageSpring = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val pagerState = rememberPagerState(initialPage = state.available.indexOf(state.selected)) { state.available.size }
+    val pagerState = rememberPagerState(initialPage = state.selected.ordinal) { ColumnType.entries.size }
     val dragging by pagerState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
     val navigator = LocalNavigator.current
 
     // スワイプで切り替わったら選択に反映する (ボタンで選んだときは先に select 済み)
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }.collect { viewModel.select(state.available[it]) }
+        snapshotFlow { pagerState.settledPage }.collect { viewModel.select(ColumnType.entries[it]) }
     }
 
     // 画面が前面にある間だけストリーミングで自動更新する
@@ -114,8 +113,7 @@ fun TimelineScreen(
     val barState = rememberQuickPostBarState()
     var headerHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
-    val draft by drafts.current.collectAsStateWithLifecycle()
-    val composer = draft.takeIf { canPost }
+    val composer = drafts.current.collectAsStateWithLifecycle().value
     // ヘッダ左のアイコンに出すログイン中のアカウント (投稿用に取得しているものを使う)
     val account: User? = composer?.state?.collectAsStateWithLifecycle()?.value?.account
     // 返信ボタン: 下書き (返信と通常の投稿で共有) の返信先にしてバーで書き始める
@@ -131,7 +129,6 @@ fun TimelineScreen(
         drafts = drafts,
         hazeState = hazeState,
         snackbarHostState = snackbarHostState,
-        enabled = canPost,
         barState = barState,
         onMediaClick = navigator::openMedia,
     ) { barSpace ->
@@ -149,11 +146,11 @@ fun TimelineScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
-                    key = { state.available[it] },
+                    key = { ColumnType.entries[it] },
                     // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
                     flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),
                 ) { page ->
-                    val column = state.available[page]
+                    val column = ColumnType.entries[page]
                     // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
                     val shouldLoad = dragging || pagerState.settledPage == page
                     LaunchedEffect(column, shouldLoad) {
@@ -173,11 +170,10 @@ fun TimelineScreen(
                 StatusBarScrim(Modifier.align(Alignment.TopCenter))
                 TimelineHeader(
                     account = account,
-                    available = state.available,
                     pagerState = pagerState,
                     hazeState = hazeState,
                     onSelect = { column ->
-                        val index = state.available.indexOf(column)
+                        val index = column.ordinal
                         if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
                             // 表示中のカラムのボタンをもう一度押したら先頭へ
                             scope.launch { listStates.getValue(column).scrollToTop() }
@@ -228,8 +224,8 @@ private fun ColumnPage(
             )
         },
     ) {
-        val onVote: (suspend (Post, List<Int>) -> Boolean)? = if (viewModel.canInteract) viewModel::vote else null
-        val onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }
+        val onVote: suspend (Post, List<Int>) -> Boolean = viewModel::vote
+        val onAction = rememberPostActionHandler(viewModel::performAction)
         val onMediaClick: (MediaClick) -> Unit = navigator::openMedia
         val timelineType = column.timeline
         when {
@@ -237,7 +233,7 @@ private fun ColumnPage(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
 
             feed.items.isEmpty() && feed.error != null ->
-                CenteredMessage(stringResource(R.string.timeline_error, feed.error!!))
+                CenteredMessage(stringResource(R.string.timeline_error, feed.error))
 
             feed.items.isEmpty() ->
                 CenteredMessage(stringResource(R.string.column_empty))

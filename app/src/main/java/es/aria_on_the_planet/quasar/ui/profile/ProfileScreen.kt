@@ -107,8 +107,8 @@ fun ProfileScreen(
         onOpenImage = onOpenImage,
         onReply = onReply,
         onHashtagClick = onHashtagClick,
-        onVote = if (viewModel.canInteract) viewModel::vote else null,
-        onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract },
+        onVote = viewModel::vote,
+        onAction = rememberPostActionHandler(viewModel::performAction),
     )
 }
 
@@ -189,7 +189,7 @@ fun ProfileContent(
         when {
             profile == null && state.profile.error != null ->
                 Box(Modifier.padding(top = scaffoldBarHeight)) {
-                    DetailMessage(stringResource(R.string.profile_error, state.profile.error!!))
+                    DetailMessage(stringResource(R.string.profile_error, state.profile.error))
                 }
 
             profile == null -> Box(Modifier.padding(top = scaffoldBarHeight)) { DetailLoading() }

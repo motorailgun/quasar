@@ -45,8 +45,6 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
  *
  * 投稿できたら ([DraftStore.published]) フル画面を閉じる。送信エラーはフル画面を開いていなければ
  * [snackbarHostState] (バーの上) に出す。
- *
- * @param enabled `false` (未ログイン等) ならバーを出さない。
  */
 @Composable
 fun QuickComposerHost(
@@ -54,13 +52,11 @@ fun QuickComposerHost(
     hazeState: HazeState,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
     barState: QuickPostBarState = rememberQuickPostBarState(),
     onMediaClick: (MediaClick) -> Unit = {},
     content: @Composable (barSpace: Dp) -> Unit,
 ) {
-    val current by drafts.current.collectAsStateWithLifecycle()
-    val session = current.takeIf { enabled }
+    val session = drafts.current.collectAsStateWithLifecycle().value
     var expanded by rememberSaveable { mutableStateOf(false) }
     var barHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current

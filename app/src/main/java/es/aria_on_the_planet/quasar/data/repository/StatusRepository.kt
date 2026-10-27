@@ -125,59 +125,53 @@ class StatusRepository(
         }
     }
 
-    /** [statusId] の投票 [pollId] に投票して更新後の [Poll] を返す。未認証では投票できない。 */
+    /** [statusId] の投票 [pollId] に投票して更新後の [Poll] を返す。 */
     suspend fun vote(session: Session, statusId: String, pollId: String, choices: List<Int>): Poll {
-        val token = requireNotNull(session.accessToken) { "Voting requires login" }
         val version = cache.issue()
-        val poll = api.votePoll(session.serverUrl, token, pollId, choices)
+        val poll = api.votePoll(session.serverUrl, session.accessToken, pollId, choices)
         cache.updatePoll(statusId, poll, version)
         return poll.toDomain()
     }
 
     /**
-     * [statusId] のポストに [action] を行い、更新後のポストを返す。未認証では操作できない。
+     * [statusId] のポストに [action] を行い、更新後のポストを返す。
      * ブーストの応答はブースト自体の Status だが、[toDomain] で中身の件数・状態が取り出される。
      */
     suspend fun perform(session: Session, statusId: String, action: PostAction): Post {
-        val token = requireNotNull(session.accessToken) { "Post actions require login" }
         val version = cache.issue()
-        return api.statusAction(session.serverUrl, token, statusId, action.endpoint)
+        return api.statusAction(session.serverUrl, session.accessToken, statusId, action.endpoint)
             .also { cache.putStatuses(listOf(it), version) }
             .toDomain()
     }
 
     /**
-     * [draft] を投稿し、作成されたポストを返す。未認証では投稿できない。
+     * [draft] を投稿し、作成されたポストを返す。
      * 同じ [idempotencyKey] での再送は二重に投稿されない (通信エラー後の再試行用)。
      */
     suspend fun publish(session: Session, draft: PostDraft, idempotencyKey: String): Post {
-        val token = requireNotNull(session.accessToken) { "Posting requires login" }
         val version = cache.issue()
-        return api.postStatus(session.serverUrl, token, draft.toFormParams(), idempotencyKey)
+        return api.postStatus(session.serverUrl, session.accessToken, draft.toFormParams(), idempotencyKey)
             .also { cache.putStatuses(listOf(it), version) }
             .toDomain()
     }
 
     /** 自分のポストの編集前の原文 (本文・CW)。 */
     suspend fun fetchSource(session: Session, statusId: String): StatusSource {
-        val token = requireNotNull(session.accessToken) { "Editing requires login" }
-        val dto = api.statusSource(session.serverUrl, token, statusId)
+        val dto = api.statusSource(session.serverUrl, session.accessToken, statusId)
         return StatusSource(text = dto.text, contentWarning = dto.spoilerText)
     }
 
     /** 自分のポスト [statusId] を [draft] の内容に書き換え、更新後のポストを返す (公開範囲・返信先は変わらない)。 */
     suspend fun edit(session: Session, statusId: String, draft: PostDraft): Post {
-        val token = requireNotNull(session.accessToken) { "Editing requires login" }
         val version = cache.issue()
-        return api.editStatus(session.serverUrl, token, statusId, draft.toEditFormParams())
+        return api.editStatus(session.serverUrl, session.accessToken, statusId, draft.toEditFormParams())
             .also { cache.putStatuses(listOf(it), version) }
             .toDomain()
     }
 
     /** 自分のポスト [statusId] を削除する。 */
     suspend fun delete(session: Session, statusId: String) {
-        val token = requireNotNull(session.accessToken) { "Deleting requires login" }
-        api.deleteStatus(session.serverUrl, token, statusId)
+        api.deleteStatus(session.serverUrl, session.accessToken, statusId)
         cache.deleteStatus(statusId)
     }
 }

@@ -73,7 +73,7 @@ import kotlinx.coroutines.flow.emptyFlow
  * * 書きかけの投稿 (`DraftStore`) はセッションごとにここで開く (どの画面から復元されても使えるように)。
  *
  * @param externalLinks 他のアプリから「Quasar で開く」に共有された URL・`@user@domain` (`linkQueryOf`)。
- *   ログイン中なら今の画面の上に開く。
+ *   今の画面の上に開く (ログアウト中なら Toast)。
  * @param onExit 一番下の画面で「戻る」(Activity を閉じる)。
  */
 @Composable
@@ -89,13 +89,13 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
         if (wrongRoot) backStack.resetTo(if (loggedIn) Route.Timeline else Route.Login)
     }
     LaunchedEffect(current) {
-        if (current?.accessToken != null) container.draftStore.open(current)
+        if (current != null) container.draftStore.open(current)
     }
 
     val context = LocalContext.current
     LaunchedEffect(externalLinks) {
         externalLinks.collect { query ->
-            if (container.sessionStore.session.value?.accessToken == null) {
+            if (container.sessionStore.session.value == null) {
                 Toast.makeText(context, R.string.open_link_not_logged_in, Toast.LENGTH_SHORT).show()
             } else {
                 // タグのページは検索では引けないので URL から直接開く。同じものを続けて共有されたら積まない
@@ -246,7 +246,6 @@ private fun TimelineEntry(container: AppContainer, session: Session) {
     TimelineScreen(
         viewModel = viewModel,
         drafts = container.draftStore,
-        canPost = session.accessToken != null,
     )
 }
 
@@ -274,7 +273,7 @@ private fun ProfileEntry(container: AppContainer, session: Session, key: Route.P
         onFollowingClick = { navigator.openFollowList(key.accountId, FollowListTab.Following) },
         onFollowersClick = { navigator.openFollowList(key.accountId, FollowListTab.Followers) },
         onOpenImage = navigator::openMediaViewer,
-        onReply = replyInComposer(container, session, navigator).takeIf { viewModel.canInteract },
+        onReply = replyInComposer(container, session, navigator),
     )
 }
 
@@ -308,7 +307,7 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
         onMediaClick = navigator::openMedia,
         // 同じハッシュタグからは遷移しない
         onHashtagClick = { tag -> if (!tag.equals(key.name, ignoreCase = true)) navigator.openHashtag(tag) },
-        onReply = replyInComposer(container, session, navigator).takeIf { viewModel.canInteract },
+        onReply = replyInComposer(container, session, navigator),
     )
 }
 
@@ -340,7 +339,7 @@ private fun AccountReactionsEntry(
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator).takeIf { viewModel.canInteract },
+        onReply = replyInComposer(container, session, navigator),
     )
 }
 

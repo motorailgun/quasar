@@ -172,7 +172,7 @@ data class Post(
     val tags: List<Hashtag>,       // tags (name / url)。本文のハッシュタグのタップに使う
 )
 
-/** ログイン中ユーザーから見た状態。API では認証時のみ返るため、未認証時はすべて false。 */
+/** ログイン中ユーザーから見た状態。 */
 data class PostViewerState(
     val bookmarked: Boolean,       // bookmarked
     val reblogged: Boolean,        // reblogged
@@ -190,7 +190,7 @@ data class PreviewCard(
 data class Poll(
     val id: String, val expiresAt: Instant?, val expired: Boolean, val multiple: Boolean,
     val votesCount: Int, val votersCount: Int?, val options: List<PollOption>, val emojis: List<CustomEmoji>,
-    val voted: Boolean, val ownVotes: List<Int>,   // voted / own_votes は認証時のみ。未認証は false / 空
+    val voted: Boolean, val ownVotes: List<Int>,   // ログイン中ユーザーの投票
 )
 data class PollOption(val title: String, val votesCount: Int? /* 結果非公開中は null */)
 
@@ -232,13 +232,16 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 
 ## タイムライン API 対応
 
-| TimelineType | エンドポイント | 認証 |
-| --- | --- | --- |
-| Home | `GET /api/v1/timelines/home` | 必須 |
-| Local | `GET /api/v1/timelines/public?local=true` | 任意 (サーバ設定次第) |
-| Global | `GET /api/v1/timelines/public` | 任意 (サーバ設定次第) |
+| TimelineType | エンドポイント |
+| --- | --- |
+| Home | `GET /api/v1/timelines/home` |
+| Local | `GET /api/v1/timelines/public?local=true` |
+| Global | `GET /api/v1/timelines/public` |
 
 ページングは `max_id` (古い方向) を使う。`TimelineRepository.fetch(type, maxId)` が `List<Post>` を返す。
+
+アプリはログインしている前提で、API はすべてログイン中のアクセストークン付きで呼ぶ (`Session.accessToken` は non-null。
+サーバ情報・カスタム絵文字・OAuth の呼び出しだけはトークン無し)。Repository・ViewModel・画面に未ログイン用の分岐は置かない。
 
 | 用途 | エンドポイント |
 | --- | --- |
@@ -246,31 +249,31 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | プロフィールの投稿一覧 | `GET /api/v1/accounts/:id/statuses` (初回 `limit=15`、以降 40) |
 | ピン留めポスト | `GET /api/v1/accounts/:id/statuses?pinned=true&limit=20` |
 | メディア一覧 | `GET /api/v1/accounts/:id/statuses?only_media=true` (40 件ずつ。ブーストは含まれない) |
-| 自分のお気に入り / ブックマーク | `GET /api/v1/favourites` / `bookmarks` (要認証。**Link ヘッダ**でページング。他人のものを取る API は無い) |
+| 自分のお気に入り / ブックマーク | `GET /api/v1/favourites` / `bookmarks` (**Link ヘッダ**でページング。他人のものを取る API は無い) |
 | フォロー / フォロワー一覧 | `GET /api/v1/accounts/:id/following` / `followers` (**Link ヘッダ**でページング。下記) |
 | ポストをブースト / お気に入りにしたユーザー | `GET /api/v1/statuses/:id/reblogged_by` / `favourited_by` (**Link ヘッダ**でページング。`StatusRepository.fetchRebloggedBy` / `fetchFavouritedBy`) |
-| 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` (要認証) |
-| フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (要認証。鍵アカウントは `requested` になる) |
-| 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (要認証。応答は Relationship) |
-| 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` (要認証) |
-| 通知 (グループ) | `GET /api/v2/notifications` (要認証、Mastodon 4.3+、既定) |
-| 通知 (個別) | `GET /api/v1/notifications` (要認証、max_id ページング。`NotificationApi.Ungrouped` 時) |
+| 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` |
+| フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (鍵アカウントは `requested` になる) |
+| 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (応答は Relationship) |
+| 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` |
+| 通知 (グループ) | `GET /api/v2/notifications` (Mastodon 4.3+、既定) |
+| 通知 (個別) | `GET /api/v1/notifications` (max_id ページング。`NotificationApi.Ungrouped` 時) |
 | ハッシュタグのタイムライン | `GET /api/v1/timelines/tag/:hashtag` (max_id ページング) |
 | ポスト | `GET /api/v1/statuses/:id` (まとめの中身は 1 件ずつ・同時 4 件まで。`StatusRepository.fetchPosts`) |
-| 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`, 要認証) |
-| ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` (要認証) |
-| お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` (要認証) |
-| ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` (要認証) |
-| スレッド | `GET /api/v1/statuses/:id/context` (未認証では祖先 40・子孫 60・深さ 20 まで) |
-| 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き、要認証) |
-| 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト、要認証) |
+| 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`) |
+| ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` |
+| お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` |
+| ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` |
+| スレッド | `GET /api/v1/statuses/:id/context` |
+| 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き) |
+| 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト) |
 | 編集 | `PUT /api/v1/statuses/:id` (form。公開範囲・返信先は送らない。代替テキストは `media_attributes[][id/description]`) |
-| 削除 | `DELETE /api/v1/statuses/:id` (要認証) |
-| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (要認証。`source.privacy` が既定の公開範囲) |
+| 削除 | `DELETE /api/v1/statuses/:id` |
+| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲) |
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
-| カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (認証不要。`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
-| URL・`@user@domain` を引く | `GET /api/v2/search?q=...&resolve=true&limit=1` (`resolve` は要認証。サーバが知らなければ AP / WebFinger で取りに行く。`SearchRepository.resolve`) |
+| カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
+| URL・`@user@domain` を引く | `GET /api/v2/search?q=...&resolve=true&limit=1` (サーバが知らなければ AP / WebFinger で取りに行く。`SearchRepository.resolve`) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 | OAuth クライアントの登録 | `POST /api/v1/apps` (ログインのたびに登録) |
 | 認可 / トークン / 無効化 | `GET /oauth/authorize` (ブラウザ) / `POST /oauth/token` (PKCE) / `POST /oauth/revoke` (ログアウト時) |
@@ -383,7 +386,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),
   ブックマーク=secondary) で表示する。
-  ブースト・お気に入り・ブックマークは押せる (`onAction`、未ログインなら `null` で表示のみ)。リプライは `onReply`
+  ブースト・お気に入り・ブックマークは押せる (`onAction`。`null` なら表示のみ = ギャラリー等)。リプライは `onReply`
   (トグルではないので `PostAction` とは別の口。`PostList` / `NotificationList` / `PostDetail` 等は中継するだけ。「投稿」の「返信」)。
 * `PostActionRow(reactionDetail = true)` (ポスト詳細の `PostDetail(reactionDetail = true)` から): X の一時期の詳細画面の形で、
   リプライ / ブーストのアイコン +「N boosts」/ お気に入りのアイコン +「M favourites」(件数の文字は labelLarge = Medium・onSurfaceVariant、plurals) / 右端に
@@ -429,7 +432,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   押されたときの状態から「する / 取り消す」を決める (済みなら取り消し)。
 * 流れ: `PostCard(onAction)` → `rememberPostActionHandler(perform, confirmation)` (`ui/component/post/PostActionHandler.kt`)
   → `ViewModel.performAction(post, action)` → `PostActionController` (`ui/feed/PostActions.kt`) → `StatusRepository.perform`。
-  画面側は `rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract }`。
+  画面側は `rememberPostActionHandler(viewModel::performAction)`。
 * **確認モーダルの差し込み口**: `PostActionConfirmation.confirm(post, action): PostAction?`。既定は
   `rememberPostActionConfirmation()` で、設定 (`AppSettings.confirmations`) で確認する操作なら `LocalActionConfirmer` のダイアログで
   答えを待ち、`null` で取りやめ (下記「設定」)。操作を変えて返してもよい (将来ブーストの公開範囲を選ばせる等)。
@@ -448,14 +451,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ### PollView (`ui/component/poll/PollView.kt`)
 * `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。
-* 結果表示: 終了済み・投票済み・`onVote == null` (未ログイン、引用内) のとき。割合バー (最多得票は primaryContainer +
+* 結果表示: 終了済み・投票済み・`onVote == null` (引用内・ギャラリー) のとき。割合バー (最多得票は primaryContainer +
   太字、0% でも細いバーを出す)・右端に割合 (10% 未満は小数 1 桁)・自分の選択にチェック。複数選択の分母は voters_count。
 * 投票: 枠線のピル型ボタンを中央寄せで並べる。単一選択はタップで即投票、複数選択はトグルで選んで「Vote」。
   投票中はボタン無効、失敗時はエラー文言。
 * フッタ: 「N votes · 6 days left」/「Final results」(複数選択は「N people」)。
 * 投票処理は ViewModel の `suspend fun vote(post, choices)` (`ui/feed/PollVoting.kt` の `submitVote`)。
   viewModelScope 上で実行し、成功したら `Post.withPoll()` で各一覧 (引用先含む) の該当投票を差し替える。
-  画面側は `onVote = if (viewModel.canInteract) viewModel::vote else null` で渡す。
+  画面側は `onVote = viewModel::vote` で渡す。
 
 ### QuotedPost (`ui/component/post/QuotedPost.kt`)
 * 角丸の OutlinedCard に、小さいアイコン (20dp) + 表示名 + @acct · 時刻 / 本文 / 投票 (結果のみ) / メディア (0.75 倍の高さ)。
@@ -497,7 +500,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * ViewModel は画面 (エントリ) ごと (`rememberViewModelStoreNavEntryDecorator`)。下に積まれた画面はコンポジションから外れる
     (状態は `rememberSaveable` で残る)。`LaunchedEffect` / `repeatOnLifecycle` で動くもの (ストリーミング・インライン再生) は、
     別の画面を開くと止まり、戻ると再開する。
-  * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。書きかけの投稿 (`DraftStore`) は
+  * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。`Login` 以外の画面は
+    セッションがあるときだけ描く (`WithSession`)。書きかけの投稿 (`DraftStore`) は
     `QuasarNavHost` がセッションごとに開く。
   * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ)。メディアビューアだけは `OverlaySceneStrategy` で
     下の画面に重ね、出入りは自分で描く。
@@ -524,9 +528,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `PostCard(pinned = true)` で小さな Pinned ラベル (12dp アイコン + labelSmall) を付ける。画面高の 30% を超える場合は `CollapsibleContent`
     で折りたたみ、下端フェード + `>` (下向き、展開時は上向き) ボタンで展開する。
   * **自分がフォローしている人のうちのフォロワー** ("followers you follow"): `GET /api/v1/accounts/familiar_followers?id[]=:id`
-    (要認証。未ログインなら呼ばない)。統計行の下に、重ねたアイコン最大 3 つ + 「Followed by A, B, and N others you follow」。
+    統計行の下に、重ねたアイコン最大 3 つ + 「Followed by A, B, and N others you follow」。
   * ピン留め・フォロワー情報は補助情報 (`ProfileExtras`) 扱いで、取得失敗時はログのみで非表示にする。
-  * **フォローボタン** (`ProfileActionButton`): ヘッダ画像の下・アイコンの右 (X と同じ位置) に置く。未ログイン・関係の取得前 / 失敗は
+  * **フォローボタン** (`ProfileActionButton`): ヘッダ画像の下・アイコンの右 (X と同じ位置) に置く。関係の取得前 / 失敗は
     出さない。自分 (`fetchMe` の ID と一致) なら「Edit profile」(押しても何もしない。編集画面は未実装)。他人は
     `Relationship.followState` (Relationship エンティティの `following` / `requested` / `blocking` / `blocked_by`) で決める:
     * NotFollowing: Follow (塗り)。相手からフォローされていれば Follow back、**鍵アカウントなら Request to follow** (リクエスト送信)。
@@ -628,12 +632,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser / Exchanging / Failed(`LoginError`))。
   * 保存: `SessionStore` は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。
     項目名を AAD にする。`EncryptedSharedPreferences` は非推奨なので使わない)。鍵は端末外に出ないので `secure.xml` は
-    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消して未ログイン扱い。
+    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消し、トークンの無い保存
+    (最初期の未ログインでの利用の名残) はログアウト状態として扱う。
     以前の平文の保存 (SharedPreferences `session`) は起動時に移して消す (そのトークンはクライアント情報が無いので
     ログアウト時に無効化できない)。
   * ログアウト: 設定画面のトップの末尾 (error 色、補足にサーバのホスト)。**設定に関わらず必ず** `ConfirmDialog` で確認してから
     `OAuthLogin.logout` (保存を消してから `POST /oauth/revoke`。失敗はログのみ)。
-* **カラム** (`ColumnType`): Home / Notifications / Local / Global。Home と通知はログイン時のみ。
+* **カラム** (`ColumnType`): Home / Notifications / Local / Global (常に 4 つ)。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
 * **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
   * 取得 API は設定 (`AppSettings.notificationApi`) で切り替え、`NotificationRepository.fetch(session, api, ...)` に渡す。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
@@ -672,7 +677,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct (タップで自分のプロフィール)・
-    設定。未取得 / 未ログインは汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
+    設定。未取得は汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。
     未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。表示中のカラムのボタンをもう一度押すと一覧の先頭へ
@@ -689,7 +694,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 投稿 (`ui/composer/`, `ui/component/composer/`)
 
-* **入口**: メイン画面とポスト画面の下のクイック投稿バー (`QuickPostBar`、ログイン時のみ。FAB は廃止)。ピルを上へ引っ張ると
+* **入口**: メイン画面とポスト画面の下のクイック投稿バー (`QuickPostBar`。FAB は廃止)。ピルを上へ引っ張ると
   (または投票・CW のチップ / 添付の ALT のタップ)、同じ画面内でフルの投稿画面 (`ComposerScreen`) が下から伸びて開く。
   バー + フル画面 + 送信エラーのスナックバーは `QuickComposerHost` にまとめてあり、両画面はそれで一覧を包む
   (一覧は `hazeSource` を付け、下端の余白に引数の `barSpace` を足す)。
@@ -891,7 +896,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   どちらかがオンなら)・`public:local`・`public`。グローバルは流量が多いので既定はオフ。オフのカラムは新着・再接続時の補完を
   受けない (同じ `user` で Home 宛ての新着が届いても足さない。削除・編集はどのカラムにも当てる)。対応は `streamChannelsFor` /
   `streamedTimelinesFor`。`stream()` は設定が変わると接続し直す (全部オフなら接続しない)。
-  認証は `Authorization: Bearer` (4.2 以降は全ストリームで要ログイン。未ログインでは接続しない)。
+  認証は `Authorization: Bearer`。
 * 切断されたら 1 秒から倍々 (最大 60 秒) で再接続し続け、接続のたびに `StreamEvent.Connected` を流す。
   メッセージの解釈は純粋関数 `parseStreamMessage` (payload は JSON 文字列なので二重デコード)。
 * 前面のみ: `TimelineScreen` が `repeatOnLifecycle(STARTED)` で `TimelineViewModel.stream()` を collect する。
@@ -968,7 +973,6 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `SettingsChoiceItem` (ラジオのダイアログ) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。
   * 面の色は surfaceBright (背景は surfaceContainer)。`SegmentedListItem` の checked 版は選択中の色・形に変わるので、
     selected 系の色と `selectedShape` を通常と同じにしている (AOSP は面の色でオン / オフを示さない)。
-  * 未ログインでの利用は考慮しない (ログイン必須の項目もそのまま出す。非ログインの経路は今後なくす方針)。
 * **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取り、`Modifier.surfaceBlur` で
   描く。元の一覧には `Modifier.surfaceBlurSource(state, LocalSurfaceBlurEnabled.current)`**。`hazeBlur` / `hazeSource` を直接
   使わない。半径・濃さを個別に書かない (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブで共通)。部品ごとに変えてよいのは色味の色だけ
@@ -1048,7 +1052,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.debug.DebugGalleryActivity \
       --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60] [--ef ui_scale 1.2]
   ```
-  `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker / profile / post-variety /
+  `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
+  picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。 / post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
@@ -1086,7 +1091,6 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `<br><br><span class="quote-inline">` で来る (`simplifyMastodonHtml`)。
 * 動画の `meta.original` には `aspect` が無い (width / height から計算)。未設定のヘッダ画像は `.../missing.png`。
 * `Status.application` (User Agent) は他サーバのポストでは返らない。
-* サーバによっては公開タイムラインも要ログイン (mastodon.social は 422)。ストリーミングは 4.2 以降すべて要ログイン。
 * 認証済みの Local / Global はミュート・ブロック・フィルタが効く (公開 API の結果と差が出ても正常)。
 * グローバルは「サーバに届いた順」で並び、表示時刻 (投稿日時) は前後する。
 
@@ -1134,12 +1138,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `~/Android/Sdk/emulator/emulator -list-avds` で AVD (今は `Pixel_10a`) を確かめ、
   `emulator -avd Pixel_10a -no-snapshot-save -no-audio -no-boot-anim -no-window` をバックグラウンドで起動 →
   `adb wait-for-device` の後 `sys.boot_completed` が 1 になるまで待つ → `installDebug`。
-  エミュレーターは未ログインのことが多い。ログインが要る画面は、まずギャラリーにシナリオを足して確かめ、それでも足りない
+  エミュレーターは未ログインのことが多い (ログイン画面以外は開けない)。まずギャラリーにシナリオを足して確かめ、それでも足りない
   (実際の API・遷移を通したい) ときはその旨をユーザーに伝える。メモリに余裕が無いときは下記の実機を使う。
 * 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。
   `adb devices` の先頭の device を使う。切断・ロック・スリープは頻繁に起きる → 実機が寝ていて (`dumpsys power` の
   `mWakefulness=Asleep`) エミュレータが起きているなら、エミュレータで動作確認する。どちらも使えなければユーザーに解除を頼む。
-  エミュレータにはログイン情報が無いことがあるので、ログインが要る確認はその旨を伝える。
 * 座標決め打ちのタップは許可されているが、アプリの外 (ブラウザ等) に出たら即中断する。リンクを避けるため、
   ポストを開くときはアクション行の空き部分をタップする。
 * 先頭へ戻るために下方向スワイプを繰り返すと pull-to-refresh が発動し一覧が読み直される (gap も消える)。

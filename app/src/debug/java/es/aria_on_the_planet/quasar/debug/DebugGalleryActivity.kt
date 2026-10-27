@@ -1,6 +1,13 @@
 package es.aria_on_the_planet.quasar.debug
 
 import android.content.Context
+import es.aria_on_the_planet.quasar.ui.component.composer.isEmbeddedPhotoPickerAvailable
+import es.aria_on_the_planet.quasar.ui.component.composer.MediaPickerSheet
+import es.aria_on_the_planet.quasar.ui.component.composer.EmojiPickerSheet
+import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.Arrangement
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
@@ -193,10 +200,11 @@ private fun GalleryIndex(onBack: () -> Unit, onOpen: (GalleryScenario) -> Unit) 
         LazyColumn(Modifier.fillMaxSize(), state = listState) {
             items(GalleryScenario.entries) { scenario ->
                 ListItem(
-                    headlineContent = { Text(stringResource(scenario.title)) },
                     supportingContent = { Text(scenario.id) },
                     modifier = Modifier.clickable { onOpen(scenario) },
-                )
+                ) {
+                    Text(stringResource(scenario.title))
+                }
             }
         }
     }
@@ -281,6 +289,11 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             GalleryScenario.EmojiPicker -> {
                 val emojis = remember(text) { GalleryFixtures.emojis(text) }
                 Box(Modifier.fillMaxSize()) { EmojiPicker(emojis = emojis, onSelect = {}) }
+            }
+
+            GalleryScenario.PickerSheets -> {
+                val emojis = remember(text) { GalleryFixtures.emojis(text) }
+                PickerSheets(emojis)
             }
 
             GalleryScenario.Profile -> {
@@ -422,5 +435,33 @@ private fun PostDetailGallery(text: String, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** 投稿欄と同じシートを開く。選んだ絵文字・メディアは数えて出すだけ (アップロードはしない)。 */
+@Composable
+private fun PickerSheets(emojis: List<CustomEmoji>) {
+    var emojiOpen by remember { mutableStateOf(false) }
+    var mediaOpen by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf(listOf<String>()) }
+    var media by remember { mutableStateOf(setOf<Uri>()) }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Button(onClick = { emojiOpen = true }) { Text("Emoji sheet") }
+        Button(onClick = { mediaOpen = true }, enabled = isEmbeddedPhotoPickerAvailable()) { Text("Media sheet") }
+        Text("Emoji: ${picked.joinToString(" ") { ":$it:" }}")
+        Text("Media: ${media.size}")
+    }
+    if (emojiOpen) {
+        EmojiPickerSheet(emojis = emojis, onSelect = { picked = picked + it.shortcode }, onDismiss = { emojiOpen = false })
+    }
+    if (mediaOpen) {
+        MediaPickerSheet(
+            selected = media,
+            maxItems = 4,
+            onSelect = { media = media + it },
+            onDeselect = { media = media - it.toSet() },
+            onDismiss = { mediaOpen = false },
+            onError = { mediaOpen = false },
+        )
     }
 }

@@ -57,7 +57,7 @@ enum class ProfileTab {
 
 /** ヘッダ右側のボタン。 */
 sealed interface ProfileButtonState {
-    /** 出さない (未ログイン・関係の取得前 / 失敗)。 */
+    /** 出さない (関係の取得前 / 失敗)。 */
     data object None : ProfileButtonState
 
     /** 自分のプロフィール。編集画面は未実装なので押しても何もしない。 */
@@ -108,9 +108,6 @@ class ProfileViewModel(
     private val repository: AccountRepository,
     private val statusRepository: StatusRepository,
 ) : ViewModel() {
-
-    /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
-    val canInteract: Boolean = session.accessToken != null
 
     private val profile = MutableStateFlow(ProfileState())
     private val extras = MutableStateFlow(ProfileExtras())
@@ -291,11 +288,10 @@ class ProfileViewModel(
     }
 
     /**
-     * 自分のプロフィールか、相手との関係を読む。未ログインなら何もしない (ボタンを出さない)。
+     * 自分のプロフィールか、相手との関係を読む。
      * 関係はキャッシュにあれば先に出し、期限内なら取りに行かない ([force] なら取り直す)。
      */
     private fun loadRelationship(force: Boolean) {
-        if (!canInteract) return
         viewModelScope.launch {
             val me = runOptional("current account") { repository.fetchMe(session) } ?: return@launch
             if (me.user.inServerId == accountId) {

@@ -15,7 +15,7 @@ data class Poll(
     val options: List<PollOption>,
     /** 選択肢に含まれるカスタム絵文字。 */
     val emojis: List<CustomEmoji>,
-    /** ログイン中ユーザーが投票済みか。未認証では `false`。 */
+    /** ログイン中ユーザーが投票済みか。 */
     val voted: Boolean,
     /** ログイン中ユーザーが選んだ選択肢のインデックス。 */
     val ownVotes: List<Int>,

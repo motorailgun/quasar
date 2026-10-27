@@ -37,6 +37,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +88,9 @@ private val AvatarRing = 4.dp
  * @param onOpenImage アイコン・ヘッダ画像のタップ (メディアビューアを開く)。`null` ならタップできない。
  * @param onUserClick 引っ越し先のアカウントのタップ (プロフィールを開く)。
  * @param followRequest 統計の下に置く、相手からのフォローリクエストへの返事 ([FollowRequestCard])。
+ * @param topBarHeight 上に重ねたトップバーの高さ (ステータスバー込み)。0 より大きければヘッダ画像をステータスバーの分だけ
+ *   高くして上端に薄いグラデーションを敷く (引っ越し先の表示があれば、それをバーの下から始める)。
+ * @param onImageBottomChanged ヘッダ画像の下端の位置 (このヘッダの上端から、px)。トップバーを不透明にする判定に使う。
  */
 @Composable
 fun ProfileHeader(
@@ -89,8 +104,21 @@ fun ProfileHeader(
     onUserClick: (User) -> Unit = {},
     actions: @Composable () -> Unit = {},
     followRequest: @Composable () -> Unit = {},
+    topBarHeight: Dp = 0.dp,
+    onImageBottomChanged: (Int) -> Unit = {},
 ) {
     val user = profile.user
+    val overlaid = topBarHeight > 0.dp
+    // 引っ越し先の表示があればそれがバーの下に来るので、画像は伸ばさない
+    val imageHeight = when {
+        overlaid && profile.movedTo == null -> HeaderHeight + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        else -> HeaderHeight
+    }
+    val imageHeightPx = with(LocalDensity.current) { imageHeight.roundToPx() }
+    var movedToHeight by remember(profile.movedTo == null) { mutableIntStateOf(0) }
+    val imageBottom = movedToHeight + imageHeightPx
+    val currentOnImageBottomChanged by rememberUpdatedState(onImageBottomChanged)
+    LaunchedEffect(imageBottom) { currentOnImageBottomChanged(imageBottom) }
     val windowSize = LocalWindowInfo.current.containerSize
     val inlinePlayback = LocalInlinePlayback.current
     // 閉じるときに縮んで戻る先。タップの時点の位置を渡す
@@ -104,12 +132,21 @@ fun ProfileHeader(
         }
     }
     Column(modifier.fillMaxWidth()) {
-        profile.movedTo?.let { MovedTo(it, onClick = { onUserClick(it) }) }
+        profile.movedTo?.let {
+            Column(
+                Modifier
+                    .onSizeChanged { size -> movedToHeight = size.height }
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                if (overlaid) Spacer(Modifier.height(topBarHeight))
+                MovedTo(it, onClick = { onUserClick(it) })
+            }
+        }
         Box {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(HeaderHeight)
+                    .height(imageHeight)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
                 val headerUrl = profile.headerUrl
@@ -133,12 +170,21 @@ fun ProfileHeader(
                                 },
                             ),
                     )
+                    if (overlaid && profile.movedTo == null) {
+                        // トップバー (戻るボタン)・ステータスバーを画像の上でも読めるよう、上端だけ薄く暗くする
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(topBarHeight)
+                                .background(Brush.verticalGradient(listOf(MediaOverlayColors.TopBarScrim, Color.Transparent))),
+                        )
+                    }
                 }
             }
             // ヘッダに半分重なるアイコン。背景色のリングで縁取る
             Box(
                 Modifier
-                    .padding(start = 16.dp, top = HeaderHeight - AvatarSize / 2 - AvatarRing)
+                    .padding(start = 16.dp, top = imageHeight - AvatarSize / 2 - AvatarRing)
                     .background(MaterialTheme.colorScheme.surface, CircleShape)
                     .padding(AvatarRing),
             ) {

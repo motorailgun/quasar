@@ -19,6 +19,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
@@ -29,7 +31,7 @@ class CollapsingHeaderState(initialOffset: Float = 0f) {
     var offset by mutableFloatStateOf(initialOffset)
         private set
 
-    /** 見出しの高さ (= 最大の折りたたみ量)。レイアウトで決まる。 */
+    /** 最大の折りたたみ量 (見出しの高さ - 畳み切ったときに残す上端の分)。レイアウトで決まる。 */
     var maxOffset by mutableFloatStateOf(0f)
         internal set
 
@@ -78,6 +80,8 @@ fun rememberCollapsingHeaderState(): CollapsingHeaderState =
  * @param pinnedOverlapsContent `true` なら [content] を [pinned] の裏から始める ([pinned] を半透明・ぼかしにして、
  *   スクロールした一覧を透かす用)。その場合 [content] の一覧は先頭に [pinned] の高さ分の余白を取る。
  *   一覧が [header] の裏に入ることは無い (上へのスクロールではまず [header] が畳まれる) ので、重なるのは [pinned] だけ。
+ * @param collapsedTop 畳み切ったときに [pinned] を置く上端からの位置 (上に重ねたトップバーの高さ)。[header] はこの分だけ
+ *   畳まれずに残り、その裏に隠れる。
  */
 @Composable
 fun CollapsingHeaderLayout(
@@ -87,6 +91,7 @@ fun CollapsingHeaderLayout(
     content: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     pinnedOverlapsContent: Boolean = false,
+    collapsedTop: Dp = 0.dp,
 ) {
     // 見出しの上でのドラッグ。自分では何も消費せず、nested scroll (state.connection とその外側) に任せる
     val headerDrag = rememberScrollableState { 0f }
@@ -104,13 +109,15 @@ fun CollapsingHeaderLayout(
         val pinnedHeight = pinnedPlaceable?.height ?: 0
         val height = constraints.maxHeight
         val contentTop = if (pinnedOverlapsContent) 0 else pinnedHeight
-        val contentHeight = (height - contentTop).coerceAtLeast(0)
+        // 畳み切ったとき本体の上端は collapsedTop まで上がるので、その分を引いて下端を画面に収める
+        val contentHeight = (height - contentTop - collapsedTop.roundToPx()).coerceAtLeast(0)
         val contentPlaceable = contentMeasurables.firstOrNull()
             ?.measure(constraints.copy(minHeight = contentHeight, maxHeight = contentHeight))
-        if (state.maxOffset != headerHeight.toFloat()) state.maxOffset = headerHeight.toFloat()
+        val maxOffset = (headerHeight - collapsedTop.roundToPx()).coerceAtLeast(0).toFloat()
+        if (state.maxOffset != maxOffset) state.maxOffset = maxOffset
         layout(constraints.maxWidth, height) {
             // 見出しの高さが縮んだ (補助情報の取得失敗等) 直後でも、はみ出さないよう丸める
-            val offset = state.offset.coerceIn(0f, headerHeight.toFloat()).roundToInt()
+            val offset = state.offset.coerceIn(0f, maxOffset).roundToInt()
             // 重なり順は後に置いたものが上: 本体 → 見出し → 残る部分
             contentPlaceable?.place(0, headerHeight + contentTop - offset)
             headerPlaceable?.place(0, -offset)

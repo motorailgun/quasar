@@ -30,7 +30,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
@@ -125,6 +141,95 @@ fun DetailScaffold(
     }
 }
 
+/**
+ * [DetailScaffold] の、トップバーを中身の上に重ねる版 (プロフィールのヘッダ画像をバーの裏まで描く用)。
+ * 中身は画面の上端 (ステータスバーの裏) から描き、バーの面の濃さは [barAlpha] (0 = 透明、1 = 不透明。引数はバーの高さ (px)。
+ * 描画時に読む) で決める。
+ * 透明な間は戻るボタンに丸い下地 ([MediaOverlayColors]) を敷き、画像の上でも読めるようにする。
+ *
+ * @param content 引数はバーの高さ (ステータスバー込み)。中身はこの分を上端の余白・畳み切ったときの位置に使う。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OverlayDetailScaffold(
+    onBack: () -> Unit,
+    titleRevealed: Boolean,
+    barAlpha: (barHeightPx: Float) -> Float,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    revealedTitle: (@Composable () -> Unit)? = null,
+    content: @Composable BoxScope.(barHeight: Dp) -> Unit,
+) {
+    val density = LocalDensity.current
+    var barHeightPx by remember { mutableFloatStateOf(0f) }
+    val barHeight = with(density) { barHeightPx.toDp() }
+    val alpha = { barAlpha(barHeightPx) }
+    val surface = MaterialTheme.colorScheme.surface
+    val showRevealed = revealedTitle != null && titleRevealed
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(surface),
+    ) {
+        DetailRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize(),
+            indicatorTopPadding = barHeight,
+        ) {
+            content(barHeight)
+        }
+        TopAppBar(
+            modifier = Modifier
+                .onSizeChanged { barHeightPx = it.height.toFloat() }
+                .drawBehind { drawRect(surface.copy(alpha = alpha())) },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent,
+            ),
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    val onSurface = MaterialTheme.colorScheme.onSurface
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .drawBehind {
+                                drawCircle(MediaOverlayColors.Scrim.copy(alpha = MediaOverlayColors.Scrim.alpha * (1f - alpha())))
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // 色は描画時に混ぜる (スクロールのたびに組み直さない)
+                        Icon(
+                            Symbols.Outlined.ArrowBack,
+                            stringResource(R.string.back),
+                            modifier = Modifier
+                                // SrcIn をアイコンの形だけに効かせるため、先に別のレイヤに描く
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        lerp(MediaOverlayColors.Content, onSurface, alpha()),
+                                        blendMode = BlendMode.SrcIn,
+                                    )
+                                },
+                        )
+                    }
+                }
+            },
+            title = {
+                AnimatedContent(
+                    targetState = showRevealed,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "detailTitle",
+                ) { revealed ->
+                    if (revealed) revealedTitle?.invoke()
+                }
+            },
+        )
+    }
+}
+
 /** 詳細画面の pull-to-refresh (Expressive の LoadingIndicator)。トップバーの下にタブ等を挟む画面でも使う。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -132,6 +237,7 @@ fun DetailRefreshBox(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    indicatorTopPadding: Dp = 0.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val pullState = rememberPullToRefreshState()
@@ -144,7 +250,9 @@ fun DetailRefreshBox(
             PullToRefreshDefaults.LoadingIndicator(
                 state = pullState,
                 isRefreshing = isRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = indicatorTopPadding),
             )
         },
         content = content,

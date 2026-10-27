@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
@@ -51,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.component.account.AccountAction
 import es.aria_on_the_planet.quasar.ui.component.account.AccountActionType
+import es.aria_on_the_planet.quasar.domain.model.FollowState
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -295,6 +297,9 @@ fun ProfileContent(
                             topPadding = tabsHeight,
                             feed = state.feedOf(tab),
                             pinnedPosts = if (tab == ProfileTab.Posts) state.extras.pinnedPosts else emptyList(),
+                            blockedBy = profile.user.screenName.takeIf {
+                                (state.button as? ProfileButtonState.Follow)?.relationship?.followState == FollowState.BlockedBy
+                            },
                             onLoadMore = { onLoadMore(tab) },
                             onUserClick = onUserClick,
                             onPostClick = onPostClick,
@@ -314,6 +319,8 @@ fun ProfileContent(
 /**
  * タブ 1 つ分の投稿一覧。Media は `only_media` で絞り込んだポスト、Favourites / Bookmarks は自分のお気に入り・
  * ブックマークを同じ形で出すだけ。
+ * [blockedBy] は相手にブロックされているときの相手の acct。サーバは一覧を空で返すので、空の表示を
+ * 「投稿がありません」ではなくブロックされているため見られない旨にする。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -323,6 +330,7 @@ private fun ProfileTabPage(
     topPadding: Dp,
     feed: PostFeedState,
     pinnedPosts: List<Post>,
+    blockedBy: String?,
     onLoadMore: () -> Unit,
     onUserClick: (User) -> Unit,
     onPostClick: (Post) -> Unit,
@@ -375,7 +383,12 @@ private fun ProfileTabPage(
                             !feed.loaded || feed.isRefreshing -> LoadingIndicator()
                             feed.error != null -> Text(stringResource(R.string.timeline_error, feed.error))
                             else -> Text(
-                                stringResource(tab.emptyMessage()),
+                                if (blockedBy != null) {
+                                    stringResource(R.string.profile_blocked_by_posts, blockedBy)
+                                } else {
+                                    stringResource(tab.emptyMessage())
+                                },
+                                textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

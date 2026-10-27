@@ -1,8 +1,10 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +21,8 @@ import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 
 /**
  * プロフィールのヘッダのボタン。自分ならプロフィール編集、他人ならフォローの状態 ([FollowState]) に応じて
- * Follow (鍵アカウントは Request to follow = リクエスト送信) / Requested (送信済み) / Following / Unblock (ブロック中)。
+ * Follow (鍵アカウントは Request to follow = リクエスト送信) / Requested (送信済み) / Following /
+ * Unblock (ブロック中。error 色の塗り) / Blocked (ブロックされている。押せない error 色の枠線と文字)。
  * フォロー・リクエスト送信・解除・リクエストの取り下げは、どれも確認ダイアログを経てから [onSetFollowing] を呼ぶ。
  * 引っ越し済みのアカウント ([Profile.movedTo]) は新たにフォローできない (フォロー中・リクエスト中なら解除・取り下げはできる)。
  */
@@ -92,15 +95,33 @@ private fun FollowButton(
                 Text(stringResource(R.string.profile_following_button))
             }
 
-        // ブロック中はフォローできない。解除は確認しない (取り返しのつかない操作ではない)
+        // ブロック中はフォローできない。ブロックしていることに気づけるよう error 色の塗りで目立たせる。
+        // 解除は確認しない (取り返しのつかない操作ではない)
         FollowState.Blocking ->
-            OutlinedButton(onClick = onUnblock, modifier = modifier, enabled = enabled, shapes = shapes) {
+            Button(
+                onClick = onUnblock,
+                modifier = modifier,
+                enabled = enabled,
+                shapes = shapes,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
                 Text(stringResource(R.string.account_unblock))
             }
 
+        // ブロックされている。押せないが、無効のグレーではなく error 色の枠線と文字で「Blocked」と出して理由を示す
         FollowState.BlockedBy ->
-            Button(onClick = {}, modifier = modifier, enabled = false, shapes = shapes) {
-                Text(stringResource(R.string.profile_follow))
+            OutlinedButton(
+                onClick = {},
+                modifier = modifier,
+                enabled = false,
+                shapes = shapes,
+                colors = ButtonDefaults.outlinedButtonColors(disabledContentColor = MaterialTheme.colorScheme.error),
+                border = BorderStroke(ButtonDefaults.outlinedButtonBorder(enabled = true).width, MaterialTheme.colorScheme.error),
+            ) {
+                Text(stringResource(R.string.profile_blocked_by))
             }
     }
 

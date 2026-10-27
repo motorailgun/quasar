@@ -69,6 +69,8 @@
     <string name="profile_follow_back">Follow back</string>
     <string name="profile_following_button">Following</string>
     <string name="profile_follow_requested">Requested</string>
+    <string name="profile_blocked_by">Blocked</string>
+    <string name="profile_blocked_by_posts">You can\'t see @%1$s\'s posts because you\'re blocked</string>
     <string name="profile_unfollow">Unfollow</string>
     <string name="profile_follow_confirm_title">Follow %1$s?</string>
     <string name="profile_request_follow">Request to follow</string>

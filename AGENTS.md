@@ -406,7 +406,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     Medium ではなく Regular)。項目を押したらシートを下へ閉じてから確認ダイアログ等を出す。プロフィールのメニューも同じ。
   * 中身は上から「ブラウザで開く」(接続中サーバの `/@acct/:statusId`)、リモートのポストなら「<ホスト>で開く」(`Status.url`、
     無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
-    出す)、他人のポストなら「ミュート」・「ブロック」(error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
+    出す)、他人のポストなら「ミュート」・「ブロック」/「ブロックを解除」(どちらも error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
     (`domain/model/WebPage.kt`、`WebPageTest`)。
   * 操作の口は `LocalAccountActions` (`ui/component/account/AccountActions.kt`、`QuasarNavHost` が `SessionAccountActions` を
     提供)。無い所ではメニュー自体を出さない (ギャラリーは手元だけで関係を持つ `GalleryAccountActions` を提供)。関係はメニューを開くたびに読む (キャッシュが新しければそれ)。
@@ -562,7 +562,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     * NotFollowing: Follow (塗り)。相手からフォローされていれば Follow back、**鍵アカウントなら Request to follow** (リクエスト送信)。
     * Requested (リクエスト送信済み・承認待ち。リモートの応答待ちでも立つ): Requested (枠線)。押すとリクエストの取り下げ (`unfollow`)。
     * Following: Following (枠線)。押すと解除。
-    * Blocking: Unblock (枠線、確認なし)。BlockedBy: 押せない Follow。
+    * Blocking: Unblock (error 色の塗り + onError の文字で目立たせる。確認なし)。
+    * BlockedBy: 押せない「Blocked」(グレーアウトではなく、error 色の枠線と文字)。サーバは投稿・ピン留め・
+      フォロー一覧を空で返すので、投稿一覧 (Posts / Media) の空の表示も「No posts yet」ではなく
+      「You can't see @acct's posts because you're blocked」(`profile_blocked_by_posts`) にする (`ProfileTabPage(blockedBy)`)。
+      ヘッダ (bio・統計・followers you follow) はそのまま出る。
     フォロー・リクエスト送信・解除・取り下げはどれも `ConfirmDialog` で確認してから `ProfileViewModel.setFollowing`。
     成功したら応答の関係で置き換え (鍵アカウントへの follow は `requested = true` で返る)、フォロワー数を手元で ±1。失敗はログのみで元に戻す。
   * **引っ越し済みのアカウント** (`Account.moved` → `Profile.movedTo`): ヘッダ画像の上に「Moved to:」(引っ越し先:) と、その下に

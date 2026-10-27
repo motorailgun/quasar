@@ -68,6 +68,8 @@
     <string name="profile_follow_back">フォローバック</string>
     <string name="profile_following_button">フォロー中</string>
     <string name="profile_follow_requested">リクエスト中</string>
+    <string name="profile_blocked_by">ブロックされています</string>
+    <string name="profile_blocked_by_posts">ブロックされているため、@%1$sさんの投稿は表示できません</string>
     <string name="profile_unfollow">フォロー解除</string>
     <string name="profile_follow_confirm_title">%1$s さんをフォローしますか？</string>
     <string name="profile_request_follow">フォローリクエスト</string>

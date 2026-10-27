@@ -70,7 +70,7 @@ val LocalAccountActions = staticCompositionLocalOf<AccountActions?> { null }
 val ProvisionalRelationship = Relationship(following = false, requested = false, followedBy = false)
 
 /**
- * メニューの中のミュート / ブロック (error 色) / ブーストの非表示。読み込みの前後でメニューの高さが変わらないよう、項目は常に
+ * メニューの中のミュート / ブロック・ブロック解除 (error 色) / ブーストの非表示。読み込みの前後でメニューの高さが変わらないよう、項目は常に
  * 3 つ出し、使えないものはグレーアウトする。[relationship] が `null` (まだ分からない) なら全部、[followKnown] が `false`
  * (フォローしているか分からない) ならブーストの非表示を押せなくする。ブーストの非表示はフォロー中の相手にだけ押せる。
  *
@@ -119,8 +119,8 @@ fun AccountActionMenuItems(
         leadingIcon = { Icon(Symbols.Outlined.Block, contentDescription = null) },
         onClick = { onAction(AccountAction(AccountActionType.Block, undo = blocking)) },
         enabled = known,
-        // 解除は取り返しのつかない操作ではないので普通の色
-        colors = if (blocking || !known) MenuDefaults.itemColors() else MenuDefaults.itemColors(textColor = error, leadingIconColor = error),
+        // ブロック中であることに気づけるよう、解除も error 色 (プロフィールの Unblock ボタンと揃える)
+        colors = if (!known) MenuDefaults.itemColors() else MenuDefaults.itemColors(textColor = error, leadingIconColor = error),
     )
     // ブーストの非表示はフォロー中の相手にだけ意味がある (フォローし直す形で変えるので、フォロー外ではフォローになってしまう)
     val hidden = current.isOn(AccountActionType.HideBoosts)

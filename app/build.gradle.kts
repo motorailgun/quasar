@@ -93,6 +93,15 @@ android {
     }
 }
 
+// Compose コンパイラのレポート (Composable ごとの skippable / restartable・引数の安定性)。
+// `./gradlew :app:compileBenchmarkKotlin -PcomposeReports --rerun` で app/build/compose_compiler/ に出る
+if (providers.gradleProperty("composeReports").isPresent) {
+    composeCompiler {
+        reportsDestination = layout.buildDirectory.dir("compose_compiler")
+        metricsDestination = layout.buildDirectory.dir("compose_compiler")
+    }
+}
+
 // Room のスキーマ (版ごとの JSON)。キャッシュなので移行は書かず作り直すが、変更の履歴として残す
 room {
     schemaDirectory("$projectDir/schemas")

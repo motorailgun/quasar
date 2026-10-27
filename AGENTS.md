@@ -478,7 +478,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ### MediaAttachments / MediaAttachmentItem (`ui/component/media/MediaAttachments.kt`)
 * `MediaAttachments(attachments, height: Dp, modifier, onClick)` が `MediaAttachmentItem` を横に並べる。
 * 全アイテムを `height` に揃え、幅は `height * アスペクト比`。合計幅が収まらない場合は `horizontalScroll`。
-* まだスクロールできる側の端は 24dp フェードさせる (`ScrollState.canScrollBackward/Forward` + アニメーション)。
+* まだスクロールできる側の端はフェードさせる。強さは残りのスクロール量から描画時に決める (コンポジションでは読まない)。
+  タップ時の各メディアの位置は `onPlaced` の座標系を持っておきタップ時に求める (`onGloballyPositioned` はスクロールの毎フレーム呼ばれる)。
   汎用の `Modifier.horizontalFadingEdges` (`ui/component/modifier/FadingEdges.kt`) を使い、スクロール Modifier より外側に付ける。
 * アスペクト比不明時は 1:1、極端な比率は 1/3〜3 に丸めて Crop 表示する。
 * 種別ごとの表示: video=再生アイコン、gifv=「GIF」ラベル、audio=プレビューが無ければ音声アイコン。
@@ -1011,6 +1012,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
 * 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
+* Compose コンパイラのレポート (skippable / 引数の安定性): `./gradlew :app:compileBenchmarkKotlin -PcomposeReports --rerun`
+  → `app/build/compose_compiler/`。
 * **動作確認用の連合環境** (`testbed/`。使い方・設定・セットアップは [docs/testbed.md](docs/testbed.md)、環境の構成は
   [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) を立てて連合させ、bots が
   投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れ、手元だけで
@@ -1057,7 +1060,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。 / post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
-  表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率)、ビルドし直さずに比べられる。
+  表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率、`--ei long_post_max_lines 3` で長文の折りたたみの行数)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
   APNG のデコーダもそのまま通る)。手で編集せず `python3 scripts/gallery/generate.py` で作り直す (中身は毎回同じ)。

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +60,9 @@ fun CollapsibleContent(
     var isExpanded by expanded
     var contentHeight by remember { mutableIntStateOf(0) }
     val maxPx = with(LocalDensity.current) { collapsedMaxHeight.roundToPx() }
-    val overflows = contentHeight > maxPx
+    // 高さはレイアウトで決まるので、そのまま読むと項目が画面に入るたびに組み立て直しになる。はみ出すかどうかが
+    // 変わったときだけ組み立て直す (収まる本文が大半なので、ほとんどは 1 回で済む)
+    val overflows by remember(maxPx) { derivedStateOf { contentHeight > maxPx } }
     val fade by animateFloatAsState(if (overflows && !isExpanded) 1f else 0f, label = "collapseFade")
 
     Column(modifier.fillMaxWidth()) {

@@ -54,6 +54,9 @@ internal object GalleryExtras {
     /** UI・文字の倍率 (`--ef ui_scale 1.2`)。 */
     const val UiScale = "ui_scale"
     const val FontScale = "font_scale"
+
+    /** 長文の折りたたみの行数 (`--ei long_post_max_lines 3`)。0 以下なら折りたたまない。 */
+    const val LongPostMaxLines = "long_post_max_lines"
 }
 
 /** [extras] で指定された項目だけ上書きする (指定の無い項目はアプリの設定のまま)。 */
@@ -74,5 +77,10 @@ internal fun DisplaySettings.overriddenBy(extras: Bundle?): DisplaySettings {
         },
         uiScale = scale(GalleryExtras.UiScale, uiScale),
         fontScale = scale(GalleryExtras.FontScale, fontScale),
+        longPostMaxLines = if (extras.containsKey(GalleryExtras.LongPostMaxLines)) {
+            extras.getInt(GalleryExtras.LongPostMaxLines).takeIf { it > 0 }
+        } else {
+            longPostMaxLines
+        },
     )
 }

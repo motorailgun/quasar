@@ -20,6 +20,9 @@ object MediaOverlayColors {
     /** 下端・上端の操作部分の下に敷くグラデーションの濃い側。 */
     val GradientScrim = Color.Black.copy(alpha = 0.55f)
 
+    /** 画像の上端に重ねたトップバーの下に敷く、薄いグラデーションの濃い側 (プロフィールのヘッダ画像)。 */
+    val TopBarScrim = Color.Black.copy(alpha = 0.3f)
+
     /** メディアビューアの背景。 */
     val Background = Color.Black
 }

@@ -61,7 +61,8 @@ import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
-import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
+import es.aria_on_the_planet.quasar.ui.component.scaffold.OverlayDetailScaffold
+import androidx.compose.runtime.mutableIntStateOf
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTab
@@ -162,26 +163,44 @@ fun ProfileContent(
         onSelectTab(tabs[pagerState.targetPage])
     }
 
-    DetailScaffold(
+    // ヘッダ画像の下端 (ヘッダの上端から、px)。ここがトップバーの下端を過ぎたらバーを不透明にする
+    var imageBottom by remember { mutableIntStateOf(0) }
+    val barFadePx = with(density) { BarFadeDistance.toPx() }
+
+    // トップバーはヘッダ画像の上に透明で重ね、画像が隠れるにつれて不透明にする
+    OverlayDetailScaffold(
         onBack = onBack,
         // ヘッダが畳まれたらトップバーに名前を出す
         titleRevealed = headerState.isCollapsed,
+        barAlpha = { barBottom ->
+            if (profile == null) {
+                1f
+            } else {
+                // 画像の下端がバーの下端より barFadePx 上に来た時点で不透明
+                val remaining = imageBottom - headerState.offset - barBottom
+                (1f - remaining / barFadePx).coerceIn(0f, 1f)
+            }
+        },
         // タブを初めて開いたときの読み込みは一覧側に出すので、引っ張って更新したときだけ出す
         isRefreshing = profile != null && (state.profile.isRefreshing || (feed.isRefreshing && feed.loaded)),
         onRefresh = onRefresh,
         revealedTitle = profile?.let { { ProfileTitle(it) } },
-    ) {
+    ) { scaffoldBarHeight ->
         when {
             profile == null && state.profile.error != null ->
-                DetailMessage(stringResource(R.string.profile_error, state.profile.error!!))
+                Box(Modifier.padding(top = scaffoldBarHeight)) {
+                    DetailMessage(stringResource(R.string.profile_error, state.profile.error!!))
+                }
 
-            profile == null -> DetailLoading()
+            profile == null -> Box(Modifier.padding(top = scaffoldBarHeight)) { DetailLoading() }
 
             else -> CollapsingHeaderLayout(
                 state = headerState,
                 modifier = Modifier.fillMaxSize(),
                 // 一覧をタブの裏まで描き、タブの背景でぼかす
                 pinnedOverlapsContent = true,
+                // 畳み切ってもタブはトップバーの下に残す
+                collapsedTop = scaffoldBarHeight,
                 header = {
                     ProfileHeader(
                         profile = profile,
@@ -191,6 +210,8 @@ fun ProfileContent(
                         onFollowersClick = onFollowersClick,
                         onOpenImage = onOpenImage,
                         onUserClick = onUserClick,
+                        topBarHeight = scaffoldBarHeight,
+                        onImageBottomChanged = { imageBottom = it },
                         followRequest = {
                             val follow = state.button as? ProfileButtonState.Follow
                             val motion = MaterialTheme.motionScheme
@@ -392,3 +413,6 @@ private fun ProfileTitle(profile: Profile) {
         subtitle = stringResource(R.string.profile_posts_count, formatCount(profile.postsCount, locale)),
     )
 }
+
+/** ヘッダ画像が隠れていくとき、トップバーが透明から不透明に変わるまでのスクロール量。 */
+private val BarFadeDistance = 32.dp

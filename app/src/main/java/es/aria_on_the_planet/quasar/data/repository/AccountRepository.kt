@@ -16,6 +16,9 @@ import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -28,6 +31,9 @@ data class CurrentAccount(
     val defaultSensitive: Boolean,
 )
 
+/** 自分の操作で [accountId] との関係が [relationship] に変わった。 */
+data class RelationshipChange(val accountId: String, val relationship: Relationship)
+
 /** キャッシュから読んだ値。[isFresh] なら API を呼ばなくてよい (引っ張って更新したときを除く)。 */
 data class CacheHit<T>(val value: T, val isFresh: Boolean)
 
@@ -39,8 +45,20 @@ class AccountRepository(
     private val api: MastodonApi,
     private val cache: EntityCache,
 ) {
+    private val changes = MutableSharedFlow<RelationshipChange>(extraBufferCapacity = 16)
+
+    /**
+     * 自分の操作 (フォロー・ブロック・ミュート・ブーストの非表示等) で変わった関係。ブロック・ミュートした相手のポストを
+     * 各画面の一覧から消すのに使う ([es.aria_on_the_planet.quasar.domain.model.isHiddenBy])。
+     */
+    val relationshipChanges: SharedFlow<RelationshipChange> = changes.asSharedFlow()
+
     private val meMutex = Mutex()
+    @Volatile
     private var me: Pair<Session, CurrentAccount>? = null
+
+    /** 取得済みならログイン中のアカウント ([fetchMe] のキャッシュ)。待たずに返す。 */
+    fun cachedMe(session: Session): CurrentAccount? = me?.takeIf { it.first == session }?.second
 
     /** ログイン中のアカウント。セッションごとにメモリへキャッシュする。 */
     suspend fun fetchMe(session: Session): CurrentAccount =
@@ -126,17 +144,28 @@ class AccountRepository(
         cache.relationship(accountId)?.let { CacheHit(it.value.toDomain(), it.isFresh(CachePolicy.RelationshipTtlMillis)) }
 
     /** [accountId] をフォローする (`follow = false` ならフォロー / リクエストをやめる)。更新後の関係を返す。 */
-    suspend fun setFollowing(session: Session, accountId: String, follow: Boolean): Relationship {
-        val version = cache.issue()
-        val relationship = api.follow(session.serverUrl, session.accessToken, accountId, follow)
-        onRelationshipChanged(accountId, relationship, version)
-        return relationship.toDomain()
-    }
+    suspend fun setFollowing(session: Session, accountId: String, follow: Boolean): Relationship =
+        changeRelationship(accountId) { api.follow(session.serverUrl, session.accessToken, accountId, follow) }
 
     /** [accountId] から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。更新後の関係を返す。 */
-    suspend fun answerFollowRequest(session: Session, accountId: String, accept: Boolean): Relationship {
+    suspend fun answerFollowRequest(session: Session, accountId: String, accept: Boolean): Relationship =
+        changeRelationship(accountId) { api.answerFollowRequest(session.serverUrl, session.accessToken, accountId, accept) }
+
+    /** [accountId] をブロックする (`block = false` なら解除)。ブロックするとフォロー・フォローされている関係も切れる。 */
+    suspend fun setBlocking(session: Session, accountId: String, block: Boolean): Relationship =
+        changeRelationship(accountId) { api.block(session.serverUrl, session.accessToken, accountId, block) }
+
+    /** [accountId] をミュートする (`mute = false` なら解除)。期限なし・通知もミュート。 */
+    suspend fun setMuting(session: Session, accountId: String, mute: Boolean): Relationship =
+        changeRelationship(accountId) { api.mute(session.serverUrl, session.accessToken, accountId, mute) }
+
+    /** フォロー中の [accountId] のブーストを出すか。フォローしていないときは呼ばない (フォローになってしまう)。 */
+    suspend fun setShowingReblogs(session: Session, accountId: String, show: Boolean): Relationship =
+        changeRelationship(accountId) { api.setShowingReblogs(session.serverUrl, session.accessToken, accountId, show) }
+
+    private suspend fun changeRelationship(accountId: String, request: suspend () -> RelationshipDto): Relationship {
         val version = cache.issue()
-        val relationship = api.answerFollowRequest(session.serverUrl, session.accessToken, accountId, accept)
+        val relationship = request()
         onRelationshipChanged(accountId, relationship, version)
         return relationship.toDomain()
     }
@@ -145,6 +174,7 @@ class AccountRepository(
     private suspend fun onRelationshipChanged(accountId: String, relationship: RelationshipDto, version: Long) {
         cache.putRelationships(listOf(relationship), version)
         cache.invalidateAccount(accountId)
+        changes.tryEmit(RelationshipChange(accountId, relationship.toDomain()))
     }
 
     /** ピン留めされたポスト。サーバによっては多いため [MaxPinnedPosts] 件で打ち切る。 */

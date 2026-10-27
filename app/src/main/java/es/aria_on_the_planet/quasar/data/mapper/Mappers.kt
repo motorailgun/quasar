@@ -55,6 +55,7 @@ fun AccountDto.toDomain() = User(
     note = note,
     emojis = emojis.map { it.toDomain() },
     iconStaticUrl = avatarStatic ?: avatar,
+    url = url,
 )
 
 fun AccountDto.toProfile() = Profile(
@@ -79,6 +80,8 @@ fun RelationshipDto.toDomain() = Relationship(
     requestedBy = requestedBy,
     blocking = blocking,
     blockedBy = blockedBy,
+    muting = muting,
+    showingReblogs = showingReblogs,
 )
 
 fun FieldDto.toDomain() = ProfileField(
@@ -132,6 +135,7 @@ fun StatusDto.toDomain(): Post {
         inReplyToAcct = body.replyTargetAcct(),
         mentions = body.mentions.map { Mention(it.id, it.username, it.acct, it.url) },
         tags = body.tags.map { Hashtag(it.name, it.url) },
+        url = body.url ?: body.uri,
     )
 }
 

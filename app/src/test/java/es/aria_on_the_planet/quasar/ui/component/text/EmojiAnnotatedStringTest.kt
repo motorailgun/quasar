@@ -54,4 +54,16 @@ class EmojiAnnotatedStringTest {
         val quoted = """<p class="quote-inline">RE: <a href="https://e/@a/1">e/@a/1</a></p><p>a</p><p>b</p>"""
         assertEquals("<p>a<br><br>b</p>", simplifyMastodonHtml(quoted))
     }
+
+    @Test
+    fun copyKeepsFullUrls() {
+        val html = """<p>see <a href="https://example.com/very/long"><span class="invisible">https://</span><span class="ellipsis">example.com/ve</span><span class="invisible">ry/long</span></a></p><p>next</p>"""
+        assertEquals(
+            """<p>see <a href="https://example.com/very/long">https://example.com/very/long</a><br><br>next</p>""",
+            mastodonHtmlForCopy(html),
+        )
+        // 引用のフォールバックは除く
+        val quoted = """<p class="quote-inline">RE: <a href="https://e/@a/1">e/@a/1</a></p><p>body</p>"""
+        assertEquals("<p>body</p>", mastodonHtmlForCopy(quoted))
+    }
 }

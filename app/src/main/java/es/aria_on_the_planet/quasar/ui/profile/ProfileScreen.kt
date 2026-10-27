@@ -49,6 +49,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.component.account.AccountAction
+import es.aria_on_the_planet.quasar.ui.component.account.AccountActionType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -99,6 +101,7 @@ fun ProfileScreen(
         onLoadMore = viewModel::loadMore,
         onSetFollowing = viewModel::setFollowing,
         onAnswerFollowRequest = viewModel::answerFollowRequest,
+        onAccountAction = viewModel::performAccountAction,
         onUserClick = onUserClick,
         onPostClick = onPostClick,
         onMediaClick = onMediaClick,
@@ -123,6 +126,7 @@ fun ProfileContent(
     onLoadMore: (ProfileTab) -> Unit,
     onSetFollowing: (Boolean) -> Unit,
     onAnswerFollowRequest: (Boolean) -> Unit,
+    onAccountAction: (AccountAction) -> Unit,
     onUserClick: (User) -> Unit,
     onPostClick: (Post) -> Unit,
     onMediaClick: (MediaClick) -> Unit,
@@ -185,6 +189,11 @@ fun ProfileContent(
         isRefreshing = profile != null && (state.profile.isRefreshing || (feed.isRefreshing && feed.loaded)),
         onRefresh = onRefresh,
         revealedTitle = profile?.let { { ProfileTitle(it) } },
+        actions = { barAlpha ->
+            if (profile != null) {
+                ProfileMenu(profile = profile, state = state.button, onAccountAction = onAccountAction, barAlpha = barAlpha)
+            }
+        },
     ) { scaffoldBarHeight ->
         when {
             profile == null && state.profile.error != null ->
@@ -239,6 +248,7 @@ fun ProfileContent(
                                 state = state.button,
                                 profile = profile,
                                 onSetFollowing = onSetFollowing,
+                                onUnblock = { onAccountAction(AccountAction(AccountActionType.Block, undo = true)) },
                                 // プロフィール編集は未実装
                                 onEditProfile = {},
                             )

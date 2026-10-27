@@ -1,6 +1,8 @@
 [
  {
   "id": "1025",
+  "url": "https://gallery.invalid/@alice/1025",
+  "uri": "https://gallery.invalid/users/alice/statuses/1025",
   "created_at": "2025-12-31T23:35:00.000Z",
   "account": {
    "id": "1",
@@ -92,6 +94,8 @@
  },
  {
   "id": "1026",
+  "url": "https://gallery.invalid/@alice/1026",
+  "uri": "https://gallery.invalid/users/alice/statuses/1026",
   "created_at": "2025-12-31T23:34:00.000Z",
   "account": {
    "id": "1",

@@ -16,7 +16,12 @@ data class User(
     val emojis: List<CustomEmoji>,
     /** アイコンのアニメーションしない版 (`avatar_static`)。 */
     val iconStaticUrl: String = iconUrl,
+    /** 所属サーバでのプロフィールのページ (`Account.url`)。 */
+    val url: String? = null,
 ) {
+    /** 接続中サーバ以外のユーザーか (`acct` にドメインが付く)。 */
+    val isRemote: Boolean get() = '@' in screenName
+
     /** ドメインを含む `username@domain` 形式。ローカルユーザーにも所属サーバのドメインを付ける。 */
     val fullScreenName: String
         get() = if ('@' in screenName) screenName else "$screenName@${serverUrl.substringAfter("://")}"

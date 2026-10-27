@@ -73,6 +73,8 @@ es.aria_on_the_planet.quasar
     │   ├── image/                  RemoteImage / LocalImage (画像表示の唯一の入口) + ImageKind / BlurHash デコーダ + プレースホルダ Painter
     │   │   └── loader/             Coil の ImageLoader とデコーダ (AnimationGate / APNG のデコーダ・再生・時刻計算・ヘッダの判定)
     │   ├── link/NewTaskUriHandler.kt 外部リンクを開く (NEW_TASK 付き。LocalUriHandler として提供)
+    │   ├── menu/ActionMenu.kt      ︙のメニュー (画面下からのシート) + MenuItemText (項目の文字、Regular)
+    │   ├── account/AccountActions.kt アカウントへの操作 (ブロック・ミュート・ブーストの非表示) の口 (LocalAccountActions) とメニューの項目
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
@@ -254,6 +256,9 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | ポストをブースト / お気に入りにしたユーザー | `GET /api/v1/statuses/:id/reblogged_by` / `favourited_by` (**Link ヘッダ**でページング。`StatusRepository.fetchRebloggedBy` / `fetchFavouritedBy`) |
 | 相手との関係 | `GET /api/v1/accounts/relationships?id[]=:id` |
 | フォロー / 解除 | `POST /api/v1/accounts/:id/follow` / `unfollow` (鍵アカウントは `requested` になる) |
+| ブロック / 解除 | `POST /api/v1/accounts/:id/block` / `unblock` (応答は Relationship) |
+| ミュート / 解除 | `POST /api/v1/accounts/:id/mute` / `unmute` (期限なし・通知もミュート = API の既定) |
+| ブーストの非表示 / 表示 | `POST /api/v1/accounts/:id/follow` (form `reblogs=false/true`。フォロー中のときだけ。フォロー外だとフォローになる) |
 | 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (応答は Relationship) |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` |
 | 通知 (グループ) | `GET /api/v2/notifications` (Mastodon 4.3+、既定) |
@@ -393,6 +398,26 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ブックマーク。アイコンのタップは通常の操作、件数のタップは `onReactionCountClick(PostActionType.Boost / Favourite)` で
   リアクションしたユーザーの一覧 (`Route.PostReactions`)。
 * `Post` 以外の状態を持たない (stateless)。
+* **ポストのメニュー** (`PostMenu.kt`): 投稿者の行の右端、公開範囲のアイコンのすぐ右 (間の余白なし。︙ のアイコン自体の左右の
+  余白で足りる) の︙ (押せる範囲は外にはみ出させ、行の高さは変えない)。ポスト詳細も投稿者の行 (`PostDetail(menu = ...)`、
+  自分のポストなら編集・削除も)。
+  * メニューは浮かぶメニューではなく**画面下からのシート** (`ActionMenu`、`ModalBottomSheet` に `DropdownMenuItem` を並べる。
+    Material 3 Expressive に下から出るメニューの部品は無い)。区切り線は入れず、項目の文字は `MenuItemText` (メニュー標準の
+    Medium ではなく Regular)。項目を押したらシートを下へ閉じてから確認ダイアログ等を出す。プロフィールのメニューも同じ。
+  * 中身は上から「ブラウザで開く」(接続中サーバの `/@acct/:statusId`)、リモートのポストなら「<ホスト>で開く」(`Status.url`、
+    無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
+    出す)、他人のポストなら「ミュート」・「ブロック」(error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
+    (`domain/model/WebPage.kt`、`WebPageTest`)。
+  * 操作の口は `LocalAccountActions` (`ui/component/account/AccountActions.kt`、`QuasarNavHost` が `SessionAccountActions` を
+    提供)。無い所ではメニュー自体を出さない (ギャラリーは手元だけで関係を持つ `GalleryAccountActions` を提供)。関係はメニューを開くたびに読む (キャッシュが新しければそれ)。
+  * 読み込みの前後でメニューの高さを変えない: 項目 (ミュート・ブロック・ブーストの非表示) は常に 3 つ出し、使えないものは
+    グレーアウトする (`AccountActionMenuItems`)。読み込むまでは仮の関係 (`ProvisionalRelationship`: ブロック・ミュートしていない)
+    でミュート・ブロックを押せるようにしておく (ミュート・ブロックの API は済みでも成功するので先に押されても困らない)。ブーストの
+    非表示はフォローしているか分かるまで、分かった後もフォロー外ならグレーアウト。自分のポストかは `AccountActions.myAccountId`
+    (`fetchMe` のキャッシュ) で判断し、まだ分からなければ 3 つともグレーアウト。プロフィールも送信中は 3 つともグレーアウト。
+  * ブロック・ミュートは設定に関わらず `ConfirmDialog` で確認する (解除・ブーストの表示切り替えは確認しない)。失敗は Toast。
+  * 成功すると `AccountRepository.relationshipChanges` に流れ、タイムライン・ハッシュタグの一覧がその相手のポスト・ブーストを
+    除く (`Post.isHiddenBy`、`PostFeed.hidePostsBy`)。通知・スレッド・プロフィールの一覧からは消さない。
 
 ### PostList (`ui/component/post/PostList.kt`)
 ポストの集合。タイムライン以外 (プロフィールの投稿一覧など) でも使う。
@@ -537,12 +562,17 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     * NotFollowing: Follow (塗り)。相手からフォローされていれば Follow back、**鍵アカウントなら Request to follow** (リクエスト送信)。
     * Requested (リクエスト送信済み・承認待ち。リモートの応答待ちでも立つ): Requested (枠線)。押すとリクエストの取り下げ (`unfollow`)。
     * Following: Following (枠線)。押すと解除。
-    * Blocking / BlockedBy: 押せないボタン (ブロック解除は未実装)。
+    * Blocking: Unblock (枠線、確認なし)。BlockedBy: 押せない Follow。
     フォロー・リクエスト送信・解除・取り下げはどれも `ConfirmDialog` で確認してから `ProfileViewModel.setFollowing`。
     成功したら応答の関係で置き換え (鍵アカウントへの follow は `requested = true` で返る)、フォロワー数を手元で ±1。失敗はログのみで元に戻す。
   * **引っ越し済みのアカウント** (`Account.moved` → `Profile.movedTo`): ヘッダ画像の上に「Moved to:」(引っ越し先:) と、その下に
     ↳ (`SubdirectoryArrowRight`) + 引っ越し先のアイコン・表示名・@acct の行 (`MovedTo`)。行全体のタップで引っ越し先のプロフィール (`onUserClick`)。フォローボタンは
     NotFollowing なら押せない Follow (フォロー中・リクエスト中なら解除・取り下げはできる)。フォロー / フォロワー一覧はそのまま開ける。
+  * **メニュー** (`ProfileMenu`): トップバーの右端の︙。戻るボタンと同じ `OverlayBarIconButton` (`OverlayDetailScaffold(actions = ...)`。
+    ヘッダ画像の上では丸い下地を敷き、バーが不透明になるにつれて普通のアイコンになる)。メニューはポストと同じ下からのシート
+    (`ActionMenu`)。ブラウザで開く / リモートなら所属サーバで開く (`Account.url`) /
+    他人ならミュート・ブロック・ブーストの非表示 (フォロー中のみ) (ラベルは「ブロック」等の短い形、`AccountActionMenuItems(named = false)`)。
+    `ProfileViewModel.performAccountAction` が応答の関係で置き換える (ブロックでフォローが切れたらフォロワー数を手元で -1)。
   * @acct の横に相手 → 自分の関係のラベル: `followed_by` なら「Follows you」。
   * **相手からのフォローリクエスト** (`requested_by`、Mastodon 4.1+): 統計の下に `FollowRequestCard` (`OutlinedCard` に
     「**名前** has requested to follow you」+ Expressive の `ButtonGroup` で承認 (`Button`) / 拒否 (`OutlinedButton`)、どちらも
@@ -597,7 +627,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     中身はフォロー一覧と同じ `UserFeedList` (各タブは開いたときに読む、PTR・追加読み込みあり)。タップでプロフィール。
     画面は `PostReactionsScreen` (ViewModel を持つ) → `PostReactionsContent` (状態とコールバックだけ。ギャラリーからも使う)。
   * **自分のポストの編集・削除**: 本体が自分のポスト (`fetchMe` の ID と投稿者が一致) なら、`PostDetail(menu = ...)` で投稿者行の
-    右端に︙ (`OwnPostMenu`: 編集 / error 色の削除)。
+    右端に︙ (`PostMenu(own = ...)`: 編集 / error 色の削除 + 他人のポストと同じブラウザで開く・本文をコピー)。
     * 編集: `PostViewModel.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
       を作る。**`DraftStore` の下書きとは別**で、ポスト画面の上に `ComposerScreen` を重ねる。中身は純粋関数 `editDraftOf`
       (`PostEditTest`): 添付は投稿済みのメディアを Uploaded 扱い、投票の期間は残り時間に最も近い選択肢 (編集で数え直しになる)。
@@ -1138,9 +1168,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ### 実機での確認 (adb)
 * **開発環境のメモリに余裕があるとき (`free -g` の available が 8GB 以上が目安) は、エミュレーターで動作確認する**。
   つながっている端末が無い・寝ているときに確認を諦めたりユーザーに頼んだりせず、自分で立ち上げる:
-  `~/Android/Sdk/emulator/emulator -list-avds` で AVD (今は `Pixel_10a`) を確かめ、
-  `emulator -avd Pixel_10a -no-snapshot-save -no-audio -no-boot-anim -no-window` をバックグラウンドで起動 →
-  `adb wait-for-device` の後 `sys.boot_completed` が 1 になるまで待つ → `installDebug`。
+  SDK は `~/Library/Android/sdk`。AVD は `~/.android/bin/android-cli emulator list` で確かめ (今は `medium_phone`。無ければ
+  `android-cli emulator create` で作る。avdmanager は入っていない)、`android-cli emulator start medium_phone` をバックグラウンドで
+  起動 (起動し終わるまで待って返る) → `installDebug` (`ANDROID_SERIAL=emulator-5554` で端末を絞る)。
   エミュレーターは未ログインのことが多い (ログイン画面以外は開けない)。まずギャラリーにシナリオを足して確かめ、それでも足りない
   (実際の API・遷移を通したい) ときはその旨をユーザーに伝える。メモリに余裕が無いときは下記の実機を使う。
 * 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。

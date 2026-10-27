@@ -17,6 +17,7 @@ import es.aria_on_the_planet.quasar.ui.feed.PostActionController
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
+import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
@@ -68,6 +69,7 @@ class TimelineViewModel(
     private val repository: TimelineRepository,
     private val statusRepository: StatusRepository,
     private val notificationRepository: NotificationRepository,
+    private val accountRepository: AccountRepository,
     private val streamingClient: StreamingClient,
     /** 設定 (読み込み後の値の流れ)。自動更新するカラムと通知の取得 API を決める。 */
     private val settings: Flow<AppSettings>,
@@ -104,6 +106,10 @@ class TimelineViewModel(
 
     init {
         refresh(selected.value)
+        // ブロック・ミュート等をしたら、その相手のポスト・ブーストを一覧から除く
+        viewModelScope.launch {
+            accountRepository.relationshipChanges.collect { change -> feeds.values.forEach { it.hidePostsBy(change) } }
+        }
         // 通知の取得 API を切り替えたら、混ざらないよう読み直す (未読み込みなら開いたときに新しい方で読む)
         viewModelScope.launch {
             settings.map { it.notificationApi }.distinctUntilChanged().drop(1).collect {

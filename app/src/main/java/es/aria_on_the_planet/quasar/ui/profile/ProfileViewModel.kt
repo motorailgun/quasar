@@ -10,6 +10,8 @@ import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
+import es.aria_on_the_planet.quasar.ui.component.account.AccountAction
+import es.aria_on_the_planet.quasar.ui.component.account.AccountActionType
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -205,6 +207,35 @@ class ProfileViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to ${if (follow) "follow" else "unfollow"}", e)
+                button.update { (it as? ProfileButtonState.Follow)?.copy(isUpdating = false) ?: it }
+            }
+        }
+    }
+
+    /** ブロック・ミュート・ブーストの非表示 (またはその取り消し) を行う。確認は画面側で済ませてから呼ぶ。 */
+    fun performAccountAction(action: AccountAction) {
+        val current = button.value as? ProfileButtonState.Follow ?: return
+        if (current.isUpdating) return
+        button.value = current.copy(isUpdating = true)
+        viewModelScope.launch {
+            try {
+                val updated = when (action.type) {
+                    AccountActionType.Block -> repository.setBlocking(session, accountId, block = !action.undo)
+                    AccountActionType.Mute -> repository.setMuting(session, accountId, mute = !action.undo)
+                    AccountActionType.HideBoosts -> repository.setShowingReblogs(session, accountId, show = action.undo)
+                }
+                button.update { (it as? ProfileButtonState.Follow)?.copy(relationship = updated, isUpdating = false) ?: it }
+                // ブロックするとフォローが切れる。フォロワー数はプロフィールを読み直さずに手元で合わせる
+                val delta = updated.following.toInt() - current.relationship.following.toInt()
+                if (delta != 0) {
+                    profile.update { s ->
+                        s.copy(profile = s.profile?.let { it.copy(followersCount = (it.followersCount + delta).coerceAtLeast(0)) })
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to ${action.type} (undo = ${action.undo})", e)
                 button.update { (it as? ProfileButtonState.Follow)?.copy(isUpdating = false) ?: it }
             }
         }

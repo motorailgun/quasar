@@ -1,6 +1,8 @@
 [
  {
   "id": "1009",
+  "url": "https://gallery.invalid/@bob/1009",
+  "uri": "https://gallery.invalid/users/bob/statuses/1009",
   "created_at": "2025-12-31T23:51:00.000Z",
   "account": {
    "id": "2",
@@ -43,6 +45,8 @@
  },
  {
   "id": "1010",
+  "url": "https://gallery.invalid/@carol/1010",
+  "uri": "https://gallery.invalid/users/carol/statuses/1010",
   "created_at": "2025-12-31T23:50:00.000Z",
   "account": {
    "id": "3",
@@ -78,6 +82,8 @@
  },
  {
   "id": "1011",
+  "url": "https://remote.invalid/@dave/1011",
+  "uri": "https://remote.invalid/users/dave/statuses/1011",
   "created_at": "2025-12-31T23:49:00.000Z",
   "account": {
    "id": "4",
@@ -105,6 +111,8 @@
  },
  {
   "id": "1012",
+  "url": "https://gallery.invalid/@alice/1012",
+  "uri": "https://gallery.invalid/users/alice/statuses/1012",
   "created_at": "2025-12-31T23:48:00.000Z",
   "account": {
    "id": "1",
@@ -132,6 +140,8 @@
  },
  {
   "id": "1013",
+  "url": "https://gallery.invalid/@bob/1013",
+  "uri": "https://gallery.invalid/users/bob/statuses/1013",
   "created_at": "2025-12-31T23:47:00.000Z",
   "account": {
    "id": "2",
@@ -174,6 +184,8 @@
  },
  {
   "id": "1014",
+  "url": "https://gallery.invalid/@carol/1014",
+  "uri": "https://gallery.invalid/users/carol/statuses/1014",
   "created_at": "2025-12-31T23:46:00.000Z",
   "account": {
    "id": "3",
@@ -209,6 +221,8 @@
  },
  {
   "id": "1015",
+  "url": "https://remote.invalid/@dave/1015",
+  "uri": "https://remote.invalid/users/dave/statuses/1015",
   "created_at": "2025-12-31T23:45:00.000Z",
   "account": {
    "id": "4",
@@ -236,6 +250,8 @@
  },
  {
   "id": "1016",
+  "url": "https://gallery.invalid/@alice/1016",
+  "uri": "https://gallery.invalid/users/alice/statuses/1016",
   "created_at": "2025-12-31T23:44:00.000Z",
   "account": {
    "id": "1",
@@ -263,6 +279,8 @@
  },
  {
   "id": "1017",
+  "url": "https://gallery.invalid/@bob/1017",
+  "uri": "https://gallery.invalid/users/bob/statuses/1017",
   "created_at": "2025-12-31T23:43:00.000Z",
   "account": {
    "id": "2",
@@ -305,6 +323,8 @@
  },
  {
   "id": "1018",
+  "url": "https://gallery.invalid/@carol/1018",
+  "uri": "https://gallery.invalid/users/carol/statuses/1018",
   "created_at": "2025-12-31T23:42:00.000Z",
   "account": {
    "id": "3",
@@ -340,6 +360,8 @@
  },
  {
   "id": "1019",
+  "url": "https://remote.invalid/@dave/1019",
+  "uri": "https://remote.invalid/users/dave/statuses/1019",
   "created_at": "2025-12-31T23:41:00.000Z",
   "account": {
    "id": "4",
@@ -367,6 +389,8 @@
  },
  {
   "id": "1020",
+  "url": "https://gallery.invalid/@alice/1020",
+  "uri": "https://gallery.invalid/users/alice/statuses/1020",
   "created_at": "2025-12-31T23:40:00.000Z",
   "account": {
    "id": "1",
@@ -394,6 +418,8 @@
  },
  {
   "id": "1021",
+  "url": "https://gallery.invalid/@bob/1021",
+  "uri": "https://gallery.invalid/users/bob/statuses/1021",
   "created_at": "2025-12-31T23:39:00.000Z",
   "account": {
    "id": "2",
@@ -436,6 +462,8 @@
  },
  {
   "id": "1022",
+  "url": "https://gallery.invalid/@carol/1022",
+  "uri": "https://gallery.invalid/users/carol/statuses/1022",
   "created_at": "2025-12-31T23:38:00.000Z",
   "account": {
    "id": "3",
@@ -471,6 +499,8 @@
  },
  {
   "id": "1023",
+  "url": "https://remote.invalid/@dave/1023",
+  "uri": "https://remote.invalid/users/dave/statuses/1023",
   "created_at": "2025-12-31T23:37:00.000Z",
   "account": {
    "id": "4",
@@ -498,6 +528,8 @@
  },
  {
   "id": "1024",
+  "url": "https://gallery.invalid/@alice/1024",
+  "uri": "https://gallery.invalid/users/alice/statuses/1024",
   "created_at": "2025-12-31T23:36:00.000Z",
   "account": {
    "id": "1",

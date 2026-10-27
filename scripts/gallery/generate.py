@@ -197,8 +197,12 @@ class Statuses:
 
     def make(self, acc, content, emojis=(), **extra):
         self.n += 1
+        status_id = str(1000 + self.n)
         data = {
-            "id": str(1000 + self.n),
+            "id": status_id,
+            # 投稿者のサーバのページ (リモートなら「<ホスト> で開く」がメニューに出る)
+            "url": f"{acc['url']}/{status_id}",
+            "uri": f"{acc['url'].rsplit('/@', 1)[0]}/users/{acc['username']}/statuses/{status_id}",
             "created_at": (CREATED_AT - timedelta(minutes=self.n)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "account": acc,
             "content": content, "visibility": "public", "emojis": list(emojis),

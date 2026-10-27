@@ -61,6 +61,8 @@
  "statuses": [
   {
    "id": "1027",
+   "url": "https://gallery.invalid/@gallery/1027",
+   "uri": "https://gallery.invalid/users/gallery/statuses/1027",
    "created_at": "2025-12-31T23:33:00.000Z",
    "account": {
     "id": "6",
@@ -138,6 +140,8 @@
   },
   {
    "id": "1028",
+   "url": "https://gallery.invalid/@gallery/1028",
+   "uri": "https://gallery.invalid/users/gallery/statuses/1028",
    "created_at": "2025-12-31T23:32:00.000Z",
    "account": {
     "id": "6",
@@ -215,6 +219,8 @@
   },
   {
    "id": "1029",
+   "url": "https://gallery.invalid/@gallery/1029",
+   "uri": "https://gallery.invalid/users/gallery/statuses/1029",
    "created_at": "2025-12-31T23:31:00.000Z",
    "account": {
     "id": "6",
@@ -292,6 +298,8 @@
   },
   {
    "id": "1030",
+   "url": "https://gallery.invalid/@gallery/1030",
+   "uri": "https://gallery.invalid/users/gallery/statuses/1030",
    "created_at": "2025-12-31T23:30:00.000Z",
    "account": {
     "id": "6",
@@ -369,6 +377,8 @@
   },
   {
    "id": "1031",
+   "url": "https://gallery.invalid/@gallery/1031",
+   "uri": "https://gallery.invalid/users/gallery/statuses/1031",
    "created_at": "2025-12-31T23:29:00.000Z",
    "account": {
     "id": "6",
@@ -446,6 +456,8 @@
   },
   {
    "id": "1032",
+   "url": "https://gallery.invalid/@gallery/1032",
+   "uri": "https://gallery.invalid/users/gallery/statuses/1032",
    "created_at": "2025-12-31T23:28:00.000Z",
    "account": {
     "id": "6",

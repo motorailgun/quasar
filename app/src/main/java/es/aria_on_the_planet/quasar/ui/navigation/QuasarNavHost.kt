@@ -22,6 +22,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
@@ -108,7 +109,9 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     val backDamping = remember { PredictiveBackDamping() }
     val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
     SideEffect { settings?.let { backDamping.settings = it.predictiveBack } }
-    CompositionLocalProvider(LocalNavigator provides navigator) {
+    // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
+    val accountActions = remember(current) { current?.let { SessionAccountActions(it, container.accountRepository) } }
+    CompositionLocalProvider(LocalNavigator provides navigator, LocalAccountActions provides accountActions) {
         NavDisplay(
             backStack = backStack,
             onBack = {
@@ -237,6 +240,7 @@ private fun TimelineEntry(container: AppContainer, session: Session) {
                     container.timelineRepository,
                     container.statusRepository,
                     container.notificationRepository,
+                    container.accountRepository,
                     container.streamingClient,
                     container.settingsStore.loaded,
                 )
@@ -296,7 +300,15 @@ private fun FollowListEntry(container: AppContainer, session: Session, key: Rout
 private fun HashtagEntry(container: AppContainer, session: Session, key: Route.Hashtag, navigator: Navigator) {
     val viewModel: HashtagViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { HashtagViewModel(session, key.name, container.timelineRepository, container.statusRepository) }
+            initializer {
+                HashtagViewModel(
+                    session,
+                    key.name,
+                    container.timelineRepository,
+                    container.statusRepository,
+                    container.accountRepository,
+                )
+            }
         },
     )
     HashtagScreen(

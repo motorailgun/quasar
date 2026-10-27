@@ -1,6 +1,8 @@
 package es.aria_on_the_planet.quasar.ui.feed
 
+import es.aria_on_the_planet.quasar.data.repository.RelationshipChange
 import es.aria_on_the_planet.quasar.domain.model.Page
+import es.aria_on_the_planet.quasar.domain.model.isHiddenBy
 import es.aria_on_the_planet.quasar.domain.model.Post
 import kotlinx.coroutines.CoroutineScope
 
@@ -41,4 +43,8 @@ class PostFeed private constructor(
 
     /** 読み込み済みのポストを書き換える (投票結果の反映など)。 */
     fun updatePosts(transform: (Post) -> Post) = updateList { it.mapPosts(transform) }
+
+    /** [change] で見えなくなったポスト (ブロック・ミュートした相手のポスト等、[isHiddenBy]) を除く。 */
+    fun hidePostsBy(change: RelationshipChange) =
+        updateList { items -> removePosts(items) { it.isHiddenBy(change.accountId, change.relationship) } }
 }

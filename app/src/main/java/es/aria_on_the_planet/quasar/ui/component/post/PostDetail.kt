@@ -45,7 +45,7 @@ object PostDetailDefaults {
 /**
  * ポスト詳細画面の主役となるポスト。[PostCard] と同じ要素を、本文を大きく・詳細な投稿日時付きで表示する。
  *
- * @param menu 投稿者の行の右端 (公開範囲のアイコンの右) に出すもの (自分のポストのメニュー)。
+ * @param menu 投稿者の行の右端 (公開範囲のアイコンの右) に出すもの (ポストのメニュー [PostMenu])。
  * @param reactionDetail アクション行のブースト・お気に入りの件数を「N boosts」「M favourites」で出し、件数のタップで
  *   [onReactionCountClick] (リアクションしたユーザーの一覧) を呼ぶ ([PostActionRow] の同名の引数)。
  */

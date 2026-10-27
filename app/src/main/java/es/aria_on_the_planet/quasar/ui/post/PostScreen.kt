@@ -49,6 +49,8 @@ import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
 import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
+import es.aria_on_the_planet.quasar.ui.component.post.PostMenu
+import es.aria_on_the_planet.quasar.ui.component.post.OwnPostMenuActions
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
@@ -73,7 +75,7 @@ private val AvatarTopY = ThreadLineDefaults.AvatarTopY
  * 前面に来るたびに付け、離れるときに何も書いていなければ外す (下書きを共有しているので、外さないと
  * タイムラインのバーまで返信になる)。重ねて開いたポスト画面の間でも、前面の画面の本体が返信先になる。
  *
- * 本体が自分のポストなら投稿者の行に︙メニュー ([OwnPostMenu]) を出す。編集はフルの投稿画面をこの画面に重ねて
+ * 本体の投稿者の行に︙メニュー ([PostMenu]。ブラウザで開く・ブロック等) を出し、自分のポストなら編集・削除も。編集はフルの投稿画面をこの画面に重ねて
  * 開き (下書きとは別の投稿欄 [PostViewModel.editor])、保存したら本体を差し替える。削除したら画面を閉じる。
  * どちらも設定に従って確認する (保存の確認は投稿画面の送信ボタンが行う)。
  */
@@ -124,22 +126,25 @@ fun PostScreen(
     }
     val confirmer = LocalActionConfirmer.current
     val scope = rememberCoroutineScope()
-    val ownPostMenu: (@Composable () -> Unit)? = if (state.isMine) {
-        {
-            OwnPostMenu(
-                onEdit = viewModel::startEdit,
-                onDelete = {
-                    scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                        if (confirmer.confirm(ConfirmTarget.DeletePost)) viewModel.delete()
-                    }
-                },
-                busy = state.ownPostBusy,
-                // ボタンの余白の分だけ右へ出し、︙を本文の右端に揃える
-                modifier = Modifier.offset(x = 12.dp),
-            )
-        }
-    } else {
-        null
+    val postMenu: @Composable (Post) -> Unit = { post ->
+        PostMenu(
+            post = post,
+            own = if (state.isMine) {
+                OwnPostMenuActions(
+                    onEdit = viewModel::startEdit,
+                    onDelete = {
+                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            if (confirmer.confirm(ConfirmTarget.DeletePost)) viewModel.delete()
+                        }
+                    },
+                )
+            } else {
+                null
+            },
+            busy = state.ownPostBusy,
+            // ボタンの余白の分だけ右へ出し、︙を本文の右端に揃える
+            modifier = Modifier.offset(x = 12.dp),
+        )
     }
 
     val listState = rememberLazyListState()
@@ -230,7 +235,7 @@ fun PostScreen(
                                     onAction = onAction,
                                     onReply = onReply,
                                     onHashtagClick = onHashtagClick,
-                                    menu = ownPostMenu,
+                                    menu = { postMenu(thread.post) },
                                     reactionDetail = true,
                                     onReactionCountClick = onReactionCountClick,
                                 )

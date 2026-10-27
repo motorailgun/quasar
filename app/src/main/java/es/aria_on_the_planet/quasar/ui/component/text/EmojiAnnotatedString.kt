@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.ui.component.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.fromHtml
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 
 private val ShortcodeRegex = Regex(""":([A-Za-z0-9_]+):""")
@@ -56,3 +57,17 @@ internal fun simplifyMastodonHtml(html: String): String = html
     .replace(InvisibleSpanRegex, "")
     .replace(EllipsisSpanRegex, "$1…")
     .replace(ParagraphBreakRegex, "<br><br>")
+
+private val ShortenedUrlSpanRegex = Regex("""<span class="(?:invisible|ellipsis)">([^<]*)</span>""")
+
+/**
+ * コピー用に Mastodon の HTML を整形する。[simplifyMastodonHtml] と違い、短縮表示の URL は省略せず全体を残す
+ * (invisible / ellipsis の span を外して中身をつなげる)。
+ */
+internal fun mastodonHtmlForCopy(html: String): String = html
+    .replace(QuoteInlineRegex, "")
+    .replace(ShortenedUrlSpanRegex, "$1")
+    .replace(ParagraphBreakRegex, "<br><br>")
+
+/** ポストの本文 (HTML) のプレーンテキスト (コピー用)。リンクは表示上の文字列、URL は省略しない。 */
+fun postPlainText(html: String): String = AnnotatedString.fromHtml(mastodonHtmlForCopy(html)).text.trim()

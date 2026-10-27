@@ -393,6 +393,27 @@ class MastodonApi(
         post(serverUrl, accessToken, "api/v1/accounts/$id/${if (follow) "follow" else "unfollow"}") {}
 
     /**
+     * フォロー中の相手 [id] のブーストをホーム等に出すか (https://docs.joinmastodon.org/methods/accounts/#follow の `reblogs`)。
+     * フォローし直す形で変える (フォロー中でなければ新たにフォローになるので、呼び出し側でフォロー中のときだけ呼ぶ)。
+     */
+    suspend fun setShowingReblogs(serverUrl: String, accessToken: String, id: String, show: Boolean): RelationshipDto =
+        post(serverUrl, accessToken, "api/v1/accounts/$id/follow") { add("reblogs", show.toString()) }
+
+    /**
+     * ブロックする (https://docs.joinmastodon.org/methods/accounts/#block) / 解除する
+     * (https://docs.joinmastodon.org/methods/accounts/#unblock)。要認証。更新後の関係を返す。
+     */
+    suspend fun block(serverUrl: String, accessToken: String, id: String, block: Boolean): RelationshipDto =
+        post(serverUrl, accessToken, "api/v1/accounts/$id/${if (block) "block" else "unblock"}") {}
+
+    /**
+     * ミュートする (https://docs.joinmastodon.org/methods/accounts/#mute。期限なし・通知もミュート = API の既定) /
+     * 解除する (https://docs.joinmastodon.org/methods/accounts/#unmute)。要認証。更新後の関係を返す。
+     */
+    suspend fun mute(serverUrl: String, accessToken: String, id: String, mute: Boolean): RelationshipDto =
+        post(serverUrl, accessToken, "api/v1/accounts/$id/${if (mute) "mute" else "unmute"}") {}
+
+    /**
      * 相手 [id] から自分へのフォローリクエストを承認する (https://docs.joinmastodon.org/methods/follow_requests/#accept) /
      * 拒否する (https://docs.joinmastodon.org/methods/follow_requests/#reject)。要認証。更新後の関係を返す。
      */

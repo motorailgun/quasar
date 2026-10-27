@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -145,6 +146,7 @@ fun PostCard(
                     post,
                     onAuthorClick = { onUserClick(post.author) },
                     showVisibility = full,
+                    showMenu = full,
                     trailing = authorTrailing,
                 )
                 Spacer(Modifier.size(4.dp))
@@ -254,10 +256,11 @@ private fun AuthorLine(
     post: Post,
     onAuthorClick: () -> Unit,
     showVisibility: Boolean = true,
+    showMenu: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // 表示名 + screenName + 時刻は左に詰め、公開範囲のアイコンは右端に寄せる
+        // 表示名 + screenName + 時刻は左に詰め、公開範囲のアイコンとメニューは右端に寄せる
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             AuthorNameAndTime(post, onAuthorClick)
         }
@@ -266,10 +269,15 @@ private fun AuthorLine(
             trailing()
         } else if (showVisibility && post.visibility.hasIcon) {
             Spacer(Modifier.width(8.dp))
-            // アクション行のアイコンと同じ幅の枠の中央に置き、右端のブックマークと縦に揃える
+            // アクション行のアイコンと同じ幅の枠の中央に置く
             Box(Modifier.size(ActionIconSize), contentAlignment = Alignment.Center) {
                 VisibilityIcon(post.visibility, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+        // ポストのメニュー (︙)。アカウントへの操作の口 (LocalAccountActions) が無い所では出さない
+        if (trailing == null && showMenu && LocalAccountActions.current != null) {
+            // ︙ は細く左右に余白のあるアイコンなので、間を空けずに置いても公開範囲のアイコンとは十分離れて見える
+            PostMenu(post, compact = true)
         }
     }
 }
@@ -568,7 +576,7 @@ private val ReactionDetailGap = 12.dp
 private const val ActionGroupFraction = 3f / 5f
 
 /** アクション行のボタンの左右の余白 (押せる範囲)。 */
-private val ActionPaddingHorizontal = 6.dp
+internal val ActionPaddingHorizontal = 6.dp
 
 /**
  * アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタン ([toggle] が `false` なら
@@ -668,7 +676,7 @@ private fun PostActionButton(
     }
 }
 
-private val ActionIconSize = 18.dp
+internal val ActionIconSize = 18.dp
 
 /**
  * [PostActionButton] のアニメーション (色・押下の縮小・タップでオンにしたときの弾みと粒)。

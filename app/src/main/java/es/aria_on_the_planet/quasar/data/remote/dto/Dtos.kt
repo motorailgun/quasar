@@ -210,6 +210,9 @@ data class RelationshipDto(
     @SerialName("requested_by") val requestedBy: Boolean = false,
     val blocking: Boolean = false,
     @SerialName("blocked_by") val blockedBy: Boolean = false,
+    val muting: Boolean = false,
+    /** フォロー中の相手のブーストをホーム等に出すか (フォローしていなければ意味を持たない)。 */
+    @SerialName("showing_reblogs") val showingReblogs: Boolean = true,
 )
 
 /** https://docs.joinmastodon.org/entities/FamiliarFollowers/ */
@@ -279,6 +282,10 @@ data class StatusDto(
     val id: String,
     @SerialName("created_at") val createdAt: String,
     val account: AccountDto,
+    /** ActivityPub の ID。 */
+    val uri: String? = null,
+    /** 元のサーバでの HTML のページ (無いこともある)。 */
+    val url: String? = null,
     val content: String = "",
     @SerialName("spoiler_text") val spoilerText: String = "",
     val sensitive: Boolean = false,

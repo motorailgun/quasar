@@ -106,6 +106,12 @@ fun removePost(current: List<TimelineItem>, statusId: String): List<TimelineItem
     return if (result.size == current.size) current else result
 }
 
+/** [predicate] に当たるポストを除く (ブロック・ミュートした相手のポスト等)。 */
+fun removePosts(current: List<TimelineItem>, predicate: (Post) -> Boolean): List<TimelineItem> {
+    val result = current.filterNot { it is TimelineItem.PostItem && predicate(it.post) }
+    return if (result.size == current.size) current else result
+}
+
 /** 編集されたポストに差し替える。ブーストとして載っている場合は、外側 (ID・ブーストした人) を保つ。 */
 fun replaceEditedPost(current: List<TimelineItem>, edited: Post): List<TimelineItem> {
     if (current.posts.none { it.statusId == edited.statusId }) return current

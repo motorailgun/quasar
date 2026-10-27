@@ -19,7 +19,7 @@ import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 
 /**
  * プロフィールのヘッダのボタン。自分ならプロフィール編集、他人ならフォローの状態 ([FollowState]) に応じて
- * Follow (鍵アカウントは Request to follow = リクエスト送信) / Requested (送信済み) / Following / Blocked。
+ * Follow (鍵アカウントは Request to follow = リクエスト送信) / Requested (送信済み) / Following / Unblock (ブロック中)。
  * フォロー・リクエスト送信・解除・リクエストの取り下げは、どれも確認ダイアログを経てから [onSetFollowing] を呼ぶ。
  * 引っ越し済みのアカウント ([Profile.movedTo]) は新たにフォローできない (フォロー中・リクエスト中なら解除・取り下げはできる)。
  */
@@ -29,6 +29,7 @@ fun ProfileActionButton(
     state: ProfileButtonState,
     profile: Profile,
     onSetFollowing: (follow: Boolean) -> Unit,
+    onUnblock: () -> Unit,
     onEditProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -40,7 +41,7 @@ fun ProfileActionButton(
                 Text(stringResource(R.string.profile_edit))
             }
 
-        is ProfileButtonState.Follow -> FollowButton(state, profile, onSetFollowing, modifier)
+        is ProfileButtonState.Follow -> FollowButton(state, profile, onSetFollowing, onUnblock, modifier)
     }
 }
 
@@ -50,6 +51,7 @@ private fun FollowButton(
     state: ProfileButtonState.Follow,
     profile: Profile,
     onSetFollowing: (follow: Boolean) -> Unit,
+    onUnblock: () -> Unit,
     modifier: Modifier,
 ) {
     // 確認中の操作 (true = フォロー / リクエスト送信、false = 解除 / リクエスト取り下げ)。null なら確認していない
@@ -90,10 +92,10 @@ private fun FollowButton(
                 Text(stringResource(R.string.profile_following_button))
             }
 
-        // ブロックが絡むとフォローできない (ブロック解除は未実装)
+        // ブロック中はフォローできない。解除は確認しない (取り返しのつかない操作ではない)
         FollowState.Blocking ->
-            OutlinedButton(onClick = {}, modifier = modifier, enabled = false, shapes = shapes) {
-                Text(stringResource(R.string.profile_blocking))
+            OutlinedButton(onClick = onUnblock, modifier = modifier, enabled = enabled, shapes = shapes) {
+                Text(stringResource(R.string.account_unblock))
             }
 
         FollowState.BlockedBy ->

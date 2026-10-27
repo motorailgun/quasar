@@ -13,6 +13,10 @@ data class Relationship(
     val blocking: Boolean = false,
     /** 相手から自分がブロックされている。 */
     val blockedBy: Boolean = false,
+    /** 自分が相手をミュートしている。 */
+    val muting: Boolean = false,
+    /** フォロー中の相手のブーストをホーム等に出す (`false` ならブーストを非表示にしている)。フォローしていなければ意味を持たない。 */
+    val showingReblogs: Boolean = true,
 ) {
     /** 自分 → 相手のフォローの状態。ブロックが絡むとフォローできないので最優先。 */
     val followState: FollowState
@@ -23,6 +27,16 @@ data class Relationship(
             requested -> FollowState.Requested
             else -> FollowState.NotFollowing
         }
+}
+
+/**
+ * [accountId] との関係が [relationship] になったとき、一覧から消すポストか。ブロック・ミュートした相手のポストと、
+ * その相手によるブースト、ブーストを非表示にした相手によるブースト (Mastodon Web と同じ)。
+ */
+fun Post.isHiddenBy(accountId: String, relationship: Relationship): Boolean {
+    val silenced = relationship.blocking || relationship.muting
+    return (author.inServerId == accountId && silenced) ||
+        (boostedBy?.inServerId == accountId && (silenced || (relationship.following && !relationship.showingReblogs)))
 }
 
 enum class FollowState {

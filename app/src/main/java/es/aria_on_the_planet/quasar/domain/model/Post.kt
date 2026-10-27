@@ -42,6 +42,8 @@ data class Post(
     val mentions: List<Mention> = emptyList(),
     /** 本文のハッシュタグ (tags)。本文のハッシュタグのタップに使う。 */
     val tags: List<Hashtag> = emptyList(),
+    /** 元のサーバでのページ (`url`、無ければ `uri`)。 */
+    val url: String? = null,
 )
 
 /** ポストの公開範囲 (visibility)。 */

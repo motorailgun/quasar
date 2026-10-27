@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.mutableFloatStateOf
@@ -145,6 +147,7 @@ fun DetailScaffold(
  * 描画時に読む) で決める。
  * 透明な間は戻るボタンに丸い下地 ([MediaOverlayColors]) を敷き、画像の上でも読めるようにする。
  *
+ * @param actions バーの右端。引数はバーの濃さ ([OverlayBarIconButton] に渡すと戻るボタンと同じ見た目になる)。
  * @param content 引数はバーの高さ (ステータスバー込み)。中身はこの分を上端の余白・畳み切ったときの位置に使う。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,6 +160,7 @@ fun OverlayDetailScaffold(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     revealedTitle: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.(barAlpha: () -> Float) -> Unit = {},
     content: @Composable BoxScope.(barHeight: Dp) -> Unit,
 ) {
     // バーの高さ (px)。面・戻るボタンの濃さを描画時に決めるのに使う (レイアウトには Scaffold の余白を使う)
@@ -177,34 +181,9 @@ fun OverlayDetailScaffold(
                         scrolledContainerColor = Color.Transparent,
                     ),
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            val onSurface = MaterialTheme.colorScheme.onSurface
-                            Box(
-                                Modifier
-                                    .size(36.dp)
-                                    .drawBehind {
-                                        drawCircle(MediaOverlayColors.Scrim.copy(alpha = MediaOverlayColors.Scrim.alpha * (1f - alpha())))
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                // 色は描画時に混ぜる (スクロールのたびに組み直さない)
-                                Icon(
-                                    Symbols.Outlined.ArrowBack,
-                                    stringResource(R.string.back),
-                                    modifier = Modifier
-                                        // SrcIn をアイコンの形だけに効かせるため、先に別のレイヤに描く
-                                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                        .drawWithContent {
-                                            drawContent()
-                                            drawRect(
-                                                lerp(MediaOverlayColors.Content, onSurface, alpha()),
-                                                blendMode = BlendMode.SrcIn,
-                                            )
-                                        },
-                                )
-                            }
-                        }
+                        OverlayBarIconButton(Symbols.Outlined.ArrowBack, stringResource(R.string.back), alpha, onBack)
                     },
+                    actions = { actions(alpha) },
                     title = {
                         AnimatedContent(
                             targetState = showRevealed,
@@ -225,6 +204,46 @@ fun OverlayDetailScaffold(
             indicatorTopPadding = barHeight,
         ) {
             content(barHeight)
+        }
+    }
+}
+
+/**
+ * [OverlayDetailScaffold] のバーのボタン。バーが透明 ([barAlpha] が 0) な間は丸い下地 ([MediaOverlayColors]) を敷き、
+ * 不透明になるにつれて下地を消して色を通常のアイコンへ寄せる。
+ */
+@Composable
+fun OverlayBarIconButton(
+    icon: ImageVector,
+    contentDescription: String?,
+    barAlpha: () -> Float,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick) {
+        val onSurface = MaterialTheme.colorScheme.onSurface
+        Box(
+            Modifier
+                .size(36.dp)
+                .drawBehind {
+                    drawCircle(MediaOverlayColors.Scrim.copy(alpha = MediaOverlayColors.Scrim.alpha * (1f - barAlpha())))
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            // 色は描画時に混ぜる (スクロールのたびに組み直さない)
+            Icon(
+                icon,
+                contentDescription,
+                modifier = Modifier
+                    // SrcIn をアイコンの形だけに効かせるため、先に別のレイヤに描く
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            lerp(MediaOverlayColors.Content, onSurface, barAlpha()),
+                            blendMode = BlendMode.SrcIn,
+                        )
+                    },
+            )
         }
     }
 }

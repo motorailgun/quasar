@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
+import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiPicker
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
@@ -124,7 +125,8 @@ class DebugGalleryActivity : ComponentActivity() {
                 val navigator = remember(backStack) {
                     GalleryNavigator(context, backStack, onExit = ::finish)
                 }
-                CompositionLocalProvider(LocalNavigator provides navigator) {
+                val accountActions = remember { GalleryAccountActions() }
+                CompositionLocalProvider(LocalNavigator provides navigator, LocalAccountActions provides accountActions) {
                     NavDisplay(
                         backStack = backStack,
                         onBack = navigator::back,
@@ -226,6 +228,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             GalleryFixtures.posts(variety).map { it.copy(viewer = it.viewer.copy(favourited = true)) }
         }
         var tab by remember { mutableStateOf(ProfileTab.Posts) }
+        var relationship by remember { mutableStateOf(Relationship(following = true, requested = false, followedBy = true)) }
         fun feed(posts: List<Post>) = PostFeedState(items = posts.map(TimelineItem::PostItem), loaded = true, endReached = true)
         val state = ProfileScreenState(
             profile = ProfileState(profile = fixture.profile),
@@ -237,7 +240,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             button = if (scenario == GalleryScenario.MyProfile) {
                 ProfileButtonState.EditProfile
             } else {
-                ProfileButtonState.Follow(Relationship(following = true, requested = false, followedBy = true))
+                ProfileButtonState.Follow(relationship)
             },
         )
         ProfileContent(
@@ -248,6 +251,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             onLoadMore = {},
             onSetFollowing = {},
             onAnswerFollowRequest = {},
+            onAccountAction = { relationship = relationship.applying(it) },
             onUserClick = {},
             onPostClick = {},
             onMediaClick = navigator::openMedia,

@@ -1,6 +1,8 @@
 [
  {
   "id": "1001",
+  "url": "https://gallery.invalid/@alice/1001",
+  "uri": "https://gallery.invalid/users/alice/statuses/1001",
   "created_at": "2025-12-31T23:59:00.000Z",
   "account": {
    "id": "1",
@@ -57,6 +59,8 @@
  },
  {
   "id": "1002",
+  "url": "https://gallery.invalid/@alice/1002",
+  "uri": "https://gallery.invalid/users/alice/statuses/1002",
   "created_at": "2025-12-31T23:58:00.000Z",
   "account": {
    "id": "1",
@@ -120,6 +124,8 @@
  },
  {
   "id": "1003",
+  "url": "https://gallery.invalid/@alice/1003",
+  "uri": "https://gallery.invalid/users/alice/statuses/1003",
   "created_at": "2025-12-31T23:57:00.000Z",
   "account": {
    "id": "1",
@@ -162,6 +168,8 @@
  },
  {
   "id": "1004",
+  "url": "https://gallery.invalid/@bob/1004",
+  "uri": "https://gallery.invalid/users/bob/statuses/1004",
   "created_at": "2025-12-31T23:56:00.000Z",
   "account": {
    "id": "2",
@@ -204,6 +212,8 @@
  },
  {
   "id": "1005",
+  "url": "https://gallery.invalid/@carol/1005",
+  "uri": "https://gallery.invalid/users/carol/statuses/1005",
   "created_at": "2025-12-31T23:55:00.000Z",
   "account": {
    "id": "3",
@@ -239,6 +249,8 @@
  },
  {
   "id": "1006",
+  "url": "https://gallery.invalid/@longname/1006",
+  "uri": "https://gallery.invalid/users/longname/statuses/1006",
   "created_at": "2025-12-31T23:54:00.000Z",
   "account": {
    "id": "5",
@@ -281,6 +293,8 @@
  },
  {
   "id": "1007",
+  "url": "https://gallery.invalid/@alice/1007",
+  "uri": "https://gallery.invalid/users/alice/statuses/1007",
   "created_at": "2025-12-31T23:53:00.000Z",
   "account": {
    "id": "1",
@@ -324,6 +338,8 @@
  },
  {
   "id": "1008",
+  "url": "https://gallery.invalid/@alice/1008",
+  "uri": "https://gallery.invalid/users/alice/statuses/1008",
   "created_at": "2025-12-31T23:52:00.000Z",
   "account": {
    "id": "1",

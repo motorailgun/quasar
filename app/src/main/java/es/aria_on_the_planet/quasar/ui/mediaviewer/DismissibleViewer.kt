@@ -45,10 +45,11 @@ import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import kotlin.math.abs
 import kotlin.math.sign
 import kotlin.math.sqrt
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * メディアビューアの出入りの状態。開く (フェードイン)・閉じる (一覧の元の位置へ縮んで戻る) のアニメーションと、
+ * メディアビューアの出入りの状態。開く (一覧の元の位置から広がる)・閉じる (一覧の元の位置へ縮んで戻る) のアニメーションと、
  * 上下スワイプ / 予測型「戻る」の途中の見た目を持つ。`NavDisplay` の遷移は付けず、すべてここで描く。
  */
 @Stable
@@ -65,38 +66,53 @@ class DismissibleViewerState internal constructor(
     /** 開くアニメーションの進み具合 (0〜1)。最初のフレームから透明にしておく (一瞬見えてしまわないよう)。 */
     internal var enterFraction by mutableFloatStateOf(0f)
 
+    /** 開くときに広がり始める変形 (一覧の元の位置)。`null` ならその場でフェードインする。 */
+    private var enterFrom: LayerTransform? = null
+
     /** 閉じるアニメーションの進み具合 (0〜1)。`null` なら閉じていない。 */
     internal var exitFraction by mutableStateOf<Float?>(null)
 
-    internal var containerBounds = Rect.Zero
+    /** 開くときに大きさが決まるのを待つので state にしている。 */
+    internal var containerBounds by mutableStateOf(Rect.Zero)
 
     /** 閉じ始めた時点の見た目と、閉じる先の変形。 */
-    internal var exitFrom = LayerTransform(1f, 0f, 0f)
-    internal var exitTo = LayerTransform(1f, 0f, 0f)
-    internal var exitFromProgress = 0f
-    internal var exitToTarget = false
+    private var exitFrom = Identity
+    private var exitTo = Identity
+    private var exitFromAlpha = 1f
+    private var exitFromBackgroundAlpha = 1f
+    private var exitToTarget = false
 
-    /** ドラッグ中・戻り中・「戻る」の途中・閉じる途中。上部バーや再生操作を隠すのに使う。 */
-    val isActive: Boolean by derivedStateOf { dragOffset != 0f || backProgress != 0f || exitFraction != null }
-
-    internal suspend fun enter() {
-        enterFraction = 0f
-        animate(0f, 1f, animationSpec = tween(EnterMillis, easing = LinearOutSlowInEasing)) { value, _ ->
-            enterFraction = value
-        }
+    /** 開く途中・ドラッグ中・戻り中・「戻る」の途中・閉じる途中。上部バーや再生操作を隠すのに使う。 */
+    val isActive: Boolean by derivedStateOf {
+        enterFraction < 1f || dragOffset != 0f || backProgress != 0f || exitFraction != null
     }
 
     /**
-     * 閉じる。今の見た目 (ドラッグ・「戻る」の途中) から、一覧の元の位置 ([target]) へ縮みながら移動して消える。
+     * 開く。一覧の元の位置 ([target]) から広がる (閉じるときの逆回し)。戻り先が分からなければフェードイン。
+     */
+    internal suspend fun enter() {
+        enterFraction = 0f
+        // 最初のレイアウトで大きさが決まるまで待つ (それまでは透明)
+        val container = snapshotFlow { containerBounds }.first { !it.isEmpty }
+        val from = target()?.let { exitTransformTo(it, container) }
+        enterFrom = from
+        val spec = if (from != null) {
+            tween<Float>(EnterMillis, easing = FastOutSlowInEasing)
+        } else {
+            tween(EnterFadeMillis, easing = LinearOutSlowInEasing)
+        }
+        animate(0f, 1f, animationSpec = spec) { value, _ -> enterFraction = value }
+    }
+
+    /**
+     * 閉じる。今の見た目 (開く途中・ドラッグ・「戻る」の途中) から、一覧の元の位置 ([target]) へ縮みながら移動して消える。
      * 戻り先が分からなければその場で縮みながら消える。終わったら [onDismissed]。
      */
     suspend fun dismiss() {
         if (exitFraction != null) return
-        val maxOffset = containerBounds.height * MaxOffsetFraction
-        val offset = rubberBand(dragOffset, maxOffset)
-        val progress = maxOf(dismissProgress(offset, maxOffset), backProgress)
-        exitFrom = LayerTransform(scale = dragScale(progress), translationX = 0f, translationY = offset)
-        exitFromProgress = progress
+        exitFrom = currentTransform()
+        exitFromAlpha = enterAlpha()
+        exitFromBackgroundAlpha = backgroundAlpha()
         val toTarget = target()?.let { exitTransformTo(it, containerBounds) }
         exitToTarget = toTarget != null
         exitTo = toTarget ?: exitFrom.copy(scale = exitFrom.scale * 0.6f)
@@ -111,11 +127,11 @@ class DismissibleViewerState internal constructor(
     internal fun backgroundAlpha(): Float {
         val exit = exitFraction
         val alpha = if (exit == null) {
-            1f - BackgroundFadeOnDrag * currentProgress()
+            (1f - BackgroundFadeOnDrag * currentProgress()) * enterFraction
         } else {
-            (1f - BackgroundFadeOnDrag * exitFromProgress) * (1f - exit)
+            exitFromBackgroundAlpha * (1f - exit)
         }
-        return (alpha * enterFraction).coerceIn(0f, 1f)
+        return alpha.coerceIn(0f, 1f)
     }
 
     /** 中身の変形と濃さを graphicsLayer に当てる (描画フェーズで読むので再コンポーズしない)。 */
@@ -123,12 +139,11 @@ class DismissibleViewerState internal constructor(
         val exit = exitFraction
         val transform: LayerTransform
         if (exit == null) {
-            val maxOffset = containerBounds.height * MaxOffsetFraction
-            transform = LayerTransform(dragScale(currentProgress()), 0f, rubberBand(dragOffset, maxOffset))
-            alpha = enterFraction
+            transform = currentTransform()
+            alpha = enterAlpha()
         } else {
             transform = lerp(exitFrom, exitTo, exit)
-            alpha = if (exitToTarget) {
+            alpha = exitFromAlpha * if (exitToTarget) {
                 // 戻り先に着く直前に消し、下のサムネイルに引き継ぐ
                 1f - ((exit - ExitFadeStart) / (1f - ExitFadeStart)).coerceIn(0f, 1f)
             } else {
@@ -141,6 +156,21 @@ class DismissibleViewerState internal constructor(
         scaleY = transform.scale
     }
 
+    /** 閉じていない間の変形 (開く途中の広がりに、ドラッグ・「戻る」の縮みと移動を重ねる)。 */
+    private fun currentTransform(): LayerTransform {
+        val base = enterFrom?.let { lerp(it, Identity, enterFraction) } ?: Identity
+        val maxOffset = containerBounds.height * MaxOffsetFraction
+        return LayerTransform(
+            scale = base.scale * dragScale(currentProgress()),
+            translationX = base.translationX,
+            translationY = base.translationY + rubberBand(dragOffset, maxOffset),
+        )
+    }
+
+    /** 開く途中の中身の濃さ。広がるときは最初の少しで現れ、下のサムネイルから引き継ぐ (閉じるときの逆)。 */
+    private fun enterAlpha(): Float =
+        if (enterFrom != null) (enterFraction / (1f - ExitFadeStart)).coerceIn(0f, 1f) else enterFraction
+
     private fun currentProgress(): Float {
         val maxOffset = containerBounds.height * MaxOffsetFraction
         return maxOf(dismissProgress(rubberBand(dragOffset, maxOffset), maxOffset), backProgress)
@@ -148,7 +178,7 @@ class DismissibleViewerState internal constructor(
 }
 
 /**
- * @param target 閉じるときに縮んで戻る先。閉じ始めた時点で呼ぶ。
+ * @param target 開くときに広がり始める元・閉じるときに縮んで戻る先。開き始め・閉じ始めの時点で呼ぶ。
  * @param onDismissed 閉じるアニメーションが終わった後 (画面をバックスタックから外す)。
  */
 @Composable
@@ -161,13 +191,14 @@ fun rememberDismissibleViewerState(
     return remember { DismissibleViewerState({ currentTarget() }, { currentOnDismissed() }) }
 }
 
-/** 閉じるときに縮んで戻る先。[bounds] はウィンドウ上の位置 (px)、[aspectRatio] は表示中のメディアの幅 / 高さ。 */
+/** 開くときに広がり始める元・閉じるときに縮んで戻る先。[bounds] はウィンドウ上の位置 (px)、[aspectRatio] は表示中のメディアの幅 / 高さ。 */
 data class DismissTarget(val bounds: Rect, val aspectRatio: Float)
 
 /**
  * メディアビューアの外枠。背景の黒を自前で描き (元の画面の上に重ねているので、黒が薄くなると透けて見える)、出入りを担う。
  *
- * * 開く: 最初の表示でフェードイン ([EnterMillis])。回転等の作り直しでは繰り返さない。
+ * * 開く: 最初の表示で一覧の元の位置から広がる ([EnterMillis]、閉じるときの逆回し)。元の位置が分からなければ
+ *   フェードイン ([EnterFadeMillis])。回転等の作り直しでは繰り返さない。
  * * 上下スワイプ: 中身は指に付いて動くが、ゴムのように引っかかり、どれだけ動かしても画面高の 30% までしか進まない。
  *   動かすにつれて少し縮み、背景の黒が薄くなる。離したとき十分動いていたか速く弾いていれば ([shouldDismiss]) 閉じ、
  *   それ以外はばねで元に戻る。
@@ -247,6 +278,8 @@ fun DismissibleViewer(
 /** graphicsLayer の変形 (中心基準の拡大率と移動量)。 */
 data class LayerTransform(val scale: Float, val translationX: Float, val translationY: Float)
 
+private val Identity = LayerTransform(1f, 0f, 0f)
+
 internal fun lerp(from: LayerTransform, to: LayerTransform, fraction: Float) = LayerTransform(
     scale = from.scale + (to.scale - from.scale) * fraction,
     translationX = from.translationX + (to.translationX - from.translationX) * fraction,
@@ -310,8 +343,10 @@ private const val DismissDistanceFraction = 0.08f
 private const val DragShrink = 0.15f
 private const val BackgroundFadeOnDrag = 0.6f
 private const val ExitMillis = 300
-/** 開くときのフェード (OS 標準のフェードイン 500ms の 0.7 倍)。 */
-private const val EnterMillis = 350
-/** 閉じるアニメーションのうち、ここから先で中身を消す。 */
+/** 開くときに元の位置から広がる長さ (閉じるときと揃える)。 */
+private const val EnterMillis = ExitMillis
+/** 元の位置が分からないときのフェード (OS 標準のフェードイン 500ms の 0.7 倍)。 */
+private const val EnterFadeMillis = 350
+/** 閉じるアニメーションのうち、ここから先で中身を消す (開くときは 1 からこれを引いた分で現れる)。 */
 private const val ExitFadeStart = 0.75f
 private val FlingVelocity = 1000.dp

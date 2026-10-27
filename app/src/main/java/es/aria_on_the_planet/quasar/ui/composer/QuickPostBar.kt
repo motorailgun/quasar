@@ -400,7 +400,7 @@ private fun DraftExtras(hasPoll: Boolean, hasContentWarning: Boolean, onClick: (
 
 private val BarCornerRadius = 28.dp
 private val HandleHeight = 20.dp
-private val AttachmentHeight = 64.dp
+private val AttachmentHeight = 80.dp
 private const val MaxLines = 5
 private val ExpandDistance = 96.dp
 private const val FlingVelocity = 1500f

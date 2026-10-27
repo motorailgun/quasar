@@ -277,7 +277,7 @@ fun SensitiveMediaToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, m
     }
 }
 
-private val AttachmentHeight = 120.dp
+private val AttachmentHeight = 160.dp
 private val FadingEdgeWidth = 12.dp
 private val ThumbnailShape = RoundedCornerShape(12.dp)
 

@@ -39,10 +39,9 @@ class StreamingClient(
 
     /**
      * [channels] を購読し、イベントを流す。切断されたら待ってから再接続し続ける (collect をやめるまで)。
-     * 接続 (再接続を含む) のたびに [StreamEvent.Connected] を流す。要ログイン (4.2 以降は全ストリームで必須)。
+     * 接続 (再接続を含む) のたびに [StreamEvent.Connected] を流す。
      */
     fun events(session: Session, channels: Set<StreamChannel>): Flow<StreamEvent> = flow {
-        val token = session.accessToken ?: return@flow
         if (channels.isEmpty()) return@flow
         val base = try {
             instanceRepository.instance(session.serverUrl).streamingUrl
@@ -57,7 +56,7 @@ class StreamingClient(
         var failures = 0
         while (true) {
             var connected = false
-            connectOnce(endpoint, token, channels).collect { event ->
+            connectOnce(endpoint, session.accessToken, channels).collect { event ->
                 if (event is StreamEvent.Connected) {
                     connected = true
                     failures = 0

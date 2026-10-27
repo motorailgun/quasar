@@ -49,7 +49,7 @@ class MastodonApi(
 
     suspend fun homeTimeline(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
         sinceId: String? = null,
@@ -61,7 +61,7 @@ class MastodonApi(
 
     suspend fun publicTimeline(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         local: Boolean,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
@@ -76,7 +76,7 @@ class MastodonApi(
     /** https://docs.joinmastodon.org/methods/timelines/#tag */
     suspend fun hashtagTimeline(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         hashtag: String,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
@@ -86,15 +86,11 @@ class MastodonApi(
     }
 
     /** https://docs.joinmastodon.org/methods/statuses/#get */
-    suspend fun status(serverUrl: String, accessToken: String?, id: String): StatusDto =
+    suspend fun status(serverUrl: String, accessToken: String, id: String): StatusDto =
         get(serverUrl, accessToken, "api/v1/statuses/$id") {}
 
-    /**
-     * https://docs.joinmastodon.org/methods/statuses/#context
-     *
-     * 未認証では祖先 40 件・子孫 60 件・深さ 20 までに制限される。
-     */
-    suspend fun statusContext(serverUrl: String, accessToken: String?, id: String): ContextDto =
+    /** https://docs.joinmastodon.org/methods/statuses/#context */
+    suspend fun statusContext(serverUrl: String, accessToken: String, id: String): ContextDto =
         get(serverUrl, accessToken, "api/v1/statuses/$id/context") {}
 
     /** https://docs.joinmastodon.org/methods/notifications/#get (要認証) */
@@ -265,7 +261,7 @@ class MastodonApi(
         get(serverUrl, accessToken, "api/v1/accounts/verify_credentials") {}
 
     /** https://docs.joinmastodon.org/methods/accounts/#get */
-    suspend fun account(serverUrl: String, accessToken: String?, id: String): AccountDto =
+    suspend fun account(serverUrl: String, accessToken: String, id: String): AccountDto =
         get(serverUrl, accessToken, "api/v1/accounts/$id") {}
 
     /**
@@ -276,7 +272,7 @@ class MastodonApi(
      */
     suspend fun accountStatuses(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         id: String,
         maxId: String? = null,
         limit: Int = DEFAULT_LIMIT,
@@ -298,7 +294,7 @@ class MastodonApi(
      */
     suspend fun accountRelations(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         id: String,
         relation: String,
         maxId: String? = null,
@@ -313,7 +309,7 @@ class MastodonApi(
      */
     suspend fun statusReactors(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         statusId: String,
         reaction: String,
         maxId: String? = null,
@@ -322,7 +318,7 @@ class MastodonApi(
 
     private suspend fun linkedAccounts(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         path: String,
         maxId: String?,
         limit: Int,
@@ -414,7 +410,7 @@ class MastodonApi(
 
     private suspend fun getStatuses(
         serverUrl: String,
-        accessToken: String?,
+        accessToken: String,
         path: String,
         query: HttpUrl.Builder.() -> Unit,
     ): List<StatusDto> = get(serverUrl, accessToken, path, query)

@@ -93,7 +93,7 @@ private fun ShareScreen(
     onOpenApp: () -> Unit,
 ) {
     val session by container.sessionStore.session.collectAsStateWithLifecycle()
-    val current = session?.takeIf { it.accessToken != null }
+    val current = session
     if (current == null) {
         NotLoggedIn(onClose = onClose, onOpenApp = onOpenApp)
         return

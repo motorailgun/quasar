@@ -76,8 +76,6 @@ class AppContainer(context: Context) {
             // ログアウト・別のアカウントでのログインで消す (起動時の今のセッションでは消さない)。キャッシュの中身は
             // ログイン中のユーザーから見た状態 (お気に入りしたか・関係・非公開のポスト) なので、別のユーザーに見せない
             sessionStore.session
-                .map { it?.serverUrl to it?.accessToken }
-                .distinctUntilChanged()
                 .drop(1)
                 .collect { cache.clear() }
         }

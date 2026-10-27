@@ -94,8 +94,8 @@ enum class PostCardMode {
  *
  * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
  * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
- * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (未ログイン時など)。
- * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (未ログイン時など)。
+ * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (デバッグ用ギャラリー等)。
+ * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (デバッグ用ギャラリー等)。
  * @param onReply アクション行のリプライが押されたとき。`null` なら表示のみ。
  * @param onHashtagClick 本文のハッシュタグが押されたとき (`#` を除いた名前)。`null` ならブラウザで開く。
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、

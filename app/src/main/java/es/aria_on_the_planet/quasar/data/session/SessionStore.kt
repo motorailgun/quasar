@@ -8,12 +8,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+/** ログイン中のセッション。ログインしていなければ [SessionStore.session] が `null` になる (トークンの無いセッションは無い)。 */
 data class Session(
     val serverUrl: String,
-    val accessToken: String?,
+    val accessToken: String,
 )
 
-/** 保存する形。[client] はトークンを発行したクライアント (ログアウト時の無効化用。手入力のトークンの頃のものは無い)。 */
+/**
+ * 保存する形。[client] はトークンを発行したクライアント (ログアウト時の無効化用。手入力のトークンの頃のものは無い)。
+ * [accessToken] が `null` のもの (最初期の、サーバだけを指定した未ログインでの利用) はログアウト状態として扱う。
+ */
 @Serializable
 private data class StoredSession(
     val serverUrl: String,
@@ -33,7 +37,7 @@ class SessionStore(context: Context, private val storage: SecureStorage) {
     /** 今のセッションのトークンを発行したクライアント。 */
     val client: OAuthClient? get() = stored?.client
 
-    fun save(session: Session, client: OAuthClient?) {
+    fun save(session: Session, client: OAuthClient) {
         val value = StoredSession(session.serverUrl, session.accessToken, client)
         storage.put(Key, json.encodeToString(value))
         stored = value
@@ -60,7 +64,7 @@ class SessionStore(context: Context, private val storage: SecureStorage) {
         return migrated
     }
 
-    private fun StoredSession.toSession() = Session(serverUrl, accessToken)
+    private fun StoredSession.toSession() = accessToken?.let { Session(serverUrl, it) }
 
     private companion object {
         const val Key = "session"

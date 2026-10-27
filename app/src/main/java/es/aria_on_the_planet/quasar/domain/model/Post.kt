@@ -68,7 +68,7 @@ data class PostApplication(
     val website: String?,
 )
 
-/** ログイン中ユーザーから見たポストの状態。未認証時はすべて `false`。 */
+/** ログイン中ユーザーから見たポストの状態。 */
 data class PostViewerState(
     val bookmarked: Boolean = false,
     val reblogged: Boolean = false,

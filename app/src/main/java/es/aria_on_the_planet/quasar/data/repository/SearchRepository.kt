@@ -25,9 +25,8 @@ class SearchRepository(
      * サーバが ActivityPub / WebFinger で取りに行く。見られないもの (フォロワー限定等)・取れないものは [ResolvedLink.NotFound]。
      */
     suspend fun resolve(session: Session, query: String): ResolvedLink {
-        val token = requireNotNull(session.accessToken) { "Resolving links requires login" }
         val version = cache.issue()
-        val results = api.search(session.serverUrl, token, query, resolve = true, limit = 1)
+        val results = api.search(session.serverUrl, session.accessToken, query, resolve = true, limit = 1)
         cache.putStatuses(results.statuses, version)
         cache.putAccounts(results.accounts, version)
         return results.statuses.firstOrNull()?.let { ResolvedLink.ToPost(it.toDomain()) }

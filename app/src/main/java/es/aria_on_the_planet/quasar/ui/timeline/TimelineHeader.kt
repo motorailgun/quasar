@@ -66,7 +66,7 @@ import kotlin.math.abs
  * (icon)  [⌂ Home ][🔔][👥][🌐]
  * ```
  *
- * * 左: ログイン中のアカウントのアイコン。タップでメニュー (名前・@acct = タップで自分のプロフィール・設定)。未取得・未ログインは汎用のアイコン。
+ * * 左: ログイン中のアカウントのアイコン。タップでメニュー (名前・@acct = タップで自分のプロフィール・設定)。未取得は汎用のアイコン。
  * * 右: カラムの切り替え (Expressive の連結 `ToggleButton`)。全体の後ろに後ろの一覧をぼかしたカプセルを 1 枚敷き
  *   ([hazeState])、未選択のボタンは透明、選択中は primary で塗る。選択中のみラベルを出し、幅はページ位置 (小数) から
  *   決めてスワイプに追従する。選択中のボタンを押したときも [onSelect] を呼ぶ (画面側で一覧を先頭へスクロールする)。
@@ -76,7 +76,6 @@ import kotlin.math.abs
 @Composable
 fun TimelineHeader(
     account: User?,
-    available: List<ColumnType>,
     pagerState: PagerState,
     hazeState: HazeState,
     onSelect: (ColumnType) -> Unit,
@@ -101,7 +100,6 @@ fun TimelineHeader(
         )
         Spacer(Modifier.width(10.dp))
         ColumnTabs(
-            available = available,
             pagerState = pagerState,
             hazeState = hazeState,
             blurStyle = blurStyle,
@@ -202,7 +200,6 @@ private fun AccountButton(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ColumnTabs(
-    available: List<ColumnType>,
     pagerState: PagerState,
     hazeState: HazeState,
     blurStyle: SurfaceBlurStyle,
@@ -227,7 +224,7 @@ private fun ColumnTabs(
             .padding(TabInset),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        available.forEachIndexed { index, type ->
+        ColumnType.entries.forEachIndexed { index, type ->
             val checked = index == selectedIndex
             // 4 カラムでは等幅にラベルが収まらないので、選択中のみラベルを出して幅を広げる
             val closeness = (1f - abs(position - index)).coerceIn(0f, 1f)
@@ -242,7 +239,7 @@ private fun ColumnTabs(
                     .semantics { role = Role.RadioButton },
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    available.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    ColumnType.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
                 colors = ToggleButtonDefaults.colors(

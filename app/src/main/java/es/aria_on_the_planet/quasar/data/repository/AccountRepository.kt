@@ -42,13 +42,12 @@ class AccountRepository(
     private val meMutex = Mutex()
     private var me: Pair<Session, CurrentAccount>? = null
 
-    /** ログイン中のアカウント。セッションごとにメモリへキャッシュする。未認証なら `null`。 */
-    suspend fun fetchMe(session: Session): CurrentAccount? {
-        val token = session.accessToken ?: return null
-        return meMutex.withLock {
+    /** ログイン中のアカウント。セッションごとにメモリへキャッシュする。 */
+    suspend fun fetchMe(session: Session): CurrentAccount =
+        meMutex.withLock {
             me?.takeIf { it.first == session }?.second
                 ?: cache.issue().let { version ->
-                    api.verifyCredentials(session.serverUrl, token).also { cache.putAccounts(listOf(it), version) }
+                    api.verifyCredentials(session.serverUrl, session.accessToken).also { cache.putAccounts(listOf(it), version) }
                 }.let { dto ->
                     CurrentAccount(
                         user = dto.toDomain(),
@@ -57,7 +56,6 @@ class AccountRepository(
                     )
                 }.also { me = session to it }
         }
-    }
 
     /** [accountId] は [session] のサーバ内 ID (`User.inServerId`)。 */
     suspend fun fetchProfile(session: Session, accountId: String): Profile {
@@ -85,18 +83,17 @@ class AccountRepository(
         return statuses.map { it.toDomain() }
     }
 
-    /** ログイン中のユーザーがお気に入りにしたポスト (要認証)。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
+    /** ログイン中のユーザーがお気に入りにしたポスト。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
     suspend fun fetchFavourites(session: Session, maxId: String? = null, limit: Int): Page<Post> =
-        fetchOwnStatuses(session) { token -> api.favourites(session.serverUrl, token, maxId, limit) }
+        fetchOwnStatuses { api.favourites(session.serverUrl, session.accessToken, maxId, limit) }
 
-    /** ログイン中のユーザーがブックマークしたポスト (要認証)。`max_id` はブックマークの ID なので [Page.nextMaxId] を使う。 */
+    /** ログイン中のユーザーがブックマークしたポスト。`max_id` はブックマークの ID なので [Page.nextMaxId] を使う。 */
     suspend fun fetchBookmarks(session: Session, maxId: String? = null, limit: Int): Page<Post> =
-        fetchOwnStatuses(session) { token -> api.bookmarks(session.serverUrl, token, maxId, limit) }
+        fetchOwnStatuses { api.bookmarks(session.serverUrl, session.accessToken, maxId, limit) }
 
-    private suspend fun fetchOwnStatuses(session: Session, fetch: suspend (token: String) -> LinkedPage<StatusDto>): Page<Post> {
-        val token = checkNotNull(session.accessToken) { "Not logged in" }
+    private suspend fun fetchOwnStatuses(fetch: suspend () -> LinkedPage<StatusDto>): Page<Post> {
         val version = cache.issue()
-        val page = fetch(token)
+        val page = fetch()
         cache.putStatuses(page.items, version)
         return Page(page.items.map { it.toDomain() }, page.nextMaxId)
     }
@@ -116,11 +113,10 @@ class AccountRepository(
         return Page(page.items.map { it.toDomain() }, page.nextMaxId)
     }
 
-    /** ログイン中ユーザーと [accountId] との関係。未認証なら `null`。 */
+    /** ログイン中ユーザーと [accountId] との関係。 */
     suspend fun fetchRelationship(session: Session, accountId: String): Relationship? {
-        val token = session.accessToken ?: return null
         val version = cache.issue()
-        val relationship = api.relationships(session.serverUrl, token, listOf(accountId)).firstOrNull { it.id == accountId }
+        val relationship = api.relationships(session.serverUrl, session.accessToken, listOf(accountId)).firstOrNull { it.id == accountId }
         relationship?.let { cache.putRelationships(listOf(it), version) }
         return relationship?.toDomain()
     }
@@ -129,20 +125,18 @@ class AccountRepository(
     suspend fun cachedRelationship(accountId: String): CacheHit<Relationship>? =
         cache.relationship(accountId)?.let { CacheHit(it.value.toDomain(), it.isFresh(CachePolicy.RelationshipTtlMillis)) }
 
-    /** [accountId] をフォローする (`follow = false` ならフォロー / リクエストをやめる)。要認証。更新後の関係を返す。 */
+    /** [accountId] をフォローする (`follow = false` ならフォロー / リクエストをやめる)。更新後の関係を返す。 */
     suspend fun setFollowing(session: Session, accountId: String, follow: Boolean): Relationship {
-        val token = checkNotNull(session.accessToken) { "Not logged in" }
         val version = cache.issue()
-        val relationship = api.follow(session.serverUrl, token, accountId, follow)
+        val relationship = api.follow(session.serverUrl, session.accessToken, accountId, follow)
         onRelationshipChanged(accountId, relationship, version)
         return relationship.toDomain()
     }
 
-    /** [accountId] から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。要認証。更新後の関係を返す。 */
+    /** [accountId] から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。更新後の関係を返す。 */
     suspend fun answerFollowRequest(session: Session, accountId: String, accept: Boolean): Relationship {
-        val token = checkNotNull(session.accessToken) { "Not logged in" }
         val version = cache.issue()
-        val relationship = api.answerFollowRequest(session.serverUrl, token, accountId, accept)
+        val relationship = api.answerFollowRequest(session.serverUrl, session.accessToken, accountId, accept)
         onRelationshipChanged(accountId, relationship, version)
         return relationship.toDomain()
     }
@@ -162,11 +156,10 @@ class AccountRepository(
         return statuses.map { it.toDomain() }
     }
 
-    /** ログイン中ユーザーがフォローしている人のうち、[accountId] をフォローしている人。未認証なら空。 */
+    /** ログイン中ユーザーがフォローしている人のうち、[accountId] をフォローしている人。 */
     suspend fun fetchFamiliarFollowers(session: Session, accountId: String): List<User> {
-        val token = session.accessToken ?: return emptyList()
         val version = cache.issue()
-        val accounts = api.familiarFollowers(session.serverUrl, token, listOf(accountId))
+        val accounts = api.familiarFollowers(session.serverUrl, session.accessToken, listOf(accountId))
             .firstOrNull { it.id == accountId }
             ?.accounts
             .orEmpty()

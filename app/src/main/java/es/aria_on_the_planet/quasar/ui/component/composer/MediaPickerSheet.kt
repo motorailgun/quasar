@@ -17,7 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -71,7 +71,7 @@ fun MediaPickerSheet(
     // ライブラリ側の未成熟と判断し、アプリの色にそろえることを優先して primary のままにしている
     accentColor: Color = MaterialTheme.colorScheme.primary,
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val scope = rememberCoroutineScope()
     val pickerState = rememberEmbeddedPhotoPickerState(
         initialMediaSelection = selected,

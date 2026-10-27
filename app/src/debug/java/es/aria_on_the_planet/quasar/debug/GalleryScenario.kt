@@ -14,6 +14,8 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     AnimatedAvatars("animated-avatars", R.string.gallery_animated_avatars, "animated-avatars.json"),
     EmojiStress("emoji-stress", R.string.gallery_emoji_stress, "emoji-stress.json"),
     EmojiPicker("emoji-picker", R.string.gallery_emoji_picker, "emoji-picker.json"),
+    /** 投稿欄のシート (絵文字ピッカー / 埋め込みの Photo Picker) をボタンで開く。絵文字は emoji-picker を使い回す。 */
+    PickerSheets("picker-sheets", R.string.gallery_picker_sheets, "emoji-picker.json"),
     Profile("profile", R.string.gallery_profile, "profile.json"),
     PostVariety("post-variety", R.string.gallery_post_variety, "post-variety.json"),
     /** 返信先の表示 (バーの縮小版 / フル画面の X 風)。データは post-variety を使い回す。 */

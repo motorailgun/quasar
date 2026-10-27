@@ -49,8 +49,6 @@ class AccountReactionsViewModel(
     /** まとめられたポストの数 (読み込み前のタイトル用)。 */
     val postCount: Int = statusIds.size
 
-    /** 投票・ブースト・お気に入り・ブックマーク・返信ができるか (要ログイン)。 */
-    val canInteract: Boolean = session.accessToken != null
 
     private val _state = MutableStateFlow(AccountReactionsState())
     val state: StateFlow<AccountReactionsState> = _state.asStateFlow()

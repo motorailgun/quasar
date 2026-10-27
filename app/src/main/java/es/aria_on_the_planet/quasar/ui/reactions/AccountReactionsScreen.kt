@@ -58,8 +58,8 @@ fun AccountReactionsScreen(
         onMediaClick = onMediaClick,
         onHashtagClick = onHashtagClick,
         onReply = onReply,
-        onVote = if (viewModel.canInteract) viewModel::vote else null,
-        onAction = rememberPostActionHandler(viewModel::performAction).takeIf { viewModel.canInteract },
+        onVote = viewModel::vote,
+        onAction = rememberPostActionHandler(viewModel::performAction),
     )
 }
 

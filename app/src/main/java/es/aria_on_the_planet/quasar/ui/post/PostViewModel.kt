@@ -37,7 +37,7 @@ data class PostScreenState(
     /** 引っ張って更新した取得の最中 (インジケータを出す)。 */
     val isRefreshing: Boolean = false,
     val error: String? = null,
-    /** ログイン中のアカウントの ID。取得前・未ログインは `null`。 */
+    /** ログイン中のアカウントの ID。取得前・失敗時は `null`。 */
     val myAccountId: String? = null,
     /** 自分のポストへの操作 (編集の準備・削除) の最中。 */
     val ownPostBusy: Boolean = false,
@@ -64,9 +64,6 @@ class PostViewModel(
     private val createEditor: (CoroutineScope, EditTarget, (Post) -> Unit) -> ComposerSession,
 ) : ViewModel() {
 
-    /** 投票・ブースト・お気に入り・ブックマークができるか (要ログイン)。 */
-    val canInteract: Boolean = session.accessToken != null
-
     private val _state = MutableStateFlow(PostScreenState())
     val state: StateFlow<PostScreenState> = _state.asStateFlow()
 
@@ -80,19 +77,17 @@ class PostViewModel(
 
     init {
         load(force = false)
-        if (canInteract) {
-            viewModelScope.launch {
-                val me = try {
-                    accountRepository.fetchMe(session)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // 取れなければ自分のポストのメニューを出さないだけ
-                    Log.w(TAG, "Failed to load current account", e)
-                    null
-                }
-                _state.update { it.copy(myAccountId = me?.user?.inServerId) }
+        viewModelScope.launch {
+            val me = try {
+                accountRepository.fetchMe(session)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // 取れなければ自分のポストのメニューを出さないだけ
+                Log.w(TAG, "Failed to load current account", e)
+                null
             }
+            _state.update { it.copy(myAccountId = me?.user?.inServerId) }
         }
     }
 

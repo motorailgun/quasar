@@ -38,10 +38,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.mutableFloatStateOf
@@ -112,22 +110,22 @@ fun DetailScaffold(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Symbols.Outlined.ArrowBack, stringResource(R.string.back))
-                    }
-                },
-                title = {
-                    AnimatedContent(
-                        targetState = showRevealed,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "detailTitle",
-                    ) { revealed ->
-                        if (revealed) revealedTitle?.invoke() else title()
-                    }
-                },
-            )
+        TopAppBar(
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Symbols.Outlined.ArrowBack, stringResource(R.string.back))
+                }
+            },
+            title = {
+                AnimatedContent(
+                    targetState = showRevealed,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "detailTitle",
+                ) { revealed ->
+                    if (revealed) revealedTitle?.invoke() else title()
+                }
+            },
+        )
         },
     ) { padding ->
         DetailRefreshBox(
@@ -161,17 +159,65 @@ fun OverlayDetailScaffold(
     revealedTitle: (@Composable () -> Unit)? = null,
     content: @Composable BoxScope.(barHeight: Dp) -> Unit,
 ) {
-    val density = LocalDensity.current
+    // バーの高さ (px)。面・戻るボタンの濃さを描画時に決めるのに使う (レイアウトには Scaffold の余白を使う)
     var barHeightPx by remember { mutableFloatStateOf(0f) }
-    val barHeight = with(density) { barHeightPx.toDp() }
     val alpha = { barAlpha(barHeightPx) }
     val surface = MaterialTheme.colorScheme.surface
     val showRevealed = revealedTitle != null && titleRevealed
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(surface),
-    ) {
+    // 中身は Scaffold の余白を当てずに全面へ描き、トップバーはその上に重なる
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+                TopAppBar(
+                    modifier = Modifier
+                        .onSizeChanged { barHeightPx = it.height.toFloat() }
+                        .drawBehind { drawRect(surface.copy(alpha = alpha())) },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            val onSurface = MaterialTheme.colorScheme.onSurface
+                            Box(
+                                Modifier
+                                    .size(36.dp)
+                                    .drawBehind {
+                                        drawCircle(MediaOverlayColors.Scrim.copy(alpha = MediaOverlayColors.Scrim.alpha * (1f - alpha())))
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                // 色は描画時に混ぜる (スクロールのたびに組み直さない)
+                                Icon(
+                                    Symbols.Outlined.ArrowBack,
+                                    stringResource(R.string.back),
+                                    modifier = Modifier
+                                        // SrcIn をアイコンの形だけに効かせるため、先に別のレイヤに描く
+                                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                        .drawWithContent {
+                                            drawContent()
+                                            drawRect(
+                                                lerp(MediaOverlayColors.Content, onSurface, alpha()),
+                                                blendMode = BlendMode.SrcIn,
+                                            )
+                                        },
+                                )
+                            }
+                        }
+                    },
+                    title = {
+                        AnimatedContent(
+                            targetState = showRevealed,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "detailTitle",
+                        ) { revealed ->
+                            if (revealed) revealedTitle?.invoke()
+                        }
+                    },
+                )
+        },
+    ) { padding ->
+        val barHeight = padding.calculateTopPadding()
         DetailRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
@@ -180,53 +226,6 @@ fun OverlayDetailScaffold(
         ) {
             content(barHeight)
         }
-        TopAppBar(
-            modifier = Modifier
-                .onSizeChanged { barHeightPx = it.height.toFloat() }
-                .drawBehind { drawRect(surface.copy(alpha = alpha())) },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = Color.Transparent,
-            ),
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    val onSurface = MaterialTheme.colorScheme.onSurface
-                    Box(
-                        Modifier
-                            .size(36.dp)
-                            .drawBehind {
-                                drawCircle(MediaOverlayColors.Scrim.copy(alpha = MediaOverlayColors.Scrim.alpha * (1f - alpha())))
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        // 色は描画時に混ぜる (スクロールのたびに組み直さない)
-                        Icon(
-                            Symbols.Outlined.ArrowBack,
-                            stringResource(R.string.back),
-                            modifier = Modifier
-                                // SrcIn をアイコンの形だけに効かせるため、先に別のレイヤに描く
-                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                .drawWithContent {
-                                    drawContent()
-                                    drawRect(
-                                        lerp(MediaOverlayColors.Content, onSurface, alpha()),
-                                        blendMode = BlendMode.SrcIn,
-                                    )
-                                },
-                        )
-                    }
-                }
-            },
-            title = {
-                AnimatedContent(
-                    targetState = showRevealed,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "detailTitle",
-                ) { revealed ->
-                    if (revealed) revealedTitle?.invoke()
-                }
-            },
-        )
     }
 }
 

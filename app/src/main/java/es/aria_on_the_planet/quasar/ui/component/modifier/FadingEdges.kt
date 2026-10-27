@@ -21,7 +21,7 @@ fun Modifier.bottomFadingEdge(
     height: Dp,
     strength: () -> Float,
 ): Modifier = this
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .offscreenWhile { strength() > 0f }
     .drawWithContent {
         drawContent()
         val amount = strength()
@@ -52,7 +52,7 @@ fun Modifier.horizontalFadingEdges(
     start: () -> Float,
     end: () -> Float,
 ): Modifier = this
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .offscreenWhile { start() > 0f || end() > 0f }
     .drawWithContent {
         drawContent()
         val edge = width.toPx().coerceAtMost(size.width / 2)
@@ -85,3 +85,13 @@ fun Modifier.horizontalFadingEdges(
             )
         }
     }
+
+/**
+ * フェードを描くとき (`fading` が真) だけ Offscreen にする。DstIn で内容の側を削るのにオフスクリーンのバッファが要るが、
+ * 常に Offscreen だと、一覧のポストの本文・添付の 1 つずつが描き直しのたびにいったんバッファへ描いてから合成される。
+ * `fading` はレイヤの設定の中で読むので、変わってもコンポーズ・レイアウトはやり直さない。
+ * 描画側の判定 (`> 0f` のときだけ DstIn で描く) と必ず揃える。揃わないと DstIn が下の画面まで削る。
+ */
+private fun Modifier.offscreenWhile(fading: () -> Boolean): Modifier = graphicsLayer {
+    compositingStrategy = if (fading()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+}

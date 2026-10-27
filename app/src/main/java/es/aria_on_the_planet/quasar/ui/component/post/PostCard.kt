@@ -3,24 +3,30 @@ package es.aria_on_the_planet.quasar.ui.component.post
 import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
 import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.theme.DisabledContentAlpha
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -516,13 +522,22 @@ private fun ReactionCountLabel(
     }
 }
 
-/** 件数の入れ替わり: 増えたら下から上へ、減ったら上から下へ。 */
+/**
+ * 件数の入れ替わり: 増えたら下から上へ、減ったら上から下へ。
+ * 一覧では項目が画面に入るたびに組み立てるので、件数が変わるまでは [AnimatedContent] を作らずそのまま出す
+ * (1 つ約 0.36ms で、アクション行の 3 つでポスト 1 件の組み立ての 3 割ほどを占めていた)。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AnimatedCount(count: Int, content: @Composable (Int) -> Unit) {
+    val holder = remember { CountTransition(count) }
+    val transitionState = holder.stateFor(count)
+    if (transitionState == null) {
+        content(count)
+        return
+    }
     val motion = MaterialTheme.motionScheme
-    AnimatedContent(
-        targetState = count,
+    rememberTransition(transitionState, label = "postActionCount").AnimatedContent(
         transitionSpec = {
             val direction = if (targetState > initialState) 1 else -1
             (slideInVertically(motion.fastSpatialSpec()) { it * direction } + fadeIn(motion.fastEffectsSpec()))
@@ -531,8 +546,19 @@ private fun AnimatedCount(count: Int, content: @Composable (Int) -> Unit) {
                 )
                 .using(SizeTransform(clip = false))
         },
-        label = "postActionCount",
     ) { value -> content(value) }
+}
+
+/** [AnimatedCount] の最初の件数と、件数が変わってから使う遷移 (最初の件数から始めるので、初回の変化も動く)。 */
+private class CountTransition(private val initial: Int) {
+    private var state: MutableTransitionState<Int>? = null
+
+    /** 件数が一度も変わっていなければ `null`。 */
+    fun stateFor(count: Int): MutableTransitionState<Int>? {
+        val current = state ?: if (count == initial) return null else MutableTransitionState(initial).also { state = it }
+        current.targetState = count
+        return current
+    }
 }
 
 /** 詳細表示のアクション行の項目 (リプライ / ブースト / お気に入り) の間隔。 */
@@ -566,40 +592,21 @@ private fun PostActionButton(
     onClick: (() -> Unit)? = null,
 ) {
     val motion = MaterialTheme.motionScheme
-    val color by animateColorAsState(
-        when {
-            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledContentAlpha)
-            active -> activeColor
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = motion.defaultEffectsSpec(),
-        label = "postActionColor",
-    )
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        if (pressed) PressedIconScale else 1f,
-        animationSpec = motion.fastSpatialSpec(),
-        label = "postActionPress",
-    )
-    // タップでオンになったときだけ弾ませ、粒を散らす
-    val popScale = remember { Animatable(1f) }
-    val burst = remember { Animatable(0f) }
-    var tapped by remember { mutableStateOf(false) }
-    LaunchedEffect(active) {
-        if (active && tapped) {
-            launch {
-                burst.snapTo(0f)
-                burst.animateTo(1f, tween(ActionBurstDurationMillis, easing = LinearEasing))
-            }
-            popScale.animateTo(PopIconScale, motion.fastSpatialSpec())
-            popScale.animateTo(1f, motion.defaultSpatialSpec())
-        } else {
-            burst.snapTo(0f)
-        }
-        tapped = false
+    val targetColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledContentAlpha)
+        active -> activeColor
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val burstColors = listOf(activeColor, activeColor.copy(alpha = 0.55f))
+    val scope = rememberCoroutineScope()
+    val animation = remember { ActionButtonAnimation(targetColor, active) }
+    // 状態・色の変化はアニメーションを始めるだけなので、ボタンごとにコルーチンを置かず反映の後で拾う
+    SideEffect { animation.update(scope, motion, targetColor, active) }
+    val interactionSource = remember { MutableInteractionSource() }
+    if (onClick != null) {
+        LaunchedEffect(interactionSource) { animation.followPresses(interactionSource, motion) }
+    }
+    val color = animation.color.value
+    val burstColors = remember(activeColor) { listOf(activeColor, activeColor.copy(alpha = 0.55f)) }
     val density = LocalDensity.current
     val iconCenterX = with(density) { (ActionPaddingHorizontal + ActionIconSize / 2).toPx() }
     val activeState = stringResource(R.string.post_action_done)
@@ -607,7 +614,7 @@ private fun PostActionButton(
         modifier = Modifier
             // 粒はボタンの外まで飛ぶので clip より外側で描く
             .actionBurst(
-                progress = { burst.value },
+                progress = { animation.burst.value },
                 centerOf = { size -> Offset(iconCenterX, size.height / 2) },
                 colors = burstColors,
             )
@@ -629,7 +636,7 @@ private fun PostActionButton(
                         indication = ripple(),
                         role = Role.Switch,
                         onValueChange = {
-                            tapped = true
+                            animation.tapped = true
                             onClick()
                         },
                     )
@@ -646,7 +653,7 @@ private fun PostActionButton(
             modifier = Modifier
                 .size(ActionIconSize)
                 .graphicsLayer {
-                    val scale = pressScale * popScale.value
+                    val scale = animation.pressScale.value * animation.popScale.value
                     scaleX = scale
                     scaleY = scale
                 },
@@ -662,6 +669,61 @@ private fun PostActionButton(
 }
 
 private val ActionIconSize = 18.dp
+
+/**
+ * [PostActionButton] のアニメーション (色・押下の縮小・タップでオンにしたときの弾みと粒)。
+ * 一覧では項目が画面に入るたびにボタンが組み立てられるので、`animate*AsState` や状態ごとの `LaunchedEffect`
+ * (どれもボタンごとにコルーチンを持つ) を使わず、変化があったときだけアニメーションを起動する。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private class ActionButtonAnimation(initialColor: Color, private var active: Boolean) {
+    val color = Animatable(initialColor)
+    val pressScale = Animatable(1f)
+    val popScale = Animatable(1f)
+    val burst = Animatable(0f)
+
+    /** タップでオンにしようとしたか。実際にオンになったとき (確認ダイアログを挟むとその後) に弾ませる。 */
+    var tapped = false
+    private var targetColor = initialColor
+
+    /** 反映された状態を受け取る。ストリーム等による変化では弾ませない。 */
+    fun update(scope: CoroutineScope, motion: MotionScheme, targetColor: Color, active: Boolean) {
+        if (targetColor != this.targetColor) {
+            this.targetColor = targetColor
+            scope.launch { color.animateTo(targetColor, motion.defaultEffectsSpec()) }
+        }
+        if (active == this.active) return
+        this.active = active
+        if (active && tapped) {
+            scope.launch {
+                burst.snapTo(0f)
+                burst.animateTo(1f, tween(ActionBurstDurationMillis, easing = LinearEasing))
+            }
+            scope.launch {
+                popScale.animateTo(PopIconScale, motion.fastSpatialSpec())
+                popScale.animateTo(1f, motion.defaultSpatialSpec())
+            }
+        } else if (burst.value != 0f) {
+            scope.launch { burst.snapTo(0f) }
+        }
+        tapped = false
+    }
+
+    /** 押している間はアイコンを縮める。 */
+    suspend fun followPresses(interactionSource: InteractionSource, motion: MotionScheme) = coroutineScope {
+        val presses = mutableListOf<PressInteraction.Press>()
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> presses += interaction
+                is PressInteraction.Release -> presses -= interaction.press
+                is PressInteraction.Cancel -> presses -= interaction.press
+                else -> return@collect
+            }
+            val target = if (presses.isEmpty()) 1f else PressedIconScale
+            launch { pressScale.animateTo(target, motion.fastSpatialSpec()) }
+        }
+    }
+}
 
 /** 押せない項目の色の不透明度 (Material の disabled content と同じ)。 */
 

@@ -3,7 +3,6 @@ package es.aria_on_the_planet.quasar.ui.component.media
 import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
 import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -38,8 +38,10 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -75,19 +77,26 @@ fun MediaAttachments(
     onClick: (MediaTap) -> Unit = {},
 ) {
     if (attachments.isEmpty()) return
-    // 再描画は不要なので State にせず、レイアウトのたびに上書きしてタップ時に読む
-    val bounds = remember { mutableMapOf<String, Rect>() }
+    // 位置はタップしたときにだけ要るので、置かれた座標系だけを持っておき、タップ時にウィンドウ上の位置を求める
+    // (onGloballyPositioned だと一覧のスクロールの毎フレーム呼ばれる)。再描画は不要なので State にしない
+    val placements = remember { mutableMapOf<String, LayoutCoordinates>() }
     val windowSize = LocalWindowInfo.current.containerSize
     val scrollState = rememberScrollState()
-    val startFade by animateFloatAsState(if (scrollState.canScrollBackward) 1f else 0f, label = "startFade")
-    val endFade by animateFloatAsState(if (scrollState.canScrollForward) 1f else 0f, label = "endFade")
+    // 収まっているときはスクロールを切る。有効なままだと横のドラッグをこの Row が取り、離したときの
+    // 速さが親の HorizontalPager に届かない (Pager の pageNestedScrollConnection が子のフリングを
+    // 消費する) ので、速く払ってもカラムが切り替わらなくなる。maxValue はレイアウトで決まり、決まる前は
+    // Int.MAX_VALUE。その間も無効扱いにして、収まる (大半の) 並びでは組み立て直しを起こさない
+    val scrollable by remember { derivedStateOf { scrollState.maxValue in 1 until Int.MAX_VALUE } }
+    // 端のフェードは残りのスクロール量から描画時に決める (コンポジションでは読まない)
+    val fadePx = with(LocalDensity.current) { FadingEdgeWidth.toPx() }
     Row(
         modifier = modifier
-            .horizontalFadingEdges(width = FadingEdgeWidth, start = { startFade }, end = { endFade })
-            // 収まっているときはスクロールを切る。有効なままだと横のドラッグをこの Row が取り、離したときの
-            // 速さが親の HorizontalPager に届かない (Pager の pageNestedScrollConnection が子のフリングを
-            // 消費する) ので、速く払ってもカラムが切り替わらなくなる。maxValue はレイアウトで決まる
-            .horizontalScroll(scrollState, enabled = scrollState.maxValue > 0),
+            .horizontalFadingEdges(
+                width = FadingEdgeWidth,
+                start = { (scrollState.value / fadePx).coerceIn(0f, 1f) },
+                end = { ((scrollState.maxValue - scrollState.value) / fadePx).coerceIn(0f, 1f) },
+            )
+            .horizontalScroll(scrollState, enabled = scrollable),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         attachments.forEach { attachment ->
@@ -97,10 +106,13 @@ fun MediaAttachments(
                     height = height,
                     sensitive = sensitive,
                     artworkUrl = artworkUrl,
-                    onClick = { playback -> onClick(MediaTap(attachment, playback, bounds.toMap(), windowSize)) },
-                    modifier = Modifier.onGloballyPositioned {
-                        bounds[attachment.id] = Rect(it.positionInWindow(), it.size.toSize())
+                    onClick = { playback ->
+                        val bounds = placements
+                            .filterValues { it.isAttached }
+                            .mapValues { (_, coordinates) -> Rect(coordinates.positionInWindow(), coordinates.size.toSize()) }
+                        onClick(MediaTap(attachment, playback, bounds, windowSize))
                     },
+                    modifier = Modifier.onPlaced { placements[attachment.id] = it },
                 )
             }
         }

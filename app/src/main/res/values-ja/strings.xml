@@ -313,7 +313,7 @@
     <string name="settings_avatar_shape_circle">円形</string>
     <string name="settings_avatar_shape_rounded_square">角丸四角形</string>
     <string name="settings_blur">ぼかし</string>
-    <string name="settings_blur_enabled">浮かぶバーの背景をぼかす</string>
+    <string name="settings_blur_enabled">フローティングバーの背景をぼかす</string>
     <string name="settings_blur_enabled_summary">バッテリーセーバー中は常にオフ</string>
     <string name="settings_blur_radius">ぼかしの強さ</string>
     <string name="settings_blur_tint">色味</string>

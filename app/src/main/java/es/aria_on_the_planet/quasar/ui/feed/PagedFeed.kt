@@ -18,6 +18,12 @@ data class FeedState<T>(
     val loaded: Boolean = false,
     /** 次ページ取得に使う `max_id`。取得した生のページから決め、表示上の並び (再グルーピング等) には依存しない。 */
     val nextMaxId: String? = null,
+    /**
+     * 直前の書き換えで先頭に新しい項目が入ったとき、先頭にいたら先頭に留まって新着を見せるか
+     * (`StickToTopEffect`)。ストリームの新着は `true`、補完 (切断中の分をまとめて取ったもの) は `false` で、
+     * 読んでいた項目の位置を保ったまま上に入れる。
+     */
+    val stickToTop: Boolean = true,
 )
 
 /**
@@ -77,6 +83,7 @@ open class PagedFeed<R, T>(
                     val merged = if (!it.loaded) mergeCached?.invoke(it.items, page.items) else null
                     it.copy(
                         items = merged ?: append(emptyList(), page.items),
+                        stickToTop = true,
                         isRefreshing = false,
                         loaded = true,
                         endReached = page.endReached,
@@ -117,15 +124,22 @@ open class PagedFeed<R, T>(
      * 一覧全体を書き換える (ストリーミングの新着・削除の反映など)。[transform] は純粋関数にする。
      * その後 [trim] で最大件数に切り詰め、末尾が捨てられたら次ページの `max_id` を残った一覧から求め直す
      * (捨てた分は下へスクロールすれば読み直せる)。
+     *
+     * @param stickToTop 先頭に新しい項目が入ったとき、先頭にいたら先頭に留まるか ([FeedState.stickToTop])。
      */
-    fun updateList(transform: (List<T>) -> List<T>) {
+    fun updateList(stickToTop: Boolean = true, transform: (List<T>) -> List<T>) {
         _state.update { s ->
             val items = transform(s.items)
             val trimmed = trim(items)
             if (trimmed.size == items.size) {
-                s.copy(items = items)
+                s.copy(items = items, stickToTop = stickToTop)
             } else {
-                s.copy(items = trimmed, nextMaxId = nextMaxIdOfItems(trimmed) ?: s.nextMaxId, endReached = false)
+                s.copy(
+                    items = trimmed,
+                    nextMaxId = nextMaxIdOfItems(trimmed) ?: s.nextMaxId,
+                    endReached = false,
+                    stickToTop = stickToTop,
+                )
             }
         }
     }

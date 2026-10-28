@@ -976,6 +976,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `max_id` を残った末尾から求め直すので、下へスクロールすれば読み直せる。読み進めて伸ばした分 (loadMore) は捨てない。
 * 表示: 先頭にいるときに先頭へ新着が入ったら `StickToTopEffect` で先頭に留まって見せる (新着は `animateItem` で現れ、
   下の項目が押し下げられる)。読み進めている途中は LazyColumn がキーで位置を保つ。項目の出入りは `Modifier.animateItem()`。
+  * 再接続時の補完で入った分は、先頭にいても先頭に留まらず、読んでいたポストの位置を保って上に入れる (1 ページ埋まれば
+    「取得分 → gap → 読んでいたポスト」で、上へスクロールすると gap と新着が出る)。`TimelineSync.backfill` が
+    `updateList(stickToTop = false)` で書き、`FeedState.stickToTop` → `PostList(stickToTop)` → `StickToTopEffect(enabled)`。
+    フラグは一覧と同じ状態に持つ (別の状態にすると、どの先頭の変化に当てるかがずれる)。ストリームの 1 件ずつの新着は今までどおり。
+    通知の補完 (1 ページ埋まったら読み直し) と引っ張って更新 (一覧を置き換え) は対象外。
 * 未対応: グローバルの自動更新、背面での受信 (Web Push)、通知の gap、通知の削除イベント。
 
 ## 設定

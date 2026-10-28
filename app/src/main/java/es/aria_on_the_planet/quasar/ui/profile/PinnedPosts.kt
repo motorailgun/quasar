@@ -6,11 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.domain.model.Post
-import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.layout.CollapsibleContent
-import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 
 /** 画面高に対して、折りたたみ時に見せるピン留めセクションの割合。 */
@@ -21,13 +19,7 @@ private const val CollapsedHeightFraction = 0.3f
 fun PinnedPosts(
     posts: List<Post>,
     modifier: Modifier = Modifier,
-    onUserClick: (User) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaClick) -> Unit = {},
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
+    callbacks: PostCallbacks = PostCallbacks.None,
 ) {
     if (posts.isEmpty()) return
     val windowHeight = LocalWindowInfo.current.containerSize.height
@@ -39,13 +31,7 @@ fun PinnedPosts(
                     PostCard(
                         post = post,
                         pinned = true,
-                        onUserClick = onUserClick,
-                        onPostClick = onPostClick,
-                        onMediaClick = onMediaClick,
-                        onVote = onVote,
-                        onAction = onAction,
-                        onReply = onReply,
-                        onHashtagClick = onHashtagClick,
+                        callbacks = callbacks,
                     )
                     if (index != posts.lastIndex) HorizontalDivider()
                 }

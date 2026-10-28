@@ -11,7 +11,7 @@ private val ShortcodeRegex = Regex(""":([A-Za-z0-9_]+):""")
 internal const val EmojiInlineIdPrefix = "emoji:"
 
 /**
- * [source] 中の `:shortcode:` のうち [emojis] に存在するものを inline content に置き換える。
+ * この文字列中の `:shortcode:` のうち [emojis] に存在するものを inline content に置き換える。
  * 元のスタイルやリンクは保持される。
  */
 internal fun AnnotatedString.replaceEmojiShortcodes(emojis: List<CustomEmoji>): AnnotatedString {

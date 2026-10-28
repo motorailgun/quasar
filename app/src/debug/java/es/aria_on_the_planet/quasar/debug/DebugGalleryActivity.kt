@@ -59,6 +59,7 @@ import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
 import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsContent
 import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsState
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
@@ -252,9 +253,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             onSetFollowing = {},
             onAnswerFollowRequest = {},
             onAccountAction = { relationship = relationship.applying(it) },
-            onUserClick = {},
-            onPostClick = {},
-            onMediaClick = navigator::openMedia,
+            callbacks = PostCallbacks(onMediaClick = navigator::openMedia),
             onFollowingClick = {},
             onFollowersClick = {},
             onOpenImage = navigator::openMediaViewer,
@@ -274,10 +273,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             postCount = 3,
             onBack = onBack,
             onRefresh = {},
-            onUserClick = {},
-            onPostClick = {},
-            onMediaClick = navigator::openMedia,
-            onHashtagClick = {},
+            callbacks = PostCallbacks(onMediaClick = navigator::openMedia, onHashtagClick = {}),
         )
         return
     }
@@ -305,7 +301,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                 PostList(
                     items = fixture.posts.map(TimelineItem::PostItem),
                     state = listState,
-                    onMediaClick = navigator::openMedia,
+                    callbacks = PostCallbacks(onMediaClick = navigator::openMedia),
                     header = { item(key = "header") { ProfileHeader(profile = fixture.profile, onOpenImage = navigator::openMediaViewer) } },
                 )
             }
@@ -379,7 +375,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
                 PostList(
                     items = posts.map(TimelineItem::PostItem),
                     state = listState,
-                    onMediaClick = navigator::openMedia,
+                    callbacks = PostCallbacks(onMediaClick = navigator::openMedia),
                 )
             }
         }
@@ -424,12 +420,14 @@ private fun PostDetailGallery(text: String, onBack: () -> Unit) {
                 Column {
                     PostDetail(
                         post = post,
-                        onMediaClick = navigator::openMedia,
-                        onAction = { target, type ->
-                            val action = type.toggleOn(target)
-                            posts = posts.map { it.withAction(target.statusId, action) }
-                        },
-                        onReply = {},
+                        callbacks = PostCallbacks(
+                            onMediaClick = navigator::openMedia,
+                            onAction = { target, type ->
+                                val action = type.toggleOn(target)
+                                posts = posts.map { it.withAction(target.statusId, action) }
+                            },
+                            onReply = {},
+                        ),
                         reactionDetail = true,
                         onReactionCountClick = { _, type ->
                             reactions = if (type == PostActionType.Boost) PostReactionsTab.Boosts else PostReactionsTab.Favourites

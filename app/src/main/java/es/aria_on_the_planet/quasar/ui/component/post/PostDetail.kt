@@ -14,8 +14,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -29,14 +27,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
-import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
-import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
-import es.aria_on_the_planet.quasar.ui.component.poll.PollView
-import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.user.UserName
 
 object PostDetailDefaults {
@@ -46,6 +39,7 @@ object PostDetailDefaults {
 /**
  * ポスト詳細画面の主役となるポスト。[PostCard] と同じ要素を、本文を大きく・詳細な投稿日時付きで表示する。
  *
+ * @param callbacks ポストへの操作の口 ([PostCallbacks])。
  * @param menu 投稿者の行の右端 (公開範囲のアイコンの右) に出すもの (ポストのメニュー [PostMenu])。
  * @param reactionDetail アクション行のブースト・お気に入りの件数を「N boosts」「M favourites」で出し、件数のタップで
  *   [onReactionCountClick] (リアクションしたユーザーの一覧) を呼ぶ ([PostActionRow] の同名の引数)。
@@ -54,18 +48,13 @@ object PostDetailDefaults {
 fun PostDetail(
     post: Post,
     modifier: Modifier = Modifier,
+    callbacks: PostCallbacks = PostCallbacks.None,
     mediaHeight: Dp = PostDetailDefaults.MediaHeight,
-    onUserClick: (User) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaClick) -> Unit = {},
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
     menu: (@Composable () -> Unit)? = null,
     reactionDetail: Boolean = false,
     onReactionCountClick: ((Post, PostActionType) -> Unit)? = null,
 ) {
+    val onUserClick = callbacks.onUserClick
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -108,63 +97,14 @@ fun PostDetail(
             menu?.invoke()
         }
         Spacer(Modifier.size(12.dp))
-        var expanded by rememberContentWarningExpanded(post)
-        post.contentWarning?.let { cw ->
-            ContentWarning(
-                text = cw,
-                emojis = post.emojis,
-                expanded = expanded,
-                onToggle = { expanded = !expanded },
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        // CW で隠すのは本文・投票・リンクプレビュー・引用。メディアは sensitive で別に制御する
-        ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
-            EmojiText(
-                text = post.text,
-                emojis = post.emojis,
-                isHtml = true,
-                postContent = true,
-                style = MaterialTheme.typography.bodyLarge,
-                onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
-            )
-            post.poll?.let { poll ->
-                PollView(
-                    poll = poll,
-                    onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-        }
-        if (post.mediaAttachments.isNotEmpty()) {
-            MediaAttachments(
-                attachments = post.mediaAttachments,
-                height = mediaHeight,
-                sensitive = post.sensitive,
-                artworkUrl = post.author.iconUrl,
-                onClick = { tap -> onMediaClick(tap.toClick(post)) },
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        if (post.card != null || post.quote != null) {
-            ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
-                post.card?.let { card ->
-                    LinkPreviewCard(card = card, modifier = Modifier.padding(top = 12.dp))
-                }
-                post.quote?.let { quote ->
-                    QuotedPost(
-                        quote = quote,
-                        mediaHeight = mediaHeight * 0.75f,
-                        maxHeight = mediaHeight,
-                        onPostClick = onPostClick,
-                        onUserClick = onUserClick,
-                        onHashtagClick = onHashtagClick,
-                        onMediaClick = onMediaClick,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
-            }
-        }
+        // 全文を読む場所なので折りたたまない
+        PostBody(
+            post,
+            callbacks = callbacks,
+            mediaHeight = mediaHeight,
+            spacing = 12.dp,
+            textStyle = MaterialTheme.typography.bodyLarge,
+        )
         Spacer(Modifier.size(12.dp))
         val context = LocalContext.current
         // ロケールや 12/24 時間設定の変更で再計算されるよう Configuration を読む
@@ -192,8 +132,8 @@ fun PostDetail(
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
         PostActionRow(
             post,
-            onAction = onAction,
-            onReply = onReply,
+            onAction = callbacks.onAction,
+            onReply = callbacks.onReply,
             reactionDetail = reactionDetail,
             onReactionCountClick = onReactionCountClick?.let { click -> { type -> click(post, type) } },
         )

@@ -45,7 +45,7 @@ fun rankEmojis(emojis: List<CustomEmoji>, query: String, limit: Int = MaxSuggest
         .map { it.first }
 }
 
-/** [query] の範囲を `:shortcode:` に置き換えた後の本文と、カーソルを置く位置。後ろが空白でなければ空白を足す。 */
+/** [range] の範囲を `:shortcode:` に置き換えた後の本文と、カーソルを置く位置。後ろが空白でなければ空白を足す。 */
 fun insertEmoji(text: CharSequence, range: TextRange, shortcode: String): Pair<String, Int> {
     val needsSpace = range.end >= text.length || !text[range.end].isWhitespace()
     val inserted = ":$shortcode:" + if (needsSpace) " " else ""
@@ -56,7 +56,7 @@ fun insertEmoji(text: CharSequence, range: TextRange, shortcode: String): Pair<S
 
 /**
  * カーソル位置 (範囲選択中はその範囲) に `:shortcode:` を挿入した後の本文と、カーソルを置く位置 (ピッカー用)。
- * サーバに絵文字として認識されるよう、直前が英数字・かな・コロンなら空白を前に、直後が空白でなければ後ろに足す。
+ * サーバに絵文字として認識されるよう、直前が文字・数字 (英数字・かな・漢字等)・コロンなら空白を前に、直後が空白でなければ後ろに足す。
  */
 fun insertEmojiAtCursor(text: CharSequence, selection: TextRange, shortcode: String): Pair<String, Int> {
     val start = selection.min.coerceIn(0, text.length)

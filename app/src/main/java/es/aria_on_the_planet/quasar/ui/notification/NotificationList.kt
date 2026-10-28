@@ -42,7 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
 import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
@@ -52,10 +51,13 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
 import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
-import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
-import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
+import es.aria_on_the_planet.quasar.ui.component.post.PostExcerpt
+import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.post.postTimeText
+import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import java.time.Instant
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
 
@@ -72,13 +74,7 @@ fun NotificationList(
     contentPadding: PaddingValues = PaddingValues(),
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
-    onUserClick: (User) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaClick) -> Unit = {},
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
+    callbacks: PostCallbacks = PostCallbacks.None,
     onAccountReactionsClick: (NotificationEntry.AccountReactions) -> Unit = {},
 ) {
     LoadMoreEffect(state, onLoadMore)
@@ -90,19 +86,10 @@ fun NotificationList(
                 when (entry) {
                     is NotificationEntry.AccountReactions -> AccountReactionsItem(
                         entry,
-                        onUserClick = onUserClick,
+                        onUserClick = callbacks.onUserClick,
                         onClick = { onAccountReactionsClick(entry) },
                     )
-                    is NotificationEntry.Single -> NotificationItem(
-                        group = entry.group,
-                        onUserClick = onUserClick,
-                        onPostClick = onPostClick,
-                        onMediaClick = onMediaClick,
-                        onVote = onVote,
-                        onAction = onAction,
-                        onReply = onReply,
-                        onHashtagClick = onHashtagClick,
-                    )
+                    is NotificationEntry.Single -> NotificationItem(group = entry.group, callbacks = callbacks)
                 }
                 HorizontalDivider()
             }
@@ -131,51 +118,24 @@ fun NotificationList(
 fun NotificationItem(
     group: NotificationGroup,
     modifier: Modifier = Modifier,
-    onUserClick: (User) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaClick) -> Unit = {},
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
+    callbacks: PostCallbacks = PostCallbacks.None,
 ) {
     if (group.type.isCompact) {
-        CompactNotification(group, modifier, onUserClick, onPostClick)
+        CompactNotification(group, modifier, callbacks.onUserClick, callbacks.onPostClick)
         return
     }
     // メンションは本文に @ユーザー名 が入るので、見出しを付けずポストだけを出す
     if (group.type == NotificationType.Mention && group.post != null) {
-        PostCard(
-            post = group.post,
-            modifier = modifier,
-            onUserClick = onUserClick,
-            onPostClick = onPostClick,
-            onMediaClick = onMediaClick,
-            onVote = onVote,
-            onAction = onAction,
-            onReply = onReply,
-            onHashtagClick = onHashtagClick,
-            showReplyIndicator = false,
-        )
+        PostCard(post = group.post, modifier = modifier, callbacks = callbacks, showReplyIndicator = false)
         return
     }
     Column(modifier.fillMaxWidth()) {
-        NotificationHeader(group, onUserClick)
+        NotificationHeader(group, callbacks.onUserClick)
         val post = group.post
         if (post != null) {
-            PostCard(
-                post = post,
-                onUserClick = onUserClick,
-                onPostClick = onPostClick,
-                onMediaClick = onMediaClick,
-                onVote = onVote,
-                onAction = onAction,
-                onReply = onReply,
-                onHashtagClick = onHashtagClick,
-                showReplyIndicator = true,
-            )
+            PostCard(post = post, callbacks = callbacks)
         } else {
-            group.accounts.firstOrNull()?.let { AccountRow(it, onUserClick) }
+            group.accounts.firstOrNull()?.let { AccountRow(it, callbacks.onUserClick) }
         }
     }
 }
@@ -209,62 +169,26 @@ private fun CompactNotification(
 ) {
     val post = group.post
     val first = group.accounts.firstOrNull()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { if (post != null) onPostClick(post) else first?.let(onUserClick) }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+    // 名前だけ太字にするため HTML で組む (名前はエスケープ済み)
+    val boldName = first?.let { "<b>${TextUtils.htmlEncode(it.nameOrAcct)}</b>" }.orEmpty()
+    CompactRow(
+        type = group.type,
+        message = group.type.groupMessage(boldName, others = group.count - 1),
+        latestAt = group.latestAt,
+        emojis = first?.emojis.orEmpty(),
+        post = post,
+        onClick = { if (post != null) onPostClick(post) else first?.let(onUserClick) },
+        modifier = modifier,
     ) {
-        // PostCard のアイコン列 (40dp) に合わせて種別アイコンを置く
-        Box(Modifier.width(40.dp), contentAlignment = Alignment.TopEnd) {
-            Icon(
-                group.type.filledIcon(),
-                contentDescription = null,
-                tint = group.type.accentColor(),
-                modifier = Modifier.size(CompactTypeIconSize),
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            // した側のアイコン列。個々のアイコンのタップでそのユーザーのプロフィール
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                group.accounts.take(MaxCompactAvatars).forEach { user ->
-                    UserIcon(
-                        user = user,
-                        size = CompactAvatarSize,
-                        modifier = Modifier.clickable { onUserClick(user) },
-                    )
-                }
-            }
-            Spacer(Modifier.size(8.dp))
-            // 名前だけ太字にするため HTML で組む (名前はエスケープ済み)
-            val boldName = first?.let { "<b>${TextUtils.htmlEncode(it.nameOrAcct)}</b>" }.orEmpty()
-            val time = group.latestAt?.let { " · " + postTimeText(it) }.orEmpty()
-            EmojiText(
-                text = group.type.groupMessage(boldName, others = group.count - 1) + time,
-                emojis = first?.emojis.orEmpty(),
-                isHtml = true,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (post != null) {
-                // 対象ポストは補足情報なので控えめに。CW があれば本文ではなく警告文を出す
-                val cw = post.contentWarning
-                EmojiText(
-                    text = cw ?: post.text,
-                    emojis = post.emojis,
-                    isHtml = cw == null,
-                    postContent = true,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+        // した側のアイコン列。個々のアイコンのタップでそのユーザーのプロフィール
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            group.accounts.take(MaxCompactAvatars).forEach { user ->
+                UserIcon(
+                    user = user,
+                    size = CompactAvatarSize,
+                    modifier = Modifier.clickable { onUserClick(user) },
                 )
             }
-        }
-        post?.mediaAttachments?.firstOrNull()?.let { media ->
-            Spacer(Modifier.width(12.dp))
-            MediaThumbnail(media, sensitive = post.sensitive)
         }
     }
 }
@@ -281,48 +205,69 @@ private fun AccountReactionsItem(
     onClick: () -> Unit,
 ) {
     val account = entry.account
-    val post = entry.latestPost
+    CompactRow(
+        type = entry.type,
+        message = entry.type.multiplePostsMessage("<b>${TextUtils.htmlEncode(account.nameOrAcct)}</b>", entry.members.size),
+        latestAt = entry.latestAt,
+        emojis = account.emojis,
+        post = entry.latestPost,
+        onClick = onClick,
+    ) {
+        UserIcon(
+            user = account,
+            size = CompactAvatarSize,
+            modifier = Modifier.clickable { onUserClick(account) },
+        )
+    }
+}
+
+/**
+ * コンパクト表示の行の形。左に種別の塗りアイコン、右に [avatars] → 説明文 ([message] は HTML。後ろに時刻を足す) →
+ * 対象ポスト ([post]) の抜粋。メディアがあれば右端にサムネイル。
+ */
+@Composable
+private fun CompactRow(
+    type: NotificationType,
+    message: String,
+    latestAt: Instant?,
+    emojis: List<CustomEmoji>,
+    post: Post?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    avatars: @Composable () -> Unit,
+) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
+        // PostCard のアイコン列 (40dp) に合わせて種別アイコンを置く
         Box(Modifier.width(40.dp), contentAlignment = Alignment.TopEnd) {
             Icon(
-                entry.type.filledIcon(),
+                type.filledIcon(),
                 contentDescription = null,
-                tint = entry.type.accentColor(),
+                tint = type.accentColor(),
                 modifier = Modifier.size(CompactTypeIconSize),
             )
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            UserIcon(
-                user = account,
-                size = CompactAvatarSize,
-                modifier = Modifier.clickable { onUserClick(account) },
-            )
+            avatars()
             Spacer(Modifier.size(8.dp))
-            val boldName = "<b>${TextUtils.htmlEncode(account.nameOrAcct)}</b>"
-            val time = entry.latestAt?.let { " · " + postTimeText(it) }.orEmpty()
+            val time = latestAt?.let { " · " + postTimeText(it) }.orEmpty()
             EmojiText(
-                text = entry.type.multiplePostsMessage(boldName, entry.members.size) + time,
-                emojis = account.emojis,
+                text = message + time,
+                emojis = emojis,
                 isHtml = true,
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (post != null) {
-                val cw = post.contentWarning
-                EmojiText(
-                    text = cw ?: post.text,
-                    emojis = post.emojis,
-                    isHtml = cw == null,
-                    postContent = true,
+                // 対象ポストは補足情報なので控えめに
+                PostExcerpt(
+                    post,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -365,7 +310,7 @@ private fun MediaThumbnail(media: MediaAttachment, sensitive: Boolean) {
 @Composable
 private fun NotificationHeader(group: NotificationGroup, onUserClick: (User) -> Unit) {
     val account = group.accounts.firstOrNull()
-    val name = account?.let { it.nameOrAcct }.orEmpty()
+    val name = account?.nameOrAcct.orEmpty()
     Row(
         modifier = Modifier
             .fillMaxWidth()

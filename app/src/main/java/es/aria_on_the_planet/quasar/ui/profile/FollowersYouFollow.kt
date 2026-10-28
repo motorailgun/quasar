@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
+import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
 

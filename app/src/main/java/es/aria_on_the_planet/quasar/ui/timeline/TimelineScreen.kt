@@ -1,15 +1,11 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -17,21 +13,15 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -48,10 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.rememberHazeState
@@ -71,10 +57,9 @@ import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
 import es.aria_on_the_planet.quasar.ui.composer.rememberQuickPostBarState
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -123,7 +108,6 @@ fun TimelineScreen(
             barState.requestInput()
         }
     }
-    val onHashtagClick: (String) -> Unit = navigator::openHashtag
 
     QuickComposerHost(
         drafts = drafts,
@@ -164,7 +148,6 @@ fun TimelineScreen(
                         topPadding = topPadding,
                         bottomPadding = bottomPadding,
                         onReply = onReply,
-                        onHashtagClick = onHashtagClick,
                     )
                 }
                 StatusBarScrim(Modifier.align(Alignment.TopCenter))
@@ -204,7 +187,6 @@ private fun ColumnPage(
     topPadding: Dp,
     bottomPadding: Dp,
     onReply: ((Post) -> Unit)?,
-    onHashtagClick: ((String) -> Unit)?,
 ) {
     val navigator = LocalNavigator.current
     val feed = state.feedOf(column)
@@ -224,9 +206,15 @@ private fun ColumnPage(
             )
         },
     ) {
-        val onVote: suspend (Post, List<Int>) -> Boolean = viewModel::vote
-        val onAction = rememberPostActionHandler(viewModel::performAction)
-        val onMediaClick: (MediaClick) -> Unit = navigator::openMedia
+        val callbacks = PostCallbacks(
+            onUserClick = navigator::openProfile,
+            onPostClick = navigator::openPost,
+            onMediaClick = navigator::openMedia,
+            onVote = viewModel::vote,
+            onAction = rememberPostActionHandler(viewModel::performAction),
+            onReply = onReply,
+            onHashtagClick = navigator::openHashtag,
+        )
         val timelineType = column.timeline
         when {
             feed.items.isEmpty() && (feed.isRefreshing || !feed.loaded) ->
@@ -245,13 +233,7 @@ private fun ColumnPage(
                 contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
-                onUserClick = navigator::openProfile,
-                onPostClick = navigator::openPost,
-                onMediaClick = onMediaClick,
-                onVote = onVote,
-                onAction = onAction,
-                onReply = onReply,
-                onHashtagClick = onHashtagClick,
+                callbacks = callbacks,
                 onAccountReactionsClick = { entry ->
                     navigator.openAccountReactions(entry.account, entry.type, entry.members.mapNotNull { it.post })
                 },
@@ -264,13 +246,7 @@ private fun ColumnPage(
                 contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
                 isLoadingMore = feed.isLoadingMore,
                 onLoadMore = { viewModel.loadMore(column) },
-                onUserClick = navigator::openProfile,
-                onPostClick = navigator::openPost,
-                onVote = onVote,
-                onAction = onAction,
-                onReply = onReply,
-                onHashtagClick = onHashtagClick,
-                onMediaClick = onMediaClick,
+                callbacks = callbacks,
                 onGapClick = { gap -> viewModel.fillGap(column, gap) },
                 stickToTop = feed.stickToTop,
             )

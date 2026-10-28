@@ -50,6 +50,8 @@ es.aria_on_the_planet.quasar
     │   ├── icon/Symbols.kt         アイコン (Material Symbols Rounded・weight 300 の生成物。Outlined = FILL 0 / Filled = FILL 1)
     │   ├── text/EmojiText.kt       カスタム絵文字対応テキスト (Text のラッパー)
     │   ├── post/PostCard.kt        ポスト 1 件 (+ PostActionRow)
+    │   ├── post/PostBody.kt        ポストの中身 (CW / 本文 / 投票 / メディア / カード / 引用。PostCard・PostDetail 共通) + PostMedia / PostExcerpt
+    │   ├── post/PostCallbacks.kt   ポストへの操作の口 (タップ・投票・アクション・返信・ハッシュタグ) をまとめたもの
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
     │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
@@ -60,6 +62,7 @@ es.aria_on_the_planet.quasar
     │   ├── scaffold/DetailScaffold.kt 詳細画面共通の骨組み (戻る付きトップバー + スクロールでタイトル切替 + PTR)
     │   ├── card/LinkPreviewCard.kt リンクプレビュー
     │   ├── media/MediaAttachments.kt 添付メディアの並び + 1 件 (MediaAttachmentItem、インライン再生) + MediaClick
+    │   ├── user/UserIcon.kt        ユーザーのアイコン (形は avatarShape) / UserName.kt 表示名 + 印
     │   ├── user/UserList.kt        ユーザーの集合 (LazyColumn) + UserListItem (フォロー / フォロワー一覧)
     │   ├── user/UserFeedList.kt    FeedState<User> の UserList + PTR + 空・読み込み中・失敗の表示 (タブ 1 つ分)
     │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに。
@@ -76,6 +79,7 @@ es.aria_on_the_planet.quasar
     │   ├── menu/ActionMenu.kt      ︙のメニュー (画面下からのシート) + MenuItemText (項目の文字、Regular)
     │   ├── account/AccountActions.kt アカウントへの操作 (ブロック・ミュート・ブーストの非表示) の口 (LocalAccountActions) とメニューの項目
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
+    │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
     │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
@@ -376,7 +380,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ### PostCard (`ui/component/post/PostCard.kt`)
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。
 
-* `PostCard(post: Post, modifier, mediaHeight: Dp = PostCardDefaults.MediaHeight, onUserClick, onPostClick, onMediaClick)`
+* `PostCard(post: Post, modifier, callbacks: PostCallbacks, mediaHeight: Dp = PostCardDefaults.MediaHeight, ...)`
+* **ポストへの操作は `PostCallbacks` (`onUserClick` / `onPostClick` / `onMediaClick` / `onVote` / `onAction` / `onReply` /
+  `onHashtagClick`) 1 つで受け渡す**。画面 (またはナビゲーションの口と ViewModel が揃う所) で 1 回組み立て、
+  `PostList` / `NotificationList` / `PinnedPosts` / `PostCard` / `PostDetail` / `QuotedPost` は中身を見ずに中継する。
+  コールバックを 1 本ずつ引数に足さない。`@Immutable` の data class なので、作り直しても中身が同じなら等しく、一覧の項目の
+  skip を妨げない (`@Immutable` を外すと suspend 関数型の `onVote` のせいで安定性が推論できず、画面の組み立て直しのたびに
+  全項目が組み立て直される。Compose コンパイラのレポートで `stable callbacks` を確かめる)。
+* 中身 (CW / 本文 / 投票 / メディア / リンクプレビュー / 引用) は `PostBody` (`PostBody.kt`) で PostCard と PostDetail が共有する
+  (間隔・文字の大きさ・折りたたみの行数だけが違う)。メディアの並びは `PostMedia`、通知・返信先の控えめな抜粋は `PostExcerpt`。
 * リプライ表示: `inReplyToId` があるポストは、ブースト表示と同じ形 (アイコン + tertiary 色) で「Reply to @acct」を出す。
   acct は `in_reply_to_account_id` を、自分へのリプライなら投稿者、それ以外は `mentions` から引いて求める
   (見つからなければ「Reply」)。Post 画面のスレッドでは縦線で関係が分かるので `showReplyIndicator = false`。
@@ -387,7 +399,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     サーバだけの `User`。プロフィールを開く用で表示には使わない)。url が一致しない実装 (本文が AP の id を指す等) はブラウザ。
   * ハッシュタグ: href と `Post.tags` の `url` の一致、またはリンクの文字列 `#名前` と `tags` の名前の一致 (大文字小文字無視)。
     `tags` の url は接続中サーバのページなので、他サーバ (Misskey 等) のポストは文字列の方で当たる。タップで
-    `onHashtagClick(name)` (`onReply` と同じく PostList / NotificationList / PostScreen 等は中継するだけ。`null` ならブラウザ)。
+    `onHashtagClick(name)` (`PostCallbacks` の 1 つ。`null` ならブラウザ)。
   * それ以外はブラウザ。
 * 公開範囲: 投稿者行 (名前 / @acct) と同じ高さの右端に `VisibilityIcon` (公式 Web UI を元に、公開・フォロワー限定は出さず、
   未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
@@ -400,7 +412,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),
   ブックマーク=secondary) で表示する。
   ブースト・お気に入り・ブックマークは押せる (`onAction`。`null` なら表示のみ = ギャラリー等)。リプライは `onReply`
-  (トグルではないので `PostAction` とは別の口。`PostList` / `NotificationList` / `PostDetail` 等は中継するだけ。「投稿」の「返信」)。
+  (トグルではないので `PostAction` とは別の口。どちらも `PostCallbacks` の中。「投稿」の「返信」)。
 * `PostActionRow(reactionDetail = true)` (ポスト詳細の `PostDetail(reactionDetail = true)` から): X の一時期の詳細画面の形で、
   リプライ / ブーストのアイコン +「N boosts」/ お気に入りのアイコン +「M favourites」(件数の文字は labelLarge = Medium・onSurfaceVariant、plurals) / 右端に
   ブックマーク。アイコンのタップは通常の操作、件数のタップは `onReactionCountClick(PostActionType.Boost / Favourite)` で
@@ -422,7 +434,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     グレーアウトする (`AccountActionMenuItems`)。読み込むまでは仮の関係 (`ProvisionalRelationship`: ブロック・ミュートしていない)
     でミュート・ブロックを押せるようにしておく (ミュート・ブロックの API は済みでも成功するので先に押されても困らない)。ブーストの
     非表示はフォローしているか分かるまで、分かった後もフォロー外ならグレーアウト。自分のポストかは `AccountActions.myAccountId`
-    (`fetchMe` のキャッシュ) で判断し、まだ分からなければ 3 つともグレーアウト。プロフィールも送信中は 3 つともグレーアウト。
+    (`fetchMe` のキャッシュ) で判断し、まだ分からなければ 3 つともグレーアウト (関係の読み込みにも失敗していたら項目ごと出さない)。プロフィールも送信中は 3 つともグレーアウト。
   * ブロック・ミュートは設定に関わらず `ConfirmDialog` で確認する (解除・ブーストの表示切り替えは確認しない)。失敗は Toast。
   * 成功すると `AccountRepository.relationshipChanges` に流れ、タイムライン・ハッシュタグの一覧がその相手のポスト・ブーストを
     除く (`Post.isHiddenBy`、`PostFeed.hidePostsBy`)。通知・スレッド・プロフィールの一覧からは消さない。
@@ -430,7 +442,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ### PostList (`ui/component/post/PostList.kt`)
 ポストの集合。タイムライン以外 (プロフィールの投稿一覧など) でも使う。
 
-* `PostList(posts, onLoadMore, isLoadingMore, modifier, contentPadding, header, ...)`
+* `PostList(items, modifier, state, contentPadding, isLoadingMore, onLoadMore, callbacks, header, footer, ...)`
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
@@ -491,7 +503,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * フッタ: 「N votes · 6 days left」/「Final results」(複数選択は「N people」)。
 * 投票処理は ViewModel の `suspend fun vote(post, choices)` (`ui/feed/PollVoting.kt` の `submitVote`)。
   viewModelScope 上で実行し、成功したら `Post.withPoll()` で各一覧 (引用先含む) の該当投票を差し替える。
-  画面側は `onVote = viewModel::vote` で渡す。
+  画面側は `PostCallbacks(onVote = viewModel::vote, ...)` で渡す。
 
 ### QuotedPost (`ui/component/post/QuotedPost.kt`)
 * 角丸の OutlinedCard に、小さいアイコン (20dp) + 表示名 + @acct · 時刻 / 本文 / 投票 (結果のみ) / メディア (0.75 倍の高さ)。
@@ -778,8 +790,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `ContentWarningField` / `VisibilityButton` (メニューで選ぶ。`compact` でアイコンのみ) / `ComposerToolbar` (スロット) +
   `AttachMediaButton` / `PollButton` / `ContentWarningButton` / `CharacterCounter` / `AttachmentStrip` + `SensitiveMediaToggle` / `PollEditor`。
   `Composer` はそれらを X の配置で並べた全体のラッパー (高さいっぱいを使う前提。別の配置では部品を直接使う)。
-* 状態は `ComposerState` (`TextFieldState` + snapshot state)。バー・フル画面では `ComposerSession` が持ち (共有)、単独で使うときは `rememberComposerState()`
-  (`rememberSaveable`。添付は保存しない)。`toDraft()` で `PostDraft` にする。
+* 状態は `ComposerState` (`TextFieldState` + snapshot state)。バー・フル画面・共有では `ComposerSession` が持つ。単独で使うための
+  `rememberComposerState()` (`rememberSaveable`。添付は保存しない) もあるが、今は呼び出し元が無い。`toDraft()` で `PostDraft` にする。
 * ドメイン: `PostDraft` / `PollDraft` / `DraftAttachment` (+ `UploadState`)。送信可否は純粋関数 `PostDraft.problems(limits)`
   (空・文字数超過・メディアと投票の併用・未アップロード・選択肢の数/空/長さ)。メディアと投票は同時に付けられない (Mastodon の制約)
   ので、片方があるともう片方のボタンを無効にする。

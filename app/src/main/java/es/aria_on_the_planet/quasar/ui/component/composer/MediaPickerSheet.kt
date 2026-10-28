@@ -49,7 +49,7 @@ fun isEmbeddedPhotoPickerAvailable(): Boolean =
  *
  * NOTE: `androidx.photopicker` は alpha。API が変わったらこのファイルだけで吸収する。
  *
- * 見た目はピッカー側が描くので、こちらから変えられるのは色味 (アクセントカラー) のみ。タブの配置等は変えられない。
+ * 見た目はピッカー側が描くので、こちらから変えられるのは色味 (アクセントカラー) とダーク / ライトのみ。タブの配置等は変えられない。
  *
  * @param maxItems 選べる最大数 (既に選択済みの分を含む)。
  * @param accentColor ピッカーの強調色。既定はアプリのテーマの primary 系 (色味をアプリにそろえる)。
@@ -67,7 +67,8 @@ fun MediaPickerSheet(
     onDismiss: () -> Unit,
     onError: (Throwable) -> Unit,
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // ピッカーはアクセントの上の文字を常に白で描くため、ダークの primary (明るい) では選択中のタブの文字が読みにくい。
+    // ピッカーはアクセントの上の文字色を輝度で決め (0.6 以上で黒、未満で白)、ダークの primary (トーン 80) は 0.6 未満なので
+    // 明るい面に白文字になり、選択中のタブの文字が読みにくい。
     // ライブラリ側の未成熟と判断し、アプリの色にそろえることを優先して primary のままにしている
     accentColor: Color = MaterialTheme.colorScheme.primary,
 ) {

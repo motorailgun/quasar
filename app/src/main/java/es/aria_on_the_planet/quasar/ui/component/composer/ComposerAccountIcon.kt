@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
+import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
 
 /** 投稿するアカウントのアイコン。[user] の取得前は同じ形のプレースホルダ。[shape] は既定で設定のアイコンの形。 */

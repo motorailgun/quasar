@@ -55,7 +55,7 @@ import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
  * 添付予定のメディアの横並び。各サムネイルに削除ボタン・代替テキスト (ALT) ボタン・アップロード状態を重ね、
  * [canAddMore] なら末尾に追加ボタンを置く。はみ出す分は横スクロール (端は [MediaAttachments] と同様にフェード)。
  *
- * NOTE: 今はレイアウトのみ。端末のメディアを選ぶ処理・アップロード・代替テキストの編集は未実装。
+ * 添付が無いときは何も出さない (追加のタイルも出ない)。
  */
 @Composable
 fun AttachmentStrip(

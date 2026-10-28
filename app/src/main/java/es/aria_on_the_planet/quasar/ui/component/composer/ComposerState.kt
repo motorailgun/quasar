@@ -167,7 +167,7 @@ class ComposerState(
 
     companion object {
         /**
-         * 本文・CW・公開範囲・投票を保存する。添付はアップロードの途中状態を戻せないので、返信先はポストを
+         * 本文・CW・公開範囲・閲覧注意・投票を保存する。添付はアップロードの途中状態を戻せないので、返信先はポストを
          * 持てないので保存しない。
          */
         val Saver: Saver<ComposerState, Any> = listSaver(
@@ -203,7 +203,7 @@ class ComposerState(
     }
 }
 
-/** 画面に閉じた投稿欄の状態 (クイック投稿バー等)。プロセスの再生成でも本文を保つ。 */
+/** 画面に閉じた投稿欄の状態。プロセスの再生成でも本文を保つ。今は呼び出し元が無い (どの投稿欄も `ComposerSession` の状態を使う)。 */
 @Composable
 fun rememberComposerState(
     visibility: PostVisibility = PostVisibility.Public,

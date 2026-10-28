@@ -1,7 +1,5 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
-import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
-import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 import es.aria_on_the_planet.quasar.ui.theme.DisabledContentAlpha
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedContent
@@ -49,11 +47,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,20 +62,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
-import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
-import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
+import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.user.UserName
-import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
+import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 
 object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
@@ -102,12 +94,9 @@ enum class PostCardMode {
 /**
  * ポスト 1 件。タイムライン・プロフィール等で再利用する stateless コンポーネント。
  *
+ * @param callbacks ポストへの操作の口 ([PostCallbacks])。
  * @param mediaHeight 添付メディアの表示高さ。各メディアはこの高さに揃えられる。
  * @param pinned プロフィールのピン留めとして表示する場合 `true`。小さな「Pinned」ラベルを付ける。
- * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (デバッグ用ギャラリー等)。
- * @param onAction アクション行のブースト・お気に入り・ブックマークが押されたとき。`null` なら表示のみ (デバッグ用ギャラリー等)。
- * @param onReply アクション行のリプライが押されたとき。`null` なら表示のみ。
- * @param onHashtagClick 本文のハッシュタグが押されたとき (`#` を除いた名前)。`null` ならブラウザで開く。
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
  *   返信関係が別の形で分かる場所では `false` にする。
  * @param mode 表示の種類 ([PostCardMode])。
@@ -117,24 +106,19 @@ enum class PostCardMode {
 fun PostCard(
     post: Post,
     modifier: Modifier = Modifier,
+    callbacks: PostCallbacks = PostCallbacks.None,
     mediaHeight: Dp = PostCardDefaults.MediaHeight,
     pinned: Boolean = false,
-    onUserClick: (User) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaClick) -> Unit = {},
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
     showReplyIndicator: Boolean = true,
     mode: PostCardMode = PostCardMode.Full,
     authorTrailing: (@Composable () -> Unit)? = null,
 ) {
     val full = mode == PostCardMode.Full
+    val onUserClick = callbacks.onUserClick
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (full) Modifier.clickable { onPostClick(post) } else Modifier)
+            .then(if (full) Modifier.clickable { callbacks.onPostClick(post) } else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick)
@@ -153,69 +137,18 @@ fun PostCard(
                     trailing = authorTrailing,
                 )
                 Spacer(Modifier.size(4.dp))
-                var expanded by rememberContentWarningExpanded(post)
-                post.contentWarning?.let { cw ->
-                    ContentWarning(
-                        text = cw,
-                        emojis = post.emojis,
-                        expanded = expanded,
-                        onToggle = { expanded = !expanded },
-                    )
-                }
-                // CW で隠すのは本文・投票。メディアは CW とは独立に sensitive で制御する
-                ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
+                PostBody(
+                    post,
+                    callbacks = callbacks,
+                    mediaHeight = mediaHeight,
+                    spacing = 8.dp,
                     // 長い本文は設定の行数で折りたたむ
-                    CollapsiblePostText(
-                        html = post.text,
-                        emojis = post.emojis,
-                        stateKey = post.statusId,
-                        maxCollapsedLines = LocalDisplaySettings.current.longPostMaxLines,
-                        onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
-                    )
-                    if (full) {
-                        post.poll?.let { poll ->
-                            PollView(
-                                poll = poll,
-                                onVote = onVote?.let { vote -> { choices -> vote(post, choices) } },
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                        }
-                    }
-                }
-                if (post.mediaAttachments.isNotEmpty()) {
-                    MediaAttachments(
-                        attachments = post.mediaAttachments,
-                        height = mediaHeight,
-                        sensitive = post.sensitive,
-                        artworkUrl = post.author.iconUrl,
-                        onClick = { tap -> onMediaClick(tap.toClick(post)) },
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
+                    collapsedMaxLines = LocalDisplaySettings.current.longPostMaxLines,
+                    extras = full,
+                )
                 if (full) {
-                    // リンクプレビュー・引用も本文の一部として CW で隠す
-                    if (post.card != null || post.quote != null) {
-                        ContentWarningBody(hasWarning = post.contentWarning != null, expanded = expanded) {
-                            post.card?.let { card ->
-                                LinkPreviewCard(card = card, modifier = Modifier.padding(top = 8.dp))
-                            }
-                            post.quote?.let { quote ->
-                                QuotedPost(
-                                    quote = quote,
-                                    mediaHeight = mediaHeight * 0.75f,
-                                    // 引用の高さは添付画像と同じ高さまで
-                                    maxHeight = mediaHeight,
-                                    onPostClick = onPostClick,
-                                    onUserClick = onUserClick,
-                                    onHashtagClick = onHashtagClick,
-                                    onMediaClick = onMediaClick,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
-                            }
-                        }
-                    }
                     Spacer(Modifier.size(8.dp))
-                    PostActionRow(post, onAction = onAction, onReply = onReply)
+                    PostActionRow(post, onAction = callbacks.onAction, onReply = callbacks.onReply)
                 }
             }
         }
@@ -237,22 +170,13 @@ private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Bool
         )
     }
     if (showReplyIndicator && post.inReplyToId != null) {
-        ReplyToLabel(post.inReplyToAcct, Modifier.padding(start = 52.dp, bottom = 4.dp))
+        val acct = post.inReplyToAcct
+        PostLabel(
+            Symbols.Outlined.Reply,
+            if (acct != null) stringResource(R.string.post_reply_to, "@$acct") else stringResource(R.string.post_reply),
+            Modifier.padding(start = 52.dp, bottom = 4.dp),
+        )
     }
-}
-
-/** ユーザーのアイコン。[shape] は既定で設定のアイコンの形 ([avatarShape])。 */
-@Composable
-fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp, shape: Shape = avatarShape()) {
-    RemoteImage(
-        url = user.iconUrl,
-        staticUrl = user.iconStaticUrl,
-        kind = ImageKind.Avatar,
-        contentDescription = user.screenName,
-        modifier = modifier
-            .size(size)
-            .clip(shape),
-    )
 }
 
 @Composable
@@ -319,43 +243,28 @@ private fun RowScope.AuthorNameAndTime(post: Post, onAuthorClick: () -> Unit) {
 }
 
 @Composable
-private fun ReplyToLabel(acct: String?, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Symbols.Outlined.Reply,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.tertiary,
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = if (acct != null) stringResource(R.string.post_reply_to, "@$acct") else stringResource(R.string.post_reply),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.tertiary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+internal fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
+    PostLabel(Symbols.Outlined.Repeat, stringResource(R.string.post_boosted_by, booster.nameOrAcct), modifier, booster.emojis)
 }
 
 @Composable
-internal fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
+private fun PostLabel(icon: ImageVector, text: String, modifier: Modifier = Modifier, emojis: List<CustomEmoji> = emptyList()) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Symbols.Outlined.Repeat,
+            icon,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.tertiary,
         )
         Spacer(Modifier.width(4.dp))
-        EmojiText(
-            text = stringResource(R.string.post_boosted_by, booster.nameOrAcct),
-            emojis = booster.emojis,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.tertiary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        val style = MaterialTheme.typography.labelMedium
+        val color = MaterialTheme.colorScheme.tertiary
+        // 絵文字の無いものは EmojiText (変換・絵文字の差し込み) を通さない
+        if (emojis.isEmpty()) {
+            Text(text, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        } else {
+            EmojiText(text, emojis, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
@@ -394,9 +303,6 @@ fun PostActionRow(
     reactionDetail: Boolean = false,
     onReactionCountClick: ((PostActionType) -> Unit)? = null,
 ) {
-    val viewer = post.viewer
-    // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
-    val boostEnabled = post.visibility.boostable || viewer.reblogged
     Row(
         // 押せる範囲を広げた分 (左右の余白) だけ外にはみ出させ、アイコンの位置は余白なしのときと揃える
         modifier = modifier
@@ -415,93 +321,88 @@ fun PostActionRow(
     ) {
         if (reactionDetail) {
             // リプライ / ブースト + 件数 / お気に入り + 件数 を左から詰めて並べ、ブックマークは右端
-            PostActionButton(
-                icon = Symbols.Outlined.Reply,
-                label = stringResource(R.string.post_replies),
-                count = post.repliesCount,
-                toggle = false,
-                onClick = onReply?.let { { it(post) } },
-            )
+            ReplyAction(post, onReply)
             Spacer(Modifier.width(ReactionDetailGap))
-            PostActionButton(
-                icon = if (viewer.reblogged) Symbols.Filled.Repeat else Symbols.Outlined.Repeat,
-                label = stringResource(R.string.post_boosts),
-                active = viewer.reblogged,
-                activeColor = MaterialTheme.extendedColors.reblog.color,
-                enabled = boostEnabled,
-                onClick = onAction?.let { { it(post, PostActionType.Boost) } },
-            )
+            BoostAction(post, onAction, showCount = false)
             ReactionCountLabel(
                 count = post.boostsCount,
                 text = { pluralStringResource(R.plurals.post_detail_boosts, it, it) },
                 onClick = onReactionCountClick?.let { { it(PostActionType.Boost) } },
             )
             Spacer(Modifier.width(ReactionDetailGap))
-            PostActionButton(
-                icon = if (viewer.favourited) Symbols.Filled.Star else Symbols.Outlined.Star,
-                label = stringResource(R.string.post_reactions),
-                active = viewer.favourited,
-                activeColor = MaterialTheme.extendedColors.favourite.color,
-                onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
-            )
+            FavouriteAction(post, onAction, showCount = false)
             ReactionCountLabel(
                 count = post.reactionsCount,
                 text = { pluralStringResource(R.plurals.post_detail_favourites, it, it) },
                 onClick = onReactionCountClick?.let { { it(PostActionType.Favourite) } },
             )
             Spacer(Modifier.weight(1f))
-            PostActionButton(
-                icon = if (viewer.bookmarked) Symbols.Filled.Bookmark else Symbols.Outlined.Bookmark,
-                label = stringResource(R.string.post_bookmark),
-                active = viewer.bookmarked,
-                activeColor = MaterialTheme.colorScheme.secondary,
-                onClick = onAction?.let { { it(post, PostActionType.Bookmark) } },
-            )
+            BookmarkAction(post, onAction)
             return@Row
         }
         // 5 個分の等幅の枠があるとして、リプライ・ブースト・お気に入りを左の 3 つ (幅の 3/5) の左端に置き、
         // ブックマークは右端。件数の桁が変わってもアイコンの位置は動かない
         Row(Modifier.fillMaxWidth(ActionGroupFraction), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                PostActionButton(
-                    icon = Symbols.Outlined.Reply,
-                    label = stringResource(R.string.post_replies),
-                    count = post.repliesCount,
-                    toggle = false,
-                    onClick = onReply?.let { { it(post) } },
-                )
-            }
-            Box(Modifier.weight(1f)) {
-                PostActionButton(
-                    icon = if (viewer.reblogged) Symbols.Filled.Repeat else Symbols.Outlined.Repeat,
-                    label = stringResource(R.string.post_boosts),
-                    count = post.boostsCount,
-                    active = viewer.reblogged,
-                    activeColor = MaterialTheme.extendedColors.reblog.color,
-                    enabled = boostEnabled,
-                    onClick = onAction?.let { { it(post, PostActionType.Boost) } },
-                )
-            }
-            Box(Modifier.weight(1f)) {
-                PostActionButton(
-                    icon = if (viewer.favourited) Symbols.Filled.Star else Symbols.Outlined.Star,
-                    label = stringResource(R.string.post_reactions),
-                    count = post.reactionsCount,
-                    active = viewer.favourited,
-                    activeColor = MaterialTheme.extendedColors.favourite.color,
-                    onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
-                )
-            }
+            Box(Modifier.weight(1f)) { ReplyAction(post, onReply) }
+            Box(Modifier.weight(1f)) { BoostAction(post, onAction, showCount = true) }
+            Box(Modifier.weight(1f)) { FavouriteAction(post, onAction, showCount = true) }
         }
         Spacer(Modifier.weight(1f))
-        PostActionButton(
-            icon = if (viewer.bookmarked) Symbols.Filled.Bookmark else Symbols.Outlined.Bookmark,
-            label = stringResource(R.string.post_bookmark),
-            active = viewer.bookmarked,
-            activeColor = MaterialTheme.colorScheme.secondary,
-            onClick = onAction?.let { { it(post, PostActionType.Bookmark) } },
-        )
+        BookmarkAction(post, onAction)
     }
+}
+
+// アクション行の各ボタン (通常の表示と詳細の表示で共通)
+
+@Composable
+private fun ReplyAction(post: Post, onReply: ((Post) -> Unit)?) {
+    PostActionButton(
+        icon = Symbols.Outlined.Reply,
+        label = stringResource(R.string.post_replies),
+        count = post.repliesCount,
+        toggle = false,
+        onClick = onReply?.let { { it(post) } },
+    )
+}
+
+@Composable
+private fun BoostAction(post: Post, onAction: OnPostAction?, showCount: Boolean) {
+    val reblogged = post.viewer.reblogged
+    PostActionButton(
+        icon = if (reblogged) Symbols.Filled.Repeat else Symbols.Outlined.Repeat,
+        label = stringResource(R.string.post_boosts),
+        count = if (showCount) post.boostsCount else null,
+        active = reblogged,
+        activeColor = MaterialTheme.extendedColors.reblog.color,
+        // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
+        enabled = post.visibility.boostable || reblogged,
+        onClick = onAction?.let { { it(post, PostActionType.Boost) } },
+    )
+}
+
+@Composable
+private fun FavouriteAction(post: Post, onAction: OnPostAction?, showCount: Boolean) {
+    val favourited = post.viewer.favourited
+    PostActionButton(
+        icon = if (favourited) Symbols.Filled.Star else Symbols.Outlined.Star,
+        label = stringResource(R.string.post_reactions),
+        count = if (showCount) post.reactionsCount else null,
+        active = favourited,
+        activeColor = MaterialTheme.extendedColors.favourite.color,
+        onClick = onAction?.let { { it(post, PostActionType.Favourite) } },
+    )
+}
+
+@Composable
+private fun BookmarkAction(post: Post, onAction: OnPostAction?) {
+    val bookmarked = post.viewer.bookmarked
+    PostActionButton(
+        icon = if (bookmarked) Symbols.Filled.Bookmark else Symbols.Outlined.Bookmark,
+        label = stringResource(R.string.post_bookmark),
+        active = bookmarked,
+        activeColor = MaterialTheme.colorScheme.secondary,
+        onClick = onAction?.let { { it(post, PostActionType.Bookmark) } },
+    )
 }
 
 /**
@@ -733,8 +634,6 @@ private class ActionButtonAnimation(initialColor: Color, private var active: Boo
         }
     }
 }
-
-/** 押せない項目の色の不透明度 (Material の disabled content と同じ)。 */
 
 /** 押している間のアイコンの縮小率。 */
 private const val PressedIconScale = 0.8f

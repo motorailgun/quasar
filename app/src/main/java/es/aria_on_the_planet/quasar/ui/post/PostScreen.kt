@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.post
 
+import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,16 +9,13 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -29,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -57,6 +54,7 @@ import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
 import es.aria_on_the_planet.quasar.ui.composer.rememberQuickPostBarState
 import es.aria_on_the_planet.quasar.ui.component.post.ThreadLineDefaults
 import es.aria_on_the_planet.quasar.ui.component.post.threadLines
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
@@ -149,8 +147,15 @@ fun PostScreen(
 
     val listState = rememberLazyListState()
     val thread = state.thread
-    val onVote: suspend (Post, List<Int>) -> Boolean = viewModel::vote
-    val onAction = rememberPostActionHandler(viewModel::performAction)
+    val callbacks = PostCallbacks(
+        onUserClick = onUserClick,
+        onPostClick = onPostClick,
+        onMediaClick = onMediaClick,
+        onVote = viewModel::vote,
+        onAction = rememberPostActionHandler(viewModel::performAction),
+        onReply = onReply,
+        onHashtagClick = onHashtagClick,
+    )
     val mainIndex = thread?.ancestors?.size ?: 0
 
     // 初回表示時は祖先ではなく本体のポストを先頭に出す
@@ -210,13 +215,7 @@ fun PostScreen(
                                         color = lineColor,
                                         startY = if (isFirst) AvatarTopY else 0.dp,
                                     ),
-                                    onUserClick = onUserClick,
-                                    onPostClick = onPostClick,
-                                    onMediaClick = onMediaClick,
-                                    onVote = onVote,
-                                    onAction = onAction,
-                                    onReply = onReply,
-                                    onHashtagClick = onHashtagClick,
+                                    callbacks = callbacks,
                                     showReplyIndicator = false,
                                 )
                             }
@@ -228,13 +227,7 @@ fun PostScreen(
                                     } else {
                                         Modifier
                                     },
-                                    onUserClick = onUserClick,
-                                    onPostClick = onPostClick,
-                                    onMediaClick = onMediaClick,
-                                    onVote = onVote,
-                                    onAction = onAction,
-                                    onReply = onReply,
-                                    onHashtagClick = onHashtagClick,
+                                    callbacks = callbacks,
                                     menu = { postMenu(thread.post) },
                                     reactionDetail = true,
                                     onReactionCountClick = onReactionCountClick,
@@ -243,22 +236,12 @@ fun PostScreen(
                             }
                             if (state.replies.isEmpty()) {
                                 item(key = "no_replies", contentType = "status") {
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(24.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
+                                    ListStatus(
                                         // キャッシュの本体を出してスレッドを取っている間
-                                        if (state.isLoading) {
-                                            LoadingIndicator()
-                                        } else {
-                                            Text(
-                                                stringResource(R.string.post_no_replies),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
+                                        loading = state.isLoading,
+                                        error = null,
+                                        empty = stringResource(R.string.post_no_replies),
+                                    )
                                 }
                             }
                             itemsIndexed(state.replies, key = { _, row -> "reply:${row.post.statusId}" }, contentType = { _, _ -> "post" }) { index, row ->
@@ -272,13 +255,7 @@ fun PostScreen(
                                         startY = if (row.connectedToPrevious) 0.dp else AvatarTopY,
                                         endY = if (row.connectedToNext) null else AvatarTopY,
                                     ),
-                                    onUserClick = onUserClick,
-                                    onPostClick = onPostClick,
-                                    onMediaClick = onMediaClick,
-                                    onVote = onVote,
-                                    onAction = onAction,
-                                    onReply = onReply,
-                                    onHashtagClick = onHashtagClick,
+                                    callbacks = callbacks,
                                     showReplyIndicator = false,
                                 )
                             }

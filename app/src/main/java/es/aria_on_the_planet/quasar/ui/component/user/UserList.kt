@@ -89,13 +89,7 @@ fun UserListItem(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    EmojiText(
-                        text = user.displayName.ifBlank { user.screenName },
-                        emojis = user.emojis,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    UserName(user, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                     Text(
                         text = "@${user.screenName}",
                         style = MaterialTheme.typography.bodyMedium,
@@ -139,13 +133,7 @@ fun UserSummary(
         UserIcon(user = user)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            EmojiText(
-                text = user.displayName.ifBlank { user.screenName },
-                emojis = user.emojis,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            UserName(user, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
             if (user.note.isNotBlank()) {
                 EmojiText(
                     text = user.note,

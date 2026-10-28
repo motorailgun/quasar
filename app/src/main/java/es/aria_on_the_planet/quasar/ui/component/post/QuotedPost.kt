@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import es.aria_on_the_planet.quasar.ui.component.user.UserName
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.modifier.bottomFadingEdge
 import androidx.compose.foundation.layout.Row
@@ -146,12 +147,9 @@ internal fun QuoteHeader(post: Post, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         UserIcon(user = post.author, size = 20.dp)
         Spacer(Modifier.width(6.dp))
-        EmojiText(
-            text = post.author.displayName.ifBlank { post.author.screenName },
-            emojis = post.author.emojis,
+        UserName(
+            post.author,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(Modifier.width(4.dp))

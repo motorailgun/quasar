@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import es.aria_on_the_planet.quasar.ui.component.user.UserName
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -237,7 +238,7 @@ private fun CompactNotification(
             }
             Spacer(Modifier.size(8.dp))
             // 名前だけ太字にするため HTML で組む (名前はエスケープ済み)
-            val boldName = first?.let { "<b>${TextUtils.htmlEncode(it.displayName.ifBlank { it.screenName })}</b>" }.orEmpty()
+            val boldName = first?.let { "<b>${TextUtils.htmlEncode(it.nameOrAcct)}</b>" }.orEmpty()
             val time = group.latestAt?.let { " · " + postTimeText(it) }.orEmpty()
             EmojiText(
                 text = group.type.groupMessage(boldName, others = group.count - 1) + time,
@@ -303,7 +304,7 @@ private fun AccountReactionsItem(
                 modifier = Modifier.clickable { onUserClick(account) },
             )
             Spacer(Modifier.size(8.dp))
-            val boldName = "<b>${TextUtils.htmlEncode(account.displayName.ifBlank { account.screenName })}</b>"
+            val boldName = "<b>${TextUtils.htmlEncode(account.nameOrAcct)}</b>"
             val time = entry.latestAt?.let { " · " + postTimeText(it) }.orEmpty()
             EmojiText(
                 text = entry.type.multiplePostsMessage(boldName, entry.members.size) + time,
@@ -364,7 +365,7 @@ private fun MediaThumbnail(media: MediaAttachment, sensitive: Boolean) {
 @Composable
 private fun NotificationHeader(group: NotificationGroup, onUserClick: (User) -> Unit) {
     val account = group.accounts.firstOrNull()
-    val name = account?.let { it.displayName.ifBlank { it.screenName } }.orEmpty()
+    val name = account?.let { it.nameOrAcct }.orEmpty()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -416,13 +417,7 @@ private fun AccountRow(user: User, onUserClick: (User) -> Unit) {
         UserIcon(user = user)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            EmojiText(
-                text = user.displayName.ifBlank { user.screenName },
-                emojis = user.emojis,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            UserName(user, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
             Text(
                 text = "@${user.fullScreenName}",
                 style = MaterialTheme.typography.bodySmall,

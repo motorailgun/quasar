@@ -434,7 +434,7 @@ private fun ProfileTab.emptyMessage(): Int = when (this) {
 private fun ProfileTitle(profile: Profile) {
     val locale = LocalConfiguration.current.locales[0]
     DetailTitle(
-        name = profile.user.displayName.ifBlank { profile.user.screenName },
+        name = profile.user.nameOrAcct,
         emojis = profile.user.emojis,
         subtitle = stringResource(R.string.profile_posts_count, formatCount(profile.postsCount, locale)),
     )

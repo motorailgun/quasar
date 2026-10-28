@@ -128,8 +128,10 @@ data class User(
     val note: String,         // プロフィール文 (HTML, カスタム絵文字を含みうる)
     val emojis: List<CustomEmoji>,
     val iconStaticUrl: String = iconUrl, // Account.avatar_static (アニメーションを止めるとき用)
-    val bot: Boolean = false, // Account.bot。プロフィール (鍵の隣)・PostCard / PostDetail の表示名の右に BotBadge
+    val locked: Boolean = false, // Account.locked (承認制)
+    val bot: Boolean = false, // Account.bot
 )
+// User.nameOrAcct: 表示名が空なら acct (displayName.ifBlank { screenName } を書かない)
 
 // User は一覧表示に必要な最小限。プロフィール画面用の詳細は Profile に分ける
 // User.fullScreenName: ローカルユーザーにも所属ドメインを付けた username@domain
@@ -143,7 +145,6 @@ data class Profile(
     val followersCount: Int,       // followers_count
     val fields: List<ProfileField>,
     val createdAt: Instant?,
-    val locked: Boolean,          // bot は User.bot
     val movedTo: User? = null,     // moved (引っ越し先)。引っ越していなければ null
 )
 
@@ -321,6 +322,13 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
     アプリ全体キャッシュ) へ記録し、記録されると再レイアウトする。未読み込みの間は正方形。比率は 1/4〜8 に丸める。
 * 変換処理 (`replaceEmojiShortcodes`, `simplifyMastodonHtml`) は純粋関数として分離し、ユニットテスト可能にする。
 
+### UserName (`ui/component/user/UserName.kt`)
+ユーザーの名前を単独で出す所 (ポストの投稿者行・引用・ユーザー一覧・通知のアカウントの行・プロフィール・引っ越し先) は
+**`EmojiText` で表示名を直に書かず `UserName(user, style = ...)` を使う**。表示名の右に印 (bot、`showLocked = true` なら承認制。
+今はプロフィールのヘッダだけ) を並べ、名前が省略されても印は残す。印の大きさは `style` の文字の大きさに合わせる。
+新しい印 (アカウントの種類等) はここに足せば全部の場所に出る。文の一部の名前 (「〇〇 boosted」・通知の文・トップバーの
+タイトル等) は `user.nameOrAcct` の文字列で出し、印は付けない。
+
 ### RemoteImage / LocalImage (`ui/component/image/`)
 画像は**`AsyncImage` を直接使わず必ず `RemoteImage` (サーバ上の画像) / `LocalImage` (投稿欄の添付等、端末内) を使う**。
 Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.linecorp.apng`) は `loader/ApngDecoder.kt` と `loader/ApngAnimationDrawable.kt` だけ。
@@ -383,7 +391,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * それ以外はブラウザ。
 * 公開範囲: 投稿者行 (名前 / @acct) と同じ高さの右端に `VisibilityIcon` (公式 Web UI を元に、公開・フォロワー限定は出さず、
   未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
-* 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + (bot なら `BotBadge`、`ui/component/user/`) + screenName / 本文 (EmojiText) / 投票 (PollView) /
+* 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) (`UserName`) + screenName / 本文 (EmojiText) / 投票 (PollView) /
   添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
 * `mode = PostCardMode.ReplyContext` は返信画面の上の返信先用: 本文 (CW・長文の折りたたみ込み) とメディアだけで、ラベル・
   公開範囲・投票・カード・引用・アクション行を出さず、カード全体のタップも受けない。`authorTrailing` は投稿者行の右端 (✕ 等)。

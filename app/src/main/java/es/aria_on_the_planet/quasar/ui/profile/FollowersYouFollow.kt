@@ -62,7 +62,7 @@ fun FollowersYouFollow(users: List<User>, modifier: Modifier = Modifier) {
 
 @Composable
 private fun followedByText(users: List<User>): String {
-    val names = users.take(MaxNames).map { it.displayName.ifBlank { it.screenName } }
+    val names = users.take(MaxNames).map { it.nameOrAcct }
     val others = users.size - names.size
     return when {
         others > 0 -> pluralStringResource(R.plurals.profile_followed_by_others, others, names[0], names[1], others)

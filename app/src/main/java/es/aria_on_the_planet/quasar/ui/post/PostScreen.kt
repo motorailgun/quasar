@@ -180,7 +180,7 @@ fun PostScreen(
                 revealedTitle = thread?.post?.let { post ->
                     {
                         DetailTitle(
-                            name = post.author.displayName.ifBlank { post.author.screenName },
+                            name = post.author.nameOrAcct,
                             emojis = post.author.emojis,
                             subtitle = "@${post.author.fullScreenName}",
                         )

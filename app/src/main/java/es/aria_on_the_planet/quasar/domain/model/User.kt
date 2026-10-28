@@ -18,9 +18,14 @@ data class User(
     val iconStaticUrl: String = iconUrl,
     /** 所属サーバでのプロフィールのページ (`Account.url`)。 */
     val url: String? = null,
+    /** 承認制のアカウント (`Account.locked`)。 */
+    val locked: Boolean = false,
     /** 自動で投稿するアカウント (`Account.bot`)。 */
     val bot: Boolean = false,
 ) {
+    /** 表示に使う名前。表示名が空なら acct。 */
+    val nameOrAcct: String get() = displayName.ifBlank { screenName }
+
     /** 接続中サーバ以外のユーザーか (`acct` にドメインが付く)。 */
     val isRemote: Boolean get() = '@' in screenName
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import es.aria_on_the_planet.quasar.ui.component.user.UserName
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -26,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -219,20 +219,12 @@ fun ProfileHeader(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    EmojiText(
-                        text = user.displayName.ifBlank { user.screenName },
-                        emojis = user.emojis,
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (profile.locked) {
-                        BadgeIcon(Symbols.Outlined.Lock, stringResource(R.string.profile_locked))
-                    }
-                    if (user.bot) {
-                        BadgeIcon(Symbols.Outlined.SmartToy, stringResource(R.string.profile_bot))
-                    }
-                }
+                UserName(
+                    user,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    maxLines = Int.MAX_VALUE,
+                    showLocked = true,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "@${user.fullScreenName}",
@@ -296,13 +288,7 @@ private fun MovedTo(target: User, onClick: () -> Unit) {
             UserIcon(target, size = 40.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                EmojiText(
-                    text = target.displayName.ifBlank { target.screenName },
-                    emojis = target.emojis,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                UserName(target, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                 Text(
                     text = "@${target.fullScreenName}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -329,18 +315,6 @@ private fun RelationshipLabel(relationship: Relationship) {
             .padding(start = 8.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
-}
-
-@Composable
-private fun BadgeIcon(icon: ImageVector, description: String) {
-    Icon(
-        icon,
-        contentDescription = description,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .padding(start = 6.dp)
-            .size(20.dp),
     )
 }
 

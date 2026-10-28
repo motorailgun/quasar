@@ -55,7 +55,7 @@ fun FollowRequestCard(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val name = "<b>${TextUtils.htmlEncode(user.displayName.ifBlank { user.screenName })}</b>"
+            val name = "<b>${TextUtils.htmlEncode(user.nameOrAcct)}</b>"
             EmojiText(
                 text = stringResource(R.string.profile_follow_request_message, name),
                 emojis = user.emojis,

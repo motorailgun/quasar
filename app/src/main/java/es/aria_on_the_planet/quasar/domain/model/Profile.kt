@@ -13,7 +13,6 @@ data class Profile(
     val followersCount: Int,
     val fields: List<ProfileField>,
     val createdAt: Instant?,
-    val locked: Boolean,
     /** 引っ越し先のアカウント (`moved`)。引っ越していなければ `null`。 */
     val movedTo: User? = null,
 )

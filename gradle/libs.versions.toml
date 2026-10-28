@@ -20,6 +20,7 @@ materialComponents = "1.14.0"
 media3 = "1.11.1"
 navigationevent = "1.2.0"
 datastore = "1.2.1"
+exifinterface = "1.4.2"
 navigation3 = "1.2.0"
 browser = "1.10.0"
 room = "2.8.5"
@@ -55,6 +56,7 @@ haze-blur = { group = "dev.chrisbanes.haze", name = "haze-blur", version.ref = "
 androidx-navigationevent-compose = { group = "androidx.navigationevent", name = "navigationevent-compose", version.ref = "navigationevent" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
 androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }

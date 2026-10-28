@@ -17,6 +17,7 @@ import java.util.UUID
  * 待ち → 送信中 (進み具合) → 変換待ち → 完了 / 失敗 と進める。
  *
  * * 追加したらすぐ 1 件ずつ送る。形式・サイズが上限に合わないものは送らずに失敗にする。
+ * * [prepare] があれば、検査の前に 1 回だけ通す (上限を超える画像を端末で作り直す等)。その間は送信中 (進み具合なし) と出す。
  * * 削除したら送信を止める (サーバに残った分は投稿に使われなければサーバが後で消す)。
  * * 失敗したものは [retry] で送り直せる (上限に合わないものは除く)。
  * * 代替テキストは送るときに付ける。送った後に変えたら [updateDescription] で反映する。
@@ -39,9 +40,13 @@ class AttachmentUploads(
     private val onError: (Throwable) -> Unit = {},
     /** 失敗の理由を決める (送り直せるのは [UploadFailure.Failed] のみ)。 */
     private val classifyFailure: (Throwable) -> UploadFailure = { UploadFailure.Failed },
+    /** 送る前に中身を替える (`null` なら替えない)。失敗したら元のまま送る。 */
+    private val prepare: (suspend (UploadSource, ComposeLimits) -> UploadSource)? = null,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val sources = mutableMapOf<String, UploadSource>()
+    /** [prepare] を済ませたもの。 */
+    private val prepared = mutableSetOf<String>()
     private val jobs = mutableMapOf<String, Job>()
     /** サーバ側の代替テキスト (送った / 反映済みのもの)。 */
     private val remoteDescriptions = mutableMapOf<String, String>()
@@ -64,6 +69,7 @@ class AttachmentUploads(
         jobs.remove(localId)?.cancel()
         descriptionJobs.remove(localId)?.cancel()
         sources.remove(localId)
+        prepared.remove(localId)
         remoteDescriptions.remove(localId)
         setAttachments(attachments().filterNot { it.localId == localId })
     }
@@ -82,6 +88,25 @@ class AttachmentUploads(
 
     private fun start(localId: String) {
         val source = sources[localId] ?: return
+        if (prepare != null && localId !in prepared) {
+            jobs.remove(localId)?.cancel()
+            update(localId) { it.copy(state = UploadState.Uploading(null)) }
+            jobs[localId] = scope.launch {
+                val replaced = try {
+                    prepare.invoke(source, limits())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    onError(e)
+                    source
+                }
+                sources[localId] = replaced
+                prepared += localId
+                jobs.remove(localId)
+                start(localId)
+            }
+            return
+        }
         checkUpload(source.mimeType, source.size, limits())?.let { failure ->
             update(localId) { it.copy(state = UploadState.Failed(failure)) }
             return

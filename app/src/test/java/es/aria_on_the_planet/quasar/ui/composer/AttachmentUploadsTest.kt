@@ -35,9 +35,11 @@ class AttachmentUploadsTest {
         scope: CoroutineScope,
         limits: ComposeLimits = ComposeLimits(),
         classify: (Throwable) -> UploadFailure = { UploadFailure.Failed },
+        prepare: (suspend (UploadSource, ComposeLimits) -> UploadSource)? = null,
     ) {
         var list = emptyList<DraftAttachment>()
         val calls = mutableListOf<Call>()
+        val sent = mutableListOf<UploadSource>()
         val descriptionUpdates = mutableListOf<Pair<String, String>>()
         private var nextId = 0
         val uploads = AttachmentUploads(
@@ -45,12 +47,14 @@ class AttachmentUploadsTest {
             attachments = { list },
             setAttachments = { list = it },
             limits = { limits },
-            upload = { _, description, onProgress, onProcessing ->
+            upload = { source, description, onProgress, onProcessing ->
+                sent += source
                 Call(description, onProgress, onProcessing).also { calls += it }.result.await()
             },
             updateDescription = { id, description -> descriptionUpdates += id to description },
             newId = { "l${nextId++}" },
             classifyFailure = classify,
+            prepare = prepare,
         )
         fun state(index: Int = 0) = list[index].state
     }
@@ -200,5 +204,45 @@ class AttachmentUploadsTest {
         h.uploads.retry("l0")
         settle()
         assertEquals(1, h.calls.size)
+    }
+
+    @Test
+    fun preparedSourceIsCheckedAndSent() = runUploads {
+        val limits = ComposeLimits(imageSizeLimit = 50)
+        val small = FakeSource(size = 10)
+        val h = Harness(this, limits, prepare = { _, l ->
+            assertEquals(limits, l)
+            small
+        })
+        // そのままでは上限を超えるが、作り直したものは収まる
+        h.uploads.add(listOf(FakeSource(size = 100)))
+        settle()
+        assertEquals(UploadState.Uploading(null), h.state())
+        assertEquals(listOf<UploadSource>(small), h.sent)
+    }
+
+    @Test
+    fun retryDoesNotPrepareAgain() = runUploads {
+        var prepared = 0
+        val h = Harness(this, prepare = { source, _ -> prepared++; source })
+        h.uploads.add(listOf(FakeSource()))
+        settle()
+        h.calls[0].result.completeExceptionally(IOException("network"))
+        settle()
+        assertEquals(UploadState.Failed(UploadFailure.Failed), h.state())
+        h.uploads.retry(h.list[0].localId)
+        settle()
+        assertEquals(2, h.calls.size)
+        assertEquals(1, prepared)
+    }
+
+    @Test
+    fun failedPrepareFallsBackToOriginal() = runUploads {
+        val h = Harness(this, ComposeLimits(imageSizeLimit = 50), prepare = { _, _ -> throw IOException("decode") })
+        h.uploads.add(listOf(FakeSource(size = 100)))
+        settle()
+        // 元のまま検査するので上限を超えて失敗
+        assertEquals(UploadState.Failed(UploadFailure.TooLarge), h.state())
+        assertTrue(h.calls.isEmpty())
     }
 }

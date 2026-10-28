@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     // 設定の保存
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.exifinterface)
     // API の結果のキャッシュ (ポスト・アカウント等。data/cache/)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

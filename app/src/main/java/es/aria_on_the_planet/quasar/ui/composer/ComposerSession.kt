@@ -76,6 +76,8 @@ class ComposerSession(
     private val openUploadSource: (Uri) -> UploadSource,
     /** 編集するポスト。`null` なら新しい投稿。 */
     val editing: EditTarget? = null,
+    /** 添付を送る前に中身を替える (設定でオンなら、上限を超える画像を作り直す)。`null` なら替えない。 */
+    private val prepareUpload: (suspend (UploadSource, ComposeLimits) -> UploadSource)? = null,
     /** 投稿 (編集なら保存) できた。[DraftStore] がこの下書きを終えて空のものに替える。 */
     private val onPublished: (Post) -> Unit,
 ) {
@@ -104,6 +106,7 @@ class ComposerSession(
             if (editing == null) mediaRepository.updateDescription(session, mediaId, description)
         },
         onError = { Log.w(TAG, "Media upload failed", it) },
+        prepare = prepareUpload,
         classifyFailure = { e ->
             when ((e as? MastodonApiException)?.code) {
                 401, 403 -> UploadFailure.NotAllowed

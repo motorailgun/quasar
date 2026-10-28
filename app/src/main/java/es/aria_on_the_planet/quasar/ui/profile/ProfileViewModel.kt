@@ -2,7 +2,9 @@ package es.aria_on_the_planet.quasar.ui.profile
 
 import android.util.Log
 import android.net.Uri
+import es.aria_on_the_planet.quasar.data.media.ImageUploadLimits
 import es.aria_on_the_planet.quasar.data.media.UploadSource
+import es.aria_on_the_planet.quasar.data.media.profileImageLimits
 import es.aria_on_the_planet.quasar.data.remote.userMessage
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
@@ -148,6 +150,8 @@ class ProfileViewModel(
     private val emojiRepository: EmojiRepository,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
+    /** 上限に合わない画像を作り直す (`ImageReencoder.prepare`)。プロフィールの画像は確かめずに常に通す。 */
+    private val prepareImage: suspend (UploadSource, ImageUploadLimits) -> UploadSource = { source, _ -> source },
 ) : ViewModel() {
 
     private val profile = MutableStateFlow(ProfileState())
@@ -362,7 +366,13 @@ class ProfileViewModel(
                 val (avatar, header) = withContext(Dispatchers.IO) {
                     editor.avatar?.let(openUploadSource) to editor.header?.let(openUploadSource)
                 }
-                val updated = repository.updateProfile(session, source, avatar, header)
+                // 上限 (2MB) を超える・受け付けない形式の画像は送る前に作り直す (WebP を使えるかは添付の形式から決める)
+                val imageLimits = profileImageLimits(
+                    runOptional("instance") { instanceRepository.instance(session.serverUrl) }?.composeLimits?.supportedMimeTypes,
+                )
+                val preparedAvatar = avatar?.let { prepareImage(it, imageLimits) }
+                val preparedHeader = header?.let { prepareImage(it, imageLimits) }
+                val updated = repository.updateProfile(session, source, preparedAvatar, preparedHeader)
                 profile.update { it.copy(profile = updated) }
                 edit.value = null
                 // 自分のポストの名前・アイコンも変わるので、一覧を読み直す

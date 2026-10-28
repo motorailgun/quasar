@@ -13,6 +13,16 @@ data class AppSettings(
     val confirmations: Set<ConfirmTarget> = DefaultConfirmations,
     /** 新しい投稿の公開範囲。`null` ならアカウントの既定 (`verify_credentials` の `source.privacy`)。 */
     val defaultVisibility: PostVisibility? = null,
+    /**
+     * 投稿の添付で、サーバの上限を超える (または受け付けない形式の) 画像を送る前に端末で圧縮し直すか
+     * (大きさ (縦横) は変えず、WebP / JPEG で画質を下げる)。既定はオフ (そのまま送り、上限を超えれば送れない)。
+     */
+    val compressOversizedImages: Boolean = false,
+    /**
+     * 投稿の添付の画像から、送る前に EXIF (位置情報・カメラ・日時等) と XMP 等のメタデータを除くか。上限に合っている画像は
+     * 作り直さずメタデータだけを除く (HEIC 等それができない形式は作り直す)。既定はオフ。
+     */
+    val stripImageMetadata: Boolean = false,
     val predictiveBack: PredictiveBackSettings = PredictiveBackSettings(),
 )
 

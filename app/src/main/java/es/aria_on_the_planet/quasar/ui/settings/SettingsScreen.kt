@@ -346,6 +346,18 @@ fun PostingSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: (
                 confirmations = settings.confirmations,
                 update = update,
             )
+            SettingsSwitchItem(
+                title = stringResource(R.string.settings_compress_oversized_images),
+                summary = stringResource(R.string.settings_compress_oversized_images_summary),
+                checked = settings.compressOversizedImages,
+                onCheckedChange = { checked -> update { it.copy(compressOversizedImages = checked) } },
+            )
+            SettingsSwitchItem(
+                title = stringResource(R.string.settings_strip_image_metadata),
+                summary = stringResource(R.string.settings_strip_image_metadata_summary),
+                checked = settings.stripImageMetadata,
+                onCheckedChange = { checked -> update { it.copy(stripImageMetadata = checked) } },
+            )
         }
     }
 }

@@ -22,6 +22,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.di.AppContainer
@@ -272,6 +273,13 @@ private fun ProfileEntry(container: AppContainer, session: Session, key: Route.P
                     instanceRepository = container.instanceRepository,
                     emojiRepository = container.emojiRepository,
                     openUploadSource = container::uploadSource,
+                    prepareImage = { source, limits ->
+                        container.imageReencoder.prepare(
+                            source,
+                            limits,
+                            ImagePrepareOptions(compressOversized = true, stripMetadata = false),
+                        )
+                    },
                 )
             }
         },

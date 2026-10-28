@@ -650,8 +650,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
       成功したら応答で表示を置き換え、投稿の一覧を読み直す。ログイン中のアカウント (`AccountRepository.myAccount`) にも流れ、
       タイムラインのヘッダ・投稿欄のアイコンが追従する。
     * 変更があれば ✕ /「戻る」で破棄の確認。保存の送信中は入力も閉じるのもできない。
-    * 未実装: 鍵・bot・`hide_collections` 等のスイッチ、画像の削除 (`DELETE /api/v1/profile/avatar`)、画像の切り抜き・縮小
-      (大きい画像はサーバが 422 で断る。文言はそのまま出る)、画像の代替テキスト、フィールドの並べ替え、featured tags。
+    * 画像は上限 (2MB) を超える・受け付けない形式なら送る前に作り直す (下記「画像の作り直し」。プロフィールは設定に関わらず常に)。
+    * 未実装: 鍵・bot・`hide_collections` 等のスイッチ、画像の削除 (`DELETE /api/v1/profile/avatar`)、画像の切り抜き、
+      画像の代替テキスト、フィールドの並べ替え、featured tags。
   * 未実装: 返信のタブ、familiar followers の一覧画面。
 * **ハッシュタグ** (`Route.Hashtag(name)`、`#` 無しの名前)。
   `GET /api/v1/timelines/tag/:hashtag` (max_id ページング、`TimelineRepository.fetchHashtag`) を `PostFeed` で読み、
@@ -878,9 +879,34 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     送った後に変えたら `PUT` で反映 (送信中に変えた分は完了後に反映)。
   * 動画・GIF は他のメディアと一緒に付けられない (`DraftAttachment.isVideoLike`、`DraftProblem.VideoWithOtherMedia`)。
     動画があれば追加ボタンを無効にする。動画のサムネイルは `coil-video` (`VideoFrameDecoder`)。
+  * **画像の作り直し** (`data/media/ImageReencoder` + 判断は純粋関数 `ImageReencode.kt`、`ImageReencodeTest`): 上限のサイズに
+    収まらない (サーバは上限「未満」を受け付ける) か受け付けない形式 (HEIC 等) の画像を、送る前に端末で作り直す。**大きさ
+    (縦横) は変えず**、画質だけを 90 → 80 → 70 → 60 と下げて収まった最初のもの。形式はサーバが WebP を受け付けるなら WebP
+    (透過も残る)、そうでなければ JPEG (3.5 は WebP 不可。WebP が使えず透過がある画像は作り直さない)。標準の `ImageDecoder` +
+    `Bitmap.compress` のみ (ライブラリなし)。EXIF (位置情報等) は作り直すと消える。結果はメモリに持つ (一時ファイルなし)。
+    * 作り直さないもの: 上限に合っている・アニメーション (GIF / WebP は `ImageInfo.isAnimated`、APNG は `acTL` の有無。作り直すと
+      止まる)・読めない / メモリ不足・どの画質でも収まらない。いずれも元のまま返し、これまでどおり検査かサーバで断られる。
+    * 投稿の添付は設定 (Posting →「大きな画像を圧縮」`compressOversizedImages`、既定オフ) でオンのとき。`AttachmentUploads(prepare)`
+      が検査の前に 1 回だけ通す (その間は送信中 (進み具合なし)。送り直しでは作り直さない)。上限は `image_size_limit` と
+      `supported_mime_types`。
+    * プロフィールの画像は常に。上限は API で返らないので Mastodon のソースから 2MB (3.x が 2MB、4.x が 8MB の小さい方)、形式は
+      JPEG / PNG / GIF + 添付で WebP を受け付けるサーバなら WebP (`profileImageLimits`)。
+    * エミュレーターで確認済み (stable 4.7): 6.7MB の PNG のアイコン → 1.06MB の WebP、19.5MB の PNG の添付 → 3.7MB の WebP。
+  * **メタデータの除去** (設定 Posting →「画像のメタデータを削除」`stripImageMetadata`、既定オフ。投稿の添付のみ): 上限に収まる画像は
+    作り直さず、入れ物からメタデータだけを除く (`stripImageMetadata`、`ImageMetadata.kt`、`ImageMetadataTest`。画素には触れない
+    ので画質は変わらず、APNG・アニメーション WebP も動いたまま)。
+    * JPEG: APP1 (EXIF / XMP)・APP13 (IPTC)・COM を除き、向き (Orientation) が 1 以外なら向きだけの最小の EXIF を入れ直す
+      (除くと横倒しで表示される)。向きの読み取りだけ Jetpack の `ExifInterface` (`androidx.exifinterface`)。ICC プロファイル (APP2) は残す。
+    * PNG: `eXIf` / `tEXt` / `zTXt` / `iTXt`。WebP: `EXIF` / `XMP ` のチャンク + `VP8X` の印と RIFF の大きさ。GIF はそのまま。
+    * HEIC 等、入れ物を直せない形式は作り直す (上の作り直しと同じ。アニメーションは除く)。上限を超える画像は「圧縮」がオンなら
+      作り直し (メタデータも消える)、オフならメタデータだけ除く。
+    * `ExifInterface` の書き込み (`saveAttributes`) は「全部消す」API が無く (タグの一覧が非公開)、ファイルも要るので使っていない。
+    * 動画のメタデータ (MP4 の位置情報等) は対象外。プロフィールの画像にも効かせていない (作り直したときだけ消える)。
+    * 確認: PIL で作った位置情報・機種・向き 6 付きの JPEG → 位置情報・機種・コメントが消え向き 6 だけ残り、画素は同一
+      (エミュレーターで添付し、11977 → 11801 バイト)。
   * `UploadSource` でデータ層を `ContentResolver` から切り離している (`AppContainer.uploadSource(uri)` が作る。IO スレッドで呼ぶ)。
   * アクセストークンに `write:media` が無いとアップロードは 403 になる (以前の手入力のトークンで起きうる。OAuth では `write` に含まれる)。
-  * 未実装: 画像の縮小・圧縮、焦点 (focus) の指定、カメラ撮影、プロセス再生成後の添付の復元。
+  * 未実装: 画像の縮小 (圧縮は上記)、焦点 (focus) の指定、カメラ撮影、プロセス再生成後の添付の復元。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。

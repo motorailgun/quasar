@@ -183,6 +183,8 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
             }
         },
     ),
+    boolean("compress_oversized_images", { it.compressOversizedImages }) { s, v -> s.copy(compressOversizedImages = v) },
+    boolean("strip_image_metadata", { it.stripImageMetadata }) { s, v -> s.copy(stripImageMetadata = v) },
     float(
         "predictive_back_max_drag_fraction",
         PredictiveBackSettings.MaxDragFractionRange,

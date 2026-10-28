@@ -6,6 +6,9 @@ import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
 import es.aria_on_the_planet.quasar.data.cache.CacheDatabase
 import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
+import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
+import es.aria_on_the_planet.quasar.data.media.ImageReencoder
+import es.aria_on_the_planet.quasar.data.media.toImageUploadLimits
 import es.aria_on_the_planet.quasar.data.media.MediaDownloader
 import es.aria_on_the_planet.quasar.data.media.SystemMediaDownloader
 import es.aria_on_the_planet.quasar.data.media.UploadSource
@@ -89,6 +92,12 @@ class AppContainer(context: Context) {
     /** 端末のファイル (Photo Picker の結果等) をアップロード元にする。問い合わせを伴うので IO スレッドで呼ぶ。 */
     fun uploadSource(uri: Uri): UploadSource = ContentUriUploadSource(contentResolver, uri)
 
+    /**
+     * 送る前の画像の手直し。上限を超える画像の作り直し (投稿の添付は設定でオンのとき、プロフィールの画像は常に) と、
+     * メタデータの除去 (投稿の添付で設定がオンのとき)。
+     */
+    val imageReencoder = ImageReencoder()
+
     /** メディアの保存 (システムの DownloadManager に任せる)。 */
     val mediaDownloader: MediaDownloader = SystemMediaDownloader(context)
 
@@ -115,6 +124,14 @@ class AppContainer(context: Context) {
         defaultVisibilitySetting = settingsStore.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
         openUploadSource = ::uploadSource,
         editing = editing,
+        prepareUpload = { source, limits ->
+            val settings = settingsStore.current()
+            imageReencoder.prepare(
+                source,
+                limits.toImageUploadLimits(),
+                ImagePrepareOptions(compressOversized = settings.compressOversizedImages, stripMetadata = settings.stripImageMetadata),
+            )
+        },
         onPublished = onPublished,
     )
 

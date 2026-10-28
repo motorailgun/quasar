@@ -71,6 +71,10 @@ import es.aria_on_the_planet.quasar.ui.component.tabs.ConnectedTabRow
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import kotlinx.coroutines.launch
+import android.widget.Toast
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * プロフィール画面。上からヘッダ / タブ (Posts・Media、自分なら Favourites・Bookmarks も) / タブごとの投稿一覧 (HorizontalPager)。
@@ -92,6 +96,12 @@ fun ProfileScreen(
     onHashtagClick: ((String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.editErrors.collect { message ->
+            Toast.makeText(context, context.getString(R.string.profile_edit_load_failed, message), Toast.LENGTH_SHORT).show()
+        }
+    }
     val callbacks = PostCallbacks(
         onUserClick = onUserClick,
         onPostClick = onPostClick,
@@ -114,10 +124,16 @@ fun ProfileScreen(
         onFollowingClick = onFollowingClick,
         onFollowersClick = onFollowersClick,
         onOpenImage = onOpenImage,
+        onStartEdit = viewModel::startEdit,
+        onCancelEdit = viewModel::cancelEdit,
+        onSaveEdit = viewModel::saveEdit,
     )
 }
 
-/** プロフィール画面の中身。ViewModel を通さずに状態とコールバックだけで描く (デバッグ用ギャラリーからも使う)。 */
+/**
+ * プロフィール画面の中身。ViewModel を通さずに状態とコールバックだけで描く (デバッグ用ギャラリーからも使う)。
+ * プロフィールの編集中は、編集画面 ([ProfileEditScreen]) を下から重ねる。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProfileContent(
@@ -133,6 +149,64 @@ fun ProfileContent(
     onFollowingClick: () -> Unit,
     onFollowersClick: () -> Unit,
     onOpenImage: (MediaViewerArgs) -> Unit,
+    onStartEdit: () -> Unit = {},
+    onCancelEdit: () -> Unit = {},
+    onSaveEdit: () -> Unit = {},
+) {
+    Box(Modifier.fillMaxSize()) {
+        ProfileBody(
+            state = state,
+            onBack = onBack,
+            onRefresh = onRefresh,
+            onSelectTab = onSelectTab,
+            onLoadMore = onLoadMore,
+            onSetFollowing = onSetFollowing,
+            onAnswerFollowRequest = onAnswerFollowRequest,
+            onAccountAction = onAccountAction,
+            callbacks = callbacks,
+            onFollowingClick = onFollowingClick,
+            onFollowersClick = onFollowersClick,
+            onOpenImage = onOpenImage,
+            onStartEdit = onStartEdit,
+        )
+        // 閉じるアニメーションの間も直前の中身を出す
+        val editing = state.edit as? ProfileEdit.Editing
+        var shownEditing by remember { mutableStateOf<ProfileEdit.Editing?>(null) }
+        if (editing != null) shownEditing = editing
+        val motion = MaterialTheme.motionScheme
+        AnimatedVisibility(
+            visible = editing != null,
+            enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.defaultEffectsSpec()),
+            exit = slideOutVertically(motion.defaultSpatialSpec()) { it } + fadeOut(motion.defaultEffectsSpec()),
+        ) {
+            val edit = shownEditing ?: return@AnimatedVisibility
+            val profile = state.profile.profile ?: return@AnimatedVisibility
+            ProfileEditScreen(
+                profile = profile,
+                edit = edit,
+                onCancel = onCancelEdit,
+                onSave = onSaveEdit,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ProfileBody(
+    state: ProfileScreenState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onSelectTab: (ProfileTab) -> Unit,
+    onLoadMore: (ProfileTab) -> Unit,
+    onSetFollowing: (Boolean) -> Unit,
+    onAnswerFollowRequest: (Boolean) -> Unit,
+    onAccountAction: (AccountAction) -> Unit,
+    callbacks: PostCallbacks,
+    onFollowingClick: () -> Unit,
+    onFollowersClick: () -> Unit,
+    onOpenImage: (MediaViewerArgs) -> Unit,
+    onStartEdit: () -> Unit,
 ) {
     val profile = state.profile.profile
     val feed = state.selectedFeed
@@ -245,8 +319,8 @@ fun ProfileContent(
                                 profile = profile,
                                 onSetFollowing = onSetFollowing,
                                 onUnblock = { onAccountAction(AccountAction(AccountActionType.Block, undo = true)) },
-                                // プロフィール編集は未実装
-                                onEditProfile = {},
+                                onEditProfile = onStartEdit,
+                                edit = state.edit,
                             )
                         },
                     )

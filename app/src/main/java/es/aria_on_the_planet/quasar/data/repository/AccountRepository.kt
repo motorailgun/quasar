@@ -6,8 +6,13 @@ import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.mapper.postVisibility
 import es.aria_on_the_planet.quasar.data.mapper.toProfile
+import es.aria_on_the_planet.quasar.data.mapper.toProfileSource
+import es.aria_on_the_planet.quasar.data.mapper.toUpdateCredentialsParams
+import es.aria_on_the_planet.quasar.data.media.ProgressRequestBody
+import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.LinkedPage
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
+import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.session.Session
@@ -15,15 +20,21 @@ import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.Profile
+import es.aria_on_the_planet.quasar.domain.model.ProfileSource
 import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /** ログイン中のアカウントと、その投稿の既定値。 */
 data class CurrentAccount(
@@ -57,26 +68,65 @@ class AccountRepository(
     val relationshipChanges: SharedFlow<RelationshipChange> = changes.asSharedFlow()
 
     private val meMutex = Mutex()
-    @Volatile
-    private var me: Pair<Session, CurrentAccount>? = null
+    private val me = MutableStateFlow<Pair<Session, CurrentAccount>?>(null)
 
     /** 取得済みならログイン中のアカウント ([fetchMe] のキャッシュ)。待たずに返す。 */
-    fun cachedMe(session: Session): CurrentAccount? = me?.takeIf { it.first == session }?.second
+    fun cachedMe(session: Session): CurrentAccount? = me.value?.takeIf { it.first == session }?.second
 
     /** ログイン中のアカウント。セッションごとにメモリへキャッシュする。 */
     suspend fun fetchMe(session: Session): CurrentAccount =
         meMutex.withLock {
-            me?.takeIf { it.first == session }?.second
-                ?: cache.issue().let { version ->
-                    api.verifyCredentials(session.serverUrl, session.accessToken).also { cache.putAccounts(listOf(it), version) }
-                }.let { dto ->
-                    CurrentAccount(
-                        user = dto.toDomain(),
-                        defaultVisibility = dto.source?.privacy?.let(::postVisibility) ?: PostVisibility.Public,
-                        defaultSensitive = dto.source?.sensitive == true,
-                    )
-                }.also { me = session to it }
+            cachedMe(session) ?: cache.issue().let { version ->
+                api.verifyCredentials(session.serverUrl, session.accessToken).also { cache.putAccounts(listOf(it), version) }
+            }.let { dto -> rememberMe(session, dto) }
         }
+
+    /**
+     * ログイン中のアカウントの取得済みの値と、その後の変化 (プロフィールの編集)。投稿欄・タイムラインのヘッダの
+     * アイコン等が追従するのに使う。取得前は何も流れない。
+     */
+    fun myAccount(session: Session): Flow<CurrentAccount> =
+        me.mapNotNull { it?.takeIf { (s, _) -> s == session }?.second }.distinctUntilChanged()
+
+    private fun rememberMe(session: Session, dto: AccountDto): CurrentAccount =
+        CurrentAccount(
+            user = dto.toDomain(),
+            defaultVisibility = dto.source?.privacy?.let(::postVisibility) ?: PostVisibility.Public,
+            defaultSensitive = dto.source?.sensitive == true,
+        ).also { me.value = session to it }
+
+    /**
+     * 自分のプロフィールの編集用の原文。表示中のプロフィールは HTML なので、`verify_credentials` の `source` を
+     * 取り直す (編集の直前に読むので、ほかの端末で変えた分も入る)。`source` を返さないサーバでは例外。
+     */
+    suspend fun fetchProfileSource(session: Session): ProfileSource {
+        val version = cache.issue()
+        val dto = api.verifyCredentials(session.serverUrl, session.accessToken)
+        cache.putAccounts(listOf(dto), version)
+        rememberMe(session, dto)
+        return dto.toProfileSource() ?: throw IOException("The server did not return the profile source")
+    }
+
+    /**
+     * 自分のプロフィールを [source] の内容にする。[avatar] / [header] があれば画像も替える (`null` ならそのまま)。
+     * 応答のプロフィールを返し、キャッシュと [myAccount] にも反映する。
+     */
+    suspend fun updateProfile(
+        session: Session,
+        source: ProfileSource,
+        avatar: UploadSource?,
+        header: UploadSource?,
+    ): Profile {
+        val images = listOfNotNull(
+            avatar?.let { Triple("avatar", it.fileName, ProgressRequestBody(it) {}) },
+            header?.let { Triple("header", it.fileName, ProgressRequestBody(it) {}) },
+        )
+        val version = cache.issue()
+        val dto = api.updateCredentials(session.serverUrl, session.accessToken, source.toUpdateCredentialsParams(), images)
+        cache.putAccounts(listOf(dto), version)
+        rememberMe(session, dto)
+        return dto.toProfile()
+    }
 
     /** [accountId] は [session] のサーバ内 ID (`User.inServerId`)。 */
     suspend fun fetchProfile(session: Session, accountId: String): Profile {

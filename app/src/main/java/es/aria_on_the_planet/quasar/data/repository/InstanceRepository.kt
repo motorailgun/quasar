@@ -1,8 +1,10 @@
 package es.aria_on_the_planet.quasar.data.repository
 
 import es.aria_on_the_planet.quasar.data.mapper.toComposeLimits
+import es.aria_on_the_planet.quasar.data.mapper.toProfileLimits
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
+import es.aria_on_the_planet.quasar.domain.model.ProfileLimits
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -11,6 +13,7 @@ data class InstanceInfo(
     /** ストリーミングのベース URL。未設定なら `null` (サーバ URL を使う)。 */
     val streamingUrl: String?,
     val composeLimits: ComposeLimits,
+    val profileLimits: ProfileLimits,
 )
 
 /**
@@ -28,6 +31,7 @@ class InstanceRepository(
             InstanceInfo(
                 streamingUrl = dto.configuration?.urls?.streaming,
                 composeLimits = dto.toComposeLimits(),
+                profileLimits = dto.toProfileLimits(),
             ).also { cache[serverUrl] = it }
         }
     }

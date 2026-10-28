@@ -47,6 +47,10 @@ data class AccountDto(
 data class AccountSourceDto(
     val privacy: String? = null,
     val sensitive: Boolean = false,
+    /** プロフィール文の原文 (HTML ではない)。 */
+    val note: String? = null,
+    /** フィールドの原文 (値は HTML ではない)。 */
+    val fields: List<FieldDto> = emptyList(),
 )
 
 /** https://docs.joinmastodon.org/entities/Status/#Mention */
@@ -159,6 +163,7 @@ data class InstanceConfigurationDto(
     val statuses: InstanceStatusesDto? = null,
     @SerialName("media_attachments") val mediaAttachments: InstanceMediaDto? = null,
     val polls: InstancePollsDto? = null,
+    val accounts: InstanceAccountsDto? = null,
 )
 
 @Serializable
@@ -184,6 +189,16 @@ data class InstancePollsDto(
     @SerialName("max_characters_per_option") val maxCharactersPerOption: Int? = null,
     @SerialName("min_expiration") val minExpiration: Long? = null,
     @SerialName("max_expiration") val maxExpiration: Long? = null,
+)
+
+/** プロフィールの上限。4.x の途中から (無ければ Mastodon の既定値)。 */
+@Serializable
+data class InstanceAccountsDto(
+    @SerialName("max_display_name_length") val maxDisplayNameLength: Int? = null,
+    @SerialName("max_note_length") val maxNoteLength: Int? = null,
+    @SerialName("max_profile_fields") val maxProfileFields: Int? = null,
+    @SerialName("profile_field_name_limit") val profileFieldNameLimit: Int? = null,
+    @SerialName("profile_field_value_limit") val profileFieldValueLimit: Int? = null,
 )
 
 @Serializable

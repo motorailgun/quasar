@@ -263,7 +263,17 @@ private fun replyInComposer(container: AppContainer, session: Session, navigator
 private fun ProfileEntry(container: AppContainer, session: Session, key: Route.Profile, navigator: Navigator) {
     val viewModel: ProfileViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { ProfileViewModel(session, key.accountId, container.accountRepository, container.statusRepository) }
+            initializer {
+                ProfileViewModel(
+                    session = session,
+                    accountId = key.accountId,
+                    repository = container.accountRepository,
+                    statusRepository = container.statusRepository,
+                    instanceRepository = container.instanceRepository,
+                    emojiRepository = container.emojiRepository,
+                    openUploadSource = container::uploadSource,
+                )
+            }
         },
     )
     ProfileScreen(

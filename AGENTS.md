@@ -43,7 +43,8 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag)
+│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag,
+│                                   ProfileEdit = ProfileSource / ProfileLimits)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
     ├── component/
@@ -94,7 +95,7 @@ es.aria_on_the_planet.quasar
     │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド / PredictiveBackDamping = 予測型「戻る」の動きを抑える)
     ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
     ├── timeline/                   タイムライン画面 + ViewModel
-    ├── profile/                    プロフィール (Screen / Header / ActionButton / ViewModel)
+    ├── profile/                    プロフィール (Screen / Header / ActionButton / ViewModel) + 編集 (ProfileEditScreen / ProfileEditor / ProfileEditFields)
     ├── follows/                    フォロー / フォロワー一覧 (Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── hashtag/                    ハッシュタグのタイムライン (Screen / ViewModel)
@@ -279,7 +280,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト) |
 | 編集 | `PUT /api/v1/statuses/:id` (form。公開範囲・返信先は送らない。代替テキストは `media_attributes[][id/description]`) |
 | 削除 | `DELETE /api/v1/statuses/:id` |
-| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲) |
+| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲。`source.note` / `source.fields` がプロフィール編集の原文) |
+| プロフィールの編集 | `PATCH /api/v1/accounts/update_credentials` (multipart。画像も同じリクエスト。フィールドは送ったもので丸ごと置き換わる) |
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
@@ -577,7 +579,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     統計行の下に、重ねたアイコン最大 3 つ + 「Followed by A, B, and N others you follow」。
   * ピン留め・フォロワー情報は補助情報 (`ProfileExtras`) 扱いで、取得失敗時はログのみで非表示にする。
   * **フォローボタン** (`ProfileActionButton`): ヘッダ画像の下・アイコンの右 (X と同じ位置) に置く。関係の取得前 / 失敗は
-    出さない。自分 (`fetchMe` の ID と一致) なら「Edit profile」(押しても何もしない。編集画面は未実装)。他人は
+    出さない。自分 (`fetchMe` の ID と一致) なら「Edit profile」(下記「プロフィールの編集」)。他人は
     `Relationship.followState` (Relationship エンティティの `following` / `requested` / `blocking` / `blocked_by`) で決める:
     * NotFollowing: Follow (塗り)。相手からフォローされていれば Follow back、**鍵アカウントなら Request to follow** (リクエスト送信)。
     * Requested (リクエスト送信済み・承認待ち。リモートの応答待ちでも立つ): Requested (枠線)。押すとリクエストの取り下げ (`unfollow`)。
@@ -624,7 +626,33 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * フォロー数・フォロワー数のタップで `openFollowList(accountId, tab)`。
   * アイコン・ヘッダ画像のタップでメディアビューア (`openMediaViewer(MediaViewerArgs.singleImage(...))`、1 枚ずつで左右スワイプ無し)。
     ID は合成 (`avatar:<id>` / `header:<id>`)、読み込み中は static の URL を出す。開く前にピン留めポストのインライン再生を止める。
-  * 未実装: 返信のタブ、familiar followers の一覧画面、プロフィール編集。
+  * **プロフィールの編集** (自分のプロフィールの「Edit profile」): 編集画面 (`ProfileEditScreen`) をプロフィール画面の上に
+    下から重ねる (`ProfileContent` の中の `AnimatedVisibility`。Route は作らず `ProfileViewModel` を共有。投稿画面と同じ形)。
+    * 普通の `Scaffold` (トップバーは ✕ /「Edit profile」/ 保存)。プロフィール画面のようにヘッダ画像をステータスバーの裏まで
+      描かない (読みにくいため)。中身は `verticalScroll` で、`contentWindowInsets = safeDrawing` でキーボードを避ける。
+    * 上からヘッダ画像 (3:1) + 半分重なるアイコン (プロフィールと同じ並び。暗い膜 + 写真のアイコン `ImageEditOverlay`、タップで
+      Photo Picker (`PickVisualMedia`、画像のみ)。選んだものは送る前に `LocalImage` で差し替えて見せる) / 表示名 / 自己紹介 /
+      カスタムフィールド / 保存の失敗 (サーバの文言)。入力欄 (`ProfileTextField`) は 16dp の角丸、カスタム絵文字の補完・強調は
+      投稿欄の部品。入力欄は自分ではカーソルの行しか見せないので、欄・文字数・候補まで `bringIntoView` する。
+    * カスタムフィールド (文言は公式 Web の新しい編集画面 `account_edit.*` に合わせ、日本語は未訳なので見出しは直訳の
+      「カスタムフィールド」、ほかは旧設定画面の「ラベル」「内容」) は、表示と同じ見た目の行を項目ごとに独立した 28dp の
+      角丸の面 (`shapes.extraLarge`) にして並べ、右端の編集ボタンでその行だけを入力欄にする (`FieldEditorRow`。開けるのは
+      1 つ、ボタンは完了に替わる。`ProfileEditor.editingFieldKey`)。さらに右に削除 (error 色)。「Add field」は空の行を足して
+      そのまま開く。名前も値も空のまま閉じたら除く。開いたら行ごとキーボードの上に出す。
+    * 原文は HTML の表示用ではなく `verify_credentials` の `source` (3.5 も返す) を、編集を始めるたびに取り直す
+      (`AccountRepository.fetchProfileSource`。取得中は Edit profile のボタンに LoadingIndicator、失敗は Toast)。入力は
+      `ProfileEditor` (TextFieldState。ViewModel が持つ。プロセスが終わると消える)。
+    * 上限は `configuration.accounts` (4.x の途中から。表示名 40 等) → 無ければ Mastodon の既定 (表示名 30 / 自己紹介 500 /
+      フィールド 4・各 255)。数え方はサーバに合わせ、表示名はコードポイント、自己紹介は投稿と同じ (URL 23 文字)、フィールドは
+      書記素 (`ProfileEdit.kt`、`ProfileEditTest`)。超えたら保存できない。
+    * 保存は `update_credentials` (`toUpdateCredentialsParams`、`ProfileMappersTest`)。フィールドは送ったもので丸ごと置き換わり、
+      送らなければ変わらないので、全部消したときは空のものを 1 つ送る (3.5 / 4.8 で確認)。変更が無ければ送らずに閉じる。
+      成功したら応答で表示を置き換え、投稿の一覧を読み直す。ログイン中のアカウント (`AccountRepository.myAccount`) にも流れ、
+      タイムラインのヘッダ・投稿欄のアイコンが追従する。
+    * 変更があれば ✕ /「戻る」で破棄の確認。保存の送信中は入力も閉じるのもできない。
+    * 未実装: 鍵・bot・`hide_collections` 等のスイッチ、画像の削除 (`DELETE /api/v1/profile/avatar`)、画像の切り抜き・縮小
+      (大きい画像はサーバが 422 で断る。文言はそのまま出る)、画像の代替テキスト、フィールドの並べ替え、featured tags。
+  * 未実装: 返信のタブ、familiar followers の一覧画面。
 * **ハッシュタグ** (`Route.Hashtag(name)`、`#` 無しの名前)。
   `GET /api/v1/timelines/tag/:hashtag` (max_id ページング、`TimelineRepository.fetchHashtag`) を `PostFeed` で読み、
   `DetailScaffold` (タイトル `#名前`、PTR) + `PostList`。ストリーミングは受けない。返信はプロフィールと同じく投稿画面 (`Route.Composer`)。
@@ -1134,7 +1162,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety)。 / post-detail (ポスト詳細の本体を
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
   表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率、`--ei long_post_max_lines 3` で長文の折りたたみの行数、`--es avatar_shape RoundedSquare` でアイコンの形)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
@@ -1263,7 +1291,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
 * **自動更新**: 通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。
-* **プロフィール**: 返信のタブ、プロフィール編集、一覧の行ごとのフォローボタン、フォロー失敗時の UI 通知。
+* **プロフィール**: 返信のタブ、プロフィール編集のスイッチ類 (鍵・bot 等)・画像の削除と切り抜き、一覧の行ごとのフォローボタン、フォロー失敗時の UI 通知。
 * **通知**: ユーザー単位のまとめに時間の窓が無い (同じユーザーなら古いリアクションも同じ行に入る)。
 * **画像のアニメーション**: GIF / APNG / Motion WebP の再生・設定のオン / オフ・メモリ不足時の挙動は確認済み。負荷は
   Snapdragon 8 Elite (OnePlus 13) でしか測っていない (release 相当、何もしない状態、CPU は 1 コア比): ピッカー (APNG 3 つ) は

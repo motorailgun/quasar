@@ -23,7 +23,8 @@ fun countPostCharacters(text: String, limits: ComposeLimits = ComposeLimits()): 
     return graphemeCount(rewritten) + placeholders * limits.charactersPerUrl
 }
 
-private fun graphemeCount(text: String): Int {
+/** 書記素 (見た目の 1 文字) の数。 */
+internal fun graphemeCount(text: String): Int {
     val iterator = BreakIterator.getCharacterInstance()
     iterator.setText(text)
     var count = 0

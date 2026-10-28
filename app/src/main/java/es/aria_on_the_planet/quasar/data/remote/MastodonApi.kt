@@ -33,6 +33,14 @@ import java.util.concurrent.TimeUnit
 
 class MastodonApiException(val code: Int, message: String) : IOException(message)
 
+/** Mastodon のエラー応答 (`{"error": "..."}`) ならその文言、それ以外は例外のメッセージ。 */
+fun Exception.userMessage(): String =
+    (this as? MastodonApiException)?.message?.let { ErrorField.find(it)?.groupValues?.get(1) }
+        ?: message
+        ?: javaClass.simpleName
+
+private val ErrorField = Regex(""""error"\s*:\s*"((?:[^"\\]|\\.)*)"""")
+
 /** Link ヘッダでページングする一覧の 1 ページ。[nextMaxId] が `null` なら最後のページ。 */
 data class LinkedPage<T>(val items: List<T>, val nextMaxId: String?)
 
@@ -254,6 +262,30 @@ class MastodonApi(
             add("client_secret", clientSecret)
             add("token", token)
         }
+    }
+
+    /**
+     * 自分のプロフィールを変える (要認証)。https://docs.joinmastodon.org/methods/accounts/#update_credentials
+     * 画像を送るので multipart。応答は `source` 付きの自分のアカウント。
+     *
+     * @param params 文字列の項目 (`display_name`, `note`, `fields_attributes[0][name]` 等)。
+     * @param images 画像の項目 (`avatar` / `header`) と、そのファイル名・中身。
+     */
+    suspend fun updateCredentials(
+        serverUrl: String,
+        accessToken: String,
+        params: List<Pair<String, String>>,
+        images: List<Triple<String, String, RequestBody>>,
+    ): AccountDto {
+        val url = serverUrl.toHttpUrl().newBuilder().addPathSegments("api/v1/accounts/update_credentials").build()
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .apply {
+                params.forEach { (name, value) -> addFormDataPart(name, value) }
+                images.forEach { (name, fileName, file) -> addFormDataPart(name, fileName, file) }
+            }
+            .build()
+        return execute(Request.Builder().url(url).patch(body), accessToken, if (images.isEmpty()) client else uploadClient)
     }
 
     /** ログイン中のアカウント (要認証)。`source` (既定の公開範囲等) を含む。 */

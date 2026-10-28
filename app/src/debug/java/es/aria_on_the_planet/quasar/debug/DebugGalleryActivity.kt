@@ -94,6 +94,16 @@ import es.aria_on_the_planet.quasar.ui.profile.ProfileHeader
 import es.aria_on_the_planet.quasar.ui.profile.ProfileScreenState
 import es.aria_on_the_planet.quasar.ui.profile.ProfileState
 import es.aria_on_the_planet.quasar.ui.profile.ProfileTab
+import es.aria_on_the_planet.quasar.ui.profile.ProfileEdit
+import es.aria_on_the_planet.quasar.ui.profile.ProfileEditor
+import es.aria_on_the_planet.quasar.domain.model.Profile
+import es.aria_on_the_planet.quasar.domain.model.ProfileField
+import es.aria_on_the_planet.quasar.domain.model.ProfileFieldSource
+import es.aria_on_the_planet.quasar.domain.model.ProfileLimits
+import es.aria_on_the_planet.quasar.domain.model.ProfileSource
+import es.aria_on_the_planet.quasar.domain.model.normalized
+import androidx.core.text.HtmlCompat
+import android.text.TextUtils
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsContent
 import es.aria_on_the_planet.quasar.ui.reactions.AccountReactionsState
 
@@ -213,6 +223,29 @@ private fun GalleryIndex(onBack: () -> Unit, onOpen: (GalleryScenario) -> Unit) 
     }
 }
 
+/** ギャラリーのプロフィールの編集用の原文 (本物はサーバの `source`。ここでは表示用の HTML から文字だけ取る)。 */
+private fun galleryProfileSource(profile: Profile) = ProfileSource(
+    displayName = profile.user.displayName,
+    note = HtmlCompat.fromHtml(profile.user.note, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim(),
+    fields = profile.fields.map {
+        ProfileFieldSource(it.name, HtmlCompat.fromHtml(it.value, HtmlCompat.FROM_HTML_MODE_COMPACT).toString())
+    },
+)
+
+/** 保存の代わりに、編集した内容を表示に当てる (本文は改行だけ HTML にする)。 */
+private fun Profile.applyingGalleryEdit(source: ProfileSource): Profile {
+    val saved = source.normalized()
+    return copy(
+        user = user.copy(
+            displayName = saved.displayName,
+            note = saved.note.takeIf { it.isNotBlank() }
+                ?.let { "<p>" + TextUtils.htmlEncode(it).replace("\n", "<br>") + "</p>" }
+                .orEmpty(),
+        ),
+        fields = saved.fields.map { ProfileField(it.name, TextUtils.htmlEncode(it.value), verifiedAt = null) },
+    )
+}
+
 @Composable
 private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -230,9 +263,13 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
         }
         var tab by remember { mutableStateOf(ProfileTab.Posts) }
         var relationship by remember { mutableStateOf(Relationship(following = true, requested = false, followedBy = true)) }
+        // プロフィールの編集は手元だけ: 原文の読み込み・保存はそれぞれ待ってから、保存は表示に当てるだけ
+        var profile by remember(fixture) { mutableStateOf(fixture.profile) }
+        var edit by remember { mutableStateOf<ProfileEdit?>(null) }
+        val scope = rememberCoroutineScope()
         fun feed(posts: List<Post>) = PostFeedState(items = posts.map(TimelineItem::PostItem), loaded = true, endReached = true)
         val state = ProfileScreenState(
-            profile = ProfileState(profile = fixture.profile),
+            profile = ProfileState(profile = profile),
             posts = feed(fixture.posts),
             media = feed(fixture.posts.filter { it.mediaAttachments.isNotEmpty() }),
             favourites = feed(favourites),
@@ -243,6 +280,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             } else {
                 ProfileButtonState.Follow(relationship)
             },
+            edit = edit,
         )
         ProfileContent(
             state = state,
@@ -257,6 +295,30 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             onFollowingClick = {},
             onFollowersClick = {},
             onOpenImage = navigator::openMediaViewer,
+            onStartEdit = {
+                edit = ProfileEdit.Loading
+                scope.launch {
+                    delay(600)
+                    edit = ProfileEdit.Editing(
+                        editor = ProfileEditor(galleryProfileSource(profile)),
+                        // 4.7 以降の既定と同じ (表示名 40 文字)
+                        limits = ProfileLimits(maxDisplayNameCharacters = 40),
+                        emojis = profile.user.emojis,
+                    )
+                }
+            },
+            onCancelEdit = { edit = null },
+            onSaveEdit = {
+                val editing = edit as? ProfileEdit.Editing
+                if (editing != null) {
+                    edit = editing.copy(isSaving = true)
+                    scope.launch {
+                        delay(2000)
+                        profile = profile.applyingGalleryEdit(editing.editor.toSource())
+                        edit = null
+                    }
+                }
+            },
         )
         return
     }

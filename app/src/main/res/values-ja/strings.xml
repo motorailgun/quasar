@@ -64,6 +64,22 @@
     </plurals>
     <string name="cancel">キャンセル</string>
     <string name="profile_edit">プロフィール編集</string>
+    <string name="profile_edit_save">保存</string>
+    <string name="profile_edit_display_name">表示名</string>
+    <string name="profile_edit_note">自己紹介</string>
+    <string name="profile_edit_fields">カスタムフィールド</string>
+    <string name="profile_edit_field_name">ラベル</string>
+    <string name="profile_edit_field_value">内容</string>
+    <string name="profile_edit_add_field">項目を追加</string>
+    <string name="profile_edit_remove_field">項目を削除</string>
+    <string name="profile_edit_edit_field">項目を編集</string>
+    <string name="profile_edit_field_done">完了</string>
+    <string name="profile_edit_change_avatar">アイコンを変更</string>
+    <string name="profile_edit_change_header">ヘッダーを変更</string>
+    <string name="profile_edit_discard_title">プロフィールの変更を破棄しますか？</string>
+    <string name="profile_edit_discard_message">現在編集しているプロフィールに加えた変更は破棄されます。</string>
+    <string name="profile_edit_keep_editing">編集を続ける</string>
+    <string name="profile_edit_load_failed">編集を始められませんでした: %1$s</string>
     <string name="profile_follow">フォロー</string>
     <string name="profile_follow_back">フォローバック</string>
     <string name="profile_following_button">フォロー中</string>

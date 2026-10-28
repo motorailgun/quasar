@@ -1,6 +1,11 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -20,7 +25,7 @@ import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 
 /**
- * プロフィールのヘッダのボタン。自分ならプロフィール編集、他人ならフォローの状態 ([FollowState]) に応じて
+ * プロフィールのヘッダのボタン。自分ならプロフィール編集 ([ProfileEditScreen] を開く)、他人ならフォローの状態 ([FollowState]) に応じて
  * Follow (鍵アカウントは Request to follow = リクエスト送信) / Requested (送信済み) / Following /
  * Unblock (ブロック中。error 色の塗り) / Blocked (ブロックされている。押せない error 色の枠線と文字)。
  * フォロー・リクエスト送信・解除・リクエストの取り下げは、どれも確認ダイアログを経てから [onSetFollowing] を呼ぶ。
@@ -35,12 +40,18 @@ fun ProfileActionButton(
     onUnblock: () -> Unit,
     onEditProfile: () -> Unit,
     modifier: Modifier = Modifier,
+    edit: ProfileEdit? = null,
 ) {
     when (state) {
         ProfileButtonState.None -> Unit
 
+        // 編集用の原文を読んでいる間は押せず、LoadingIndicator を出す
         ProfileButtonState.EditProfile ->
-            OutlinedButton(onClick = onEditProfile, modifier = modifier, shapes = ButtonDefaults.shapes()) {
+            OutlinedButton(onClick = onEditProfile, modifier = modifier, enabled = edit == null, shapes = ButtonDefaults.shapes()) {
+                if (edit == ProfileEdit.Loading) {
+                    LoadingIndicator(Modifier.size(ButtonDefaults.IconSize), color = LocalContentColor.current)
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                }
                 Text(stringResource(R.string.profile_edit))
             }
 

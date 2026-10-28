@@ -65,6 +65,22 @@
     </plurals>
     <string name="cancel">Cancel</string>
     <string name="profile_edit">Edit profile</string>
+    <string name="profile_edit_save">Save</string>
+    <string name="profile_edit_display_name">Display name</string>
+    <string name="profile_edit_note">Bio</string>
+    <string name="profile_edit_fields">Custom fields</string>
+    <string name="profile_edit_field_name">Label</string>
+    <string name="profile_edit_field_value">Value</string>
+    <string name="profile_edit_add_field">Add field</string>
+    <string name="profile_edit_remove_field">Delete field</string>
+    <string name="profile_edit_edit_field">Edit field</string>
+    <string name="profile_edit_field_done">Done</string>
+    <string name="profile_edit_change_avatar">Change profile picture</string>
+    <string name="profile_edit_change_header">Change header</string>
+    <string name="profile_edit_discard_title">Discard changes?</string>
+    <string name="profile_edit_discard_message">Your changes to your profile will be lost.</string>
+    <string name="profile_edit_keep_editing">Keep editing</string>
+    <string name="profile_edit_load_failed">Couldn\'t start editing: %1$s</string>
     <string name="profile_follow">Follow</string>
     <string name="profile_follow_back">Follow back</string>
     <string name="profile_following_button">Following</string>

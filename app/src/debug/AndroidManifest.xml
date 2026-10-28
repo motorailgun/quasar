@@ -9,7 +9,8 @@
         <activity
             android:name=".debug.DebugGalleryActivity"
             android:exported="true"
-            android:label="@string/gallery_name">
+            android:label="@string/gallery_name"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -1,6 +1,20 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
 import android.util.Log
+import android.net.Uri
+import es.aria_on_the_planet.quasar.data.media.UploadSource
+import es.aria_on_the_planet.quasar.data.remote.userMessage
+import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
+import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
+import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.domain.model.ProfileLimits
+import es.aria_on_the_planet.quasar.domain.model.problems
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
@@ -64,7 +78,7 @@ sealed interface ProfileButtonState {
     /** 出さない (関係の取得前 / 失敗)。 */
     data object None : ProfileButtonState
 
-    /** 自分のプロフィール。編集画面は未実装なので押しても何もしない。 */
+    /** 自分のプロフィール。押すと編集 ([ProfileEdit])。 */
     data object EditProfile : ProfileButtonState
 
     /**
@@ -78,6 +92,24 @@ sealed interface ProfileButtonState {
     ) : ProfileButtonState
 }
 
+/** プロフィールの編集 (自分のプロフィールだけ)。`null` なら編集していない。 */
+sealed interface ProfileEdit {
+    /** 編集用の原文を読んでいる。 */
+    data object Loading : ProfileEdit
+
+    /**
+     * 編集中。[emojis] は表示名・プロフィール文の絵文字の補完用。[isSaving] は保存の送信中、[error] は直前の保存の
+     * 失敗 (サーバの文言)。
+     */
+    data class Editing(
+        val editor: ProfileEditor,
+        val limits: ProfileLimits,
+        val emojis: List<CustomEmoji>,
+        val isSaving: Boolean = false,
+        val error: String? = null,
+    ) : ProfileEdit
+}
+
 data class ProfileScreenState(
     val profile: ProfileState = ProfileState(),
     val extras: ProfileExtras = ProfileExtras(),
@@ -87,6 +119,7 @@ data class ProfileScreenState(
     val bookmarks: PostFeedState = PostFeedState(),
     val tab: ProfileTab = ProfileTab.Posts,
     val button: ProfileButtonState = ProfileButtonState.None,
+    val edit: ProfileEdit? = null,
 ) {
     /** 自分のプロフィールか。 */
     val isMe: Boolean get() = button == ProfileButtonState.EditProfile
@@ -111,12 +144,23 @@ class ProfileViewModel(
     private val accountId: String,
     private val repository: AccountRepository,
     private val statusRepository: StatusRepository,
+    private val instanceRepository: InstanceRepository,
+    private val emojiRepository: EmojiRepository,
+    /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
+    private val openUploadSource: (Uri) -> UploadSource,
 ) : ViewModel() {
 
     private val profile = MutableStateFlow(ProfileState())
     private val extras = MutableStateFlow(ProfileExtras())
     private val tab = MutableStateFlow(ProfileTab.Posts)
     private val button = MutableStateFlow<ProfileButtonState>(ProfileButtonState.None)
+    private val edit = MutableStateFlow<ProfileEdit?>(null)
+    private var editJob: Job? = null
+
+    private val _editErrors = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    /** 編集を始められなかった (原文を読めなかった) ときの文言。画面が Toast で出す。 */
+    val editErrors: SharedFlow<String> = _editErrors.asSharedFlow()
 
     // 前に開いたときの一覧を先に出す (showCachedPosts)
     private val posts = PostFeed(viewModelScope, firstPageLimit = InitialPostCount) { maxId ->
@@ -158,9 +202,9 @@ class ProfileViewModel(
         combine(profile, extras, ::Pair),
         combine(posts.state, media.state, favourites.state, bookmarks.state) { p, m, f, b -> listOf(p, m, f, b) },
         tab,
-        button,
-    ) { (profile, extras), (posts, media, favourites, bookmarks), tab, button ->
-        ProfileScreenState(profile, extras, posts, media, favourites, bookmarks, tab, button)
+        combine(button, edit, ::Pair),
+    ) { (profile, extras), (posts, media, favourites, bookmarks), tab, (button, edit) ->
+        ProfileScreenState(profile, extras, posts, media, favourites, bookmarks, tab, button, edit)
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileScreenState())
 
@@ -266,6 +310,70 @@ class ProfileViewModel(
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to ${if (accept) "accept" else "reject"} follow request", e)
                 button.update { (it as? ProfileButtonState.Follow)?.copy(answering = null) ?: it }
+            }
+        }
+    }
+
+    /** プロフィールの編集を始める。編集用の原文 (と上限・絵文字) を読んでから [ProfileEdit.Editing] にする。 */
+    fun startEdit() {
+        if (button.value != ProfileButtonState.EditProfile || edit.value != null) return
+        edit.value = ProfileEdit.Loading
+        editJob = viewModelScope.launch {
+            val limits = async { runOptional("instance") { instanceRepository.instance(session.serverUrl).profileLimits } }
+            val emojis = async { runOptional("emojis") { emojiRepository.pickerEmojis(session.serverUrl) } }
+            try {
+                val source = repository.fetchProfileSource(session)
+                edit.value = ProfileEdit.Editing(
+                    editor = ProfileEditor(source),
+                    limits = limits.await() ?: ProfileLimits(),
+                    emojis = emojis.await().orEmpty(),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load the profile source", e)
+                edit.value = null
+                _editErrors.tryEmit(e.userMessage())
+            }
+        }
+    }
+
+    /** 編集をやめる (入力は捨てる。確認は画面側で済ませてから呼ぶ)。保存の送信中なら何もしない。 */
+    fun cancelEdit() {
+        if ((edit.value as? ProfileEdit.Editing)?.isSaving == true) return
+        editJob?.cancel()
+        edit.value = null
+    }
+
+    /** 編集した内容を保存する。変わっていなければ送らずに閉じる。できたら表示を応答で置き換え、一覧も読み直す。 */
+    fun saveEdit() {
+        val current = edit.value as? ProfileEdit.Editing ?: return
+        if (current.isSaving) return
+        val editor = current.editor
+        val source = editor.toSource()
+        if (source.problems(current.limits).isNotEmpty()) return
+        if (!editor.hasChanges) {
+            edit.value = null
+            return
+        }
+        edit.value = current.copy(isSaving = true, error = null)
+        editJob = viewModelScope.launch {
+            try {
+                val (avatar, header) = withContext(Dispatchers.IO) {
+                    editor.avatar?.let(openUploadSource) to editor.header?.let(openUploadSource)
+                }
+                val updated = repository.updateProfile(session, source, avatar, header)
+                profile.update { it.copy(profile = updated) }
+                edit.value = null
+                // 自分のポストの名前・アイコンも変わるので、一覧を読み直す
+                posts.refresh()
+                for (feed in feeds.values) if (feed !== posts && feed.state.value.loaded) feed.refresh()
+                loadExtras()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to update the profile", e)
+                edit.update { (it as? ProfileEdit.Editing)?.copy(isSaving = false, error = e.userMessage()) ?: it }
             }
         }
     }

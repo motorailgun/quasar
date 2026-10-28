@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
+import es.aria_on_the_planet.quasar.data.remote.userMessage
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
@@ -151,7 +152,6 @@ class ComposerSession(
         scope.launch {
             val sensitiveBefore = composer.sensitive
             runCatchingLogged("account") { accountRepository.fetchMe(session) }?.let { me ->
-                _state.update { it.copy(account = me.user) }
                 // 編集では既定値を入れない (公開範囲は変えられず、閲覧注意はポストのまま)
                 if (editing != null) return@let
                 accountDefaultVisibility = me.defaultVisibility
@@ -159,6 +159,10 @@ class ComposerSession(
                 // 取得までの間にユーザーが選んでいたら上書きしない
                 if (composer.sensitive == sensitiveBefore) composer.sensitive = me.defaultSensitive
             }
+        }
+        scope.launch {
+            // プロフィールの編集でアイコン・名前が変わったら追従する
+            accountRepository.myAccount(session).collect { me -> _state.update { it.copy(account = me.user) } }
         }
     }
 
@@ -272,12 +276,6 @@ class ComposerSession(
         scope.cancel()
     }
 
-    /** Mastodon のエラー応答 (`{"error": "..."}`) ならその文言、それ以外は例外のメッセージ。 */
-    private fun Exception.userMessage(): String =
-        (this as? MastodonApiException)?.message?.let { ErrorField.find(it)?.groupValues?.get(1) }
-            ?: message
-            ?: javaClass.simpleName
-
     private suspend fun <T> runCatchingLogged(what: String, block: suspend () -> T): T? = try {
         block()
     } catch (e: CancellationException) {
@@ -289,6 +287,5 @@ class ComposerSession(
 
     private companion object {
         const val TAG = "ComposerSession"
-        val ErrorField = Regex(""""error"\s*:\s*"((?:[^"\\]|\\.)*)"""")
     }
 }

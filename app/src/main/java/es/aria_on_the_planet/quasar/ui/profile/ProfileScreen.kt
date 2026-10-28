@@ -63,6 +63,7 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
+import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.OverlayDetailScaffold
@@ -340,6 +341,8 @@ private fun ProfileTabPage(
     onReply: ((Post) -> Unit)?,
     onHashtagClick: ((String) -> Unit)?,
 ) {
+    // ピン留めは一覧の上に入るので、先頭にいるときに後から出たら (取得が一覧より遅かった) 先頭に留まって見せる
+    StickToTopEffect(listState, pinnedPosts.isNotEmpty())
     PostList(
         items = feed.items,
         modifier = Modifier.fillMaxSize(),

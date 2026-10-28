@@ -890,7 +890,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## キャッシュ (`data/cache/`)
 
 * Room の 1 テーブル (`cache_entries`: 種類 + ID → API の JSON (DTO そのまま)・版・取得時刻)。種類 (`CacheKind`) は
-  Status (ブーストは中身だけ) / Account / Relationship (ID は相手) / Context (スレッドの ID の並び)。
+  Status (ブーストは中身だけ) / Account / Relationship (ID は相手) / Context (スレッドの ID の並び) /
+  AccountPosts・PinnedPosts (プロフィールの投稿一覧の最初のページ・ピン留めの並び。ID はアカウント。`PostListEntry` =
+  外側の ID・中身の ID・ブーストした人で、`EntityCache.postList` がブーストの外側を組み立て直す)。
   スキーマが変わったら移行せず作り直す (`fallbackToDestructiveMigration`)。スキーマの JSON は `app/schemas/`。
   * 置き場所は `cacheDir/api-cache/api-cache.db` (`CacheDatabase.create`)。設定画面では「キャッシュ」に数えられ、「キャッシュを削除」・
     容量不足のときの OS の削除の対象 (バックアップ・端末間の移行の対象外)。本体・`-wal`・`-shm` がばらけて消されないよう、
@@ -917,11 +919,23 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     404 / 410 ならキャッシュからも消して「読み込めない」表示に戻す。裏の取得では引っ張って更新のインジケータは出さない
     (`isRefreshing` と `isLoading` を分けている。プロフィールも同じ)。
   * プロフィール: アカウントはポストの投稿者・通知等で入っていることが多い。投稿一覧・ピン留め・familiar followers は毎回取る。
+    投稿一覧 (Posts タブ) の最初のページとピン留めは、前に開いたときの並びを取得が終わるまで先に出す (`PagedFeed.showCached`。
+    ピン留めは一覧の上に入るので両方読んでから一緒に出す)。取得の結果は `mergeRefreshedPosts` (`TimelineItemTest`) で当てる:
+    ページの範囲は取得の中身にし、それより古いキャッシュの分は残す。キーが保たれるので読み進めていた位置はずれず、先頭に
+    いれば `StickToTopEffect` で新着を見せる。ページが `limit` 件に満たない (それで全部) か、キャッシュの最新まで届かない
+    (間に区間がありうる) ときは置き換える。Media・お気に入り・ブックマークのタブはキャッシュしない。
+    * キャッシュの読み出し (`AccountRepository.cachedPostList`) は全体を `Dispatchers.Default` で行い、Main に戻るのは最後の 1 回だけ。
+      Room と JSON の変換を行き来するたびに Main に戻ると、画面の組み立て中の Main を毎回待って 500ms 以上かかり、testbed の
+      API に負けて出なかった (debug ビルド・エミュレーター)。今の形での計測 (エミュレーター、15 件・34KB): 読み出し自体は
+      debug で約 12ms (うち JSON のデコード 7ms)、benchmark で約 3ms。Main に戻るまでは debug で 60〜150ms (ほぼ画面の最初の
+      フレームの組み立て待ち)、benchmark では温まった後 約 10ms で、遷移の最初のフレームから一覧が出ている。
+    * familiar followers は後から届いて見出しが伸びる。`CollapsingHeaderState` は畳み切っている間に見出しの高さが変わったら
+      畳んだままにする (一覧ごと下へずれないように)。
   * まとめの中身: 通知を取ったときにポストが入っているので、期限切れ・無いものだけを取る。
 * 上限: 起動時に種類ごとに古い分を消す (`CachePolicy.MaxEntries`)。ログアウト・別のセッションへの切り替えで全部消す
   (`AppContainer`。中身はログイン中のユーザーから見た状態なので)。
 * テスト: 純粋関数は `CacheMergeTest` / `VersionClockTest`、SQL は計装テストの `CacheDaoTest` (下記「開発メモ」)。
-* 未対応: 一覧 (タイムライン・通知) は Room を見ない (画面をまたいだ操作の反映は揃わない)、起動時に前回の一覧を出すこと。
+* 未対応: 一覧 (タイムライン・通知。プロフィールの投稿一覧は最初のページだけ) は Room を見ない (画面をまたいだ操作の反映は揃わない)、起動時に前回の一覧を出すこと。
   削除は消すだけで印を残さないので、削除の前に出した取得の応答が後から届くと書き戻されうる (次に開いたときの 404 で消える)。
 
 ## 自動更新 (Streaming API)

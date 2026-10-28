@@ -32,6 +32,8 @@ data class FeedState<T>(
  * @param trim [updateList] (ストリーム・補完による新しい側への追加) の後に一覧を最大件数に切り詰める純粋関数。
  *   読み進めて伸ばした分 (loadMore) には適用しない。
  * @param nextMaxIdOfItems 切り詰めで末尾が変わったときに、残った一覧から次ページの `max_id` を求め直す。
+ * @param mergeCached [showCached] で先に出した一覧に、最初の取得の結果を当てる純粋関数。
+ *   `null` を返したら (または未指定なら) 取得の結果で置き換える。
  * @param fetchPage `maxId` より古いページを返す。`null` なら最新から。
  */
 open class PagedFeed<R, T>(
@@ -39,6 +41,7 @@ open class PagedFeed<R, T>(
     private val append: (current: List<T>, page: List<R>) -> List<T>,
     private val trim: (List<T>) -> List<T> = { it },
     private val nextMaxIdOfItems: (List<T>) -> String? = { null },
+    private val mergeCached: ((current: List<T>, page: List<R>) -> List<T>?)? = null,
     private val fetchPage: suspend (maxId: String?) -> Page<R>,
 ) {
     /**
@@ -70,12 +73,14 @@ open class PagedFeed<R, T>(
             try {
                 val page = fetchPage(null)
                 _state.update {
+                    // まだ取得していない (= 出ているのは showCached の分) なら、位置を保つよう当てる
+                    val merged = if (!it.loaded) mergeCached?.invoke(it.items, page.items) else null
                     it.copy(
-                        items = append(emptyList(), page.items),
+                        items = merged ?: append(emptyList(), page.items),
                         isRefreshing = false,
                         loaded = true,
                         endReached = page.endReached,
-                        nextMaxId = page.nextMaxId,
+                        nextMaxId = merged?.let(nextMaxIdOfItems) ?: page.nextMaxId,
                     )
                 }
             } catch (e: CancellationException) {
@@ -83,6 +88,17 @@ open class PagedFeed<R, T>(
             } catch (e: Exception) {
                 _state.update { it.copy(isRefreshing = false, loaded = true, error = e.message ?: e.toString()) }
             }
+        }
+    }
+
+    /**
+     * 前に取ったもの (キャッシュ) を、最初の取得が終わるまでの間だけ先に出す。取得済み・既に項目があれば何もしない。
+     * 取得の結果は [mergeCached] で当てる。取得が終わるまで [FeedState.loaded] は `false` のまま (裏の取得なので、
+     * 引っ張って更新のインジケータは出ない)。
+     */
+    fun showCached(items: List<T>) {
+        _state.update {
+            if (it.loaded || it.items.isNotEmpty()) it else it.copy(items = items, nextMaxId = nextMaxIdOfItems(items))
         }
     }
 

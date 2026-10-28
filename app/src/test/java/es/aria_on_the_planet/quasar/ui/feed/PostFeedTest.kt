@@ -125,4 +125,31 @@ class PostFeedTest {
     fun mastodonIdsCompareNumerically() {
         assertEquals("99", listOf("100", "99", "1000").minWithOrNull(MastodonIdComparator))
     }
+
+    @Test
+    fun cachedItemsAreMergedWithFirstPage() {
+        val requested = mutableListOf<String?>()
+        val feed = PostFeed(scope, firstPageLimit = 2) { maxId ->
+            requested += maxId
+            when (maxId) {
+                null -> listOf(post("4"), post("3"))
+                else -> emptyList()
+            }
+        }
+        feed.showCached(listOf(post("3"), post("2"), post("1")).map(TimelineItem::PostItem))
+        assertFalse(feed.state.value.loaded)
+        feed.refresh()
+        assertEquals(listOf("4", "3", "2", "1"), feed.state.value.items.posts.map { it.id })
+        // 続きは残したキャッシュの末尾から
+        feed.loadMore()
+        assertEquals(listOf(null, "1"), requested)
+    }
+
+    @Test
+    fun cachedItemsAreIgnoredAfterLoad() {
+        val feed = PostFeed(scope, firstPageLimit = 2) { listOf(post("4"), post("3")) }
+        feed.refresh()
+        feed.showCached(listOf(post("2")).map(TimelineItem::PostItem))
+        assertEquals(listOf("4", "3"), feed.state.value.items.posts.map { it.id })
+    }
 }

@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.data.repository
 
+import es.aria_on_the_planet.quasar.data.cache.CacheKind
 import es.aria_on_the_planet.quasar.data.cache.CachePolicy
 import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
@@ -16,11 +17,13 @@ import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** ログイン中のアカウントと、その投稿の既定値。 */
 data class CurrentAccount(
@@ -97,8 +100,25 @@ class AccountRepository(
     ): List<Post> {
         val version = cache.issue()
         val statuses = api.accountStatuses(session.serverUrl, session.accessToken, accountId, maxId, limit, onlyMedia = onlyMedia)
-        cache.putStatuses(statuses, version)
+        // 投稿一覧の最初のページは並びも持ち、次に開いたときに先に出す ([cachedPosts])
+        if (maxId == null && !onlyMedia) {
+            cache.putPostList(CacheKind.AccountPosts, accountId, statuses, version)
+        } else {
+            cache.putStatuses(statuses, version)
+        }
         return statuses.map { it.toDomain() }
+    }
+
+    /** 前に開いたときの [accountId] の投稿一覧の最初のページ (キャッシュ)。無ければ `null`。 */
+    suspend fun cachedPosts(accountId: String): List<Post>? = cachedPostList(CacheKind.AccountPosts, accountId)
+
+    /** 前に開いたときの [accountId] のピン留めポスト (キャッシュ)。無ければ `null`。 */
+    suspend fun cachedPinnedPosts(accountId: String): List<Post>? = cachedPostList(CacheKind.PinnedPosts, accountId)
+
+    // Room と JSON の変換を何度も行き来するので、全体を Main の外で行う (Main に戻るたびに画面の組み立てを待つと、
+    // ローカルの API より遅くなった)
+    private suspend fun cachedPostList(kind: CacheKind, accountId: String): List<Post>? = withContext(Dispatchers.Default) {
+        cache.postList(kind, accountId)?.value?.map { it.toDomain() }
     }
 
     /** ログイン中のユーザーがお気に入りにしたポスト。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
@@ -182,7 +202,7 @@ class AccountRepository(
         val version = cache.issue()
         val statuses = api.accountStatuses(session.serverUrl, session.accessToken, accountId, limit = MaxPinnedPosts, pinned = true)
             .take(MaxPinnedPosts)
-        cache.putStatuses(statuses, version)
+        cache.putPostList(CacheKind.PinnedPosts, accountId, statuses, version)
         return statuses.map { it.toDomain() }
     }
 

@@ -198,4 +198,37 @@ class TimelineItemTest {
             describe(applyNewerPage(timeline(20), "20", listOf(post(50), post(40), post(30)), pageLimit = 3)),
         )
     }
+
+    // --- キャッシュで先に出した一覧への最初のページ ------------------------------------------------
+
+    @Test
+    fun refreshedPageReplacesItsRangeAndKeepsOlderCached() {
+        // 25 は新着、20 は消された、10 以前はページの範囲外なので残す
+        val merged = mergeRefreshedPosts(timeline(30, 20, 15, 10, 5), listOf(post(30, "edited"), post(25), post(15)), pageLimit = 3)
+        assertEquals(listOf("30", "25", "15", "10", "5"), describe(merged!!))
+        assertEquals("edited", (merged[0] as TimelineItem.PostItem).post.text)
+    }
+
+    @Test
+    fun refreshedPageNotReachingCachedIsNotMerged() {
+        // 間に未取得の区間がありうる
+        assertNull(mergeRefreshedPosts(timeline(20, 10), listOf(post(50), post(40), post(30)), pageLimit = 3))
+    }
+
+    @Test
+    fun shortRefreshedPageIsWholeList() {
+        // 3 件に満たない = それで全部。キャッシュの 10 は消されている
+        assertNull(mergeRefreshedPosts(timeline(30, 20, 10), listOf(post(30), post(20)), pageLimit = 3))
+    }
+
+    @Test
+    fun refreshedPageWithoutCacheIsNotMerged() {
+        assertNull(mergeRefreshedPosts(emptyList(), listOf(post(30), post(20)), pageLimit = 2))
+    }
+
+    @Test
+    fun refreshedPageKeepsBoostKeys() {
+        val merged = mergeRefreshedPosts(listOf(TimelineItem.PostItem(boost(40, 7)), *timeline(30).toTypedArray()), listOf(boost(40, 7), post(30)), pageLimit = 2)
+        assertEquals(listOf("40", "30"), describe(merged!!))
+    }
 }

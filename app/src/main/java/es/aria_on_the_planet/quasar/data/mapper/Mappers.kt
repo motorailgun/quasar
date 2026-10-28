@@ -56,6 +56,7 @@ fun AccountDto.toDomain() = User(
     emojis = emojis.map { it.toDomain() },
     iconStaticUrl = avatarStatic ?: avatar,
     url = url,
+    bot = bot,
 )
 
 fun AccountDto.toProfile() = Profile(
@@ -69,7 +70,6 @@ fun AccountDto.toProfile() = Profile(
     fields = fields.map { it.toDomain() },
     createdAt = createdAt?.let { parseInstantOrNull(it) },
     locked = locked,
-    bot = bot,
     movedTo = moved?.toDomain(),
 )
 

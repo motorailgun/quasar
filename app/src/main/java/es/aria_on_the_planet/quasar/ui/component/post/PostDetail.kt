@@ -37,6 +37,7 @@ import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.component.user.BotBadge
 
 object PostDetailDefaults {
     val MediaHeight: Dp = 240.dp
@@ -89,13 +90,19 @@ fun PostDetail(
                     UserIcon(user = post.author)
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        EmojiText(
-                            text = post.author.displayName.ifBlank { post.author.screenName },
-                            emojis = post.author.emojis,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            EmojiText(
+                                text = post.author.displayName.ifBlank { post.author.screenName },
+                                emojis = post.author.emojis,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            if (post.author.bot) {
+                                BotBadge(Modifier.padding(start = 6.dp), size = 16.dp)
+                            }
+                        }
                         Text(
                             text = "@${post.author.fullScreenName}",
                             style = MaterialTheme.typography.bodyMedium,

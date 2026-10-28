@@ -229,7 +229,7 @@ def build_fixtures(e, avatars, header, media, tall):
     dave = account("4", "dave", "Dave", avatars["webp"], [], domain="remote.invalid")
     longname = account("5", "longname",
                        "とても長い表示名のユーザー :wide_wave: :pulse_webp: Very Long Display Name That Overflows",
-                       avatars["static"], ems("wide_wave", "pulse_webp"))
+                       avatars["static"], ems("wide_wave", "pulse_webp"), bot=True)
     st = Statuses()
 
     # --- animated-emoji: 本文・表示名・CW・投票にアニメ絵文字 (形式ごと)
@@ -275,7 +275,7 @@ def build_fixtures(e, avatars, header, media, tall):
         "6", "gallery", "Gallery :spin_slow: Profile :pulse_webp:", avatars["gif"],
         ems("spin_slow", "pulse_webp", "bounce_gif", "wobble_webp"),
         note=p("bio にも絵文字 :bounce_gif: :wobble_webp:<br>2 行目"),
-        header=header, locked=True,
+        header=header, locked=True, bot=True,
         fields=[
             {"name": "Web :spin_slow:", "value": f'<a href="{SERVER}/">gallery.invalid</a>',
              "verified_at": "2025-01-01T00:00:00.000+00:00"},

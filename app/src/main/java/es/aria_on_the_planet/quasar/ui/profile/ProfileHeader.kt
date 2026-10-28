@@ -229,7 +229,7 @@ fun ProfileHeader(
                     if (profile.locked) {
                         BadgeIcon(Symbols.Outlined.Lock, stringResource(R.string.profile_locked))
                     }
-                    if (profile.bot) {
+                    if (user.bot) {
                         BadgeIcon(Symbols.Outlined.SmartToy, stringResource(R.string.profile_bot))
                     }
                 }

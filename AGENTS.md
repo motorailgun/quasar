@@ -128,6 +128,7 @@ data class User(
     val note: String,         // プロフィール文 (HTML, カスタム絵文字を含みうる)
     val emojis: List<CustomEmoji>,
     val iconStaticUrl: String = iconUrl, // Account.avatar_static (アニメーションを止めるとき用)
+    val bot: Boolean = false, // Account.bot。プロフィール (鍵の隣)・PostCard / PostDetail の表示名の右に BotBadge
 )
 
 // User は一覧表示に必要な最小限。プロフィール画面用の詳細は Profile に分ける
@@ -142,8 +143,7 @@ data class Profile(
     val followersCount: Int,       // followers_count
     val fields: List<ProfileField>,
     val createdAt: Instant?,
-    val locked: Boolean,
-    val bot: Boolean,
+    val locked: Boolean,          // bot は User.bot
     val movedTo: User? = null,     // moved (引っ越し先)。引っ越していなければ null
 )
 
@@ -383,7 +383,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * それ以外はブラウザ。
 * 公開範囲: 投稿者行 (名前 / @acct) と同じ高さの右端に `VisibilityIcon` (公式 Web UI を元に、公開・フォロワー限定は出さず、
   未収載=月、ダイレクト=手紙)。`PostDetail` も 2 段の名前 / @acct の右端 (縦中央)。引用 (QuotedPost) には出さない。
-* 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + screenName / 本文 (EmojiText) / 投票 (PollView) /
+* 構成: (ブースト表示) / (リプライ表示) / アイコン + 表示名 (EmojiText) + (bot なら `BotBadge`、`ui/component/user/`) + screenName / 本文 (EmojiText) / 投票 (PollView) /
   添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
 * `mode = PostCardMode.ReplyContext` は返信画面の上の返信先用: 本文 (CW・長文の折りたたみ込み) とメディアだけで、ラベル・
   公開範囲・投票・カード・引用・アクション行を出さず、カード全体のタップも受けない。`authorTrailing` は投稿者行の右端 (✕ 等)。

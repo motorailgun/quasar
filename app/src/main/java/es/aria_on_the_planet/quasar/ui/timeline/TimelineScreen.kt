@@ -272,6 +272,7 @@ private fun ColumnPage(
                 onHashtagClick = onHashtagClick,
                 onMediaClick = onMediaClick,
                 onGapClick = { gap -> viewModel.fillGap(column, gap) },
+                stickToTop = feed.stickToTop,
             )
         }
     }

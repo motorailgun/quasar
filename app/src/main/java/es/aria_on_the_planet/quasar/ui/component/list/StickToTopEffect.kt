@@ -15,13 +15,16 @@ import androidx.compose.runtime.remember
  * 先頭を指定し、ずれ自体を起こさない。新着は `animateItem` で現れ、下の項目は押し下げられる。
  *
  * @param firstKey 一覧の先頭項目のキー。変わったら新着が入ったとみなす。
+ * @param enabled `false` なら、その変化では先頭に留まらない (まとめて取った新着を、読んでいた位置を保って上に入れる)。
+ *   [firstKey] と同じ状態から読む (別々に変わると、どの変化に当てるかがずれる)。
  */
 @Composable
-fun StickToTopEffect(state: LazyListState, firstKey: Any?) {
+fun StickToTopEffect(state: LazyListState, firstKey: Any?, enabled: Boolean = true) {
     val last = remember(state) { LastKey(firstKey) }
     SideEffect {
         if (last.key == firstKey) return@SideEffect
         last.key = firstKey
+        if (!enabled) return@SideEffect
         // まだ前のレイアウトのままなので、直前に先頭にいたかが読める。指で動かしている最中は邪魔しない
         val atTop = state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0
         if (atTop && !state.isScrollInProgress) state.requestScrollToItem(0)

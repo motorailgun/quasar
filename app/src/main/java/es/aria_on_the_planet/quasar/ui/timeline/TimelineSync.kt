@@ -109,7 +109,8 @@ class TimelineSync(
             if (!state.loaded || state.isRefreshing) continue
             val sinceId = newestPostId(state.items) ?: continue
             val page = fetchOrReport("backfill $type") { fetchPosts(type, null, sinceId) } ?: continue
-            feed.updateList { applyNewerPage(it, sinceId, page, pageLimit) }
+            // 切断中の分はまとめて入るので、先頭にいても先頭に留まらず、読んでいたポストの位置を保って上に入れる
+            feed.updateList(stickToTop = false) { applyNewerPage(it, sinceId, page, pageLimit) }
         }
         val feed = notifications ?: return
         val state = feed.state.value

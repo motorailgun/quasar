@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -149,6 +150,24 @@ class TimelineSyncTest {
     }
 
     // --- 再接続時の補完 -------------------------------------------------------------------------
+
+    @Test
+    fun backfillKeepsPositionButStreamSticksToTop() = runBlocking {
+        val server = FakeServer().apply {
+            timelines[TimelineType.Home] = { _, sinceId -> if (sinceId == null) posts(20, 10) else posts(40, 30) }
+        }
+        val home = feedFor(server, TimelineType.Home).apply { refresh() }
+        val sync = sync(server, mapOf(TimelineType.Home to home), pageLimit = 3)
+
+        // 切断中の分はまとめて入るので、読んでいた位置を保つ
+        sync.handle(StreamEvent.Connected)
+        assertEquals(listOf("40", "30", "20", "10"), describe(home.state.value.items))
+        assertFalse(home.state.value.stickToTop)
+
+        // ストリームの新着は先頭にいれば見せる
+        sync.handle(StreamEvent.Update(StreamChannel.User, post(50)))
+        assertTrue(home.state.value.stickToTop)
+    }
 
     @Test
     fun backfillUsesNewestIdAndMergesPartialPage() = runBlocking {

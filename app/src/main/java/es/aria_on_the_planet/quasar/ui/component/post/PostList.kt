@@ -58,12 +58,13 @@ fun PostList(
     onReply: ((Post) -> Unit)? = null,
     onHashtagClick: ((String) -> Unit)? = null,
     onGapClick: (TimelineItem.Gap) -> Unit = {},
+    stickToTop: Boolean = true,
     header: (LazyListScope.() -> Unit)? = null,
     footer: (LazyListScope.() -> Unit)? = null,
 ) {
     LoadMoreEffect(state, onLoadMore, LoadMoreThreshold)
-    // 先頭にいるときにストリーミングの新着が入ったら見せる
-    StickToTopEffect(state, items.firstOrNull()?.key)
+    // 先頭にいるときにストリーミングの新着が入ったら見せる (stickToTop = false なら位置を保つ)
+    StickToTopEffect(state, items.firstOrNull()?.key, enabled = stickToTop)
 
     LazyColumn(
         modifier = modifier,

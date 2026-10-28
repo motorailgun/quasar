@@ -18,6 +18,8 @@ data class User(
     val iconStaticUrl: String = iconUrl,
     /** 所属サーバでのプロフィールのページ (`Account.url`)。 */
     val url: String? = null,
+    /** 自動で投稿するアカウント (`Account.bot`)。 */
+    val bot: Boolean = false,
 ) {
     /** 接続中サーバ以外のユーザーか (`acct` にドメインが付く)。 */
     val isRemote: Boolean get() = '@' in screenName

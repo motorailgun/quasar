@@ -45,6 +45,7 @@
   "following_count": 56,
   "followers_count": 78,
   "locked": true,
+  "bot": true,
   "fields": [
    {
     "name": "Web :spin_slow:",
@@ -110,6 +111,7 @@
     "following_count": 56,
     "followers_count": 78,
     "locked": true,
+    "bot": true,
     "fields": [
      {
       "name": "Web :spin_slow:",
@@ -189,6 +191,7 @@
     "following_count": 56,
     "followers_count": 78,
     "locked": true,
+    "bot": true,
     "fields": [
      {
       "name": "Web :spin_slow:",
@@ -268,6 +271,7 @@
     "following_count": 56,
     "followers_count": 78,
     "locked": true,
+    "bot": true,
     "fields": [
      {
       "name": "Web :spin_slow:",
@@ -347,6 +351,7 @@
     "following_count": 56,
     "followers_count": 78,
     "locked": true,
+    "bot": true,
     "fields": [
      {
       "name": "Web :spin_slow:",
@@ -426,6 +431,7 @@
     "following_count": 56,
     "followers_count": 78,
     "locked": true,
+    "bot": true,
     "fields": [
      {
       "name": "Web :spin_slow:",
@@ -505,6 +511,7 @@
     "following_count": 56,
     "followers_count": 78,
     "locked": true,
+    "bot": true,
     "fields": [
      {
       "name": "Web :spin_slow:",

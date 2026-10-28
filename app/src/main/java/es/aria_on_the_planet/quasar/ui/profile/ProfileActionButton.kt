@@ -77,7 +77,7 @@ private fun FollowButton(
                     stringResource(
                         when {
                             // 鍵アカウントへはフォローではなくフォローリクエストの送信になる
-                            profile.locked -> R.string.profile_request_follow
+                            profile.user.locked -> R.string.profile_request_follow
                             relationship.followedBy -> R.string.profile_follow_back
                             else -> R.string.profile_follow
                         },
@@ -133,7 +133,7 @@ private fun FollowButton(
         onSetFollowing(follow)
     }
     when {
-        follow && profile.locked -> ConfirmDialog(
+        follow && profile.user.locked -> ConfirmDialog(
             title = stringResource(R.string.profile_request_follow_confirm_title, acct),
             message = stringResource(R.string.profile_request_follow_confirm_message),
             confirmLabel = stringResource(R.string.profile_request_follow_send),

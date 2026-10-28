@@ -97,7 +97,7 @@ fun AccountReactionsContent(
             val subtitle = type.postsTitle(if (state.loaded) state.posts.size else postCount)
             val account = state.account
             if (account != null) {
-                DetailTitle(account.displayName.ifBlank { account.screenName }, account.emojis, subtitle)
+                DetailTitle(account.nameOrAcct, account.emojis, subtitle)
             } else {
                 Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

@@ -134,7 +134,7 @@ class MappersTest {
         assertEquals(19600, profile.postsCount)
         assertEquals(683, profile.followingCount)
         assertEquals(435, profile.followersCount)
-        assertEquals(true, profile.locked)
+        assertEquals(true, profile.user.locked)
         assertEquals("2018-02-01T00:00:00Z", profile.createdAt.toString())
         assertEquals(listOf(true, false), profile.fields.map { it.verifiedAt != null })
 

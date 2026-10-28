@@ -62,7 +62,7 @@ fun FollowListScreen(
                 title = {
                     state.profile?.let { profile ->
                         DetailTitle(
-                            name = profile.user.displayName.ifBlank { profile.user.screenName },
+                            name = profile.user.nameOrAcct,
                             emojis = profile.user.emojis,
                             subtitle = "@${profile.user.screenName}",
                         )

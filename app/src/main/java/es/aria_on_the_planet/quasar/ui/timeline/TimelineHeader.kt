@@ -135,7 +135,7 @@ private fun AccountButton(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
-        val description = account?.displayName?.ifBlank { null } ?: account?.screenName
+        val description = account?.nameOrAcct
         if (account != null) {
             UserIcon(
                 user = account,

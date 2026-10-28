@@ -79,7 +79,7 @@ import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.theme.extendedColors
-import es.aria_on_the_planet.quasar.ui.component.user.BotBadge
+import es.aria_on_the_planet.quasar.ui.component.user.UserName
 import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
 
 object PostCardDefaults {
@@ -295,18 +295,11 @@ private fun RowScope.AuthorNameAndTime(post: Post, onAuthorClick: () -> Unit) {
             .clickable(onClick = onAuthorClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EmojiText(
-            text = post.author.displayName.ifBlank { post.author.screenName },
-            emojis = post.author.emojis,
+        UserName(
+            post.author,
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        // 表示名が省略されても印は残す
-        if (post.author.bot) {
-            BotBadge(Modifier.padding(start = 4.dp))
-        }
         Spacer(Modifier.width(4.dp))
         Text(
             text = "@${post.author.screenName}",
@@ -356,7 +349,7 @@ internal fun BoostedByLabel(booster: User, modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.width(4.dp))
         EmojiText(
-            text = stringResource(R.string.post_boosted_by, booster.displayName.ifBlank { booster.screenName }),
+            text = stringResource(R.string.post_boosted_by, booster.nameOrAcct),
             emojis = booster.emojis,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.tertiary,

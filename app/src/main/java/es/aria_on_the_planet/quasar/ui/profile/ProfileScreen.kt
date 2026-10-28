@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
+import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -20,7 +21,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
@@ -29,20 +29,16 @@ import es.aria_on_the_planet.quasar.ui.component.blur.LocalSurfaceBlurEnabled
 import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -60,7 +56,7 @@ import es.aria_on_the_planet.quasar.ui.component.layout.CollapsingHeaderLayout
 import es.aria_on_the_planet.quasar.ui.component.layout.rememberCollapsingHeaderState
 import es.aria_on_the_planet.quasar.ui.component.list.scrollToTop
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
-import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
@@ -96,6 +92,15 @@ fun ProfileScreen(
     onHashtagClick: ((String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val callbacks = PostCallbacks(
+        onUserClick = onUserClick,
+        onPostClick = onPostClick,
+        onMediaClick = onMediaClick,
+        onVote = viewModel::vote,
+        onAction = rememberPostActionHandler(viewModel::performAction),
+        onReply = onReply,
+        onHashtagClick = onHashtagClick,
+    )
     ProfileContent(
         state = state,
         onBack = onBack,
@@ -105,16 +110,10 @@ fun ProfileScreen(
         onSetFollowing = viewModel::setFollowing,
         onAnswerFollowRequest = viewModel::answerFollowRequest,
         onAccountAction = viewModel::performAccountAction,
-        onUserClick = onUserClick,
-        onPostClick = onPostClick,
-        onMediaClick = onMediaClick,
+        callbacks = callbacks,
         onFollowingClick = onFollowingClick,
         onFollowersClick = onFollowersClick,
         onOpenImage = onOpenImage,
-        onReply = onReply,
-        onHashtagClick = onHashtagClick,
-        onVote = viewModel::vote,
-        onAction = rememberPostActionHandler(viewModel::performAction),
     )
 }
 
@@ -130,16 +129,10 @@ fun ProfileContent(
     onSetFollowing: (Boolean) -> Unit,
     onAnswerFollowRequest: (Boolean) -> Unit,
     onAccountAction: (AccountAction) -> Unit,
-    onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
-    onMediaClick: (MediaClick) -> Unit,
+    callbacks: PostCallbacks,
     onFollowingClick: () -> Unit,
     onFollowersClick: () -> Unit,
     onOpenImage: (MediaViewerArgs) -> Unit,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
 ) {
     val profile = state.profile.profile
     val feed = state.selectedFeed
@@ -221,7 +214,7 @@ fun ProfileContent(
                         onFollowingClick = onFollowingClick,
                         onFollowersClick = onFollowersClick,
                         onOpenImage = onOpenImage,
-                        onUserClick = onUserClick,
+                        onUserClick = callbacks.onUserClick,
                         topBarHeight = scaffoldBarHeight,
                         onImageBottomChanged = { imageBottom = it },
                         followRequest = {
@@ -302,13 +295,7 @@ fun ProfileContent(
                                 (state.button as? ProfileButtonState.Follow)?.relationship?.followState == FollowState.BlockedBy
                             },
                             onLoadMore = { onLoadMore(tab) },
-                            onUserClick = onUserClick,
-                            onPostClick = onPostClick,
-                            onMediaClick = onMediaClick,
-                            onVote = onVote,
-                            onAction = onAction,
-                            onReply = onReply,
-                            onHashtagClick = onHashtagClick,
+                            callbacks = callbacks,
                         )
                     }
                 },
@@ -333,13 +320,7 @@ private fun ProfileTabPage(
     pinnedPosts: List<Post>,
     blockedBy: String?,
     onLoadMore: () -> Unit,
-    onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
-    onMediaClick: (MediaClick) -> Unit,
-    onVote: (suspend (Post, List<Int>) -> Boolean)?,
-    onAction: OnPostAction?,
-    onReply: ((Post) -> Unit)?,
-    onHashtagClick: ((String) -> Unit)?,
+    callbacks: PostCallbacks,
 ) {
     // ピン留めは一覧の上に入るので、先頭にいるときに後から出たら (取得が一覧より遅かった) 先頭に留まって見せる
     StickToTopEffect(listState, pinnedPosts.isNotEmpty())
@@ -351,51 +332,28 @@ private fun ProfileTabPage(
         contentPadding = PaddingValues(top = topPadding),
         isLoadingMore = feed.isLoadingMore,
         onLoadMore = onLoadMore,
-        onUserClick = onUserClick,
-        onPostClick = onPostClick,
-        onMediaClick = onMediaClick,
-        onVote = onVote,
-        onAction = onAction,
-        onReply = onReply,
-        onHashtagClick = onHashtagClick,
+        callbacks = callbacks,
         header = {
             // 通常の一覧にも同じポストが含まれうるので、ピン留めは 1 アイテムにまとめてキー衝突を避ける
             if (pinnedPosts.isNotEmpty()) {
                 item(key = "pinned_posts", contentType = "pinned_posts") {
                     PinnedPosts(
                         posts = pinnedPosts,
-                        onUserClick = onUserClick,
-                        onPostClick = onPostClick,
-                        onMediaClick = onMediaClick,
-                        onVote = onVote,
-                        onAction = onAction,
-                        onReply = onReply,
-                        onHashtagClick = onHashtagClick,
+                        callbacks = callbacks,
                     )
                 }
             }
             if (feed.items.isEmpty()) {
                 item(key = "feed_status", contentType = "status") {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        when {
-                            !feed.loaded || feed.isRefreshing -> LoadingIndicator()
-                            feed.error != null -> Text(stringResource(R.string.timeline_error, feed.error))
-                            else -> Text(
-                                if (blockedBy != null) {
-                                    stringResource(R.string.profile_blocked_by_posts, blockedBy)
-                                } else {
-                                    stringResource(tab.emptyMessage())
-                                },
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    ListStatus(
+                        loading = !feed.loaded || feed.isRefreshing,
+                        error = feed.error?.let { stringResource(R.string.timeline_error, it) },
+                        empty = if (blockedBy != null) {
+                            stringResource(R.string.profile_blocked_by_posts, blockedBy)
+                        } else {
+                            stringResource(tab.emptyMessage())
+                        },
+                    )
                 }
             }
         },

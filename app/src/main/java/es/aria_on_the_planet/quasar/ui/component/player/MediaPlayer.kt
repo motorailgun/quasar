@@ -39,8 +39,8 @@ import es.aria_on_the_planet.quasar.ui.component.image.rememberBlurHashPainter
  * video / gifv / audio の再生部分。Player は持たず、受け取った [player] を描くだけ。
  * 一覧 (インライン) とメディアビューアの両方で使う。
  *
- * * [player] が `null` (自分が再生の持ち主でない) の間は、サムネイル (preview / BlurHash) を出す。
- * * audio は映像の代わりに [artworkUrl] (投稿者のアイコン) を円形で出し、再生中だけ回す。
+ * * video / gifv は、[player] が `null` (自分が再生の持ち主でない) の間はサムネイル (preview / BlurHash) を出す。
+ * * audio は映像の代わりに (player の有無に関わらず) [artworkUrl] (投稿者のアイコン) を円形で出し、再生中だけ回す。
  * * 描画は TextureView。SurfaceView は Compose の alpha (閉じるときのフェード) や一覧のスクロールに
  *   追従しないことがあるため。
  *

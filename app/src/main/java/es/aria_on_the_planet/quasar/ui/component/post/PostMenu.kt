@@ -62,12 +62,12 @@ private sealed interface TargetState {
 
 /**
  * ポストのメニュー (︙)。ブラウザで開く (リモートのポストなら元のサーバで開くも)、本文をコピー、他人のポストなら投稿者の
- * ブーストの非表示 (フォロー中のみ)・ミュート・ブロック、[own] があれば編集・削除 (error 色)。
- * 投稿者との関係は開くたびに読み (キャッシュが新しければそれ)、読み込むまでは仮の関係 ([ProvisionalRelationship]) で出す。ブロック・ミュートは確認してから行う。
+ * ミュート・ブロック・ブーストの非表示 (フォロー中のみ)、[own] があれば編集・削除 (削除は error 色)。
+ * 投稿者との関係は開くたびに読み (キャッシュが新しければそれ)、読み込むまでは仮の関係 ([ProvisionalRelationship]) で出す (自分の ID がまだ分からず、関係の読み込みにも失敗したら項目ごと出さない)。ブロック・ミュートは確認してから行う。
  * [LocalAccountActions] が無い所 (ギャラリー等) では何も出さない。
  *
  * @param compact 投稿者の行 (公開範囲の右) に置く小さいボタン。`false` なら [IconButton] (ポスト詳細の投稿者の行)。
- * @param busy 編集の準備・削除の最中。ボタンの代わりに読み込み中を出し、押せない。
+ * @param busy 編集の準備・削除の最中。ボタンの代わりに読み込み中を出し、押せない ([compact] では見ない)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

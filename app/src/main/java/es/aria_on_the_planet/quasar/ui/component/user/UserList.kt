@@ -27,7 +27,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
-import es.aria_on_the_planet.quasar.ui.component.post.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 
 /**

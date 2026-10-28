@@ -28,14 +28,15 @@ import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.replyRecipients
-import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.PostCardMode
+import es.aria_on_the_planet.quasar.ui.component.post.PostExcerpt
+import es.aria_on_the_planet.quasar.ui.component.post.PostMedia
 import es.aria_on_the_planet.quasar.ui.component.post.QuoteHeader
 import es.aria_on_the_planet.quasar.ui.component.post.ThreadLineDefaults
 import es.aria_on_the_planet.quasar.ui.component.post.threadLines
-import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 
 /**
  * クイック投稿バーの本文の上に出す返信先。縮小したヘッダ (アイコン・名前・時刻) + 本文 [BodyMaxLines] 行 +
@@ -61,28 +62,13 @@ fun ReplyTargetPreview(
                 QuoteHeader(post, Modifier.weight(1f))
                 CancelReplyButton(onCancel, size = 36.dp)
             }
-            val cw = post.contentWarning
-            EmojiText(
-                text = cw ?: post.text,
-                emojis = post.emojis,
-                isHtml = cw == null,
-                postContent = true,
+            PostExcerpt(
+                post,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = BodyMaxLines,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(end = 8.dp),
             )
-            if (post.mediaAttachments.isNotEmpty()) {
-                MediaAttachments(
-                    attachments = post.mediaAttachments,
-                    height = PreviewMediaHeight,
-                    sensitive = post.sensitive,
-                    artworkUrl = post.author.iconUrl,
-                    onClick = { tap -> onMediaClick(tap.toClick(post)) },
-                    modifier = Modifier.padding(top = 6.dp, end = 8.dp),
-                )
-            }
+            PostMedia(post, PreviewMediaHeight, onMediaClick, Modifier.padding(top = 6.dp, end = 8.dp))
         }
     }
 }
@@ -119,7 +105,7 @@ fun ReplyContext(
             post = post,
             mode = PostCardMode.ReplyContext,
             mediaHeight = ContextMediaHeight,
-            onMediaClick = onMediaClick,
+            callbacks = PostCallbacks(onMediaClick = onMediaClick),
             authorTrailing = { CancelReplyButton(onCancel, size = 32.dp) },
             modifier = Modifier.threadLines(
                 xs = listOf(ThreadLineDefaults.AvatarCenterX),

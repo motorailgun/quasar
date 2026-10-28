@@ -11,8 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.user.UserName
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.modifier.bottomFadingEdge
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,8 +37,6 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.Quote
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
-import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
 import es.aria_on_the_planet.quasar.ui.component.poll.PollView
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 
@@ -49,6 +47,7 @@ private val QuoteFadeHeight = 32.dp
  * 引用されたポストを、枠付きで縮小表示する。表示できない状態の場合はその旨のプレースホルダを出す。
  * 引用の引用はさらに入れ子にせず、プレースホルダ 1 行にとどめる。
  *
+ * @param callbacks ポストへの操作の口 ([PostCallbacks])。引用内の投票・アクションは使わない。
  * @param maxHeight 本文側 (ヘッダ・本文・投票) の高さ上限。超える分は下端をフェードさせて切る。
  *   メディアはこの上限とは独立して常に表示する。`null` なら制限なし。
  */
@@ -56,11 +55,8 @@ private val QuoteFadeHeight = 32.dp
 fun QuotedPost(
     quote: Quote,
     modifier: Modifier = Modifier,
+    callbacks: PostCallbacks = PostCallbacks.None,
     mediaHeight: Dp = PostCardDefaults.MediaHeight * 0.75f,
-    onPostClick: (Post) -> Unit = {},
-    onUserClick: (User) -> Unit = {},
-    onHashtagClick: ((String) -> Unit)? = null,
-    onMediaClick: (MediaClick) -> Unit = {},
     maxHeight: Dp? = null,
     nested: Boolean = false,
 ) {
@@ -73,7 +69,7 @@ fun QuotedPost(
         return
     }
     OutlinedCard(
-        onClick = { onPostClick(post) },
+        onClick = { callbacks.onPostClick(post) },
         shape = QuoteShape,
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -115,7 +111,7 @@ fun QuotedPost(
                                 postContent = true,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 6.dp),
-                                onLinkClick = rememberPostLinkHandler(post, onUserClick, onHashtagClick),
+                                onLinkClick = rememberPostLinkHandler(post, callbacks.onUserClick, callbacks.onHashtagClick),
                             )
                         }
                         // 引用内の投票は閲覧のみ (結果表示)
@@ -124,16 +120,7 @@ fun QuotedPost(
                 }
             }
             // メディアは本文の高さ上限とは独立して常に表示する
-            if (post.mediaAttachments.isNotEmpty()) {
-                MediaAttachments(
-                    attachments = post.mediaAttachments,
-                    height = mediaHeight,
-                    sensitive = post.sensitive,
-                    artworkUrl = post.author.iconUrl,
-                    onClick = { tap -> onMediaClick(tap.toClick(post)) },
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
+            PostMedia(post, mediaHeight, callbacks.onMediaClick, Modifier.padding(top = 8.dp))
             post.quote?.let { inner ->
                 QuotedPost(quote = inner, nested = true, modifier = Modifier.padding(top = 8.dp))
             }

@@ -1,30 +1,24 @@
 package es.aria_on_the_planet.quasar.ui.reactions
 
-import androidx.compose.foundation.layout.Box
+import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
-import es.aria_on_the_planet.quasar.ui.component.post.OnPostAction
+import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
@@ -53,13 +47,15 @@ fun AccountReactionsScreen(
         postCount = viewModel.postCount,
         onBack = onBack,
         onRefresh = viewModel::refresh,
-        onUserClick = onUserClick,
-        onPostClick = onPostClick,
-        onMediaClick = onMediaClick,
-        onHashtagClick = onHashtagClick,
-        onReply = onReply,
-        onVote = viewModel::vote,
-        onAction = rememberPostActionHandler(viewModel::performAction),
+        callbacks = PostCallbacks(
+            onUserClick = onUserClick,
+            onPostClick = onPostClick,
+            onMediaClick = onMediaClick,
+            onVote = viewModel::vote,
+            onAction = rememberPostActionHandler(viewModel::performAction),
+            onReply = onReply,
+            onHashtagClick = onHashtagClick,
+        ),
     )
 }
 
@@ -76,13 +72,7 @@ fun AccountReactionsContent(
     postCount: Int,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
-    onMediaClick: (MediaClick) -> Unit,
-    onHashtagClick: (String) -> Unit,
-    onReply: ((Post) -> Unit)? = null,
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
+    callbacks: PostCallbacks,
 ) {
     val listState = rememberLazyListState()
     val items = remember(state.posts) { state.posts.map(TimelineItem::PostItem) }
@@ -107,38 +97,22 @@ fun AccountReactionsContent(
             items = items,
             modifier = Modifier.fillMaxSize(),
             state = listState,
-            onUserClick = onUserClick,
-            onPostClick = onPostClick,
-            onMediaClick = onMediaClick,
-            onVote = onVote,
-            onAction = onAction,
-            onReply = onReply,
-            onHashtagClick = onHashtagClick,
+            callbacks = callbacks,
             header = {
                 if (state.posts.isEmpty()) {
                     item(key = "status", contentType = "status") {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            when {
-                                !state.loaded || state.isRefreshing -> LoadingIndicator()
-                                state.error != null -> Text(stringResource(R.string.hashtag_error, state.error.orEmpty()))
-                                else -> Text(
-                                    stringResource(R.string.account_reactions_empty),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                        ListStatus(
+                            loading = !state.loaded || state.isRefreshing,
+                            error = state.error?.let { stringResource(R.string.hashtag_error, it) },
+                            empty = stringResource(R.string.account_reactions_empty),
+                        )
                     }
                 }
             },
             footer = {
                 state.account?.let { account ->
                     item(key = "account", contentType = "account") {
-                        UserSummary(user = account, onClick = { onUserClick(account) })
+                        UserSummary(user = account, onClick = { callbacks.onUserClick(account) })
                     }
                 }
             },

@@ -26,17 +26,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
-import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
 import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
 
 /**
  * ポストの集合。タイムライン・プロフィールの投稿一覧などで再利用する。
  * 要素は [TimelineItem] (ポストか、未取得の区間の読み込みボタン)。
+ * ポストへの操作は [callbacks] ([PostCallbacks]) でまとめて受け、各 [PostCard] に渡す。
  * データ取得は行わず、末尾付近までスクロールされたら [onLoadMore]、読み込みボタンで [onGapClick] を呼ぶ。
  * [header] / [footer] は一覧の先頭 / 末尾 (追加読み込みの表示より後) に置くアイテム。
  */
@@ -50,13 +48,7 @@ fun PostList(
     mediaHeight: Dp = PostCardDefaults.MediaHeight,
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
-    onUserClick: (User) -> Unit = {},
-    onPostClick: (Post) -> Unit = {},
-    onMediaClick: (MediaClick) -> Unit = {},
-    onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
-    onAction: OnPostAction? = null,
-    onReply: ((Post) -> Unit)? = null,
-    onHashtagClick: ((String) -> Unit)? = null,
+    callbacks: PostCallbacks = PostCallbacks.None,
     onGapClick: (TimelineItem.Gap) -> Unit = {},
     stickToTop: Boolean = true,
     header: (LazyListScope.() -> Unit)? = null,
@@ -77,14 +69,8 @@ fun PostList(
                 when (item) {
                     is TimelineItem.PostItem -> PostCard(
                         post = item.post,
+                        callbacks = callbacks,
                         mediaHeight = mediaHeight,
-                        onUserClick = onUserClick,
-                        onPostClick = onPostClick,
-                        onMediaClick = onMediaClick,
-                        onVote = onVote,
-                        onAction = onAction,
-                        onReply = onReply,
-                        onHashtagClick = onHashtagClick,
                     )
                     is TimelineItem.Gap -> GapRow(item, onClick = { onGapClick(item) })
                 }

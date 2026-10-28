@@ -16,18 +16,28 @@ typealias PostFeedState = FeedState<TimelineItem>
 class PostFeed private constructor(
     scope: CoroutineScope,
     nextMaxIdOfItems: (List<TimelineItem>) -> String?,
+    mergeCached: ((List<TimelineItem>, List<Post>) -> List<TimelineItem>?)?,
     fetchPage: suspend (maxId: String?) -> Page<Post>,
 ) : PagedFeed<Post, TimelineItem>(
     scope = scope,
     append = ::appendOlderPosts,
     trim = ::trimTimeline,
     nextMaxIdOfItems = nextMaxIdOfItems,
+    mergeCached = mergeCached,
     fetchPage = fetchPage,
 ) {
-    /** ポストの ID で `max_id` を決める一覧 (タイムライン・プロフィール等)。 */
-    constructor(scope: CoroutineScope, fetch: suspend (maxId: String?) -> List<Post>) : this(
+    /**
+     * ポストの ID で `max_id` を決める一覧 (タイムライン・プロフィール等)。
+     * @param firstPageLimit [showCached] で先に出す一覧なら、最初のページの `limit`。取得の結果を [mergeRefreshedPosts] で当てる。
+     */
+    constructor(
+        scope: CoroutineScope,
+        firstPageLimit: Int? = null,
+        fetch: suspend (maxId: String?) -> List<Post>,
+    ) : this(
         scope = scope,
         nextMaxIdOfItems = ::oldestPostId,
+        mergeCached = firstPageLimit?.let { limit -> { current, page -> mergeRefreshedPosts(current, page, limit) } },
         // タイムラインは新しい順なので末尾が最も古い
         fetchPage = { maxId -> fetch(maxId).let { Page(it, it.lastOrNull()?.id) } },
     )
@@ -38,7 +48,7 @@ class PostFeed private constructor(
          * 切り詰めた後に一覧から求め直すこともしない。
          */
         fun linked(scope: CoroutineScope, fetchPage: suspend (maxId: String?) -> Page<Post>): PostFeed =
-            PostFeed(scope, nextMaxIdOfItems = { null }, fetchPage = fetchPage)
+            PostFeed(scope, nextMaxIdOfItems = { null }, mergeCached = null, fetchPage = fetchPage)
     }
 
     /** 読み込み済みのポストを書き換える (投票結果の反映など)。 */

@@ -42,6 +42,22 @@ fun appendOlderPosts(current: List<TimelineItem>, page: List<Post>): List<Timeli
 }
 
 /**
+ * 先に出しておいた (キャッシュの) 一覧 [current] に、取り直した最新のページ [page] (新しい順、`limit = [pageLimit]`) を当てる。
+ * ページの範囲 (その最古のポスト以降) はページの中身にし (消された・編集されたものを反映)、それより古い分は残す。
+ * 項目のキーが保たれるので、読み進めていた位置はずれない。
+ * 次の場合は `null` (置き換える): [current] が空、ページが [pageLimit] 件に満たない (それで全部なので古い分は消されている)、
+ * ページが [current] の最新まで届かない (間に未取得の区間がありうる)。
+ */
+fun mergeRefreshedPosts(current: List<TimelineItem>, page: List<Post>, pageLimit: Int): List<TimelineItem>? {
+    if (page.size < pageLimit) return null
+    val newestKnown = current.posts.maxOfWithOrNull(MastodonIdComparator) { it.id } ?: return null
+    val oldestOfPage = page.minOfWithOrNull(MastodonIdComparator) { it.id } ?: return null
+    if (MastodonIdComparator.compare(oldestOfPage, newestKnown) > 0) return null
+    val older = current.posts.filter { MastodonIdComparator.compare(it.id, oldestOfPage) < 0 }
+    return appendOlderPosts(appendOlderPosts(emptyList(), page), older)
+}
+
+/**
  * 新しいポストを ID 順の正しい位置へ入れる。既にある ID は無視する。
  * ストリームの新着は先頭に入り、補完で取得した分が後から届いても順序が崩れない。
  */

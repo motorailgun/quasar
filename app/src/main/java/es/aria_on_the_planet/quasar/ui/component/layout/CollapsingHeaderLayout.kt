@@ -33,7 +33,17 @@ class CollapsingHeaderState(initialOffset: Float = 0f) {
 
     /** 最大の折りたたみ量 (見出しの高さ - 畳み切ったときに残す上端の分)。レイアウトで決まる。 */
     var maxOffset by mutableFloatStateOf(0f)
-        internal set
+        private set
+
+    /**
+     * 見出しの高さが変わったとき。畳み切っていたら畳んだままにする (補助情報が後から届いて見出しが伸びても、
+     * 一覧を読んでいる途中で見出しの下端が出てきて一覧ごと下へずれないように)。
+     */
+    internal fun updateMaxOffset(value: Float) {
+        if (maxOffset == value) return
+        if (isCollapsed) offset = value
+        maxOffset = value
+    }
 
     /** 見出しが完全に隠れたか (トップバーにタイトルを出す判定などに使う)。 */
     val isCollapsed: Boolean by derivedStateOf { maxOffset > 0f && offset >= maxOffset }
@@ -114,7 +124,7 @@ fun CollapsingHeaderLayout(
         val contentPlaceable = contentMeasurables.firstOrNull()
             ?.measure(constraints.copy(minHeight = contentHeight, maxHeight = contentHeight))
         val maxOffset = (headerHeight - collapsedTop.roundToPx()).coerceAtLeast(0).toFloat()
-        if (state.maxOffset != maxOffset) state.maxOffset = maxOffset
+        state.updateMaxOffset(maxOffset)
         layout(constraints.maxWidth, height) {
             // 見出しの高さが縮んだ (補助情報の取得失敗等) 直後でも、はみ出さないよう丸める
             val offset = state.offset.coerceIn(0f, maxOffset).roundToInt()

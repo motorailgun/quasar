@@ -17,8 +17,10 @@ import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
 import es.aria_on_the_planet.quasar.ui.feed.submitVote
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -116,7 +118,8 @@ class ProfileViewModel(
     private val tab = MutableStateFlow(ProfileTab.Posts)
     private val button = MutableStateFlow<ProfileButtonState>(ProfileButtonState.None)
 
-    private val posts = PostFeed(viewModelScope) { maxId ->
+    // 前に開いたときの一覧を先に出す (showCachedPosts)
+    private val posts = PostFeed(viewModelScope, firstPageLimit = InitialPostCount) { maxId ->
         repository.fetchPosts(
             session = session,
             accountId = accountId,
@@ -161,7 +164,11 @@ class ProfileViewModel(
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileScreenState())
 
+    /** ピン留めを取得したか (取得の後に読み終わったキャッシュで上書きしない)。 */
+    private var pinnedFetched = false
+
     init {
+        showCachedPosts()
         load(force = false)
     }
 
@@ -307,10 +314,28 @@ class ProfileViewModel(
         }
     }
 
+    /**
+     * 前に開いたときの投稿一覧の最初のページとピン留め (キャッシュ) を、取得が終わるまでの間だけ先に出す。取得の結果は
+     * 読み進めた位置を保つよう当てる ([es.aria_on_the_planet.quasar.ui.feed.mergeRefreshedPosts])。
+     * ピン留めは一覧の上に入るので、後から出ると先頭にいても見えない位置に入る。なので両方読んでから一緒に出す。
+     */
+    private fun showCachedPosts() {
+        viewModelScope.launch {
+            val pinnedRead = async { runOptional("cached pinned posts") { repository.cachedPinnedPosts(accountId) } }
+            val cachedPosts = runOptional("cached posts") { repository.cachedPosts(accountId) }
+            val cachedPinned = pinnedRead.await()
+            if (cachedPinned != null && !pinnedFetched) extras.update { it.copy(pinnedPosts = cachedPinned) }
+            cachedPosts?.let { list -> posts.showCached(list.map(TimelineItem::PostItem)) }
+        }
+    }
+
     private fun loadExtras() {
         viewModelScope.launch {
             val pinned = runOptional("pinned posts") { repository.fetchPinnedPosts(session, accountId) }
-            pinned?.let { posts -> extras.update { it.copy(pinnedPosts = posts) } }
+            pinned?.let { posts ->
+                pinnedFetched = true
+                extras.update { it.copy(pinnedPosts = posts) }
+            }
         }
         viewModelScope.launch {
             val followers = runOptional("followers you follow") { repository.fetchFamiliarFollowers(session, accountId) }

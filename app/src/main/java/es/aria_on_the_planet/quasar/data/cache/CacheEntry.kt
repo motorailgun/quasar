@@ -16,6 +16,12 @@ enum class CacheKind {
 
     /** スレッド (`ContextIds`)。ID は本体の Status ID。中身の Status は [Status] に入っている。 */
     Context,
+
+    /** プロフィールの投稿一覧の最初のページ (`PostListEntry` の並び)。ID はアカウント ID。中身の Status は [Status] に入っている。 */
+    AccountPosts,
+
+    /** プロフィールのピン留めポスト (`PostListEntry` の並び)。ID はアカウント ID。 */
+    PinnedPosts,
 }
 
 /**

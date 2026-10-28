@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /** キャッシュから読んだ値と、それを取った時刻。 */
@@ -21,6 +22,12 @@ data class Cached<T>(val value: T, val fetchedAt: Long) {
 /** スレッドの並び (中身の Status は別に持つ)。 */
 @Serializable
 data class ContextIds(val ancestors: List<String>, val descendants: List<String>)
+
+/** 一覧の 1 件。ブーストは外側の ID とブーストした人を持つ (中身は [CacheKind.Status]、ブーストした人は [CacheKind.Account])。 */
+@Serializable
+data class PostListEntry(val id: String, val statusId: String, val boostedBy: String? = null)
+
+private val PostListSerializer = ListSerializer(PostListEntry.serializer())
 
 /** 期限と、残す件数。 */
 object CachePolicy {
@@ -38,6 +45,8 @@ object CachePolicy {
         CacheKind.Account to 2000,
         CacheKind.Relationship to 500,
         CacheKind.Context to 300,
+        CacheKind.AccountPosts to 200,
+        CacheKind.PinnedPosts to 200,
     )
 }
 
@@ -80,6 +89,29 @@ class EntityCache(
         putStatuses(context.ancestors + context.descendants, version)
         val ids = ContextIds(context.ancestors.map { it.id }, context.descendants.map { it.id })
         write { dao.putNewer(listOf(entry(CacheKind.Context, statusId, ContextIds.serializer(), ids, version))) }
+    }
+
+    /** [ownerId] の一覧 ([kind]、[CacheKind.AccountPosts] 等) を [statuses] (新しい順) の並びで書く。中身の Status も書く。 */
+    suspend fun putPostList(kind: CacheKind, ownerId: String, statuses: List<StatusDto>, version: Long) {
+        putStatuses(statuses, version)
+        val entries = statuses.map { PostListEntry(it.id, it.reblog?.id ?: it.id, it.account.id.takeIf { _ -> it.reblog != null }) }
+        write { dao.putNewer(listOf(entry(kind, ownerId, PostListSerializer, entries, version))) }
+    }
+
+    /**
+     * [putPostList] で書いた一覧を Status に戻す (ブーストは外側を組み立て直す)。キャッシュから消えたポスト・ブーストした人は飛ばす。
+     * 取得時刻は並びを書いた時刻。
+     */
+    suspend fun postList(kind: CacheKind, ownerId: String): Cached<List<StatusDto>>? {
+        val list = read(kind, ownerId, PostListSerializer) ?: return null
+        val bodies = statuses(list.value.map { it.statusId })
+        val boosters = readAll(CacheKind.Account, list.value.mapNotNull { it.boostedBy }, AccountDto.serializer())
+        val restored = list.value.mapNotNull { entry ->
+            val body = bodies[entry.statusId]?.value ?: return@mapNotNull null
+            val boostedBy = entry.boostedBy ?: return@mapNotNull body
+            boosters[boostedBy]?.value?.let { StatusDto(id = entry.id, createdAt = body.createdAt, account = it, reblog = body) }
+        }
+        return Cached(restored, list.fetchedAt)
     }
 
     /** 保存済みの [statusId] の投票を [poll] に差し替える (投票した応答)。 */

@@ -390,9 +390,9 @@
     <string name="settings_visibility_account_default_description">The default set for your account on the server</string>
     <string name="settings_confirm_post">Confirm before posting</string>
     <string name="settings_compress_oversized_images">Compress large images</string>
-    <string name="settings_compress_oversized_images_summary">Re-encode images over the server\'s size limit at a lower quality before uploading. The dimensions don\'t change. Animated images are sent as-is.</string>
+    <string name="settings_compress_oversized_images_summary">Re-encode images (except animated) over the server\'s size limit at a lower quality before uploading.</string>
     <string name="settings_strip_image_metadata">Remove image metadata</string>
-    <string name="settings_strip_image_metadata_summary">Remove EXIF (location, camera, date) and other metadata from attached images before uploading. Quality doesn\'t change. HEIC images are converted.</string>
+    <string name="settings_strip_image_metadata_summary">Remove EXIF and other metadata from attached images before uploading.</string>
 
     <string name="settings_confirm_summary">Ask before sending</string>
     <string name="settings_boost">Boost</string>

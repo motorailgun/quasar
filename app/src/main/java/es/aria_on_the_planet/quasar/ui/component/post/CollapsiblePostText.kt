@@ -24,6 +24,7 @@ private val FadeHeight = 40.dp
  *
  * @param stateKey 展開状態を保持するキー (ポストの statusId など)。
  * @param maxCollapsedLines `null` なら折りたたまない。
+ * @param showToggle `false` なら「Show more」を出さず、折りたたんだ高さで切ってフェードさせるだけ (開けない)。
  * @param onLinkClick 本文のリンクのタップ ([EmojiText] の同名の引数)。
  */
 @Composable
@@ -33,6 +34,7 @@ fun CollapsiblePostText(
     stateKey: String,
     maxCollapsedLines: Int?,
     modifier: Modifier = Modifier,
+    showToggle: Boolean = true,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     onLinkClick: ((url: String, text: String?) -> Unit)? = null,
 ) {
@@ -49,7 +51,7 @@ fun CollapsiblePostText(
         modifier = modifier,
         expanded = rememberExpandedState(stateKey),
         fadeHeight = FadeHeight,
-        toggle = { expanded, onToggle -> ShowMoreToggle(expanded = expanded, onToggle = onToggle) },
+        toggle = { expanded, onToggle -> if (showToggle) ShowMoreToggle(expanded = expanded, onToggle = onToggle) },
     ) {
         EmojiText(
             text = html, emojis = emojis, isHtml = true, postContent = true, style = style, onLinkClick = onLinkClick,

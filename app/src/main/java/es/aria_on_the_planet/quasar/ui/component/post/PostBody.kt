@@ -1,6 +1,9 @@
 package es.aria_on_the_planet.quasar.ui.component.post
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -10,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.component.card.LinkPreviewCard
 import es.aria_on_the_planet.quasar.ui.component.media.MediaAttachments
@@ -24,6 +29,7 @@ import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
  * @param spacing 本文の後の各部品 (投票・メディア・カード・引用) の上の間隔。
  * @param collapsedMaxLines 長文をこの行数で折りたたむ。`null` なら全文。
  * @param extras 投票・リンクプレビュー・引用も出すか (返信先の表示 [PostCardMode.ReplyContext] では出さない)。
+ * @param fixed 開閉させない ([PostCardMode.Preview])。CW は開いたまま、長文は開閉のボタン無しで切ってフェードさせる。
  */
 @Composable
 internal fun PostBody(
@@ -34,10 +40,16 @@ internal fun PostBody(
     textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
     collapsedMaxLines: Int? = null,
     extras: Boolean = true,
+    fixed: Boolean = false,
 ) {
     var expanded by rememberContentWarningExpanded(post)
-    val hasWarning = post.contentWarning != null
-    post.contentWarning?.let { cw ->
+    // 開いたままなら隠す部分は無いのと同じ (アニメーションの入れ物も作らない)
+    val hasWarning = post.contentWarning != null && !fixed
+    if (fixed) {
+        post.contentWarning?.let { cw ->
+            FixedContentWarning(cw, post, textStyle, Modifier.padding(bottom = spacing))
+        }
+    } else post.contentWarning?.let { cw ->
         ContentWarning(
             text = cw,
             emojis = post.emojis,
@@ -52,6 +64,7 @@ internal fun PostBody(
             emojis = post.emojis,
             stateKey = post.statusId,
             maxCollapsedLines = collapsedMaxLines,
+            showToggle = !fixed,
             style = textStyle,
             onLinkClick = rememberPostLinkHandler(post, callbacks.onUserClick, callbacks.onHashtagClick),
         )
@@ -83,6 +96,21 @@ internal fun PostBody(
                 )
             }
         }
+    }
+}
+
+/** 開いたままの CW ([PostBody] の `fixed`)。本文と見分けられるよう、警告文の左に警告のアイコンを付ける。 */
+@Composable
+private fun FixedContentWarning(text: String, post: Post, style: TextStyle, modifier: Modifier = Modifier) {
+    Row(modifier) {
+        // 1 行目の文字の高さの中央に合わせる (bodyMedium は行の高さ 20sp)
+        Icon(
+            Symbols.Outlined.Warning,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 1.dp, end = 6.dp).size(18.dp),
+        )
+        EmojiText(text = text, emojis = post.emojis, postContent = true, style = style)
     }
 }
 

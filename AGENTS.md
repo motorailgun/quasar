@@ -52,6 +52,7 @@ es.aria_on_the_planet.quasar
     │   ├── text/EmojiText.kt       カスタム絵文字対応テキスト (Text のラッパー)
     │   ├── post/PostCard.kt        ポスト 1 件 (+ PostActionRow)
     │   ├── post/PostBody.kt        ポストの中身 (CW / 本文 / 投票 / メディア / カード / 引用。PostCard・PostDetail 共通) + PostMedia / PostExcerpt
+    │   ├── post/PostMenu.kt        ポストの︙のメニュー + PostMenuPreview.kt (メニューの上に出す対象のポスト)
     │   ├── post/PostCallbacks.kt   ポストへの操作の口 (タップ・投票・アクション・返信・ハッシュタグ) をまとめたもの
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
@@ -77,7 +78,7 @@ es.aria_on_the_planet.quasar
     │   ├── image/                  RemoteImage / LocalImage (画像表示の唯一の入口) + ImageKind / BlurHash デコーダ + プレースホルダ Painter
     │   │   └── loader/             Coil の ImageLoader とデコーダ (AnimationGate / APNG のデコーダ・再生・時刻計算・ヘッダの判定)
     │   ├── link/NewTaskUriHandler.kt 外部リンクを開く (NEW_TASK 付き。LocalUriHandler として提供)
-    │   ├── menu/ActionMenu.kt      ︙のメニュー (画面下からのシート) + MenuItemText (項目の文字、Regular)
+    │   ├── menu/ActionMenu.kt      ︙のメニュー (画面下からのシート。項目の上に header を置ける) + MenuItemText (項目の文字、Regular)
     │   ├── account/AccountActions.kt アカウントへの操作 (ブロック・ミュート・ブーストの非表示) の口 (LocalAccountActions) とメニューの項目
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く)
@@ -409,6 +410,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   添付メディア (MediaAttachments) / リンクプレビュー (LinkPreviewCard) / 引用 (QuotedPost) / アクション行
 * `mode = PostCardMode.ReplyContext` は返信画面の上の返信先用: 本文 (CW・長文の折りたたみ込み) とメディアだけで、ラベル・
   公開範囲・投票・カード・引用・アクション行を出さず、カード全体のタップも受けない。`authorTrailing` は投稿者行の右端 (✕ 等)。
+* `mode = PostCardMode.Preview` はポストのメニューの上の対象のポスト用 (下記「ポストのメニュー」): 出すものは ReplyContext と
+  同じだが開閉できない。CW は開いたまま (`PostBody(fixed = true)`: 警告のアイコン + 警告文の下に本文)、長文は設定に関わらず
+  6 行で切ってフェードするだけ (`CollapsiblePostText(showToggle = false)`、「Show more」を出さない)。
+* `avatarSize` (既定 40dp。ラベルの左端もこれに合わせる) / `contentPadding` (既定 左右 16dp・上下 12dp) で大きさ・余白を変えられる。
 * `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),
@@ -426,6 +431,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * メニューは浮かぶメニューではなく**画面下からのシート** (`ActionMenu`、`ModalBottomSheet` に `DropdownMenuItem` を並べる。
     Material 3 Expressive に下から出るメニューの部品は無い)。区切り線は入れず、項目の文字は `MenuItemText` (メニュー標準の
     Medium ではなく Regular)。項目を押したらシートを下へ閉じてから確認ダイアログ等を出す。プロフィールのメニューも同じ。
+    シートの中身は全体を縦にスクロールできる (横画面等で画面の高さを超えても全項目に届く)。
+  * **項目の上に対象のポスト** (`PostMenuPreview`、`ActionMenu(header = ...)`): 下からのシートだとどのポストへの操作か分かり
+    づらいため。`PostCard(mode = Preview)` を文字・アイコンはタイムラインと同じ大きさ、メディアだけ 96dp で出す。面の背景は
+    敷かず、左右の余白は項目 (`DropdownMenuItem`) の中の余白と同じ 12dp にしてアイコンの左端を項目と揃える。押せない: 上に
+    `pointerInput` だけの覆いを重ね (リンク・メディア・CW / 長文の開閉が効かない。シートのドラッグは親が受ける)、
+    `LocalInlinePlayback` を `null` にしてその場の再生も止める。ブーストは中身のポスト (操作の対象が `post.author` なので)。
+    プロフィールのメニューには出さない (画面そのものが対象)。
   * 中身は上から「ブラウザで開く」(接続中サーバの `/@acct/:statusId`)、リモートのポストなら「<ホスト>で開く」(`Status.url`、
     無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
     出す)、他人のポストなら「ミュート」・「ブロック」/「ブロックを解除」(どちらも error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
@@ -1191,7 +1203,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
       --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60] [--ef ui_scale 1.2]
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
-  picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety /
+  picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。

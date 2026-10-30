@@ -153,7 +153,11 @@ fun PostMenu(
                 }
             }
         }
-        ActionMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ActionMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            header = { PostMenuPreview(post) },
+        ) {
             val dismiss = { expanded = false }
             // 自分のポストか: 関係を読み込んだ結果、まだなら覚えている自分の ID で決める
             val myId = actions.myAccountId

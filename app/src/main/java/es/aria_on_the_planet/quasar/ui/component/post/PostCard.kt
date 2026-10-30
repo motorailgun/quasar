@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -76,7 +77,15 @@ import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 
 object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
+    val AvatarSize: Dp = 40.dp
+    val ContentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 }
+
+/** [PostCardMode.Preview] の本文の行数の上限。 */
+private const val PreviewMaxLines = 6
+
+/** アイコンと本文の列の間。 */
+private val AvatarGap = 12.dp
 
 /** [PostCard] の表示の種類。 */
 enum class PostCardMode {
@@ -89,6 +98,13 @@ enum class PostCardMode {
      * カード全体のタップも受けない。
      */
     ReplyContext,
+
+    /**
+     * ポストのメニューの上に出す対象のポスト ([PostMenuPreview])。出すものは [ReplyContext] と同じだが、開閉できない:
+     * CW は開いたまま (警告のアイコン + 警告文の下に本文)、長文は設定に関わらず [PreviewMaxLines] 行で切ってフェードさせるだけ
+     * (「Show more」は出さない)。
+     */
+    Preview,
 }
 
 /**
@@ -100,6 +116,8 @@ enum class PostCardMode {
  * @param showReplyIndicator リプライのとき「Reply to @user」を出すか。スレッド表示など、
  *   返信関係が別の形で分かる場所では `false` にする。
  * @param mode 表示の種類 ([PostCardMode])。
+ * @param avatarSize 投稿者のアイコンの大きさ。ラベル (ブースト等) の左端もこれに合わせてずらす。
+ * @param contentPadding カードの内側の余白。
  * @param authorTrailing 投稿者行の右端に置くもの ([PostCardMode.ReplyContext] の ✕ 等)。公開範囲のアイコンの代わりに出す。
  */
 @Composable
@@ -111,6 +129,8 @@ fun PostCard(
     pinned: Boolean = false,
     showReplyIndicator: Boolean = true,
     mode: PostCardMode = PostCardMode.Full,
+    avatarSize: Dp = PostCardDefaults.AvatarSize,
+    contentPadding: PaddingValues = PostCardDefaults.ContentPadding,
     authorTrailing: (@Composable () -> Unit)? = null,
 ) {
     val full = mode == PostCardMode.Full
@@ -119,15 +139,16 @@ fun PostCard(
         modifier = modifier
             .fillMaxWidth()
             .then(if (full) Modifier.clickable { callbacks.onPostClick(post) } else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(contentPadding),
     ) {
-        if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick)
+        if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick, labelStart = avatarSize + AvatarGap)
         Row {
             UserIcon(
                 user = post.author,
+                size = avatarSize,
                 modifier = Modifier.clickable { onUserClick(post.author) },
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(AvatarGap))
             Column(Modifier.weight(1f)) {
                 AuthorLine(
                     post,
@@ -143,8 +164,9 @@ fun PostCard(
                     mediaHeight = mediaHeight,
                     spacing = 8.dp,
                     // 長い本文は設定の行数で折りたたむ
-                    collapsedMaxLines = LocalDisplaySettings.current.longPostMaxLines,
+                    collapsedMaxLines = if (mode == PostCardMode.Preview) PreviewMaxLines else LocalDisplaySettings.current.longPostMaxLines,
                     extras = full,
+                    fixed = mode == PostCardMode.Preview,
                 )
                 if (full) {
                     Spacer(Modifier.size(8.dp))
@@ -157,15 +179,15 @@ fun PostCard(
 
 /** 本文の上のラベル (ピン留め・ブースト・リプライ)。 */
 @Composable
-private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Boolean, onUserClick: (User) -> Unit) {
+private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Boolean, onUserClick: (User) -> Unit, labelStart: Dp) {
     if (pinned) {
-        PinnedLabel(Modifier.padding(start = 52.dp, bottom = 2.dp))
+        PinnedLabel(Modifier.padding(start = labelStart, bottom = 2.dp))
     }
     post.boostedBy?.let { booster ->
         BoostedByLabel(
             booster,
             Modifier
-                .padding(start = 52.dp, bottom = 4.dp)
+                .padding(start = labelStart, bottom = 4.dp)
                 .clickable { onUserClick(booster) },
         )
     }
@@ -174,7 +196,7 @@ private fun PostCardLabels(post: Post, pinned: Boolean, showReplyIndicator: Bool
         PostLabel(
             Symbols.Outlined.Reply,
             if (acct != null) stringResource(R.string.post_reply_to, "@$acct") else stringResource(R.string.post_reply),
-            Modifier.padding(start = 52.dp, bottom = 4.dp),
+            Modifier.padding(start = labelStart, bottom = 4.dp),
         )
     }
 }

@@ -20,6 +20,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -33,6 +36,15 @@ data class PostThread(
     val descendants: List<Post>,
 )
 
+/** 自分の操作 (編集・削除) で変わったポスト。 */
+sealed interface PostChange {
+    /** [post] に書き換えた。 */
+    data class Edited(val post: Post) : PostChange
+
+    /** [statusId] を削除した。 */
+    data class Deleted(val statusId: String) : PostChange
+}
+
 /** キャッシュから組み立てたスレッド。[isPostFresh] なら本体は取り直さなくてよい。 */
 data class CachedThread(val thread: PostThread, val isPostFresh: Boolean)
 
@@ -43,6 +55,11 @@ class StatusRepository(
     private val api: MastodonApi,
     private val cache: EntityCache,
 ) {
+    private val changes = MutableSharedFlow<PostChange>(extraBufferCapacity = 16)
+
+    /** 自分の編集・削除で変わったポスト。各画面の一覧の差し替え・削除に使う (どの画面から操作したかに関わらず)。 */
+    val postChanges: SharedFlow<PostChange> = changes.asSharedFlow()
+
     /**
      * [statusId] のスレッドを取得する。[post] (キャッシュの本体) を渡すと本体は取らず、スレッド (`/context`) だけを取る。
      * 消された・見られなくなったポスト (404 / 410) はキャッシュからも消して投げ直す。
@@ -167,12 +184,14 @@ class StatusRepository(
         return api.editStatus(session.serverUrl, session.accessToken, statusId, draft.toEditFormParams())
             .also { cache.putStatuses(listOf(it), version) }
             .toDomain()
+            .also { changes.tryEmit(PostChange.Edited(it)) }
     }
 
     /** 自分のポスト [statusId] を削除する。 */
     suspend fun delete(session: Session, statusId: String) {
         api.deleteStatus(session.serverUrl, session.accessToken, statusId)
         cache.deleteStatus(statusId)
+        changes.tryEmit(PostChange.Deleted(statusId))
     }
 }
 

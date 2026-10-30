@@ -2,12 +2,15 @@ package es.aria_on_the_planet.quasar.ui.navigation
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -32,7 +35,9 @@ import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
+import es.aria_on_the_planet.quasar.ui.component.post.LocalOwnPostActions
 import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
+import es.aria_on_the_planet.quasar.ui.composer.PostEditorHost
 import es.aria_on_the_planet.quasar.ui.follows.FollowListScreen
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.follows.FollowListViewModel
@@ -112,46 +117,56 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     SideEffect { settings?.let { backDamping.settings = it.predictiveBack } }
     // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
     val accountActions = remember(current) { current?.let { SessionAccountActions(it, container.accountRepository) } }
-    CompositionLocalProvider(LocalNavigator provides navigator, LocalAccountActions provides accountActions) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = {
-                backDamping.onBack()
-                navigator.back()
-            },
-            entryDecorators = listOf(
-                rememberSaveableStateHolderNavEntryDecorator(),
-                rememberViewModelStoreNavEntryDecorator(),
-                rememberPredictiveBackDampingDecorator(backDamping),
-            ),
-            // メディアビューアは下の画面に重ねる (それ以外は 1 画面ずつ)
-            sceneStrategies = remember { listOf(OverlaySceneStrategy()) },
-            transitionSpec = { pushTransition() },
-            popTransitionSpec = { popTransition() },
-            predictivePopTransitionSpec = { predictivePopTransition(backDamping.settings.transitionMillis) },
-            entryProvider = entryProvider {
-                entry<Route.Login> { LoginScreen(container.oauthLogin) }
-                entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
-                entry<Route.Profile> { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
-                entry<Route.FollowList> { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
-                entry<Route.Hashtag> { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
-                entry<Route.AccountReactions> { key ->
-                    WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
-                }
-                entry<Route.PostReactions> { key ->
-                    WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
-                }
-                entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
-                entry<Route.OpenLink> { key ->
-                    WithSession(current) { session ->
-                        OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
+    // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
+    val ownPostActions = remember(current) { current?.let { SessionOwnPostActions(it, container.postEditStore) } }
+    LaunchedEffect(current) { container.postEditStore.closeUnlessOwnedBy(current) }
+    CompositionLocalProvider(
+        LocalNavigator provides navigator,
+        LocalAccountActions provides accountActions,
+        LocalOwnPostActions provides ownPostActions,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            NavDisplay(
+                backStack = backStack,
+                onBack = {
+                    backDamping.onBack()
+                    navigator.back()
+                },
+                entryDecorators = listOf(
+                    rememberSaveableStateHolderNavEntryDecorator(),
+                    rememberViewModelStoreNavEntryDecorator(),
+                    rememberPredictiveBackDampingDecorator(backDamping),
+                ),
+                // メディアビューアは下の画面に重ねる (それ以外は 1 画面ずつ)
+                sceneStrategies = remember { listOf(OverlaySceneStrategy()) },
+                transitionSpec = { pushTransition() },
+                popTransitionSpec = { popTransition() },
+                predictivePopTransitionSpec = { predictivePopTransition(backDamping.settings.transitionMillis) },
+                entryProvider = entryProvider {
+                    entry<Route.Login> { LoginScreen(container.oauthLogin) }
+                    entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
+                    entry<Route.Profile> { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
+                    entry<Route.FollowList> { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
+                    entry<Route.Hashtag> { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
+                    entry<Route.AccountReactions> { key ->
+                        WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
                     }
-                }
-                entry<Route.Composer> { ComposerEntry(container, navigator) }
-                mediaViewerEntry(container, onBack = navigator::back)
-                settingsEntries(container, navigator) { backStack.add(it) }
-            },
-        )
+                    entry<Route.PostReactions> { key ->
+                        WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
+                    }
+                    entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
+                    entry<Route.OpenLink> { key ->
+                        WithSession(current) { session ->
+                            OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
+                        }
+                    }
+                    entry<Route.Composer> { ComposerEntry(container, navigator) }
+                    mediaViewerEntry(container, onBack = navigator::back)
+                    settingsEntries(container, navigator) { backStack.add(it) }
+                },
+            )
+            PostEditorHost(container.postEditStore)
+        }
     }
 }
 
@@ -382,8 +397,6 @@ private fun PostEntry(container: AppContainer, session: Session, key: Route.Post
                     session = session,
                     statusId = key.statusId,
                     repository = container.statusRepository,
-                    accountRepository = container.accountRepository,
-                    createEditor = { scope, target, onSaved -> container.composerSession(session, scope, target, onSaved) },
                 )
             }
         },

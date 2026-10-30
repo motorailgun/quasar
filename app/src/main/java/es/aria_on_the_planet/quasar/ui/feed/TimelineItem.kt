@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.feed
 
+import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.streaming.StreamEvent
 import es.aria_on_the_planet.quasar.domain.model.Post
 
@@ -135,6 +136,15 @@ fun replaceEditedPost(current: List<TimelineItem>, edited: Post): List<TimelineI
         if (post.statusId == edited.statusId) edited.copy(id = post.id, boostedBy = post.boostedBy) else post
     }
 }
+
+/** 自分の編集・削除 ([PostChange]) を当てる。 */
+fun applyPostChange(current: List<TimelineItem>, change: PostChange): List<TimelineItem> = when (change) {
+    is PostChange.Edited -> replaceEditedPost(current, change.post)
+    is PostChange.Deleted -> removePost(current, change.statusId)
+}
+
+/** ポストの並び (ピン留め・スレッド等) 版の [applyPostChange]。 */
+fun List<Post>.withPostChange(change: PostChange): List<Post> = applyPostChange(map(TimelineItem::PostItem), change).posts
 
 /**
  * ポスト数が [maxPosts] を超えたら古い側 (下) から捨てる。末尾に残った gap も捨てる (下に続きが無いので無意味)。

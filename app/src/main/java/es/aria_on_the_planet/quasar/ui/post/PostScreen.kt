@@ -1,11 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.post
 
 import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,11 +19,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -41,13 +34,9 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
-import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
-import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
 import es.aria_on_the_planet.quasar.ui.component.post.PostMenu
-import es.aria_on_the_planet.quasar.ui.component.post.OwnPostMenuActions
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
@@ -60,8 +49,6 @@ import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailTitle
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.launch
 
 private val AvatarCenterX = ThreadLineDefaults.AvatarCenterX
 private val AvatarTopY = ThreadLineDefaults.AvatarTopY
@@ -73,9 +60,8 @@ private val AvatarTopY = ThreadLineDefaults.AvatarTopY
  * 前面に来るたびに付け、離れるときに何も書いていなければ外す (下書きを共有しているので、外さないと
  * タイムラインのバーまで返信になる)。重ねて開いたポスト画面の間でも、前面の画面の本体が返信先になる。
  *
- * 本体の投稿者の行に︙メニュー ([PostMenu]。ブラウザで開く・ブロック等) を出し、自分のポストなら編集・削除も。編集はフルの投稿画面をこの画面に重ねて
- * 開き (下書きとは別の投稿欄 [PostViewModel.editor])、保存したら本体を差し替える。削除したら画面を閉じる。
- * どちらも設定に従って確認する (保存の確認は投稿画面の送信ボタンが行う)。
+ * 本体の投稿者の行に︙メニュー ([PostMenu]。ブラウザで開く・ブロック等、自分のポストなら編集・削除も。他の画面のメニューと同じ)
+ * を出す。編集を保存したら本体を差し替え、本体を削除したら画面を閉じる (どちらも `StatusRepository.postChanges` から)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -109,40 +95,12 @@ fun PostScreen(
             barState.requestInput()
         }
     }
-    val editor by viewModel.editor.collectAsStateWithLifecycle()
-    val resources = LocalResources.current
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 PostScreenEvent.Deleted -> onBack()
-                is PostScreenEvent.EditLoadFailed ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.post_edit_load_failed, event.message))
-                is PostScreenEvent.DeleteFailed ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.post_delete_failed, event.message))
             }
         }
-    }
-    val confirmer = LocalActionConfirmer.current
-    val scope = rememberCoroutineScope()
-    val postMenu: @Composable (Post) -> Unit = { post ->
-        PostMenu(
-            post = post,
-            own = if (state.isMine) {
-                OwnPostMenuActions(
-                    onEdit = viewModel::startEdit,
-                    onDelete = {
-                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            if (confirmer.confirm(ConfirmTarget.DeletePost)) viewModel.delete()
-                        }
-                    },
-                )
-            } else {
-                null
-            },
-            busy = state.ownPostBusy,
-            // ボタンの余白の分だけ右へ出し、︙を本文の右端に揃える
-            modifier = Modifier.offset(x = 12.dp),
-        )
     }
 
     val listState = rememberLazyListState()
@@ -228,7 +186,8 @@ fun PostScreen(
                                         Modifier
                                     },
                                     callbacks = callbacks,
-                                    menu = { postMenu(thread.post) },
+                                    // ボタンの余白の分だけ右へ出し、︙を本文の右端に揃える
+                                    menu = { PostMenu(thread.post, modifier = Modifier.offset(x = 12.dp)) },
                                     reactionDetail = true,
                                     onReactionCountClick = onReactionCountClick,
                                 )
@@ -262,24 +221,6 @@ fun PostScreen(
                         }
                     }
                 }
-            }
-        }
-
-        // 編集: フルの投稿画面を重ねる (閉じるアニメーションの間も最後の投稿欄を出しておく)
-        var lastEditor by remember { mutableStateOf(editor) }
-        if (editor != null) lastEditor = editor
-        AnimatedVisibility(
-            visible = editor != null,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
-        ) {
-            lastEditor?.let { session ->
-                ComposerScreen(
-                    session = session,
-                    onClose = viewModel::closeEditor,
-                    onFinish = viewModel::closeEditor,
-                    keepDraftOnClose = false,
-                )
             }
         }
     }

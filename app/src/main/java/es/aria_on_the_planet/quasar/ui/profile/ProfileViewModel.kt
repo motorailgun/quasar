@@ -22,6 +22,7 @@ import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
+import es.aria_on_the_planet.quasar.ui.feed.withPostChange
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
@@ -218,6 +219,13 @@ class ProfileViewModel(
     init {
         showCachedPosts()
         load(force = false)
+        // 自分の編集・削除を当てる
+        viewModelScope.launch {
+            statusRepository.postChanges.collect { change ->
+                feeds.values.forEach { it.applyChange(change) }
+                extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.withPostChange(change)) }
+            }
+        }
     }
 
     /** 引っ張って更新: プロフィール・関係もキャッシュの期限に関わらず取り直す。 */

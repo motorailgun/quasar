@@ -46,12 +46,13 @@ import es.aria_on_the_planet.quasar.ui.component.account.ProvisionalRelationship
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import es.aria_on_the_planet.quasar.ui.component.text.postPlainText
 import es.aria_on_the_planet.quasar.ui.component.menu.ActionMenu
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
+import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import es.aria_on_the_planet.quasar.ui.component.menu.MenuItemText
-
-/** 自分のポストのメニューの編集・削除。確認は [onDelete] の先 (呼び出し側) が行う。 */
-class OwnPostMenuActions(val onEdit: () -> Unit, val onDelete: () -> Unit)
 
 /** メニューを開いたときに読む相手の状態。 */
 private sealed interface TargetState {
@@ -62,12 +63,13 @@ private sealed interface TargetState {
 
 /**
  * ポストのメニュー (︙)。ブラウザで開く (リモートのポストなら元のサーバで開くも)、本文をコピー、他人のポストなら投稿者の
- * ミュート・ブロック・ブーストの非表示 (フォロー中のみ)、[own] があれば編集・削除 (削除は error 色)。
+ * ミュート・ブロック・ブーストの非表示 (フォロー中のみ)、自分のポストなら編集・削除 (削除は error 色、設定に従って確認する)。
+ * 編集・削除は [LocalOwnPostActions] で、どの画面 (タイムライン・ポスト詳細等) でも同じ。
  * 投稿者との関係は開くたびに読み (キャッシュが新しければそれ)、読み込むまでは仮の関係 ([ProvisionalRelationship]) で出す (自分の ID がまだ分からず、関係の読み込みにも失敗したら項目ごと出さない)。ブロック・ミュートは確認してから行う。
  * [LocalAccountActions] が無い所 (ギャラリー等) では何も出さない。
  *
  * @param compact 投稿者の行 (公開範囲の右) に置く小さいボタン。`false` なら [IconButton] (ポスト詳細の投稿者の行)。
- * @param busy 編集の準備・削除の最中。ボタンの代わりに読み込み中を出し、押せない ([compact] では見ない)。
+ *   編集の準備・削除の最中は、どちらもボタンの代わりに読み込み中を出し、押せない。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -75,10 +77,11 @@ fun PostMenu(
     post: Post,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    own: OwnPostMenuActions? = null,
-    busy: Boolean = false,
 ) {
     val actions = LocalAccountActions.current ?: return
+    val ownActions = LocalOwnPostActions.current
+    val busy = ownActions?.busyStatusId?.collectAsStateWithLifecycle()?.value == post.statusId
+    val confirmer = LocalActionConfirmer.current
     val author = post.author
     var expanded by remember { mutableStateOf(false) }
     var target by remember(author) { mutableStateOf<TargetState>(TargetState.Loading) }
@@ -132,10 +135,14 @@ fun PostMenu(
                         }
                     }
                     .clip(CircleShape)
-                    .clickable(role = Role.Button, onClickLabel = label) { expanded = true }
+                    .clickable(enabled = !busy, role = Role.Button, onClickLabel = label) { expanded = true }
                     .padding(horizontal = ActionPaddingHorizontal, vertical = CompactMenuPaddingVertical),
             ) {
-                Icon(Symbols.Outlined.MoreVert, contentDescription = label, modifier = Modifier.size(ActionIconSize), tint = tint)
+                if (busy) {
+                    LoadingIndicator(Modifier.size(ActionIconSize))
+                } else {
+                    Icon(Symbols.Outlined.MoreVert, contentDescription = label, modifier = Modifier.size(ActionIconSize), tint = tint)
+                }
             }
         } else {
             IconButton(onClick = { expanded = true }, enabled = !busy) {
@@ -148,13 +155,17 @@ fun PostMenu(
         }
         ActionMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             val dismiss = { expanded = false }
-            if (own != null) {
+            // 自分のポストか: 関係を読み込んだ結果、まだなら覚えている自分の ID で決める
+            val myId = actions.myAccountId
+            val state = target
+            val mine = if (state is TargetState.Loaded) state.target == AccountMenuTarget.Me else myId == author.inServerId
+            if (mine && ownActions != null) {
                 DropdownMenuItem(
                     text = { MenuItemText(stringResource(R.string.post_edit)) },
                     leadingIcon = { Icon(Symbols.Outlined.Edit, contentDescription = null) },
                     onClick = {
                         dismiss()
-                        own.onEdit()
+                        ownActions.edit(post)
                     },
                 )
                 val error = MaterialTheme.colorScheme.error
@@ -163,7 +174,9 @@ fun PostMenu(
                     leadingIcon = { Icon(Symbols.Outlined.Delete, contentDescription = null) },
                     onClick = {
                         dismiss()
-                        own.onDelete()
+                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            if (confirmer.confirm(ConfirmTarget.DeletePost)) ownActions.delete(post)
+                        }
                     },
                     colors = MenuDefaults.itemColors(textColor = error, leadingIconColor = error),
                 )
@@ -189,28 +202,22 @@ fun PostMenu(
             // 自分のポストにはアカウントへの操作を出さない。関係を読み込むまで (読めなかったときも) は仮の関係で出しておき、
             // フォローしているか次第のブーストの非表示はグレーアウトしておく。自分の ID がまだ分からなければ全部グレーアウト
             // (自分のポストにブロック等を押せる状態で出さないように)
-            val myId = actions.myAccountId
-            val state = target
-            if (state is TargetState.Loaded && state.target == AccountMenuTarget.Me) return@ActionMenu
-            if (state !is TargetState.Loaded && myId == author.inServerId) return@ActionMenu
+            if (mine) return@ActionMenu
             val relationship = when (state) {
                 is TargetState.Loaded -> (state.target as AccountMenuTarget.Other).relationship
                 TargetState.Loading -> if (myId == null) null else ProvisionalRelationship
                 TargetState.Failed -> if (myId == null) return@ActionMenu else ProvisionalRelationship
             }
-            val followKnown = state is TargetState.Loaded
-            if (own == null) {
-                AccountActionMenuItems(
-                    user = author,
-                    relationship = relationship,
-                    followKnown = followKnown,
-                    named = true,
-                    onAction = { action ->
-                        dismiss()
-                        if (action.needsConfirmation) confirming = action else perform(action)
-                    },
-                )
-            }
+            AccountActionMenuItems(
+                user = author,
+                relationship = relationship,
+                followKnown = state is TargetState.Loaded,
+                named = true,
+                onAction = { action ->
+                    dismiss()
+                    if (action.needsConfirmation) confirming = action else perform(action)
+                },
+            )
         }
     }
 

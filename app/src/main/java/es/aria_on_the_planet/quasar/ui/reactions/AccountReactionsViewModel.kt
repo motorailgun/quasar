@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
+import es.aria_on_the_planet.quasar.ui.feed.withPostChange
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -57,6 +58,10 @@ class AccountReactionsViewModel(
 
     init {
         load(force = false)
+        // 自分の編集・削除を当てる
+        viewModelScope.launch {
+            statusRepository.postChanges.collect { change -> _state.update { it.copy(posts = it.posts.withPostChange(change)) } }
+        }
     }
 
     /** 引っ張って更新: キャッシュの期限に関わらず全部取り直す。 */

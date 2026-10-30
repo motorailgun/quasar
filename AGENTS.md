@@ -421,8 +421,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   リアクションしたユーザーの一覧 (`Route.PostReactions`)。
 * `Post` 以外の状態を持たない (stateless)。
 * **ポストのメニュー** (`PostMenu.kt`): 投稿者の行の右端、公開範囲のアイコンのすぐ右 (間の余白なし。︙ のアイコン自体の左右の
-  余白で足りる) の︙ (押せる範囲は外にはみ出させ、行の高さは変えない)。ポスト詳細も投稿者の行 (`PostDetail(menu = ...)`、
-  自分のポストなら編集・削除も)。
+  余白で足りる) の︙ (押せる範囲は外にはみ出させ、行の高さは変えない)。ポスト詳細も投稿者の行 (`PostDetail(menu = ...)`)。
+  どの画面でも中身は同じで、自分のポストなら編集・削除 (下記「Post」の「自分のポストの編集・削除」) も出る。
   * メニューは浮かぶメニューではなく**画面下からのシート** (`ActionMenu`、`ModalBottomSheet` に `DropdownMenuItem` を並べる。
     Material 3 Expressive に下から出るメニューの部品は無い)。区切り線は入れず、項目の文字は `MenuItemText` (メニュー標準の
     Medium ではなく Regular)。項目を押したらシートを下へ閉じてから確認ダイアログ等を出す。プロフィールのメニューも同じ。
@@ -679,17 +679,22 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `Navigator.openPostReactions`): トップバー「Reactions」の下に `ConnectedTabRow` (Boosts / Favourites) + `HorizontalPager`。
     中身はフォロー一覧と同じ `UserFeedList` (各タブは開いたときに読む、PTR・追加読み込みあり)。タップでプロフィール。
     画面は `PostReactionsScreen` (ViewModel を持つ) → `PostReactionsContent` (状態とコールバックだけ。ギャラリーからも使う)。
-  * **自分のポストの編集・削除**: 本体が自分のポスト (`fetchMe` の ID と投稿者が一致) なら、`PostDetail(menu = ...)` で投稿者行の
-    右端に︙ (`PostMenu(own = ...)`: 編集 / error 色の削除 + 他人のポストと同じブラウザで開く・本文をコピー)。
-    * 編集: `PostViewModel.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
-      を作る。**`DraftStore` の下書きとは別**で、ポスト画面の上に `ComposerScreen` を重ねる。中身は純粋関数 `editDraftOf`
+  * **自分のポストの編集・削除**: ポストのメニュー (`PostMenu`) は、自分のポスト (`AccountActions.myAccountId` = `fetchMe` の ID、
+    まだなら関係の読み込みの `AccountMenuTarget.Me`) なら、**どの画面 (タイムライン・プロフィール・ハッシュタグ・通知・詳細) でも**
+    編集 / error 色の削除 + ブラウザで開く・本文をコピーを出す。口は `LocalOwnPostActions` (`ui/component/post/OwnPostActions.kt`、
+    `QuasarNavHost` が `SessionOwnPostActions` を提供。無い所 = ギャラリーでは出さない)。中身はアプリ全体で 1 つの
+    `PostEditStore` (`AppContainer.postEditStore`、`ui/composer/`)。準備・削除の最中は︙が読み込み中になる。
+    * 編集: `PostEditStore.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
+      を作る。**`DraftStore` の下書きとは別**で、`QuasarNavHost` が全画面の上に `PostEditorHost` で `ComposerScreen` を下から重ねる。中身は純粋関数 `editDraftOf`
       (`PostEditTest`): 添付は投稿済みのメディアを Uploaded 扱い、投票の期間は残り時間に最も近い選択肢 (編集で数え直しになる)。
       公開範囲は変えられない (`Composer(visibilityEditable = false)`)。送信は Save (`toEditFormParams`、`DraftMappersTest`)、
-      保存できたら本体を差し替えて閉じる。× / 戻るは変更があれば破棄の確認 (`ComposerSession.hasChanges`)。
+      保存できたら閉じる。× / 戻るは変更があれば破棄の確認 (`ComposerSession.hasChanges`)。
       投稿済みのメディアは `PUT /api/v1/media/:id` で変えられないので、編集中の代替テキストは編集の送信でまとめて送る。
-    * 削除: 確認の後 `PostViewModel.delete`、成功したら画面を閉じる。他の画面の一覧からは消さない (ストリーミングの
-      `delete` が届けば消える)。
-    * 失敗はスナックバー。
+    * 削除: 確認 (`ConfirmTarget.DeletePost`、`PostMenu` が行う) の後 `PostEditStore.delete`。
+    * 結果は `StatusRepository.postChanges` (`PostChange.Edited` / `Deleted`) に流れ、各 ViewModel が一覧に当てる
+      (`PostFeed.applyChange` / `List<Post>.withPostChange`。編集は差し替え、削除はブーストごと除く。通知は中のポストの差し替えのみ)。
+      ポスト画面は本体が消えたら画面を閉じる。
+    * 失敗は Toast (`PostEditorHost`)。
 * **DetailScaffold** (`ui/component/scaffold/`): Profile と Post で共通の骨組み。戻る付き TopAppBar、
   pull-to-refresh、`revealTitleAfterIndex` 番目のアイテムが画面外に出たら `title` → `revealedTitle` に切り替え。
   補助として `DetailTitle` (名前 + 補足の 2 段)、`DetailLoading`、`DetailMessage` を持つ。

@@ -30,6 +30,7 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.EditTarget
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
+import es.aria_on_the_planet.quasar.ui.composer.PostEditStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -104,9 +105,14 @@ class AppContainer(context: Context) {
     /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
     val draftStore = DraftStore { session, scope, onPublished -> composerSession(session, scope, null, onPublished) }
 
+    /** 自分のポストの編集・削除 (どの画面のメニューからでも同じ流れ)。 */
+    val postEditStore = PostEditStore(statusRepository) { session, scope, target, onSaved ->
+        composerSession(session, scope, target, onSaved)
+    }
+
     /**
      * 投稿欄 1 つ分。[editing] が `null` なら新しい投稿 ([draftStore] が持つ)、あれば自分のポストの編集
-     * (ポスト画面が持つ)。[onPublished] は投稿・保存できたとき。
+     * ([postEditStore] が持つ)。[onPublished] は投稿・保存できたとき。
      */
     fun composerSession(
         session: Session,

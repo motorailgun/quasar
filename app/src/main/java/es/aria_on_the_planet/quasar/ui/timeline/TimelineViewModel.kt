@@ -7,6 +7,7 @@ import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
+import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
@@ -109,6 +110,17 @@ class TimelineViewModel(
         // ブロック・ミュート等をしたら、その相手のポスト・ブーストを一覧から除く
         viewModelScope.launch {
             accountRepository.relationshipChanges.collect { change -> feeds.values.forEach { it.hidePostsBy(change) } }
+        }
+        // 自分の編集・削除を当てる (通知は中のポストの差し替えだけ。削除はストリームの削除と同じく通知からは除かない)
+        viewModelScope.launch {
+            statusRepository.postChanges.collect { change ->
+                feeds.values.forEach { it.applyChange(change) }
+                if (change is PostChange.Edited) {
+                    notifications.updateItems { entry ->
+                        entry.mapGroups { g -> if (g.post?.statusId == change.post.statusId) g.copy(post = change.post) else g }
+                    }
+                }
+            }
         }
         // 通知の取得 API を切り替えたら、混ざらないよう読み直す (未読み込みなら開いたときに新しい方で読む)
         viewModelScope.launch {

@@ -36,6 +36,10 @@ class HashtagViewModel(
         viewModelScope.launch {
             accountRepository.relationshipChanges.collect(posts::hidePostsBy)
         }
+        // 自分の編集・削除を当てる
+        viewModelScope.launch {
+            statusRepository.postChanges.collect(posts::applyChange)
+        }
     }
 
     fun refresh() = posts.refresh()

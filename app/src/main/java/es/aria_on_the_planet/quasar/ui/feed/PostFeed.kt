@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.feed
 
+import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.repository.RelationshipChange
 import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.isHiddenBy
@@ -57,4 +58,7 @@ class PostFeed private constructor(
     /** [change] で見えなくなったポスト (ブロック・ミュートした相手のポスト等、[isHiddenBy]) を除く。 */
     fun hidePostsBy(change: RelationshipChange) =
         updateList { items -> removePosts(items) { it.isHiddenBy(change.accountId, change.relationship) } }
+
+    /** 自分の編集・削除を当てる (編集は差し替え、削除はブーストごと除く)。 */
+    fun applyChange(change: PostChange) = updateList { applyPostChange(it, change) }
 }

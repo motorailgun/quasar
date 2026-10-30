@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.feed
 
+import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.streaming.StreamChannel
 import es.aria_on_the_planet.quasar.data.streaming.StreamEvent
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -145,6 +146,16 @@ class TimelineItemTest {
         assertEquals("25", result[1].id)
         assertEquals("bob", result[1].boostedBy?.screenName)
         assertSame(list, replaceEditedPost(list, post(999)))
+    }
+
+    @Test
+    fun appliesOwnEditAndDeleteToPlainPostLists() {
+        val posts = listOf(post(30), boost(25, statusId = 5), post(5))
+        val edited = posts.withPostChange(PostChange.Edited(post(5, text = "edited")))
+        assertEquals(listOf("", "edited", "edited"), edited.map { it.text })
+        assertEquals("25", edited[1].id)
+        // 削除はブーストごと除く
+        assertEquals(listOf("30"), posts.withPostChange(PostChange.Deleted("5")).map { it.id })
     }
 
     // --- 最大件数 -------------------------------------------------------------------------------

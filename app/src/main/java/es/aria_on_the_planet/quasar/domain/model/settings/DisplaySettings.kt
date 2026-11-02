@@ -49,6 +49,8 @@ data class DisplaySettings(
     val fontScale: Float = 1f,
     /** ユーザーのアイコンの切り取りの形。 */
     val avatarShape: AvatarShape = AvatarShape.Circle,
+    /** タイムラインのカラムを何列並べるか。[ColumnLayout.Auto] は幅で決める (`docs/tablet-layout.md`)。 */
+    val columnLayout: ColumnLayout = ColumnLayout.Auto,
 ) {
     companion object {
         const val DefaultLongPostMaxLines = 8
@@ -66,3 +68,11 @@ data class DisplaySettings(
 
 /** ユーザーのアイコンの切り取りの形。描くときの形は `ui/component/user/AvatarShape.kt`。 */
 enum class AvatarShape { Circle, RoundedSquare }
+
+/** タイムラインのカラムの並べ方。 */
+enum class ColumnLayout {
+    /** 幅 840dp 以上 (Window size class の Expanded) で 2 カラム、それ未満は 1 カラム。 */
+    Auto,
+    Single,
+    Double,
+}

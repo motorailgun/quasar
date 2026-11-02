@@ -12,6 +12,7 @@ import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
@@ -35,8 +36,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Density
+import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -76,11 +82,7 @@ fun TimelineScreen(
     val dragging by pagerState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
     val navigator = LocalNavigator.current
-
-    // スワイプで切り替わったら選択に反映する (ボタンで選んだときは先に select 済み)
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }.collect { viewModel.select(ColumnType.entries[it]) }
-    }
+    val density = LocalDensity.current
 
     // 画面が前面にある間だけストリーミングで自動更新する
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -88,16 +90,30 @@ fun TimelineScreen(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.stream() }
     }
 
-    val error = state.current.error
+    // 同時に見せるカラムの数 (ウィンドウの幅と設定で決める。docs/tablet-layout.md)。幅は uiScale を掛けた dp
+    val windowWidth = with(density) { LocalWindowInfo.current.containerSize.width.toDp() }
+    val visibleColumns = visibleColumnCount(LocalDisplaySettings.current.columnLayout, windowWidth)
+    val columnCount = ColumnType.entries.size
+    // 見えているカラムの左端。2 カラムでは末尾のページは左端に来ない
+    fun startOf(page: Int) = page.coerceAtMost(columnCount - visibleColumns)
+
+    // スワイプで切り替わったら選択に反映する (ボタンで選んだときは先に select 済み)。1 ⇔ 2 カラムの切り替えでも追従する
+    LaunchedEffect(pagerState, visibleColumns) {
+        snapshotFlow { startOf(pagerState.settledPage) }.collect { viewModel.select(ColumnType.entries[it]) }
+    }
+
+    // 見えているカラムのどれかの取得に失敗したら (一覧が空ならその場に出るので除く) スナックバーで知らせる
+    val error = (startOf(pagerState.settledPage) until startOf(pagerState.settledPage) + visibleColumns)
+        .map { state.feedOf(ColumnType.entries[it]) }
+        .firstNotNullOfOrNull { feed -> feed.error?.takeIf { feed.items.isNotEmpty() } }
     LaunchedEffect(error) {
-        if (error != null && state.current.items.isNotEmpty()) snackbarHostState.showSnackbar(error)
+        if (error != null) snackbarHostState.showSnackbar(error)
     }
 
     // クイック投稿バー: 下に浮かべ、後ろの一覧をぼかす。ピルを引き上げると同じ画面内でフルの投稿画面に広がる
     val hazeState = rememberHazeState()
     val barState = rememberQuickPostBarState()
     var headerHeight by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
     val composer = drafts.current.collectAsStateWithLifecycle().value
     // ヘッダ左のアイコンに出すログイン中のアカウント (投稿用に取得しているものを使う)
     val account: User? = composer?.state?.collectAsStateWithLifecycle()?.value?.account
@@ -124,6 +140,10 @@ fun TimelineScreen(
         // トップバーは置かず、ヘッダ (アイコン + タブ) を一覧の上に浮かべる
         Scaffold { _ ->
             Box(Modifier.fillMaxSize()) {
+                val pageSize = remember(visibleColumns) {
+                    if (visibleColumns == 1) PageSize.Fill else ColumnsPageSize(visibleColumns)
+                }
+                val dividerColor = MaterialTheme.colorScheme.outlineVariant
                 HorizontalPager(
                     state = pagerState,
                     // 上下ともヘッダ・バーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
@@ -131,16 +151,27 @@ fun TimelineScreen(
                         .fillMaxSize()
                         .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
                     key = { ColumnType.entries[it] },
+                    // 2 カラムでは 1 ページを幅の半分にして 2 ページを同時に見せる (スワイプでは 1 カラムずつずれる)
+                    pageSize = pageSize,
                     // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
                     flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),
                 ) { page ->
                     val column = ColumnType.entries[page]
                     // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
-                    val shouldLoad = dragging || pagerState.settledPage == page
+                    val start = startOf(pagerState.settledPage)
+                    val shouldLoad = dragging || page in start until start + visibleColumns
                     LaunchedEffect(column, shouldLoad) {
                         if (shouldLoad) viewModel.ensureLoaded(column)
                     }
                     ColumnPage(
+                        modifier = if (visibleColumns > 1 && page > 0) {
+                            // 並べたカラムの間の区切り線 (左端)
+                            Modifier.drawBehind {
+                                drawLine(dividerColor, Offset.Zero, Offset(0f, size.height), strokeWidth = 1.dp.toPx())
+                            }
+                        } else {
+                            Modifier
+                        },
                         column = column,
                         state = state,
                         listState = listStates.getValue(column),
@@ -154,15 +185,17 @@ fun TimelineScreen(
                 TimelineHeader(
                     account = account,
                     pagerState = pagerState,
+                    visibleColumns = visibleColumns,
                     hazeState = hazeState,
                     onSelect = { column ->
-                        val index = column.ordinal
-                        if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                        val current = startOf(pagerState.currentPage)
+                        val start = startColumnFor(column.ordinal, current, visibleColumns, columnCount)
+                        if (start == current && !pagerState.isScrollInProgress) {
                             // 表示中のカラムのボタンをもう一度押したら先頭へ
                             scope.launch { listStates.getValue(column).scrollToTop() }
                         } else {
-                            viewModel.select(column)
-                            scope.launch { pagerState.animateScrollToPage(index, animationSpec = pageSpring) }
+                            viewModel.select(ColumnType.entries[start])
+                            scope.launch { pagerState.animateScrollToPage(start, animationSpec = pageSpring) }
                         }
                     },
                     onOpenProfile = navigator::openProfile,
@@ -180,6 +213,7 @@ fun TimelineScreen(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ColumnPage(
+    modifier: Modifier,
     column: ColumnType,
     state: TimelineScreenState,
     listState: LazyListState,
@@ -196,7 +230,7 @@ private fun ColumnPage(
         isRefreshing = isRefreshing,
         onRefresh = { viewModel.refresh(column) },
         state = pullState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         indicator = {
             PullToRefreshDefaults.LoadingIndicator(
                 state = pullState,
@@ -252,6 +286,12 @@ private fun ColumnPage(
             )
         }
     }
+}
+
+/** 表示幅を [columns] 等分したページ幅。 */
+private class ColumnsPageSize(private val columns: Int) : PageSize {
+    override fun Density.calculateMainAxisPageSize(availableSpace: Int, pageSpacing: Int): Int =
+        (availableSpace - pageSpacing * (columns - 1)) / columns
 }
 
 @Composable

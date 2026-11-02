@@ -797,6 +797,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 読み込み: 指で引き出し始めたカラム / 落ち着いたカラムだけ `ensureLoaded`。ボタンで遠くへ飛ぶ時に通過するカラムは読まない。
     選択 (`viewModel.select`) はボタン押下時と `settledPage` の変化時。
   * ドラッグにゴムの抵抗を付けた版は `timeline-swipe-rubber-band` ブランチにある (60fps 出ていないように見えたので保留)。
+  * **タブレット表示** (計画・範囲外のものは [docs/tablet-layout.md](docs/tablet-layout.md)): ウィンドウの幅が 840dp 以上
+    (Expanded) ならカラムを 2 つ並べる (設定 `DisplaySettings.columnLayout` で 1 / 2 カラムに固定できる)。ページャのページ幅を
+    半分にするだけで、`currentPage` は左端のカラム。タブは見えている 2 つを 1 つのまとまりとして塗り、見えていないカラムを
+    押すとずらす量が最小の組へ。計算は純粋関数 (`ColumnWindow.kt`、`ColumnWindowTest`)。クイック投稿バーは幅 640dp まで。
   pull-to-refresh と追加読み込みに対応。読み込み中は `LoadingIndicator` を使う。
 
 ## 投稿 (`ui/composer/`, `ui/component/composer/`)
@@ -1104,6 +1108,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `surfaceBlur` (一覧の上に浮かぶ UI の背景をぼかすか。既定オン) / `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) /
   `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`menuBlur` (︙のメニューのシートの背景をぼかすか。既定オン。
   半径・濃さは上と共通で、設定画面のスライダーはどちらかがオンなら動かせる)、`emojiAvatarAnimationMaxFps`、
+  `columnLayout` (タイムラインのカラムの並べ方: `Auto` (既定。幅 840dp 以上で 2 カラム) / `Single` / `Double`)、
   `avatarShape` (ユーザーのアイコンの切り取り: `AvatarShape.Circle` (既定) / `RoundedSquare` (角の半径は一辺の 20%))。
   アイコンの形は**必ず `avatarShape()` (`ui/component/user/AvatarShape.kt`) から取る** (`UserIcon` / `ComposerAccountIcon` の既定の
   `shape`)。例外としてクイック投稿バーとタイムラインのヘッダ (左上のメニュー) のアイコンは設定に関わらず円 (`shape = CircleShape`)。背景色で縁取る枠は `avatarShape(ring = 縁の幅)` で角をアイコンと同心にする。

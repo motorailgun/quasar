@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
+import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
@@ -37,6 +38,7 @@ class SettingsPreferencesTest {
             uiScale = 1.25f,
             fontScale = 0.9f,
             avatarShape = AvatarShape.RoundedSquare,
+            columnLayout = ColumnLayout.Double,
         ),
         notificationApi = NotificationApi.Ungrouped,
         streaming = StreamingSettings(home = false, notifications = false, local = false, global = true),

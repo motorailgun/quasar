@@ -12,6 +12,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
+import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
@@ -100,8 +101,9 @@ fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: (
 private val LongPostMaxLinesChoices = listOf(null, 4, 6, 8, 12, 16)
 private val MaxFpsChoices = listOf(15, 30, 60, null)
 private val AvatarShapeChoices = AvatarShape.entries
+private val ColumnLayoutChoices = ColumnLayout.entries
 
-/** 表示: UI・文字の倍率・長文の折りたたみ・アイコンの形・ぼかし・アニメーション。 */
+/** 表示: UI・文字の倍率・カラムの並べ方・長文の折りたたみ・アイコンの形・ぼかし・アニメーション。 */
 @Composable
 fun DisplaySettingsPage(
     display: DisplaySettings,
@@ -121,6 +123,23 @@ fun DisplaySettingsPage(
                 title = stringResource(R.string.settings_font_scale),
                 value = display.fontScale,
                 onValueChange = { value -> updateDisplay { copy(fontScale = value) } },
+            )
+        }
+        SettingsGroup(title = stringResource(R.string.settings_layout)) {
+            SettingsChoiceItem(
+                title = stringResource(R.string.settings_column_layout),
+                options = ColumnLayoutChoices,
+                selected = display.columnLayout,
+                label = { layout ->
+                    stringResource(
+                        when (layout) {
+                            ColumnLayout.Auto -> R.string.settings_column_layout_auto
+                            ColumnLayout.Single -> R.string.settings_column_layout_single
+                            ColumnLayout.Double -> R.string.settings_column_layout_double
+                        },
+                    )
+                },
+                onSelect = { updateDisplay { copy(columnLayout = it) } },
             )
         }
         SettingsGroup(title = stringResource(R.string.settings_posts)) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -82,6 +83,8 @@ fun QuickComposerHost(
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
+                // 幅の広い画面 (タブレット) では全幅に伸ばさず中央に置く
+                .widthIn(max = BarMaxWidth)
                 .fillMaxWidth()
                 // キーボードが出ているときはその上に乗せる
                 .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
@@ -124,3 +127,4 @@ fun QuickComposerHost(
 }
 
 private val BarMargin = 12.dp
+private val BarMaxWidth = 640.dp

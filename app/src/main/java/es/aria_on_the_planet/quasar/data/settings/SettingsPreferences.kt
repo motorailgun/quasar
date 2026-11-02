@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
+import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
@@ -141,6 +142,13 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         { s, v -> s.copy(display = s.display.copy(avatarShape = v)) },
         encode = { it.name },
         decode = { stored -> enumOrNull<AvatarShape>(stored)?.let(::Decoded) },
+    ),
+    SettingField(
+        stringPreferencesKey("column_layout"),
+        { it.display.columnLayout },
+        { s, v -> s.copy(display = s.display.copy(columnLayout = v)) },
+        encode = { it.name },
+        decode = { stored -> enumOrNull<ColumnLayout>(stored)?.let(::Decoded) },
     ),
     SettingField(
         stringPreferencesKey("notification_api"),

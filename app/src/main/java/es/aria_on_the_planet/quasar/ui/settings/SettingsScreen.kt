@@ -158,6 +158,12 @@ fun DisplaySettingsPage(
                 checked = display.surfaceBlur,
                 onCheckedChange = { checked -> updateDisplay { copy(surfaceBlur = checked) } },
             )
+            SettingsSwitchItem(
+                title = stringResource(R.string.settings_menu_blur),
+                summary = stringResource(R.string.settings_menu_blur_summary),
+                checked = display.menuBlur,
+                onCheckedChange = { checked -> updateDisplay { copy(menuBlur = checked) } },
+            )
             SettingsSliderItem(
                 title = stringResource(R.string.settings_blur_radius),
                 value = display.surfaceBlurRadiusDp,
@@ -165,7 +171,8 @@ fun DisplaySettingsPage(
                 steps = DisplaySettings.MaxSurfaceBlurRadiusDp.toInt() - 1,
                 valueLabel = { stringResource(R.string.settings_blur_radius_value, it.roundToInt()) },
                 onValueChange = { value -> updateDisplay { copy(surfaceBlurRadiusDp = value.roundToInt().toFloat()) } },
-                enabled = display.surfaceBlur,
+                // 半径・色味はバーとメニューで共通
+                enabled = display.surfaceBlur || display.menuBlur,
             )
             SettingsSliderItem(
                 title = stringResource(R.string.settings_blur_tint),
@@ -175,7 +182,8 @@ fun DisplaySettingsPage(
                 steps = 19,
                 valueLabel = { stringResource(R.string.settings_percent, (it * 100).roundToInt()) },
                 onValueChange = { value -> updateDisplay { copy(surfaceBlurTintAlpha = (value * 20).roundToInt() / 20f) } },
-                enabled = display.surfaceBlur,
+                // 半径・色味はバーとメニューで共通
+                enabled = display.surfaceBlur || display.menuBlur,
             )
         }
         SettingsGroup(title = stringResource(R.string.settings_animation)) {

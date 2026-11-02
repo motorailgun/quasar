@@ -187,7 +187,7 @@ fun PostScreen(
                                     },
                                     callbacks = callbacks,
                                     // ボタンの余白の分だけ右へ出し、︙を本文の右端に揃える
-                                    menu = { PostMenu(thread.post, modifier = Modifier.offset(x = 12.dp)) },
+                                    menu = { PostMenu(thread.post, modifier = Modifier.offset(x = 12.dp), preview = false) },
                                     reactionDetail = true,
                                     onReactionCountClick = onReactionCountClick,
                                 )

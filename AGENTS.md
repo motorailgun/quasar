@@ -9,7 +9,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | --- | --- |
 | UI | Jetpack Compose, `androidx.compose.material3` 1.5.x (Expressive API: `MaterialExpressiveTheme`, `LoadingIndicator` 等) |
 | アイコン | Material Symbols (Rounded・weight 300) を `scripts/icons/generate.py` で ImageVector にしたもの (`ui/component/icon/Symbols.kt`)。material-icons-extended は使わない |
-| ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ) |
+| ぼかし | Haze (`dev.chrisbanes.haze:haze-blur`。クイック投稿バー・タイムラインのヘッダ・︙のメニューのシート) |
 | 状態管理 | `androidx.lifecycle` ViewModel + `StateFlow` |
 | 設定 | Preferences DataStore (`androidx.datastore:datastore-preferences`) |
 | キャッシュ | Room 2.8 (KSP。API の結果の JSON を持つ。`data/cache/`) |
@@ -74,6 +74,7 @@ es.aria_on_the_planet.quasar
     │   ├── dialog/ActionConfirmation.kt 設定に従う操作前の確認 (ActionConfirmationHost / LocalActionConfirmer)
     │   ├── settings/               AOSP 風の設定の部品 (SettingsScaffold / SettingsGroup / Switch・Choice・Slider 等の項目)
     │   ├── blur/SurfaceBlur.kt     浮かぶ UI の背景のぼかし (rememberSurfaceBlurStyle。半径・濃さは DisplaySettings)
+    │   │                           + BackdropBlur.kt (画面全体を元にしたぼかし。︙のメニューのシート用)
     │   ├── player/                 再生部品 (PlaybackController / MediaPlayer / InlineControls / FullControls / LocalInlinePlayback)
     │   ├── image/                  RemoteImage / LocalImage (画像表示の唯一の入口) + ImageKind / BlurHash デコーダ + プレースホルダ Painter
     │   │   └── loader/             Coil の ImageLoader とデコーダ (AnimationGate / APNG のデコーダ・再生・時刻計算・ヘッダの判定)
@@ -432,12 +433,17 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     Material 3 Expressive に下から出るメニューの部品は無い)。区切り線は入れず、項目の文字は `MenuItemText` (メニュー標準の
     Medium ではなく Regular)。項目を押したらシートを下へ閉じてから確認ダイアログ等を出す。プロフィールのメニューも同じ。
     シートの中身は全体を縦にスクロールできる (横画面等で画面の高さを超えても全項目に届く)。
+    背景は設定 (`menuBlur`) に従って後ろの画面をぼかす (下記「設定」のぼかし)。シートの面は透明にし、持ち手 (`DragHandle` を自分で
+    置き、タップで閉じる)・インセット (`modalWindowInsets`) も含めて中身の側で背景を描く。シートの `modifier` はシートの位置の
+    ずれ (ドラッグ・開閉) より外側に付くので、そこにぼかしを付けると画面の上端に描かれる。開くときに弾むとシートの面だけが縦に
+    伸びるので、背景は下へ 64dp はみ出させて描いている (`extendDownward`)。
   * **項目の上に対象のポスト** (`PostMenuPreview`、`ActionMenu(header = ...)`): 下からのシートだとどのポストへの操作か分かり
     づらいため。`PostCard(mode = Preview)` を文字・アイコンはタイムラインと同じ大きさ、メディアだけ 96dp で出す。面の背景は
     敷かず、左右の余白は項目 (`DropdownMenuItem`) の中の余白と同じ 12dp にしてアイコンの左端を項目と揃える。押せない: 上に
     `pointerInput` だけの覆いを重ね (リンク・メディア・CW / 長文の開閉が効かない。シートのドラッグは親が受ける)、
     `LocalInlinePlayback` を `null` にしてその場の再生も止める。ブーストは中身のポスト (操作の対象が `post.author` なので)。
-    プロフィールのメニューには出さない (画面そのものが対象)。
+    プロフィールのメニュー・ポスト詳細の主役のポストのメニュー (`PostMenu(preview = false)`) には出さない (画面そのものが対象)。
+    ポスト詳細でも祖先・リプライ (`PostCard`) のメニューには出す。
   * 中身は上から「ブラウザで開く」(接続中サーバの `/@acct/:statusId`)、リモートのポストなら「<ホスト>で開く」(`Status.url`、
     無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
     出す)、他人のポストなら「ミュート」・「ブロック」/「ブロックを解除」(どちらも error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
@@ -1096,7 +1102,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
   `surfaceBlur` (一覧の上に浮かぶ UI の背景をぼかすか。既定オン) / `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) /
-  `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`emojiAvatarAnimationMaxFps`、
+  `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`menuBlur` (︙のメニューのシートの背景をぼかすか。既定オン。
+  半径・濃さは上と共通で、設定画面のスライダーはどちらかがオンなら動かせる)、`emojiAvatarAnimationMaxFps`、
   `avatarShape` (ユーザーのアイコンの切り取り: `AvatarShape.Circle` (既定) / `RoundedSquare` (角の半径は一辺の 20%))。
   アイコンの形は**必ず `avatarShape()` (`ui/component/user/AvatarShape.kt`) から取る** (`UserIcon` / `ComposerAccountIcon` の既定の
   `shape`)。例外としてクイック投稿バーとタイムラインのヘッダ (左上のメニュー) のアイコンは設定に関わらず円 (`shape = CircleShape`)。背景色で縁取る枠は `avatarShape(ring = 縁の幅)` で角をアイコンと同心にする。
@@ -1129,6 +1136,15 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     とき (`ACTION_POWER_SAVE_MODE_CHANGED` で追従)。ぼかさないときは色味を下地に重ねた不透明な色で塗り、元の一覧のレイヤも作らない。
   * 負荷 (エミュレータ、タイムラインのスクロール中): ぼかし 2 枚 (ヘッダ・バー) で RenderThread が 1 フレームあたり約 4〜5ms 増える。
     ノイズ 0・`HazePerformanceMode.Performance` (入力の縮小) ではほぼ変わらなかった (エミュレータでは)。
+  * **︙のメニューのシート** (`ActionMenu`) は別のウィンドウ (`ModalBottomSheet` のダイアログ) なので、元は画面全体:
+    `QuasarAppContent` が中身全体を `BackdropBlurHost` で包み (元 = `surfaceBlurSource`)、シートは `LocalBackdropBlur` の
+    `HazeState` で `surfaceBlur` を描く (`rememberSurfaceBlurStyle(enabled = ...)`)。Haze は元と効果が別のウィンドウなら画面の座標で
+    合わせる (`HazePositionStrategy.Auto`)。ぼかすかは設定 `menuBlur` かつバッテリーセーバー中でないとき (`null` なら不透明な面)。
+    * **元は常に付けておく**。Haze 2.0.1 の `hazeSource` は、効果より後から付くと使われていることに気づかず、中身をレイヤに
+      描かない (何も映らず透明になる)。メニューを開いている間だけ付ける形にしたらこれで映らなかった。使う効果が無い間の元は
+      レイヤを作らずそのまま描く (`hasCaptureDemand`) ので、常に付けていても負荷はほぼ無い。
+    * 元の中に別の元 (タイムラインのページャ・プロフィールのタブ) があっても、そのまま映る (ギャラリーで確認)。
+    * ギャラリーでは `--ez menu_blur false` / `--ez surface_blur false` で切り替えられる。
   ぼかした面に縁を付けるときは `surfaceBlurBorder()` (outlineVariant 0.5 の 1dp) を使う。
   閲覧注意メディアの `Modifier.blur` は隠すためのものなので対象外。
 
@@ -1200,7 +1216,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   Android 16 の実機では、同じ Activity への intent が「届けた」扱いのまま `onNewIntent` が呼ばれなかった):
   ```
   adb shell am start --activity-clear-task -n es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.debug.DebugGalleryActivity \
-      --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60] [--ef ui_scale 1.2]
+      --es scenario animated-emoji [--ez animate_images false] [--ez animate_avatars false] [--ei max_fps 60] [--ef ui_scale 1.2] [--ez menu_blur false]
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
@@ -1290,6 +1306,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   起動 (起動し終わるまで待って返る) → `installDebug` (`ANDROID_SERIAL=emulator-5554` で端末を絞る)。
   エミュレーターは未ログインのことが多い (ログイン画面以外は開けない)。まずギャラリーにシナリオを足して確かめ、それでも足りない
   (実際の API・遷移を通したい) ときはその旨をユーザーに伝える。メモリに余裕が無いときは下記の実機を使う。
+* **見た目・動作を確かめるだけの簡単な UI の確認は、エミュレーターが既に立ち上がっていればそちらを使う** (実機がつながっていても)。
+  実機はユーザーが手元で使っていることがあり、座標のタップ・キー入力が別のアプリに入ってしまう (Claude のアプリにタップと「戻る」が
+  入ったことがある)。実機で操作するときは、送る前に `dumpsys activity activities | grep ResumedActivity` で Quasar が前面かを確かめる。
 * 実機はワイヤレス adb で、シリアルが `adb-...-w20nYF (2)._adb-tls-connect._tcp` のように変わることがある。
   `adb devices` の先頭の device を使う。切断・ロック・スリープは頻繁に起きる → 実機が寝ていて (`dumpsys power` の
   `mWakefulness=Asleep`) エミュレータが起きているなら、エミュレータで動作確認する。どちらも使えなければユーザーに解除を頼む。

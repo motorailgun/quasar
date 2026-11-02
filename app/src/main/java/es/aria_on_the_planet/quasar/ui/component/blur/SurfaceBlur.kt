@@ -31,18 +31,15 @@ import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 import es.aria_on_the_planet.quasar.ui.settings.surfaceBlurRadius
 
 /**
- * 浮かぶ UI の背景をぼかすか。`QuasarAppContent` が [rememberSurfaceBlurEnabled] の値を提供する。
+ * 浮かぶ UI の背景をぼかすか。`QuasarAppContent` が、設定 (`DisplaySettings.surfaceBlur`) がオンで
+ * バッテリーセーバー中 ([rememberPowerSaveMode]) でないときに `true` を提供する。
  * 切り替わるのは設定の変更・バッテリーセーバーの出入りだけなので static。
  */
 val LocalSurfaceBlurEnabled = staticCompositionLocalOf { true }
 
-/** 設定 (`DisplaySettings.surfaceBlur`) がオンで、バッテリーセーバー中でないときだけぼかす。 */
+/** バッテリーセーバー中か。切り替わったら追従する。中はどのぼかしも設定に関わらず止める。 */
 @Composable
-fun rememberSurfaceBlurEnabled(): Boolean = LocalDisplaySettings.current.surfaceBlur && !rememberPowerSaveMode()
-
-/** バッテリーセーバー中か。切り替わったら追従する。 */
-@Composable
-private fun rememberPowerSaveMode(): Boolean {
+fun rememberPowerSaveMode(): Boolean {
     val context = LocalContext.current
     val powerManager = remember(context) { context.getSystemService(PowerManager::class.java) }
     var powerSave by remember { mutableStateOf(powerManager.isPowerSaveMode) }
@@ -80,11 +77,14 @@ class SurfaceBlurStyle internal constructor(val haze: HazeBlurStyle?, val solidC
  * 下地が無いとぼかした結果が透けて後ろの実物がくっきり見えてしまう。
  *
  * @param tintColor 重ねる色味 (不透明度は設定値で上書きする)。部品ごとに面の役割に合わせて選ぶ。
+ * @param enabled ぼかすか。既定は [LocalSurfaceBlurEnabled] (メニューは別の設定なので [LocalBackdropBlur] の有無で渡す)。
  */
 @Composable
-fun rememberSurfaceBlurStyle(tintColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh): SurfaceBlurStyle {
+fun rememberSurfaceBlurStyle(
+    tintColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    enabled: Boolean = LocalSurfaceBlurEnabled.current,
+): SurfaceBlurStyle {
     val settings = LocalDisplaySettings.current
-    val enabled = LocalSurfaceBlurEnabled.current
     val radius = settings.surfaceBlurRadius
     val background = MaterialTheme.colorScheme.surface
     val tint = tintColor.copy(alpha = settings.surfaceBlurTintAlpha)

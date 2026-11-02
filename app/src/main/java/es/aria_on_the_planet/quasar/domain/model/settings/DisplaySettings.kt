@@ -8,11 +8,17 @@ data class DisplaySettings(
     val longPostMaxLines: Int? = DefaultLongPostMaxLines,
     /**
      * 一覧の上に浮かぶ UI (タイムラインのヘッダ・クイック投稿バー・プロフィールのタブ) の背景をぼかすか。オフなら不透明な面。
-     * バッテリーセーバー中は設定に関わらずぼかさない (`rememberSurfaceBlurEnabled`)。ぼかしは描画の負荷が大きい。
+     * バッテリーセーバー中は設定に関わらずぼかさない (`rememberPowerSaveMode`)。ぼかしは描画の負荷が大きい。
      */
     val surfaceBlur: Boolean = true,
     /**
-     * 同じぼかしの半径 (dp)。
+     * ポスト・プロフィールの︙のメニュー (下からのシート) の背景をぼかすか。半径・色味は [surfaceBlurRadiusDp] /
+     * [surfaceBlurTintAlpha] と同じで、バッテリーセーバー中は設定に関わらずぼかさない。ぼかしの元は画面全体
+     * (`BackdropBlurHost`)。
+     */
+    val menuBlur: Boolean = true,
+    /**
+     * 同じぼかし (メニューのぼかしも) の半径 (dp)。
      * `rememberSurfaceBlurStyle` が使う。閲覧注意メディアのぼかしは別 (隠すためのものなので対象外)。
      */
     val surfaceBlurRadiusDp: Float = DefaultSurfaceBlurRadiusDp,

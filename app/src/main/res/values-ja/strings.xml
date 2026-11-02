@@ -333,6 +333,8 @@
     <string name="settings_blur">ぼかし</string>
     <string name="settings_blur_enabled">フローティングバーの背景をぼかす</string>
     <string name="settings_blur_enabled_summary">バッテリーセーバー中は常にオフ</string>
+    <string name="settings_menu_blur">メニューの背景をぼかす</string>
+    <string name="settings_menu_blur_summary">︙のメニュー。バッテリーセーバー中は常にオフ</string>
     <string name="settings_blur_radius">ぼかしの強さ</string>
     <string name="settings_blur_tint">色味</string>
     <string name="settings_animation">アニメーション</string>

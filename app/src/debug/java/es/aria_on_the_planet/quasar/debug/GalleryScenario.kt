@@ -49,6 +49,10 @@ internal object GalleryExtras {
     const val AnimateOtherEmojis = "animate_other_emojis"
     const val AnimateAvatars = "animate_avatars"
 
+    /** 浮かぶバー・︙のメニューの背景のぼかし (`--ez surface_blur false` / `--ez menu_blur false`)。 */
+    const val SurfaceBlur = "surface_blur"
+    const val MenuBlur = "menu_blur"
+
     /** 絵文字・アイコンのアニメーションの上限 (fps)。0 以下なら上限なし。 */
     const val MaxFps = "max_fps"
 
@@ -74,6 +78,8 @@ internal fun DisplaySettings.overriddenBy(extras: Bundle?): DisplaySettings {
         animatePostEmojis = flag(GalleryExtras.AnimatePostEmojis, animatePostEmojis),
         animateOtherEmojis = flag(GalleryExtras.AnimateOtherEmojis, animateOtherEmojis),
         animateAvatars = flag(GalleryExtras.AnimateAvatars, animateAvatars),
+        surfaceBlur = flag(GalleryExtras.SurfaceBlur, surfaceBlur),
+        menuBlur = flag(GalleryExtras.MenuBlur, menuBlur),
         emojiAvatarAnimationMaxFps = if (extras.containsKey(GalleryExtras.MaxFps)) {
             extras.getInt(GalleryExtras.MaxFps).takeIf { it > 0 }
         } else {

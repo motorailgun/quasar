@@ -70,6 +70,7 @@ private sealed interface TargetState {
  *
  * @param compact 投稿者の行 (公開範囲の右) に置く小さいボタン。`false` なら [IconButton] (ポスト詳細の投稿者の行)。
  *   編集の準備・削除の最中は、どちらもボタンの代わりに読み込み中を出し、押せない。
+ * @param preview 項目の上に対象のポスト ([PostMenuPreview]) を出すか。ポスト詳細の主役のポストは画面そのものが対象なので `false`。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -77,6 +78,7 @@ fun PostMenu(
     post: Post,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    preview: Boolean = true,
 ) {
     val actions = LocalAccountActions.current ?: return
     val ownActions = LocalOwnPostActions.current
@@ -156,7 +158,7 @@ fun PostMenu(
         ActionMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            header = { PostMenuPreview(post) },
+            header = if (preview) ({ PostMenuPreview(post) }) else null,
         ) {
             val dismiss = { expanded = false }
             // 自分のポストか: 関係を読み込んだ結果、まだなら覚えている自分の ID で決める

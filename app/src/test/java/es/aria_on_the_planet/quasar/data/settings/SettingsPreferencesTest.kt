@@ -26,6 +26,7 @@ class SettingsPreferencesTest {
         display = DisplaySettings(
             longPostMaxLines = null,
             surfaceBlur = false,
+            menuBlur = false,
             surfaceBlurRadiusDp = 10f,
             surfaceBlurTintAlpha = 0.5f,
             animateImages = false,

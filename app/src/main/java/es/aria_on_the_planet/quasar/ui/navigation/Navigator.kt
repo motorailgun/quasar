@@ -27,8 +27,8 @@ interface Navigator {
     /** [post] (ブーストなら中身) をブースト / お気に入りにしたユーザーの一覧。 */
     fun openPostReactions(post: Post, tab: PostReactionsTab)
 
-    /** 投稿画面 (下書きは共有)。 */
-    fun openComposer()
+    /** 投稿画面 (下書きは共有)。[panelDraft] なら詳細のパネルの下書きを書く。 */
+    fun openComposer(panelDraft: Boolean = false)
 
     /** 添付メディアのタップ。unknown は元のファイルをブラウザで開き、それ以外はメディアビューア。 */
     fun openMedia(click: MediaClick)

@@ -188,7 +188,7 @@ private class GalleryNavigator(
     override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
     override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) = Unit
     override fun openPostReactions(post: Post, tab: PostReactionsTab) = Unit
-    override fun openComposer() = Unit
+    override fun openComposer(panelDraft: Boolean) = Unit
     override fun openSettings() = Unit
     override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
     override fun openMediaViewer(args: MediaViewerArgs) {

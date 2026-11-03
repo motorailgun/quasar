@@ -49,10 +49,6 @@ class ComposerState(
     var inReplyTo by mutableStateOf<Post?>(null)
         private set
 
-    /** 返信先を自動で付けたか (ポスト画面を開いたとき)。返信ボタンで付けたものは `false`。 */
-    var autoReply by mutableStateOf(false)
-        private set
-
     /** 返信のために自動で変えた内容 (宛先・公開範囲・CW)。返信の付け替え・取り消しで戻すのに使う。 */
     private var replyMemory by mutableStateOf<ReplyMemory?>(null)
 
@@ -61,44 +57,20 @@ class ComposerState(
      * ユーザーが書いた本文・選んだ値は変えない (詳細は [es.aria_on_the_planet.quasar.domain.model.startReply])。
      *
      * @param myAcct ログイン中のアカウントの acct (宛先から除く)。取得前は `null`。
-     * @param auto ポスト画面を開いたときの自動の返信か。
      */
-    fun startReply(target: Post, myAcct: String?, auto: Boolean = false) {
+    fun startReply(target: Post, myAcct: String?) {
         val (fields, memory) = startReplyFields(replyFields(), replyMemory, target, myAcct)
         applyReplyFields(fields)
         replyMemory = memory
         inReplyTo = target
-        autoReply = auto
     }
-
-    /**
-     * ユーザーが ✕ で自動の返信を外したポストの statusId。同じポストには自動で付け直さない
-     * (下書きが続く間。投稿・破棄で新しい下書きになると忘れる)。
-     */
-    var dismissedAutoReplyId by mutableStateOf<String?>(null)
-        private set
 
     /** 返信をやめる (✕)。自動で変えた内容のうち、ユーザーが変えていないものを返信前に戻す。 */
     fun cancelReply() {
-        if (autoReply) dismissedAutoReplyId = inReplyTo?.statusId
-        resetReply()
-    }
-
-    /** [target] への返信を自動で付けてよいか: 返信ボタンで付けた返信先が無く、何も書いておらず、✕ で外されていない。 */
-    fun canAutoReply(target: Post): Boolean =
-        (inReplyTo == null || autoReply) && isUntouched() && dismissedAutoReplyId != target.statusId
-
-    /** 自動で付けた返信を、何も書いていなければ外す (ポスト画面を離れるとき)。✕ とは違い外したことは覚えない。 */
-    fun releaseAutoReply() {
-        if (autoReply && isUntouched()) resetReply()
-    }
-
-    private fun resetReply() {
         val memory = replyMemory ?: return
         applyReplyFields(cancelReplyFields(replyFields(), memory))
         replyMemory = null
         inReplyTo = null
-        autoReply = false
     }
 
     /** 何も書いていないか (自動で入れた宛先・CW だけか)。スナップショットから読む。 */
@@ -150,7 +122,6 @@ class ComposerState(
         attachments = emptyList()
         replyMemory = null
         inReplyTo = null
-        autoReply = false
     }
 
     /** [draft] の内容を入れる (ポストの編集の最初)。返信先は持たない ([PostDraft.inReplyToId] は使わない)。 */

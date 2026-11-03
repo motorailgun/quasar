@@ -42,6 +42,7 @@ import es.aria_on_the_planet.quasar.ui.timeline.visibleColumnCount
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.LocalOwnPostActions
 import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
+import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.PostEditorHost
 import es.aria_on_the_planet.quasar.ui.follows.FollowListScreen
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
@@ -101,7 +102,10 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
         if (wrongRoot) backStack.resetTo(if (loggedIn) Route.Timeline else Route.Login)
     }
     LaunchedEffect(current) {
-        if (current != null) container.draftStore.open(current)
+        if (current != null) {
+            container.draftStore.open(current)
+            container.panelDraftStore.open(current)
+        }
     }
 
     val context = LocalContext.current
@@ -178,7 +182,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
                             OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
                         }
                     }
-                    entry<Route.Composer> { ComposerEntry(container, navigator) }
+                    entry<Route.Composer> { key -> ComposerEntry(container, key, navigator) }
                     mediaViewerEntry(container, onBack = navigator::back)
                     settingsEntries(container, navigator) { backStack.add(it) }
                 },
@@ -243,8 +247,8 @@ private class BackStackNavigator(
         backStack.add(Route.PostReactions(post.statusId, tab))
     }
 
-    override fun openComposer() {
-        backStack.add(Route.Composer)
+    override fun openComposer(panelDraft: Boolean) {
+        backStack.add(Route.Composer(panelDraft))
     }
 
     override fun openMedia(click: MediaClick) {
@@ -290,10 +294,20 @@ private fun TimelineEntry(container: AppContainer, session: Session) {
     )
 }
 
-/** クイック投稿バーの無い画面からの返信: 下書き (共有) の返信先にして投稿画面で書く。 */
-private fun replyInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit = { post ->
-    container.draftStore.open(session).startReply(post)
-    navigator.openComposer()
+/** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアプリ全体のもの。 */
+@Composable
+private fun draftsHere(container: AppContainer): DraftStore =
+    if (LocalInDetailPanel.current) container.panelDraftStore else container.draftStore
+
+/** クイック投稿バーの無い画面からの返信: 下書き (この画面のもの) の返信先にして投稿画面で書く。 */
+@Composable
+private fun replyInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit {
+    val inPanel = LocalInDetailPanel.current
+    val drafts = draftsHere(container)
+    return { post ->
+        drafts.open(session).startReply(post)
+        navigator.openComposer(panelDraft = inPanel)
+    }
 }
 
 @Composable
@@ -424,7 +438,7 @@ private fun PostEntry(container: AppContainer, session: Session, key: Route.Post
     )
     PostScreen(
         viewModel = viewModel,
-        drafts = container.draftStore,
+        drafts = draftsHere(container),
         onBack = navigator::back,
         onUserClick = navigator::openProfile,
         onPostClick = { post -> if (post.statusId != key.statusId) navigator.openPost(post) },
@@ -471,17 +485,18 @@ private fun OpenLinkEntry(
 
 /** 投稿画面 (単独)。投稿できたら閉じる。閉じても下書きは残す。 */
 @Composable
-private fun ComposerEntry(container: AppContainer, navigator: Navigator) {
-    val draft by container.draftStore.current.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        container.draftStore.published.collect { navigator.back() }
+private fun ComposerEntry(container: AppContainer, key: Route.Composer, navigator: Navigator) {
+    val drafts = if (key.panelDraft) container.panelDraftStore else container.draftStore
+    val draft by drafts.current.collectAsStateWithLifecycle()
+    LaunchedEffect(drafts) {
+        drafts.published.collect { navigator.back() }
     }
     draft?.let {
         ComposerScreen(
             session = it,
             onClose = navigator::back,
             onFinish = {
-                container.draftStore.finish()
+                drafts.finish()
                 navigator.back()
             },
             keepDraftOnClose = true,

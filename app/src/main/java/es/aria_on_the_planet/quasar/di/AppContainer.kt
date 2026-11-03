@@ -105,6 +105,9 @@ class AppContainer(context: Context) {
     /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
     val draftStore = DraftStore { session, scope, onPublished -> composerSession(session, scope, null, onPublished) }
 
+    /** 詳細のパネル (タブレット表示) の中の書きかけの投稿。[draftStore] とは別で、パネルの中の画面だけで共有する。 */
+    val panelDraftStore = DraftStore { session, scope, onPublished -> composerSession(session, scope, null, onPublished) }
+
     /** 自分のポストの編集・削除 (どの画面のメニューからでも同じ流れ)。 */
     val postEditStore = PostEditStore(statusRepository) { session, scope, target, onSaved ->
         composerSession(session, scope, target, onSaved)

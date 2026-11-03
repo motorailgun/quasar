@@ -222,28 +222,13 @@ class ComposerSession(
         }
     }
 
-    /**
-     * [target] への返信にする (返信中なら返信先を付け替える)。本文・添付は残す。
-     *
-     * @param auto ポスト画面を開いたときの自動の返信か ([ComposerState.autoReply])。
-     */
-    fun startReply(target: Post, auto: Boolean = false) {
-        composer.startReply(target, myAcct = _state.value.account?.screenName, auto = auto)
+    /** [target] への返信にする (返信中なら返信先を付け替える)。本文・添付は残す。 */
+    fun startReply(target: Post) {
+        composer.startReply(target, myAcct = _state.value.account?.screenName)
     }
 
     /** 返信をやめる (✕)。 */
     fun cancelReply() = composer.cancelReply()
-
-    /**
-     * ポスト画面を開いたとき: 何も書いていなければ [target] (主役のポスト) への返信にする (X と同じ)。
-     * 書きかけ・返信ボタンで付けた返信先があれば何もしない。離れるときは [releaseAutoReply]。
-     */
-    fun startAutoReply(target: Post) {
-        if (composer.canAutoReply(target)) startReply(target, auto = true)
-    }
-
-    /** ポスト画面を離れるとき: 自動で付けた返信を、何も書いていなければ外す。 */
-    fun releaseAutoReply() = composer.releaseAutoReply()
 
     /** Photo Picker で選ばれたメディアを添付し、アップロードを始める。既に添付しているものは無視する。 */
     fun addMedia(uris: List<Uri>) {

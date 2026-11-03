@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -273,6 +274,9 @@ private fun <T : Any> DetailPanel(entries: List<NavEntry<T>>, state: DetailPanel
     }
 }
 
+/** 詳細のパネルの中の画面か。パネルの中のクイック投稿バー・返信はパネルの下書き (`AppContainer.panelDraftStore`) を使う。 */
+val LocalInDetailPanel = compositionLocalOf { false }
+
 @Composable
 private fun <T : Any> PanelEntry(
     entry: NavEntry<T>,
@@ -281,7 +285,9 @@ private fun <T : Any> PanelEntry(
 ) {
     key(entry.contentKey) {
         Box(Modifier.fillMaxSize().graphicsLayer(layer)) {
-            CompositionLocalProvider(LocalBackClosesPanel provides isFirst) { entry.Content() }
+            CompositionLocalProvider(LocalBackClosesPanel provides isFirst, LocalInDetailPanel provides true) {
+                entry.Content()
+            }
         }
     }
 }

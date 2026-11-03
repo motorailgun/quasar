@@ -49,8 +49,11 @@ sealed interface Route : NavKey {
      */
     @Serializable data class OpenLink(val query: String) : Route
 
-    /** 投稿画面 (クイック投稿バーの無い画面からの返信用)。下書きは共有。 */
-    @Serializable data object Composer : Route
+    /**
+     * 投稿画面 (クイック投稿バーの無い画面からの返信用)。下書きは共有。[panelDraft] なら詳細のパネルの下書き
+     * (パネルの中の画面から開いたとき)。
+     */
+    @Serializable data class Composer(val panelDraft: Boolean = false) : Route
 
     /** メディアビューア (下の画面に重ねて表示する)。 */
     @Serializable data class MediaViewer(val args: MediaViewerArgs) : Route

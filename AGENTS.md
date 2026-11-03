@@ -818,6 +818,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   単独の投稿画面 (`Route.Composer`、`Navigator.openComposer()`) はバーの無い画面 (プロフィール・ハッシュタグからの返信) 用。閉じても下書きは残す。
 * **下書きの共有**: 書きかけの投稿は `ComposerSession` (入力 `ComposerState`・添付のアップロード・送信・上限・アカウント・絵文字)。
   `DraftStore` (`AppContainer.draftStore`) がアプリ全体で 1 つ持ち、バー・フル画面・単独の投稿画面が同じものを使う。
+  例外として、詳細のパネル (タブレット表示) の中の画面は別の `AppContainer.panelDraftStore` を使う (`LocalInDetailPanel` で
+  決める。パネルから開いた単独の投稿画面は `Route.Composer(panelDraft = true)`)。パネルを閉じても下書きは残る。
   session は自分のコルーチンの範囲 (`SupervisorJob` + Main) で動くので、画面を切り替えてもアップロードは止まらない。
   投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。アカウントが変わったら作り直す。プロセスが終わると消える (保存しない)。
   * 投稿できたら `DraftStore` 自身が `finish()` し、`DraftStore.published` (SharedFlow) に投稿を流す。同じ下書きを複数の画面
@@ -944,7 +946,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
 * **返信**:
-  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アプリ全体で 1 つ)。
+  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アプリ全体で 1 つ。パネルは別)。
+    **返信先が付くのは返信ボタンを押したときだけ** (ポスト画面を開いただけでは付けない。以前の X 風の「自動の返信」は外した)。
     返信ボタン (`onReply`) は `session.startReply(post)` + `QuickPostBarState.requestInput()` (バーにフォーカス)。
     返信中に別のポストの返信ボタンを押すと返信先を上書きし、本文は残す。プロフィール (バーが無い) は `startReply` → `Navigator.openComposer()`。
   * `startReply` は宛先 (`@作者 @メンション先 `、自分は除く) を本文に入れ、公開範囲を返信前の値と返信先の狭い方にし、返信先の CW を
@@ -954,10 +957,6 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 表示: バーは返信中なら本文の上に `ReplyTargetPreview` (縮小・本文 2 行・メディア 48dp・✕)。フル画面は `Composer(header = ...)`
     に `ReplyContext` (X の返信画面の形: `PostCard(ReplyContext)` + 縦線 + 「Replying to @acct」 + 投稿者行の右端に ✕)。
     どちらも入口に関係なく `inReplyTo` だけで決まる。本文欄の文言は「Post your reply」。
-  * **ポスト画面の自動の返信** (X と同じ): 前面に来たとき (`LifecycleResumeEffect`) 何も書いていなければ本体への返信にし
-    (`startAutoReply`、`ComposerState.autoReply = true`)、離れるとき (pause) まだ何も書いていなければ外す (`releaseAutoReply`)。
-    下書きを共有しているので、外さないとタイムラインのバーまで返信になる。返信ボタンで付けた返信先・書きかけがあれば付け替えない。
-    ✕ で外した自動の返信は、その下書きの間は同じポストに付け直さない (`dismissedAutoReplyId`)。
   * ポスト画面はストリーミングを受けないので、自分の返信は `published` から `insertReply` (`ReplyList.kt`、深さ優先の順で
     返信先の子孫の末尾へ) で足し、返信先のリプライ数を +1 する。
 * **他アプリからの共有** (`ui/share/`): `ACTION_SEND` (`text/plain` / `image/*` / `video/*`) と `ACTION_SEND_MULTIPLE`

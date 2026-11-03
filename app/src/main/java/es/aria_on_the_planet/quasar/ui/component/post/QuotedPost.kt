@@ -21,7 +21,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,7 +49,7 @@ private val QuoteFadeHeight = 32.dp
 
 /**
  * 引用されたポストを、枠付きで縮小表示する。表示できない状態の場合はその旨のプレースホルダを出す。
- * 引用の引用はさらに入れ子にせず、プレースホルダ 1 行にとどめる。
+ * 引用の引用はさらに入れ子にせず、引用元を開くリンク風の 1 行にとどめる ([NestedQuote])。
  *
  * @param callbacks ポストへの操作の口 ([PostCallbacks])。引用内の投票・アクションは使わない。
  * @param maxHeight 本文側 (ヘッダ・本文・投票) の高さ上限。超える分は下端をフェードさせて切る。
@@ -58,18 +62,14 @@ fun QuotedPost(
     callbacks: PostCallbacks = PostCallbacks.None,
     mediaHeight: Dp = PostCardDefaults.MediaHeight * 0.75f,
     maxHeight: Dp? = null,
-    nested: Boolean = false,
 ) {
     val post = quote.post
-    if (quote.state != QuoteState.Accepted || post == null || nested) {
-        QuotePlaceholder(
-            text = stringResource(if (nested && post != null) R.string.quote_nested else quote.state.messageRes()),
-            modifier = modifier,
-        )
+    if (quote.state != QuoteState.Accepted || post == null) {
+        QuotePlaceholder(text = stringResource(quote.state.messageRes()), modifier = modifier)
         return
     }
     OutlinedCard(
-        onClick = { callbacks.onPostClick(post) },
+        onClick = { callbacks.onPostClick(post.statusId) },
         shape = QuoteShape,
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -122,7 +122,7 @@ fun QuotedPost(
             // メディアは本文の高さ上限とは独立して常に表示する
             PostMedia(post, mediaHeight, callbacks.onMediaClick, Modifier.padding(top = 8.dp))
             post.quote?.let { inner ->
-                QuotedPost(quote = inner, nested = true, modifier = Modifier.padding(top = 8.dp))
+                NestedQuote(inner, onClick = callbacks.onPostClick, modifier = Modifier.padding(top = 2.dp))
             }
         }
     }
@@ -171,6 +171,28 @@ private fun QuotePlaceholder(text: String, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
         )
+    }
+}
+
+/**
+ * 引用の引用。API は中身を返さない (ShallowQuote: state と ID だけ) ので入れ子にはせず、引用元を開くリンク風の
+ * 1 行にする (開いた先ではトップレベルなので中身付きで返る)。表示できない状態 (deleted・blocked 等) は何も出さない。
+ */
+@Composable
+private fun NestedQuote(quote: Quote, onClick: (statusId: String) -> Unit, modifier: Modifier = Modifier) {
+    val postId = quote.postId
+    if (quote.state != QuoteState.Accepted || postId == null) return
+    val color = MaterialTheme.colorScheme.primary
+    Row(
+        modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable { onClick(postId) }
+            .padding(top = 2.dp, start = 2.dp, end = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Symbols.Outlined.FormatQuote, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(text = stringResource(R.string.quote_nested), style = MaterialTheme.typography.labelLarge, color = color)
     }
 }
 

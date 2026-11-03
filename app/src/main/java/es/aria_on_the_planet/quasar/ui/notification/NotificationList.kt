@@ -165,7 +165,7 @@ private fun CompactNotification(
     group: NotificationGroup,
     modifier: Modifier,
     onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
+    onPostClick: (statusId: String) -> Unit,
 ) {
     val post = group.post
     val first = group.accounts.firstOrNull()
@@ -177,7 +177,7 @@ private fun CompactNotification(
         latestAt = group.latestAt,
         emojis = first?.emojis.orEmpty(),
         post = post,
-        onClick = { if (post != null) onPostClick(post) else first?.let(onUserClick) },
+        onClick = { if (post != null) onPostClick(post.statusId) else first?.let(onUserClick) },
         modifier = modifier,
     ) {
         // した側のアイコン列。個々のアイコンのタップでそのユーザーのプロフィール

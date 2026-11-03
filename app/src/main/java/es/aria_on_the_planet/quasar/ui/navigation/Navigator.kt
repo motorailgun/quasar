@@ -15,7 +15,8 @@ import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
  */
 interface Navigator {
     fun openProfile(user: User)
-    fun openPost(post: Post)
+    /** [statusId] はブーストなら中身の ID ([Post.statusId])。 */
+    fun openPost(statusId: String)
 
     /** [name] は `#` 無し。 */
     fun openHashtag(name: String)

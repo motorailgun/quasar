@@ -87,7 +87,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel,
     onBack: () -> Unit,
     onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
+    onPostClick: (statusId: String) -> Unit,
     onMediaClick: (MediaClick) -> Unit,
     onFollowingClick: () -> Unit,
     onFollowersClick: () -> Unit,

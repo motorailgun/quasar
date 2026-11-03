@@ -138,7 +138,7 @@ fun PostCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (full) Modifier.clickable { callbacks.onPostClick(post) } else Modifier)
+            .then(if (full) Modifier.clickable { callbacks.onPostClick(post.statusId) } else Modifier)
             .padding(contentPadding),
     ) {
         if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick, labelStart = avatarSize + AvatarGap)

@@ -227,8 +227,8 @@ private class BackStackNavigator(
         backStack.add(Route.Profile(user.inServerId))
     }
 
-    override fun openPost(post: Post) {
-        backStack.add(Route.Post(post.statusId))
+    override fun openPost(statusId: String) {
+        backStack.add(Route.Post(statusId))
     }
 
     override fun openHashtag(name: String) {
@@ -441,7 +441,7 @@ private fun PostEntry(container: AppContainer, session: Session, key: Route.Post
         drafts = draftsHere(container),
         onBack = navigator::back,
         onUserClick = navigator::openProfile,
-        onPostClick = { post -> if (post.statusId != key.statusId) navigator.openPost(post) },
+        onPostClick = { id -> if (id != key.statusId) navigator.openPost(id) },
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
         onReactionCountClick = { post, type ->

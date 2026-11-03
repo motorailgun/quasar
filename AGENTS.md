@@ -169,7 +169,7 @@ data class Post(
     val mediaAttachments: List<MediaAttachment>,  // media_attachments (0〜15 件)
     val card: PreviewCard?,        // 本文中の URL のリンクプレビュー
     val poll: Poll?,               // poll
-    val quote: Quote?,             // quote (Quote / ShallowQuote の両方を QuoteDto で受ける)
+    val quote: Quote?,             // quote (Quote / ShallowQuote の両方を QuoteDto で受ける。Quote.postId は ShallowQuote でも入る)
     val application: PostApplication?, // application (name, website)。リモートのポストでは null
     val contentWarning: String?,   // spoiler_text (空なら null)
     val sensitive: Boolean,        // sensitive (メディアの閲覧注意)。CW とは独立
@@ -385,7 +385,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ポスト 1 件の表示。タイムライン・プロフィール・詳細画面などで再利用する。
 
 * `PostCard(post: Post, modifier, callbacks: PostCallbacks, mediaHeight: Dp = PostCardDefaults.MediaHeight, ...)`
-* **ポストへの操作は `PostCallbacks` (`onUserClick` / `onPostClick` / `onMediaClick` / `onVote` / `onAction` / `onReply` /
+* **ポストへの操作は `PostCallbacks` (`onUserClick` / `onPostClick` (statusId で受ける) / `onMediaClick` / `onVote` / `onAction` / `onReply` /
   `onHashtagClick`) 1 つで受け渡す**。画面 (またはナビゲーションの口と ViewModel が揃う所) で 1 回組み立て、
   `PostList` / `NotificationList` / `PinnedPosts` / `PostCard` / `PostDetail` / `QuotedPost` は中身を見ずに中継する。
   コールバックを 1 本ずつ引数に足さない。`@Immutable` の data class なので、作り直しても中身が同じなら等しく、一覧の項目の
@@ -530,7 +530,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   タップで引用元のポスト詳細を開く。カード (リンクプレビュー) とアクション行は出さない。
 * 本文側 (ヘッダ・本文・投票) の高さは呼び出し側の `mediaHeight` (添付画像と同じ高さ) を上限とし、超える分は
   下端フェードで切る。メディアはこの上限とは独立して、本文の下に常に全体を表示する。
-* 引用の引用はさらに入れ子にせず、プレースホルダ 1 行。
+* 引用の引用はさらに入れ子にせず、引用符のアイコン +「Quoted another post」の primary 色のリンク風の 1 行 (`NestedQuote`。
+  灰色の面のプレースホルダは押せなさそうに見えるので使わない)。API も中身を返さない: 引用先の `quote` は ShallowQuote
+  (`state` と `quoted_status_id` だけ)。accepted なら存在するので `Quote.postId` で `onPostClick` する (開いた先では
+  トップレベルなので中身付きで返る)。表示できない状態 (deleted・blocked 等) の入れ子は何も出さない。
 * 表示不可 (pending / deleted / blocked / muted / その他) は状態に応じた文言のプレースホルダ。
 * 本文の引用フォールバック「RE: <リンク>」は `simplifyMastodonHtml` で除去する
   (Mastodon は `<p class="quote-inline">`、Misskey 由来は `<br><br><span class="quote-inline">`)。
@@ -1009,6 +1012,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     トランザクションの中で `PRAGMA synchronous` を読む (外で読むと読み取り用の接続の値が返る)。
 * **書き込み**: Repository が取得・操作の結果を `EntityCache` に書く。タイムライン・ハッシュタグ・通知 (一覧はキャッシュ
   しないが中のポスト・アカウントは書く)・プロフィールの投稿 / ピン留め・フォロー一覧・スレッド・関係・投稿 / 編集の応答。
+  引用先の Status は持つが、引用先がさらに引用しているものは持たない (`collectEntities`。その引用は ID だけの浅い形で、
+  ポスト画面が期限内のキャッシュを使うと引用の中身が出ず、完全な形も上書きしてしまうため)。
   ストリーミングは `StreamingClient` が DTO のうちに書く (`decodeStreamMessage`。update / status.update / notification の中身。
   版は受け取った時点、delete はキャッシュから消す)。
   * **版 (CAS)**: リクエストを出す直前に `cache.issue()` (`VersionClock`: 実時刻ミリ秒、プロセス内で必ず増える) で版を取り、

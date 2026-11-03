@@ -60,6 +60,19 @@ class CacheMergeTest {
     }
 
     @Test
+    fun quotedStatusesThatQuoteAgainAreNotStored() {
+        // A → B → C: B の引用は API では ID だけ (ShallowQuote) なので、B は浅い形。持たない (投稿者は持つ)
+        val b = status("b", author = "2").copy(quote = QuoteDto(state = "accepted", quotedStatusId = "c"))
+        val a = status("a", author = "1", quoted = b)
+        val collected = collectEntities(listOf(a))
+        assertEquals(listOf("a"), collected.statuses.map { it.id })
+        assertEquals(listOf("1", "2"), collected.accounts.map { it.id })
+        // B をトップレベルで取ったときは B と中身付きの C を持つ
+        val full = status("b", author = "2", quoted = status("c", author = "3"))
+        assertEquals(listOf("b", "c"), collectEntities(listOf(full)).statuses.map { it.id })
+    }
+
+    @Test
     fun freshnessUsesFetchTimeAndTreatsInvalidatedAsStale() {
         assertTrue(isFresh(fetchedAt = 1_000, ttlMillis = 500, now = 1_499))
         assertFalse(isFresh(fetchedAt = 1_000, ttlMillis = 500, now = 1_500))

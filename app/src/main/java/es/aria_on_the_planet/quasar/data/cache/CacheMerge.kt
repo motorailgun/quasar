@@ -27,7 +27,10 @@ internal data class CollectedEntities(val statuses: List<StatusDto>, val account
 /**
  * [statuses] から、保存する Status と Account を取り出す。
  * * ブースト: 外側は持たず (ポスト画面は中身の ID で開く)、中身を持つ。ブーストした人のアカウントは持つ。
- * * 引用: 引用先の Status も持つ (`quoted_status` がある = 中身が返っているときだけ)。
+ * * 引用: 引用先の Status も持つ (`quoted_status` がある = 中身が返っているときだけ)。ただし引用先がさらに引用して
+ *   いるものは持たない。引用先の引用は API が中身を返さない (ShallowQuote: ID だけ) ので、その形で持つとポスト画面が
+ *   期限内のキャッシュを使って引用の中身を出せず、取り直した完全な形も版の新しい浅い形で上書きされうる。
+ *   引用していない引用先は、トップレベルで取ったものと同じ形。
  * * 各 Status の投稿者・[accounts] を Account として持つ。
  * 同じ ID は後に出た方で上書きする (同じ応答の中なので中身は同じ)。
  */
@@ -42,7 +45,9 @@ internal fun collectEntities(statuses: List<StatusDto>, accounts: List<AccountDt
             return
         }
         collectedStatuses[status.id] = status
-        status.quote?.quotedStatus?.let(::visit)
+        status.quote?.quotedStatus?.let { quoted ->
+            if (quoted.quote == null) visit(quoted) else collectedAccounts[quoted.account.id] = quoted.account
+        }
     }
     statuses.forEach(::visit)
     accounts.forEach { collectedAccounts[it.id] = it }

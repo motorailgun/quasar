@@ -215,6 +215,7 @@ fun QuoteDto.toDomain() = Quote(
         else -> QuoteState.Unauthorized
     },
     post = quotedStatus?.toDomain(),
+    postId = quotedStatus?.id ?: quotedStatusId,
 )
 
 fun PreviewCardDto.toDomain() = PreviewCard(

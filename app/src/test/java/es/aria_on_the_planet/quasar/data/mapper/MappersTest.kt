@@ -175,10 +175,14 @@ class MappersTest {
         assertEquals("2026-10-21T00:00:00Z", poll.expiresAt.toString())
         assertEquals(QuoteState.Accepted, post.quote!!.state)
         assertEquals("q", post.quote!!.post!!.statusId)
+        assertEquals("q", post.quote!!.postId)
 
         // ShallowQuote (quoted_status_id のみ) と未知の state
         val shallow = QuoteDto(state = "accepted", quotedStatusId = "q").toDomain()
         assertNull(shallow.post)
+        // 引用の引用から開くための ID
+        assertEquals("q", shallow.postId)
+        assertNull(QuoteDto(state = "deleted").toDomain().postId)
         assertEquals(QuoteState.Unauthorized, QuoteDto(state = "something_new").toDomain().state)
         assertEquals(QuoteState.Pending, QuoteDto(state = "pending").toDomain().state)
     }

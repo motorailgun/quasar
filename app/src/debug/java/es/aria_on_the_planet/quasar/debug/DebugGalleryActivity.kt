@@ -183,7 +183,7 @@ private class GalleryNavigator(
     private val onExit: () -> Unit,
 ) : Navigator {
     override fun openProfile(user: User) = Unit
-    override fun openPost(post: Post) = Unit
+    override fun openPost(statusId: String) = Unit
     override fun openHashtag(name: String) = Unit
     override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
     override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) = Unit

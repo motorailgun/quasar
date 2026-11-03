@@ -5,6 +5,11 @@ data class Quote(
     val state: QuoteState,
     /** 引用元ポスト。取得できない状態や、shallow な表現の場合は `null`。 */
     val post: Post?,
+    /**
+     * 引用元ポストの ID ([post] があればその ID)。引用の引用は API が中身を返さず ID だけ (ShallowQuote) なので、
+     * そこから開くのに使う。分からなければ `null`。
+     */
+    val postId: String? = post?.statusId,
 )
 
 /** https://docs.joinmastodon.org/entities/Quote/#state */

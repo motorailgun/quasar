@@ -27,7 +27,7 @@ fun HashtagScreen(
     viewModel: HashtagViewModel,
     onBack: () -> Unit,
     onUserClick: (User) -> Unit,
-    onPostClick: (Post) -> Unit,
+    onPostClick: (statusId: String) -> Unit,
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
     onReply: ((Post) -> Unit)?,

@@ -13,6 +13,8 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
  * equals で等しく、一覧の項目の skip を妨げない。[Immutable] が無いと、suspend 関数型 ([onVote]) の安定性が推論できず
  * インスタンスの同一性で比べられ、画面の組み立て直しのたびに一覧の全項目が組み立て直される。
  *
+ * @param onPostClick ポスト (ブーストなら中身の ID = [Post.statusId]) を開く。ID で受けるのは、中身の無い入れ子の引用
+ *   (ID だけが返る) からも開くため。
  * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (デバッグ用ギャラリー等)。
  * @param onAction アクション行のブースト・お気に入り・ブックマーク ([rememberPostActionHandler])。`null` なら表示のみ。
  * @param onReply アクション行のリプライ。`null` なら表示のみ。
@@ -21,7 +23,7 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 @Immutable
 data class PostCallbacks(
     val onUserClick: (User) -> Unit = {},
-    val onPostClick: (Post) -> Unit = {},
+    val onPostClick: (statusId: String) -> Unit = {},
     val onMediaClick: (MediaClick) -> Unit = {},
     val onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     val onAction: OnPostAction? = null,

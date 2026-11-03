@@ -43,6 +43,7 @@
     <string name="post_reply">Reply</string>
     <string name="post_boosted_by">%1$s boosted</string>
     <string name="back">Back</string>
+    <string name="close">Close</string>
     <string name="profile_posts">Posts</string>
     <string name="profile_following">Following</string>
     <string name="profile_followers">Followers</string>

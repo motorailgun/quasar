@@ -571,6 +571,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `QuasarNavHost` がセッションごとに開く。
   * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ)。メディアビューアだけは `OverlaySceneStrategy` で
     下の画面に重ね、出入りは自分で描く。
+  * **詳細のパネル** (`DetailPanel.kt`、計画・経緯は [docs/tablet-layout.md](docs/tablet-layout.md)): タイムラインが 2 カラムの間は、
+    ポスト・プロフィール等 (`DetailPanelSceneStrategy.panel()` の印。`NavKey.opensInPanel` と揃える) をタイムラインの上に浮かぶ
+    右半分の角丸カードで開く。どの画面もこの Scene で描き、キーは下地の画面のキー (パネルを積んでも NavDisplay の遷移が起きない)。
+    出入り・中の切り替え・予測型「戻る」はカードが描き、閉じる・戻るはアニメーションの後にバックスタックから外す
+    (`Navigator.back()` もパネルを通る)。パネルの最初の画面の戻るボタンは ✕ (`LocalBackClosesPanel`)。
+    `OverlayScene` にしないこと: NavDisplay は重ねる Scene をキーで 1 つにまとめて最初のものを描き続けるので、中身が替わらない。
   * 予測型「戻る」も同じ向きのスライドだが、指で引いている間は引いた量に対して log で伸び、幅いっぱい引いても
     `PredictiveBackSettings.maxDragFraction` (既定 20%) までしかずれない。離すと残りを抜ける (`PredictiveBackDamping.kt`)。
     * NavDisplay は引いた量をそのまま遷移の進み具合として seek し、離した後は同じ遷移の残りを等速で再生するだけ

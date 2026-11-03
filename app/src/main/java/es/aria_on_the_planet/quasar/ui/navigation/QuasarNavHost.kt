@@ -12,6 +12,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -34,6 +36,9 @@ import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
+import es.aria_on_the_planet.quasar.ui.component.layout.LocalFloatingPanelInset
+import es.aria_on_the_planet.quasar.ui.timeline.visibleColumnCount
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.LocalOwnPostActions
 import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
@@ -111,10 +116,23 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
             }
         }
     }
-    val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, onExit) }
+    // 幅の広い画面では、ポスト・プロフィール等をタイムラインの上に浮かぶパネルで開く (docs/tablet-layout.md)
+    val panel = remember(backStack) { DetailPanelState(pop = { backStack.removeLastOrNull() }) }
+    val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, panel, onExit) }
     val backDamping = remember { PredictiveBackDamping() }
     val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
-    SideEffect { settings?.let { backDamping.settings = it.predictiveBack } }
+    SideEffect {
+        settings?.let {
+            backDamping.settings = it.predictiveBack
+            panel.backSettings = it.predictiveBack
+        }
+    }
+    val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    val panelEnabled = visibleColumnCount(settings?.display?.columnLayout ?: ColumnLayout.Auto, windowWidth) >= 2
+    // メディアビューアは下の画面に重ねる。詳細のパネルも下の画面 (タイムライン) に重ねる
+    val sceneStrategies = remember(panel, panelEnabled) {
+        listOf(OverlaySceneStrategy<NavKey>(), DetailPanelSceneStrategy(panel, panelEnabled))
+    }
     // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
     val accountActions = remember(current) { current?.let { SessionAccountActions(it, container.accountRepository) } }
     // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
@@ -124,6 +142,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
         LocalNavigator provides navigator,
         LocalAccountActions provides accountActions,
         LocalOwnPostActions provides ownPostActions,
+        LocalFloatingPanelInset provides panel.coveredWidth,
     ) {
         Box(Modifier.fillMaxSize()) {
             NavDisplay(
@@ -137,25 +156,24 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
                     rememberViewModelStoreNavEntryDecorator(),
                     rememberPredictiveBackDampingDecorator(backDamping),
                 ),
-                // メディアビューアは下の画面に重ねる (それ以外は 1 画面ずつ)
-                sceneStrategies = remember { listOf(OverlaySceneStrategy()) },
+                sceneStrategies = sceneStrategies,
                 transitionSpec = { pushTransition() },
                 popTransitionSpec = { popTransition() },
                 predictivePopTransitionSpec = { predictivePopTransition(backDamping.settings.transitionMillis) },
                 entryProvider = entryProvider {
                     entry<Route.Login> { LoginScreen(container.oauthLogin) }
                     entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
-                    entry<Route.Profile> { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
-                    entry<Route.FollowList> { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
-                    entry<Route.Hashtag> { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
-                    entry<Route.AccountReactions> { key ->
+                    entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
+                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
+                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
+                    entry<Route.AccountReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
                         WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
                     }
-                    entry<Route.PostReactions> { key ->
+                    entry<Route.PostReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
                         WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
                     }
-                    entry<Route.Post> { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
-                    entry<Route.OpenLink> { key ->
+                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
+                    entry<Route.OpenLink>(metadata = DetailPanelSceneStrategy.panel()) { key ->
                         WithSession(current) { session ->
                             OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
                         }
@@ -198,6 +216,7 @@ private fun NavBackStack<NavKey>.replace(from: Route, to: Route) {
 private class BackStackNavigator(
     private val backStack: NavBackStack<NavKey>,
     private val context: Context,
+    private val panel: DetailPanelState,
     private val onExit: () -> Unit,
 ) : Navigator {
     override fun openProfile(user: User) {
@@ -241,6 +260,8 @@ private class BackStackNavigator(
     }
 
     override fun back() {
+        // 詳細のパネルの画面はパネルが閉じるアニメーションをしてから外す
+        if (backStack.lastOrNull()?.opensInPanel() == true && panel.requestBack()) return
         if (backStack.size > 1) backStack.removeLastOrNull() else onExit()
     }
 }

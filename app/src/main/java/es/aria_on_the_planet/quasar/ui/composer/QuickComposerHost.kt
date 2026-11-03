@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import es.aria_on_the_planet.quasar.ui.component.layout.LocalFloatingPanelInset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -83,6 +84,8 @@ fun QuickComposerHost(
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
+                // 右側を詳細のパネルが覆っている間は、覆われていない所の中央に寄せる
+                .padding(end = LocalFloatingPanelInset.current)
                 // 幅の広い画面 (タブレット) では全幅に伸ばさず中央に置く
                 .widthIn(max = BarMaxWidth)
                 .fillMaxWidth()

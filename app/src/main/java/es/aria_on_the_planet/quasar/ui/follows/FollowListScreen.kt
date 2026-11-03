@@ -1,5 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.follows
 
+import es.aria_on_the_planet.quasar.ui.component.scaffold.backIcon
+import es.aria_on_the_planet.quasar.ui.component.scaffold.backLabel
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -56,7 +58,7 @@ fun FollowListScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Symbols.Outlined.ArrowBack, stringResource(R.string.back))
+                        Icon(backIcon(), backLabel())
                     }
                 },
                 title = {

@@ -24,7 +24,8 @@ private const val TransitionMillis = 450
 /** 下になる画面がずれる量 (幅に対する割合)。 */
 internal const val UnderlapFraction = 4
 
-private fun <T> slideSpec() = tween<T>(TransitionMillis, easing = Emphasized)
+/** 画面の切り替えの時間・曲線 (詳細のパネルの中の切り替えも同じ)。 */
+internal fun <T> slideSpec() = tween<T>(TransitionMillis, easing = Emphasized)
 
 /** 進むとき。 */
 fun pushTransition(): ContentTransform =

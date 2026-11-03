@@ -115,7 +115,7 @@ fun DetailScaffold(
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Symbols.Outlined.ArrowBack, stringResource(R.string.back))
+                    Icon(backIcon(), backLabel())
                 }
             },
             title = {
@@ -181,7 +181,7 @@ fun OverlayDetailScaffold(
                         scrolledContainerColor = Color.Transparent,
                     ),
                     navigationIcon = {
-                        OverlayBarIconButton(Symbols.Outlined.ArrowBack, stringResource(R.string.back), alpha, onBack)
+                        OverlayBarIconButton(backIcon(), backLabel(), alpha, onBack)
                     },
                     actions = { actions(alpha) },
                     title = {

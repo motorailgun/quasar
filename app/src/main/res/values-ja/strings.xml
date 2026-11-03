@@ -43,6 +43,7 @@
     <string name="post_reply">返信</string>
     <string name="post_boosted_by">%1$sさんがブースト</string>
     <string name="back">戻る</string>
+    <string name="close">閉じる</string>
     <string name="profile_posts">投稿</string>
     <string name="profile_following">フォロー</string>
     <string name="profile_followers">フォロワー</string>

@@ -518,7 +518,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * `PollView(poll, modifier, onVote: (suspend (List<Int>) -> Boolean)?)`。`PostCard` / `PostDetail` が本文の直後に置く。
 * 結果表示: 終了済み・投票済み・`onVote == null` (引用内・ギャラリー) のとき。割合バー (最多得票は primaryContainer +
   太字、0% でも細いバーを出す)・右端に割合 (10% 未満は小数 1 桁)・自分の選択にチェック。複数選択の分母は voters_count。
-* 投票: 枠線のピル型ボタンを中央寄せで並べる。単一選択はタップで即投票、複数選択はトグルで選んで「Vote」。
+* 投票: 枠線のピル型ボタンを中央寄せで並べる。最小のタッチ領域 (48dp) の上下の余白は外し、結果と同じ 40dp の行・間隔にしている。単一選択はタップで即投票、複数選択はトグルで選んで「Vote」。
   投票中はボタン無効、失敗時はエラー文言。
 * フッタ: 「N votes · 6 days left」/「Final results」(複数選択は「N people」)。
 * 投票処理は ViewModel の `suspend fun vote(post, choices)` (`ui/feed/PollVoting.kt` の `submitVote`)。

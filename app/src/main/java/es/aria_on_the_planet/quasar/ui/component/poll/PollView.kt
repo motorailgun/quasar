@@ -17,11 +17,13 @@ import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedToggleButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +38,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Poll
@@ -160,43 +163,47 @@ private fun PollChoices(poll: Poll, onVote: suspend (List<Int>) -> Boolean) {
         }
     }
 
-    poll.options.forEachIndexed { index, option ->
-        val label: @Composable () -> Unit = {
-            EmojiText(
-                text = option.title,
-                emojis = poll.emojis,
-                postContent = true,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary.takeIf { !(poll.multiple && index in selected) }
-                    ?: MaterialTheme.colorScheme.onPrimary,
-            )
+    // ボタンは最小のタッチ領域 (48dp) まで上下に見えない余白を足すので、結果の行 (40dp) より間が広く見える。
+    // 選択肢どうしの間隔を結果と揃えるため外す (押せる範囲は見た目どおりの 40dp になる)
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        poll.options.forEachIndexed { index, option ->
+            val label: @Composable () -> Unit = {
+                EmojiText(
+                    text = option.title,
+                    emojis = poll.emojis,
+                    postContent = true,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary.takeIf { !(poll.multiple && index in selected) }
+                        ?: MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+            if (poll.multiple) {
+                OutlinedToggleButton(
+                    checked = index in selected,
+                    onCheckedChange = { checked -> selected = if (checked) selected + index else selected - index },
+                    enabled = !submitting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = OptionMinHeight),
+                ) { label() }
+            } else {
+                OutlinedButton(
+                    onClick = { submit(listOf(index)) },
+                    enabled = !submitting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = OptionMinHeight),
+                ) { label() }
+            }
         }
         if (poll.multiple) {
-            OutlinedToggleButton(
-                checked = index in selected,
-                onCheckedChange = { checked -> selected = if (checked) selected + index else selected - index },
-                enabled = !submitting,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = OptionMinHeight),
-            ) { label() }
-        } else {
-            OutlinedButton(
-                onClick = { submit(listOf(index)) },
-                enabled = !submitting,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = OptionMinHeight),
-            ) { label() }
-        }
-    }
-    if (poll.multiple) {
-        Button(
-            onClick = { submit(selected.sorted()) },
-            enabled = selected.isNotEmpty() && !submitting,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.poll_vote))
+            Button(
+                onClick = { submit(selected.sorted()) },
+                enabled = selected.isNotEmpty() && !submitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.poll_vote))
+            }
         }
     }
     if (failed) {

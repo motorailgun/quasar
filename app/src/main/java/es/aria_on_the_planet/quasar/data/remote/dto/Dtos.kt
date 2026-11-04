@@ -106,6 +106,15 @@ data class PollOptionDto(
 )
 
 /**
+ * https://docs.joinmastodon.org/entities/Status/#quote_approval 。使うのはログイン中のユーザーへの答え
+ * (`current_user`: automatic / manual / denied / unknown) だけ。
+ */
+@Serializable
+data class QuoteApprovalDto(
+    @SerialName("current_user") val currentUser: String? = null,
+)
+
+/**
  * https://docs.joinmastodon.org/entities/Quote/ と https://docs.joinmastodon.org/entities/ShallowQuote/ の両方を受ける。
  * Quote は `quoted_status`、ShallowQuote は `quoted_status_id` を持つ。
  */
@@ -318,6 +327,8 @@ data class StatusDto(
     val card: PreviewCardDto? = null,
     val poll: PollDto? = null,
     val quote: QuoteDto? = null,
+    /** 引用の方針 (Mastodon 4.5+)。 */
+    @SerialName("quote_approval") val quoteApproval: QuoteApprovalDto? = null,
     val application: ApplicationDto? = null,
     // 以下は認証時のみ返される
     val favourited: Boolean? = null,

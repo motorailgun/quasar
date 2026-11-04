@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -59,6 +60,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -67,6 +70,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
+import es.aria_on_the_planet.quasar.domain.model.quotable
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
@@ -170,7 +174,12 @@ fun PostCard(
                 )
                 if (full) {
                     Spacer(Modifier.size(8.dp))
-                    PostActionRow(post, onAction = callbacks.onAction, onReply = callbacks.onReply)
+                    PostActionRow(
+                        post,
+                        onAction = callbacks.onAction,
+                        onReply = callbacks.onReply,
+                        onQuote = callbacks.onQuote,
+                    )
                 }
             }
         }
@@ -311,6 +320,7 @@ private fun PinnedLabel(modifier: Modifier = Modifier) {
 /**
  * リプライ・ブースト・リアクション・ブックマークの件数と、自分が操作済みかどうかを表示する。
  * [onAction] があればブースト・お気に入り・ブックマークを、[onReply] があればリプライを押せる。
+ * [onQuote] があればブーストの長押しで引用する。
  *
  * @param reactionDetail ポスト詳細用の表示。ブースト・お気に入りの件数をアイコンの横に「N boosts」「M favourites」と
  *   出し (X の一時期の詳細画面の形)、アイコンのタップは通常の操作、件数のタップは [onReactionCountClick]
@@ -322,6 +332,7 @@ fun PostActionRow(
     modifier: Modifier = Modifier,
     onAction: OnPostAction? = null,
     onReply: ((Post) -> Unit)? = null,
+    onQuote: ((Post) -> Unit)? = null,
     reactionDetail: Boolean = false,
     onReactionCountClick: ((PostActionType) -> Unit)? = null,
 ) {
@@ -345,7 +356,7 @@ fun PostActionRow(
             // リプライ / ブースト + 件数 / お気に入り + 件数 を左から詰めて並べ、ブックマークは右端
             ReplyAction(post, onReply)
             Spacer(Modifier.width(ReactionDetailGap))
-            BoostAction(post, onAction, showCount = false)
+            BoostAction(post, onAction, onQuote, showCount = false)
             ReactionCountLabel(
                 count = post.boostsCount,
                 text = { pluralStringResource(R.plurals.post_detail_boosts, it, it) },
@@ -366,7 +377,7 @@ fun PostActionRow(
         // ブックマークは右端。件数の桁が変わってもアイコンの位置は動かない
         Row(Modifier.fillMaxWidth(ActionGroupFraction), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { ReplyAction(post, onReply) }
-            Box(Modifier.weight(1f)) { BoostAction(post, onAction, showCount = true) }
+            Box(Modifier.weight(1f)) { BoostAction(post, onAction, onQuote, showCount = true) }
             Box(Modifier.weight(1f)) { FavouriteAction(post, onAction, showCount = true) }
         }
         Spacer(Modifier.weight(1f))
@@ -388,7 +399,7 @@ private fun ReplyAction(post: Post, onReply: ((Post) -> Unit)?) {
 }
 
 @Composable
-private fun BoostAction(post: Post, onAction: OnPostAction?, showCount: Boolean) {
+private fun BoostAction(post: Post, onAction: OnPostAction?, onQuote: ((Post) -> Unit)?, showCount: Boolean) {
     val reblogged = post.viewer.reblogged
     PostActionButton(
         icon = if (reblogged) Symbols.Filled.Repeat else Symbols.Outlined.Repeat,
@@ -399,6 +410,11 @@ private fun BoostAction(post: Post, onAction: OnPostAction?, showCount: Boolean)
         // フォロワー限定・ダイレクトはブーストできない (既にブースト済みなら取り消しはできるようにする)
         enabled = post.visibility.boostable || reblogged,
         onClick = onAction?.let { { it(post, PostActionType.Boost) } },
+        // 引用できるのはサーバが引用できると答えたポストだけ (引用に対応していないサーバのポストは不可)。
+        // できないポストでも長押しは受けて何もしない (受けないと離したときにブーストになる)
+        onLongClick = onQuote?.let { quote -> { if (post.quotable) quote(post) } },
+        longClickEnabled = post.quotable,
+        longClickLabel = stringResource(R.string.post_quote),
     )
 }
 
@@ -504,7 +520,9 @@ internal val ActionPaddingHorizontal = 6.dp
 
 /**
  * アクション行の 1 項目。[onClick] が `null` なら表示のみ、あればオン・オフの切り替えボタン ([toggle] が `false` なら
- * 普通のボタン) になる。[enabled] が `false` ならグレーアウトして押せない。
+ * 普通のボタン) になる。[enabled] が `false` ならグレーアウトして押せない。[onLongClick] があれば長押しも受ける
+ * (押している間の縮みは同じで、長押しでは弾ませない)。[longClickEnabled] が `false` なら長押しは受けるだけで
+ * 振動・読み上げのラベルを出さない ([onLongClick] 側で何もしない)。
  *
  * アニメーションは Expressive の motionScheme (テーマの spring) に合わせる:
  * 押している間はアイコンを縮め、タップでオンになったらアイコンを弾ませて後ろから粒を散らす ([actionBurst])。
@@ -522,6 +540,9 @@ private fun PostActionButton(
     enabled: Boolean = true,
     toggle: Boolean = true,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    longClickEnabled: Boolean = true,
+    longClickLabel: String? = null,
 ) {
     val motion = MaterialTheme.motionScheme
     val targetColor = when {
@@ -552,7 +573,30 @@ private fun PostActionButton(
             )
             .clip(CircleShape)
             .then(
-                if (onClick != null && !toggle) {
+                if (onClick != null && onLongClick != null) {
+                    // toggleable は長押しを受けないので、切り替えの意味付けは semantics で足す
+                    Modifier
+                        .then(
+                            if (toggle) {
+                                Modifier.semantics { toggleableState = ToggleableState(active) }
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .combinedClickable(
+                            enabled = enabled,
+                            interactionSource = interactionSource,
+                            indication = ripple(),
+                            role = if (toggle) Role.Switch else Role.Button,
+                            onLongClickLabel = longClickLabel.takeIf { longClickEnabled },
+                            onLongClick = onLongClick,
+                            hapticFeedbackEnabled = longClickEnabled,
+                            onClick = {
+                                if (toggle) animation.tapped = true
+                                onClick()
+                            },
+                        )
+                } else if (onClick != null && !toggle) {
                     Modifier.clickable(
                         enabled = enabled,
                         interactionSource = interactionSource,

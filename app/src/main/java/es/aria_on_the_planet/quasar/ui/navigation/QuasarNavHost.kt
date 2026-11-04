@@ -310,6 +310,17 @@ private fun replyInComposer(container: AppContainer, session: Session, navigator
     }
 }
 
+/** クイック投稿バーの無い画面からの引用 (ブーストの長押し): 下書きの引用先にして投稿画面で書く。 */
+@Composable
+private fun quoteInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit {
+    val inPanel = LocalInDetailPanel.current
+    val drafts = draftsHere(container)
+    return { post ->
+        drafts.open(session).startQuote(post)
+        navigator.openComposer(panelDraft = inPanel)
+    }
+}
+
 @Composable
 private fun ProfileEntry(container: AppContainer, session: Session, key: Route.Profile, navigator: Navigator) {
     val viewModel: ProfileViewModel = viewModel(
@@ -346,6 +357,7 @@ private fun ProfileEntry(container: AppContainer, session: Session, key: Route.P
         onFollowersClick = { navigator.openFollowList(key.accountId, FollowListTab.Followers) },
         onOpenImage = navigator::openMediaViewer,
         onReply = replyInComposer(container, session, navigator),
+        onQuote = quoteInComposer(container, session, navigator),
     )
 }
 
@@ -388,6 +400,7 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
         // 同じハッシュタグからは遷移しない
         onHashtagClick = { tag -> if (!tag.equals(key.name, ignoreCase = true)) navigator.openHashtag(tag) },
         onReply = replyInComposer(container, session, navigator),
+        onQuote = quoteInComposer(container, session, navigator),
     )
 }
 
@@ -420,6 +433,7 @@ private fun AccountReactionsEntry(
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
         onReply = replyInComposer(container, session, navigator),
+        onQuote = quoteInComposer(container, session, navigator),
     )
 }
 

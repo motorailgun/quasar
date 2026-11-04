@@ -20,6 +20,7 @@
     <string name="timeline_error">読み込めませんでした: %1$s</string>
     <string name="post_replies">返信</string>
     <string name="post_boosts">ブースト</string>
+    <string name="post_quote">引用</string>
     <string name="post_bookmark">ブックマーク</string>
     <string name="post_action_done">済み</string>
     <string name="post_visibility_unlisted">ひかえめな公開</string>
@@ -283,6 +284,7 @@
     <string name="composer_reply_placeholder">返信を投稿</string>
     <string name="composer_replying_to">返信先: %1$s</string>
     <string name="composer_cancel_reply">返信をやめる</string>
+    <string name="composer_cancel_quote">引用をやめる</string>
     <string name="account_menu">アカウント</string>
     <!-- 操作の前の確認 -->
     <string name="confirm_post_title">投稿しますか？</string>

@@ -50,6 +50,7 @@ fun PostDraft.toFormParams(): List<Pair<String, String>> = buildList {
         add("poll[multiple]" to poll.multiple.toString())
     }
     inReplyToId?.let { add("in_reply_to_id" to it) }
+    quotedStatusId?.let { add("quoted_status_id" to it) }
 }
 
 /**

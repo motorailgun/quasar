@@ -124,6 +124,13 @@ fun TimelineScreen(
             barState.requestInput()
         }
     }
+    // ブーストの長押し: 下書きの引用先にしてバーで書き始める
+    val onQuote: ((Post) -> Unit)? = composer?.let { session ->
+        { post ->
+            session.startQuote(post)
+            barState.requestInput()
+        }
+    }
 
     QuickComposerHost(
         drafts = drafts,
@@ -179,6 +186,7 @@ fun TimelineScreen(
                         topPadding = topPadding,
                         bottomPadding = bottomPadding,
                         onReply = onReply,
+                        onQuote = onQuote,
                     )
                 }
                 StatusBarScrim(Modifier.align(Alignment.TopCenter))
@@ -221,6 +229,7 @@ private fun ColumnPage(
     topPadding: Dp,
     bottomPadding: Dp,
     onReply: ((Post) -> Unit)?,
+    onQuote: ((Post) -> Unit)?,
 ) {
     val navigator = LocalNavigator.current
     val feed = state.feedOf(column)
@@ -247,6 +256,7 @@ private fun ColumnPage(
             onVote = viewModel::vote,
             onAction = rememberPostActionHandler(viewModel::performAction),
             onReply = onReply,
+            onQuote = onQuote,
             onHashtagClick = navigator::openHashtag,
         )
         val timelineType = column.timeline

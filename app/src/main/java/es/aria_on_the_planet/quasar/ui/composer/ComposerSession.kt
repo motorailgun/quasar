@@ -230,6 +230,12 @@ class ComposerSession(
     /** 返信をやめる (✕)。 */
     fun cancelReply() = composer.cancelReply()
 
+    /** [target] を引用する (引用中なら付け替える)。本文・添付・返信先は残す。 */
+    fun startQuote(target: Post) = composer.startQuote(target)
+
+    /** 引用をやめる (✕)。 */
+    fun cancelQuote() = composer.cancelQuote()
+
     /** Photo Picker で選ばれたメディアを添付し、アップロードを始める。既に添付しているものは無視する。 */
     fun addMedia(uris: List<Uri>) {
         val attached = composer.attachments.mapNotNullTo(HashSet()) { it.previewUri }

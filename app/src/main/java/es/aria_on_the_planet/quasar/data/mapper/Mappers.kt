@@ -31,6 +31,7 @@ import es.aria_on_the_planet.quasar.domain.model.PreviewCard
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
 import es.aria_on_the_planet.quasar.domain.model.Quote
+import es.aria_on_the_planet.quasar.domain.model.QuotePermission
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
 import es.aria_on_the_planet.quasar.domain.model.Relationship
 import es.aria_on_the_planet.quasar.domain.model.PostViewerState
@@ -120,6 +121,7 @@ fun StatusDto.toDomain(): Post {
         card = body.card?.toDomain(),
         poll = body.poll?.toDomain(),
         quote = body.quote?.toDomain(),
+        quotePermission = body.quoteApproval?.let { quotePermissionOf(it.currentUser) },
         contentWarning = body.spoilerText.takeIf { it.isNotBlank() },
         sensitive = body.sensitive,
         visibility = postVisibility(body.visibility),
@@ -199,6 +201,14 @@ internal fun postVisibility(value: String): PostVisibility = when (value) {
     "private" -> PostVisibility.Private
     "direct" -> PostVisibility.Direct
     else -> PostVisibility.Public
+}
+
+/** `quote_approval.current_user`。未知の値・欠けているものは [QuotePermission.Unknown]。 */
+fun quotePermissionOf(value: String?): QuotePermission = when (value) {
+    "automatic" -> QuotePermission.Automatic
+    "manual" -> QuotePermission.Manual
+    "denied" -> QuotePermission.Denied
+    else -> QuotePermission.Unknown
 }
 
 fun QuoteDto.toDomain() = Quote(

@@ -49,6 +49,20 @@ class ComposerState(
     var inReplyTo by mutableStateOf<Post?>(null)
         private set
 
+    /** 引用するポスト。引用でなければ `null`。返信とは独立 (返信しながら引用もできる)。 */
+    var quote by mutableStateOf<Post?>(null)
+        private set
+
+    /** [target] を引用する (引用中なら付け替える)。本文等は変えない。 */
+    fun startQuote(target: Post) {
+        quote = target
+    }
+
+    /** 引用をやめる (✕)。 */
+    fun cancelQuote() {
+        quote = null
+    }
+
     /** 返信のために自動で変えた内容 (宛先・公開範囲・CW)。返信の付け替え・取り消しで戻すのに使う。 */
     private var replyMemory by mutableStateOf<ReplyMemory?>(null)
 
@@ -74,7 +88,7 @@ class ComposerState(
     }
 
     /** 何も書いていないか (自動で入れた宛先・CW だけか)。スナップショットから読む。 */
-    fun isUntouched(): Boolean =
+    fun isUntouched(): Boolean = quote == null &&
         replyFields().isUntouched(replyMemory, hasAttachments = attachments.isNotEmpty(), hasPoll = poll != null)
 
     private fun replyFields() = ReplyFields(
@@ -102,6 +116,7 @@ class ComposerState(
         attachments = attachments,
         poll = poll,
         inReplyToId = inReplyTo?.statusId,
+        quotedStatusId = quote?.statusId,
     )
 
     /** 投票の有無を切り替える (メディアがある間は付けられない)。 */
@@ -122,9 +137,11 @@ class ComposerState(
         attachments = emptyList()
         replyMemory = null
         inReplyTo = null
+        quote = null
     }
 
-    /** [draft] の内容を入れる (ポストの編集の最初)。返信先は持たない ([PostDraft.inReplyToId] は使わない)。 */
+    /** [draft] の内容を入れる (ポストの編集の最初)。返信先・引用は持たない ([PostDraft.inReplyToId] /
+     * [PostDraft.quotedStatusId] は使わない。編集では変えられない)。 */
     fun load(draft: PostDraft) {
         clear()
         text.setTextAndPlaceCursorAtEnd(draft.text)
@@ -138,8 +155,8 @@ class ComposerState(
 
     companion object {
         /**
-         * 本文・CW・公開範囲・閲覧注意・投票を保存する。添付はアップロードの途中状態を戻せないので、返信先はポストを
-         * 持てないので保存しない。
+         * 本文・CW・公開範囲・閲覧注意・投票を保存する。添付はアップロードの途中状態を戻せないので、返信先・引用は
+         * ポストを持てないので保存しない。
          */
         val Saver: Saver<ComposerState, Any> = listSaver(
             save = { state ->

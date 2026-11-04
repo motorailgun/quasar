@@ -134,6 +134,7 @@ fun PostDetail(
             post,
             onAction = callbacks.onAction,
             onReply = callbacks.onReply,
+            onQuote = callbacks.onQuote,
             reactionDetail = reactionDetail,
             onReactionCountClick = onReactionCountClick?.let { click -> { type -> click(post, type) } },
         )

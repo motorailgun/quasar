@@ -18,6 +18,7 @@
     <string name="timeline_error">Failed to load: %1$s</string>
     <string name="post_replies">Replies</string>
     <string name="post_boosts">Boosts</string>
+    <string name="post_quote">Quote</string>
     <string name="post_bookmark">Bookmark</string>
     <string name="post_action_done">Done</string>
     <string name="post_visibility_unlisted">Quiet public</string>
@@ -305,6 +306,7 @@
     <string name="composer_reply_placeholder">Post your reply</string>
     <string name="composer_replying_to">Replying to %1$s</string>
     <string name="composer_cancel_reply">Cancel reply</string>
+    <string name="composer_cancel_quote">Remove quote</string>
     <string name="account_menu">Account</string>
     <!-- 操作の前の確認 -->
     <string name="ok" translatable="false">OK</string>

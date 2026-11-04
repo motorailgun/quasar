@@ -14,7 +14,10 @@ import es.aria_on_the_planet.quasar.data.remote.dto.MediaSizeDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollOptionDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
+import es.aria_on_the_planet.quasar.data.remote.dto.QuoteApprovalDto
 import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
+import es.aria_on_the_planet.quasar.domain.model.QuotePermission
+import es.aria_on_the_planet.quasar.domain.model.quotable
 import es.aria_on_the_planet.quasar.domain.model.QuoteState
 import es.aria_on_the_planet.quasar.domain.model.MediaType
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
@@ -185,6 +188,33 @@ class MappersTest {
         assertNull(QuoteDto(state = "deleted").toDomain().postId)
         assertEquals(QuoteState.Unauthorized, QuoteDto(state = "something_new").toDomain().state)
         assertEquals(QuoteState.Pending, QuoteDto(state = "pending").toDomain().state)
+    }
+
+    @Test
+    fun mapsQuotePermission() {
+        fun status(approval: QuoteApprovalDto?, boosted: Boolean = false): StatusDto {
+            val body = StatusDto(id = "1", createdAt = "2026-10-15T00:00:00Z", account = alice, quoteApproval = approval)
+            return if (boosted) StatusDto(id = "2", createdAt = "2026-10-15T00:00:00Z", account = bob, reblog = body) else body
+        }
+        val automatic = status(QuoteApprovalDto("automatic")).toDomain()
+        assertEquals(QuotePermission.Automatic, automatic.quotePermission)
+        assertEquals(true, automatic.quotable)
+        assertEquals(true, status(QuoteApprovalDto("manual")).toDomain().quotable)
+        assertEquals(false, status(QuoteApprovalDto("denied")).toDomain().quotable)
+        // 方針が分からない・未知の値は引用できない扱い
+        assertEquals(QuotePermission.Unknown, status(QuoteApprovalDto("unknown")).toDomain().quotePermission)
+        assertEquals(QuotePermission.Unknown, status(QuoteApprovalDto("something_new")).toDomain().quotePermission)
+        assertEquals(false, status(QuoteApprovalDto(null)).toDomain().quotable)
+        // 引用に対応していないサーバ (quote_approval が無い)
+        assertNull(status(null).toDomain().quotePermission)
+        assertEquals(false, status(null).toDomain().quotable)
+        // ブーストは中身の値
+        assertEquals(true, status(QuoteApprovalDto("automatic"), boosted = true).toDomain().quotable)
+        // 実際の JSON の形 (4.5+)
+        val decoded = Json { ignoreUnknownKeys = true }.decodeFromString<QuoteApprovalDto>(
+            """{"automatic": ["public"], "manual": [], "current_user": "automatic"}""",
+        )
+        assertEquals("automatic", decoded.currentUser)
     }
 
     @Test

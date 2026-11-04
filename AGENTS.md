@@ -170,6 +170,7 @@ data class Post(
     val card: PreviewCard?,        // 本文中の URL のリンクプレビュー
     val poll: Poll?,               // poll
     val quote: Quote?,             // quote (Quote / ShallowQuote の両方を QuoteDto で受ける。Quote.postId は ShallowQuote でも入る)
+    val quotePermission: QuotePermission?, // quote_approval.current_user (Automatic / Manual / Denied / Unknown)。無ければ null (4.5 未満)
     val application: PostApplication?, // application (name, website)。リモートのポストでは null
     val contentWarning: String?,   // spoiler_text (空なら null)
     val sensitive: Boolean,        // sensitive (メディアの閲覧注意)。CW とは独立
@@ -278,7 +279,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` |
 | ブックマーク / 取り消し | `POST /api/v1/statuses/:id/bookmark` / `unbookmark` |
 | スレッド | `GET /api/v1/statuses/:id/context` |
-| 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き) |
+| 投稿 | `POST /api/v1/statuses` (form、`Idempotency-Key` 付き。引用は `quoted_status_id`、Mastodon 4.5+) |
 | 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト) |
 | 編集 | `PUT /api/v1/statuses/:id` (form。公開範囲・返信先は送らない。代替テキストは `media_attributes[][id/description]`) |
 | 削除 | `DELETE /api/v1/statuses/:id` |
@@ -962,6 +963,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     どちらも入口に関係なく `inReplyTo` だけで決まる。本文欄の文言は「Post your reply」。
   * ポスト画面はストリーミングを受けないので、自分の返信は `published` から `insertReply` (`ReplyList.kt`、深さ優先の順で
     返信先の子孫の末尾へ) で足し、返信先のリプライ数を +1 する。
+* **引用**: アクション行のブーストの長押し (`PostCallbacks.onQuote` → `PostActionRow(onQuote)`) で、下書きの引用先 (`ComposerState.quote`、`ComposerSession.startQuote`) にする。返信と同じく
+  下書きの一部で、返信先とは独立 (両方付けられる)。バーのある画面 (タイムライン・ポスト) はバーにフォーカス、無い画面は
+  投稿画面を開く (`quoteInComposer`)。表示は返信と逆に本文欄の下 (`QuoteTargetPreview`、✕ で外す。フル画面は
+  `Composer(belowText = ...)`)。送信は `PostDraft.quotedStatusId` → `quoted_status_id`。編集では変えられない。
+  * 引用できるかは Status の `quote_approval.current_user` (`Post.quotePermission` / `Post.quotable`、`MappersTest`)。
+    automatic / manual (承認待ちになる) だけ引用でき、denied / unknown / 項目が無い (4.5 未満のサーバ。3.5 で確認) は不可。
+    不可のポストでも長押しは受けて何もしない (`longClickEnabled = false`。振動も無し)。受けないと離したときにブーストになる。
+  * 未実装: 引用の承認方針 (`quote_approval_policy`) の指定、manual (承認待ちになる) の事前の表示。
 * **他アプリからの共有** (`ui/share/`): `ACTION_SEND` (`text/plain` / `image/*` / `video/*`) と `ACTION_SEND_MULTIPLE`
   (`image/*` / `video/*`) を `ShareActivity` で受け、`ComposerScreen` を出す。
   * **MainActivity とは別の Activity**: 標準の launchMode なので共有元のタスクに積まれ、投稿・破棄で `finish()` すると共有元に

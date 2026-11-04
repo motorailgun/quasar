@@ -93,6 +93,7 @@ fun ProfileScreen(
     onFollowersClick: () -> Unit,
     onOpenImage: (MediaViewerArgs) -> Unit,
     onReply: ((Post) -> Unit)? = null,
+    onQuote: ((Post) -> Unit)? = null,
     onHashtagClick: ((String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,6 +110,7 @@ fun ProfileScreen(
         onVote = viewModel::vote,
         onAction = rememberPostActionHandler(viewModel::performAction),
         onReply = onReply,
+        onQuote = onQuote,
         onHashtagClick = onHashtagClick,
     )
     ProfileContent(

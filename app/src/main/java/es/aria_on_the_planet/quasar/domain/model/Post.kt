@@ -20,6 +20,11 @@ data class Post(
     val poll: Poll? = null,
     /** 引用しているポスト。 */
     val quote: Quote? = null,
+    /**
+     * ログイン中のユーザーがこのポストを引用できるか (`quote_approval.current_user`)。`null` は返らなかった
+     * (引用に対応していないサーバ。Mastodon 4.5 未満)。
+     */
+    val quotePermission: QuotePermission? = null,
     /** 投稿に使われたアプリ。他サーバからのポストでは通常 `null`。 */
     val application: PostApplication? = null,
     /** Content Warning (spoiler_text)。無ければ `null`。カスタム絵文字は [emojis] を使う。 */
@@ -45,6 +50,13 @@ data class Post(
     /** 元のサーバでのページ (`url`、無ければ `uri`)。 */
     val url: String? = null,
 )
+
+/**
+ * 引用して投稿できるか。サーバが引用できると答えたもの (承認待ちになるものを含む) だけ。方針が分からない・
+ * サーバが引用に対応していない場合は不可 (Mastodon Web と同じ)。
+ */
+val Post.quotable: Boolean
+    get() = quotePermission == QuotePermission.Automatic || quotePermission == QuotePermission.Manual
 
 /** ポストの公開範囲 (visibility)。 */
 enum class PostVisibility {

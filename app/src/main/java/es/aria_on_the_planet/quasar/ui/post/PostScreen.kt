@@ -85,6 +85,12 @@ fun PostScreen(
             barState.requestInput()
         }
     }
+    val onQuote: ((Post) -> Unit)? = composer?.let { session ->
+        { post ->
+            session.startQuote(post)
+            barState.requestInput()
+        }
+    }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
@@ -102,6 +108,7 @@ fun PostScreen(
         onVote = viewModel::vote,
         onAction = rememberPostActionHandler(viewModel::performAction),
         onReply = onReply,
+        onQuote = onQuote,
         onHashtagClick = onHashtagClick,
     )
     val mainIndex = thread?.ancestors?.size ?: 0

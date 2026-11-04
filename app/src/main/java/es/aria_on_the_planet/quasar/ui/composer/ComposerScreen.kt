@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +39,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
+import es.aria_on_the_planet.quasar.ui.component.composer.QuoteTargetPreview
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 
@@ -96,6 +98,7 @@ fun ComposerScreen(
 
     val openMediaPicker = rememberMediaPicker(session)
     val replyTarget = composer.inReplyTo
+    val quoteTarget = composer.quote
 
     val requestClose = {
         if (keepDraftOnClose || !hasChanges) onClose() else confirmingDiscard = true
@@ -163,6 +166,18 @@ fun ComposerScreen(
                     )
                 }
             },
+            belowText = quoteTarget?.let { target ->
+                {
+                    QuoteTargetPreview(
+                        post = target,
+                        onCancel = session::cancelQuote,
+                        bodyMaxLines = FullQuoteBodyMaxLines,
+                        mediaHeight = FullQuoteMediaHeight,
+                        contentPadding = FullQuoteContentPadding,
+                        onMediaClick = LocalNavigator.current::openMedia,
+                    )
+                }
+            },
             placeholder = stringResource(
                 if (replyTarget != null) R.string.composer_reply_placeholder else R.string.composer_placeholder,
             ),
@@ -187,3 +202,10 @@ fun ComposerScreen(
         )
     }
 }
+
+/** フルの投稿画面の引用先の本文の行数・メディアの高さ (バーより大きく出す)。 */
+private const val FullQuoteBodyMaxLines = 4
+private val FullQuoteMediaHeight = 72.dp
+
+/** フルの投稿画面の引用先の枠の内側の余白 (バーより広く取る)。 */
+private val FullQuoteContentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 8.dp, bottom = 16.dp)

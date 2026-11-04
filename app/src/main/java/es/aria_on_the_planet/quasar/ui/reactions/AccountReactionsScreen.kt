@@ -39,6 +39,7 @@ fun AccountReactionsScreen(
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
     onReply: ((Post) -> Unit)?,
+    onQuote: ((Post) -> Unit)?,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     AccountReactionsContent(
@@ -54,6 +55,7 @@ fun AccountReactionsScreen(
             onVote = viewModel::vote,
             onAction = rememberPostActionHandler(viewModel::performAction),
             onReply = onReply,
+            onQuote = onQuote,
             onHashtagClick = onHashtagClick,
         ),
     )

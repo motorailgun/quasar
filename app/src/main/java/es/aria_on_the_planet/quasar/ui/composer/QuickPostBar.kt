@@ -82,6 +82,7 @@ import es.aria_on_the_planet.quasar.ui.component.composer.ComposerToolbar
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiButton
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiPickerSheet
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiSuggestionStrip
+import es.aria_on_the_planet.quasar.ui.component.composer.QuoteTargetPreview
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyTargetPreview
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.composer.VisibilityButton
@@ -101,6 +102,7 @@ import kotlinx.coroutines.launch
  * [絵文字の候補]
  * [添付 (小)]
  * (icon) 本文 ...   [送信]
+ * [引用先 ✕]                ← 引用中だけ ([QuoteTargetPreview])
  * (残り)  [公開範囲][絵文字][メディア]   ← フォーカス中か入力があるときだけ
  * ```
  *
@@ -139,6 +141,7 @@ fun QuickPostBar(
     val keyboard = LocalSoftwareKeyboardController.current
     val attachments = composer.attachments
     val replyTarget = composer.inReplyTo
+    val quoteTarget = composer.quote
     LaunchedEffect(barState) {
         barState.requests.collect {
             focusRequester.requestFocus()
@@ -250,6 +253,18 @@ fun QuickPostBar(
             )
             Spacer(Modifier.width(8.dp))
             SendButton(enabled = canSubmit && enabled, sending = state.sending, onClick = rememberConfirmedSubmit(session))
+        }
+        val lastQuoteTarget = remember { arrayOfNulls<Post>(1) }
+        if (quoteTarget != null) lastQuoteTarget[0] = quoteTarget
+        AnimatedVisibility(quoteTarget != null) {
+            lastQuoteTarget[0]?.let { target ->
+                QuoteTargetPreview(
+                    post = target,
+                    onCancel = session::cancelQuote,
+                    onMediaClick = onMediaClick,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                )
+            }
         }
         AnimatedVisibility(focused || !isEmpty) {
             ComposerToolbar(leading = { CharacterCounter(used = characterCount, max = limits.maxCharacters) }) {

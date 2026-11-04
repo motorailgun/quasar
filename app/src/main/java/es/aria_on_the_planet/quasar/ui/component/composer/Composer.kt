@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.ui.component.composer
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -58,6 +59,7 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
  * @param header 自分のアイコンの行より上に出すもの (返信先の [ReplyContext])。一緒にスクロールする。
  *   あるときはアイコンの行の上の余白を詰める (縦線をアイコンまで繋げるため、余白は header 側が持つ)。
+ * @param belowText 本文欄のすぐ下に出すもの (引用先の [QuoteTargetPreview])。
  * @param placeholder 本文欄が空のときの文言。
  */
 @Composable
@@ -77,6 +79,7 @@ fun Composer(
         state.attachments = state.attachments.map { if (it.localId == attachment.localId) it.copy(description = description) else it }
     },
     header: (@Composable () -> Unit)? = null,
+    belowText: (@Composable () -> Unit)? = null,
     placeholder: String = stringResource(R.string.composer_placeholder),
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -133,6 +136,9 @@ fun Composer(
                             .onFocusChanged { if (it.isFocused) activeField = state.text }
                             .padding(top = 8.dp),
                     )
+                    belowText?.let { content ->
+                        Box(Modifier.padding(top = 12.dp)) { content() }
+                    }
                     AttachmentStrip(
                         attachments = attachments,
                         onRemove = onRemoveAttachment,

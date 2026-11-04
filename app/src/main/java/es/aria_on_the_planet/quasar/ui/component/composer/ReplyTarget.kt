@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.ui.component.composer
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,6 +50,59 @@ fun ReplyTargetPreview(
     modifier: Modifier = Modifier,
     onMediaClick: (MediaClick) -> Unit = {},
 ) {
+    TargetPreview(
+        post = post,
+        onCancel = onCancel,
+        cancelLabel = stringResource(R.string.composer_cancel_reply),
+        bodyMaxLines = BodyMaxLines,
+        mediaHeight = PreviewMediaHeight,
+        contentPadding = PreviewContentPadding,
+        onMediaClick = onMediaClick,
+        modifier = modifier,
+    )
+}
+
+/**
+ * 本文欄の下に出す引用先 (クイック投稿バー・フルの投稿画面で共通)。形は [ReplyTargetPreview] と同じで、✕ で引用をやめる。
+ * 返信先は本文の上 (流れの前)、引用先は本文の下 (投稿に埋め込まれる位置) に置く。
+ *
+ * @param bodyMaxLines 本文 (CW 付きなら警告文) の最大行数。
+ * @param mediaHeight メディアのサムネイルの高さ。
+ * @param contentPadding 枠の内側の余白 (右端の ✕ はこの内側に置く)。
+ */
+@Composable
+fun QuoteTargetPreview(
+    post: Post,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+    bodyMaxLines: Int = BodyMaxLines,
+    mediaHeight: Dp = PreviewMediaHeight,
+    contentPadding: PaddingValues = PreviewContentPadding,
+    onMediaClick: (MediaClick) -> Unit = {},
+) {
+    TargetPreview(
+        post = post,
+        onCancel = onCancel,
+        cancelLabel = stringResource(R.string.composer_cancel_quote),
+        bodyMaxLines = bodyMaxLines,
+        mediaHeight = mediaHeight,
+        contentPadding = contentPadding,
+        onMediaClick = onMediaClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun TargetPreview(
+    post: Post,
+    onCancel: () -> Unit,
+    cancelLabel: String,
+    bodyMaxLines: Int,
+    mediaHeight: Dp,
+    contentPadding: PaddingValues,
+    onMediaClick: (MediaClick) -> Unit,
+    modifier: Modifier,
+) {
     Surface(
         shape = PreviewShape,
         // 下地はバーのぼかし。透明の Surface は文字色を決めないので明示する
@@ -57,18 +111,18 @@ fun ReplyTargetPreview(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 10.dp)) {
+        Column(Modifier.padding(contentPadding)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QuoteHeader(post, Modifier.weight(1f))
-                CancelReplyButton(onCancel, size = 36.dp)
+                CancelButton(onCancel, cancelLabel, size = 36.dp)
             }
             PostExcerpt(
                 post,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = BodyMaxLines,
+                maxLines = bodyMaxLines,
                 modifier = Modifier.padding(end = 8.dp),
             )
-            PostMedia(post, PreviewMediaHeight, onMediaClick, Modifier.padding(top = 6.dp, end = 8.dp))
+            PostMedia(post, mediaHeight, onMediaClick, Modifier.padding(top = 6.dp, end = 8.dp))
         }
     }
 }
@@ -106,7 +160,9 @@ fun ReplyContext(
             mode = PostCardMode.ReplyContext,
             mediaHeight = ContextMediaHeight,
             callbacks = PostCallbacks(onMediaClick = onMediaClick),
-            authorTrailing = { CancelReplyButton(onCancel, size = 32.dp) },
+            authorTrailing = {
+                CancelButton(onCancel, stringResource(R.string.composer_cancel_reply), size = 32.dp)
+            },
             modifier = Modifier.threadLines(
                 xs = listOf(ThreadLineDefaults.AvatarCenterX),
                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -145,11 +201,11 @@ fun ReplyingToLabel(accts: List<String>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun CancelReplyButton(onClick: () -> Unit, size: Dp) {
+private fun CancelButton(onClick: () -> Unit, label: String, size: Dp) {
     IconButton(onClick = onClick, modifier = Modifier.size(size)) {
         Icon(
             Symbols.Filled.Close,
-            contentDescription = stringResource(R.string.composer_cancel_reply),
+            contentDescription = label,
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -159,4 +215,7 @@ private fun CancelReplyButton(onClick: () -> Unit, size: Dp) {
 private val PreviewShape = RoundedCornerShape(16.dp)
 private const val BodyMaxLines = 2
 private val PreviewMediaHeight = 48.dp
+
+/** 縮小表示の枠の内側の余白。上は ✕ の押せる範囲 (36dp) がヘッダの行の高さを決めるので 0、右は ✕ の分だけ詰める。 */
+private val PreviewContentPadding = PaddingValues(start = 12.dp, end = 4.dp, bottom = 10.dp)
 private val ContextMediaHeight = 120.dp

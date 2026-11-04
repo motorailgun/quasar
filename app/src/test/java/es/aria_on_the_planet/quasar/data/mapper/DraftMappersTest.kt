@@ -33,6 +33,14 @@ class DraftMappersTest {
     }
 
     @Test
+    fun quote() {
+        assertEquals(
+            listOf("status" to "hi", "visibility" to "public", "in_reply_to_id" to "1", "quoted_status_id" to "42"),
+            PostDraft("hi", inReplyToId = "1", quotedStatusId = "42").toFormParams(),
+        )
+    }
+
+    @Test
     fun blankContentWarningIsOmitted() {
         assertEquals(2, PostDraft("hi", contentWarning = " ").toFormParams().size)
     }

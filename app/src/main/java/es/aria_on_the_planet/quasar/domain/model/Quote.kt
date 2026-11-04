@@ -24,3 +24,17 @@ enum class QuoteState {
     BlockedDomain,
     MutedAccount,
 }
+
+/**
+ * ログイン中のユーザーがポストを引用できるか (Status の `quote_approval.current_user`、Mastodon 4.5+)。
+ * https://docs.joinmastodon.org/entities/Status/#quote_approval
+ */
+enum class QuotePermission {
+    /** すぐ引用になる。 */
+    Automatic,
+    /** 引用できるが、投稿者の承認待ちになる。 */
+    Manual,
+    Denied,
+    /** 投稿者の方針が分からない (未知の値もこれ)。 */
+    Unknown,
+}

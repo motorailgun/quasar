@@ -31,6 +31,7 @@ fun HashtagScreen(
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
     onReply: ((Post) -> Unit)?,
+    onQuote: ((Post) -> Unit)?,
 ) {
     val feed by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -41,6 +42,7 @@ fun HashtagScreen(
         onVote = viewModel::vote,
         onAction = rememberPostActionHandler(viewModel::performAction),
         onReply = onReply,
+        onQuote = onQuote,
         onHashtagClick = onHashtagClick,
     )
 

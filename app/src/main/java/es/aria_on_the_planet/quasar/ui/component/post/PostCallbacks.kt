@@ -18,6 +18,7 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
  * @param onVote 投票する。`null` なら投票できず、投票は結果表示になる (デバッグ用ギャラリー等)。
  * @param onAction アクション行のブースト・お気に入り・ブックマーク ([rememberPostActionHandler])。`null` なら表示のみ。
  * @param onReply アクション行のリプライ。`null` なら表示のみ。
+ * @param onQuote アクション行のブーストの長押し (引用して投稿する)。`null` なら長押しできない。
  * @param onHashtagClick 本文のハッシュタグ (`#` を除いた名前)。`null` ならブラウザで開く。
  */
 @Immutable
@@ -28,6 +29,7 @@ data class PostCallbacks(
     val onVote: (suspend (Post, List<Int>) -> Boolean)? = null,
     val onAction: OnPostAction? = null,
     val onReply: ((Post) -> Unit)? = null,
+    val onQuote: ((Post) -> Unit)? = null,
     val onHashtagClick: ((String) -> Unit)? = null,
 ) {
     companion object {

@@ -16,6 +16,8 @@ data class PostDraft(
     /** 投票。Mastodon ではメディアと同時に付けられない。 */
     val poll: PollDraft? = null,
     val inReplyToId: String? = null,
+    /** 引用するポストの ID (Mastodon 4.5+)。引用でなければ `null`。 */
+    val quotedStatusId: String? = null,
 )
 
 /** 作成中の投票。 */
@@ -82,7 +84,8 @@ fun checkUpload(mimeType: String?, size: Long?, limits: ComposeLimits): UploadFa
 
 /** 何も入力されていないか (破棄の確認が要らないか)。 */
 val PostDraft.isEmpty: Boolean
-    get() = text.isBlank() && contentWarning.isNullOrBlank() && attachments.isEmpty() && poll == null
+    get() = text.isBlank() && contentWarning.isNullOrBlank() && attachments.isEmpty() && poll == null &&
+        quotedStatusId == null
 
 /** 送信を妨げる問題。 */
 enum class DraftProblem {

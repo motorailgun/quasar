@@ -57,7 +57,7 @@ data class DisplaySettings(
         const val DefaultSurfaceBlurRadiusDp = 6f
         /** ぼかしの半径の上限 (dp)。設定画面のスライダーの範囲。 */
         const val MaxSurfaceBlurRadiusDp = 16f
-        const val DefaultSurfaceBlurTintAlpha = 0.8f
+        const val DefaultSurfaceBlurTintAlpha = 0.9f
         const val DefaultEmojiAvatarAnimationMaxFps = 30
         /** [uiScale] / [fontScale] の範囲。 */
         val ScaleRange = 0.75f..1.25f

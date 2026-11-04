@@ -1116,7 +1116,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `animateImages` (画像のアニメーション全体。オフなら他の 3 つに関わらず止める) / `animatePostEmojis` (ポストの中身の絵文字) /
   `animateOtherEmojis` (それ以外の絵文字) / `animateAvatars` (アイコン)。判定は `DisplaySettings.animates(ImageKind)`、
   `surfaceBlur` (一覧の上に浮かぶ UI の背景をぼかすか。既定オン) / `surfaceBlurRadiusDp` (ui では `surfaceBlurRadius: Dp`) /
-  `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.8)、`menuBlur` (︙のメニューのシートの背景をぼかすか。既定オン。
+  `surfaceBlurTintAlpha` (同じぼかしの半径と色味の濃さ。既定 6dp / 0.9)、`menuBlur` (︙のメニューのシートの背景をぼかすか。既定オン。
   半径・濃さは上と共通で、設定画面のスライダーはどちらかがオンなら動かせる)、`emojiAvatarAnimationMaxFps`、
   `columnLayout` (タイムラインのカラムの並べ方: `Auto` (既定。幅 840dp 以上で 2 カラム) / `Single` / `Double`)、
   `avatarShape` (ユーザーのアイコンの切り取り: `AvatarShape.Circle` (既定) / `RoundedSquare` (角の半径は一辺の 20%))。

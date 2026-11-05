@@ -186,6 +186,14 @@ class AccountRepository(
         return Page(page.items.map { it.toDomain() }, page.nextMaxId)
     }
 
+    /** 自分へのフォローリクエストを送ってきたアカウント。`max_id` はリクエストの ID なので [Page.nextMaxId] を使う。 */
+    suspend fun fetchFollowRequests(session: Session, maxId: String? = null): Page<User> {
+        val version = cache.issue()
+        val page = api.followRequests(session.serverUrl, session.accessToken, maxId)
+        cache.putAccounts(page.items, version)
+        return Page(page.items.map { it.toDomain() }, page.nextMaxId)
+    }
+
     /** [accountId] がフォローしているアカウント。`max_id` はフォロー関係の ID なので [Page.nextMaxId] を使う。 */
     suspend fun fetchFollowing(session: Session, accountId: String, maxId: String? = null): Page<User> =
         fetchRelations(session, accountId, "following", maxId)

@@ -49,6 +49,13 @@ import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.follows.FollowListViewModel
 import es.aria_on_the_planet.quasar.ui.hashtag.HashtagScreen
 import es.aria_on_the_planet.quasar.ui.hashtag.HashtagViewModel
+import es.aria_on_the_planet.quasar.ui.personal.FollowRequestsScreen
+import es.aria_on_the_planet.quasar.ui.personal.FollowRequestsViewModel
+import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
+import es.aria_on_the_planet.quasar.ui.personal.PersonalPostsScreen
+import es.aria_on_the_planet.quasar.ui.personal.PersonalPostsViewModel
+import es.aria_on_the_planet.quasar.ui.search.SearchScreen
+import es.aria_on_the_planet.quasar.ui.search.SearchViewModel
 import es.aria_on_the_planet.quasar.ui.login.LoginScreen
 import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
@@ -170,6 +177,15 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
                     entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
                     entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
                     entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
+                    entry<Route.PersonalPosts>(metadata = DetailPanelSceneStrategy.panel()) { key ->
+                        WithSession(current) { PersonalPostsEntry(container, it, key, navigator) }
+                    }
+                    entry<Route.Search>(metadata = DetailPanelSceneStrategy.panel()) {
+                        WithSession(current) { SearchEntry(container, it, navigator) }
+                    }
+                    entry<Route.FollowRequests>(metadata = DetailPanelSceneStrategy.panel()) {
+                        WithSession(current) { FollowRequestsEntry(container, it, navigator) }
+                    }
                     entry<Route.AccountReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
                         WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
                     }
@@ -261,6 +277,18 @@ private class BackStackNavigator(
 
     override fun openSettings() {
         backStack.add(Route.Settings)
+    }
+
+    override fun openPersonalPosts(list: PersonalPostList) {
+        backStack.add(Route.PersonalPosts(list))
+    }
+
+    override fun openFollowRequests() {
+        backStack.add(Route.FollowRequests)
+    }
+
+    override fun openSearch() {
+        backStack.add(Route.Search)
     }
 
     override fun back() {
@@ -402,6 +430,60 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
         onReply = replyInComposer(container, session, navigator),
         onQuote = quoteInComposer(container, session, navigator),
     )
+}
+
+@Composable
+private fun PersonalPostsEntry(container: AppContainer, session: Session, key: Route.PersonalPosts, navigator: Navigator) {
+    val viewModel: PersonalPostsViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                PersonalPostsViewModel(
+                    session,
+                    key.list,
+                    container.accountRepository,
+                    container.timelineRepository,
+                    container.statusRepository,
+                )
+            }
+        },
+    )
+    PersonalPostsScreen(
+        viewModel = viewModel,
+        onBack = navigator::back,
+        onUserClick = navigator::openProfile,
+        onPostClick = navigator::openPost,
+        onMediaClick = navigator::openMedia,
+        onHashtagClick = navigator::openHashtag,
+        onReply = replyInComposer(container, session, navigator),
+        onQuote = quoteInComposer(container, session, navigator),
+    )
+}
+
+@Composable
+private fun SearchEntry(container: AppContainer, session: Session, navigator: Navigator) {
+    val viewModel: SearchViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { SearchViewModel(session, container.searchRepository, container.statusRepository) }
+        },
+    )
+    SearchScreen(
+        viewModel = viewModel,
+        onBack = navigator::back,
+        onUserClick = navigator::openProfile,
+        onPostClick = navigator::openPost,
+        onMediaClick = navigator::openMedia,
+        onHashtagClick = navigator::openHashtag,
+        onReply = replyInComposer(container, session, navigator),
+        onQuote = quoteInComposer(container, session, navigator),
+    )
+}
+
+@Composable
+private fun FollowRequestsEntry(container: AppContainer, session: Session, navigator: Navigator) {
+    val viewModel: FollowRequestsViewModel = viewModel(
+        factory = viewModelFactory { initializer { FollowRequestsViewModel(session, container.accountRepository) } },
+    )
+    FollowRequestsScreen(viewModel = viewModel, onBack = navigator::back, onUserClick = navigator::openProfile)
 }
 
 @Composable

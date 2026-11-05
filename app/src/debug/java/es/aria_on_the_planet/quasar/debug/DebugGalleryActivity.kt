@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.debug
 
+import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
 import android.content.Context
 import es.aria_on_the_planet.quasar.ui.component.composer.isEmbeddedPhotoPickerAvailable
 import es.aria_on_the_planet.quasar.ui.component.composer.MediaPickerSheet
@@ -190,6 +191,9 @@ private class GalleryNavigator(
     override fun openPostReactions(post: Post, tab: PostReactionsTab) = Unit
     override fun openComposer(panelDraft: Boolean) = Unit
     override fun openSettings() = Unit
+    override fun openPersonalPosts(list: PersonalPostList) = Unit
+    override fun openFollowRequests() = Unit
+    override fun openSearch() = Unit
     override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
     override fun openMediaViewer(args: MediaViewerArgs) {
         backStack.add(Route.MediaViewer(args))

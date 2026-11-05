@@ -14,7 +14,7 @@ import es.aria_on_the_planet.quasar.ui.feed.FeedState
 
 /**
  * ページングするユーザーの一覧 ([UserList]) に、pull-to-refresh と、空のときの表示 (読み込み中・失敗・空) を付けたもの。
- * フォロー / フォロワー一覧、ポストのブースト / お気に入りの一覧のタブ 1 つ分。
+ * フォロー / フォロワー一覧、ポストのブースト / お気に入りの一覧、検索のアカウントのタブ 1 つ分。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -24,6 +24,8 @@ fun UserFeedList(
     onLoadMore: () -> Unit,
     onUserClick: (User) -> Unit,
     modifier: Modifier = Modifier,
+    /** 空のときの文言。`null` なら「表示するものがありません」。 */
+    empty: String? = null,
 ) {
     DetailRefreshBox(
         // 初回の読み込みは一覧側に出すので、引っ張って更新したときだけ出す
@@ -45,7 +47,7 @@ fun UserFeedList(
                             loading = !feed.loaded || feed.isRefreshing,
                             error = feed.error?.let { stringResource(R.string.user_list_error, it) },
                             // 一覧を隠しているアカウントも空で返る
-                            empty = stringResource(R.string.user_list_empty),
+                            empty = empty ?: stringResource(R.string.user_list_empty),
                         )
                     }
                 }

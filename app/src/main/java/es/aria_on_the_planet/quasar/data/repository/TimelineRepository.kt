@@ -4,6 +4,7 @@ import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 
@@ -38,5 +39,17 @@ class TimelineRepository(
         val statuses = api.hashtagTimeline(session.serverUrl, session.accessToken, hashtag, maxId)
         cache.putStatuses(statuses, version)
         return statuses.map { it.toDomain() }
+    }
+
+    /**
+     * 非公開の返信 (ダイレクト) の会話を新しい順に、それぞれの最新のポストで返す (ポストの無い会話は除く)。
+     * `max_id` は会話の ID なので [Page.nextMaxId] を使う。
+     */
+    suspend fun fetchConversations(session: Session, maxId: String? = null): Page<Post> {
+        val version = cache.issue()
+        val page = api.conversations(session.serverUrl, session.accessToken, maxId)
+        val statuses = page.items.mapNotNull { it.lastStatus }
+        cache.putStatuses(statuses, version)
+        return Page(statuses.map { it.toDomain() }, page.nextMaxId)
     }
 }

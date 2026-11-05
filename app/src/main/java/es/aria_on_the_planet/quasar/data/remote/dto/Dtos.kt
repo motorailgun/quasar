@@ -300,6 +300,15 @@ data class StatusSourceDto(
     @SerialName("spoiler_text") val spoilerText: String = "",
 )
 
+/** https://docs.joinmastodon.org/entities/Conversation/ */
+@Serializable
+data class ConversationDto(
+    val id: String,
+    val unread: Boolean = false,
+    val accounts: List<AccountDto> = emptyList(),
+    @SerialName("last_status") val lastStatus: StatusDto? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Status/ */
 @Serializable
 data class StatusDto(

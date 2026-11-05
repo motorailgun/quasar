@@ -285,7 +285,18 @@
     <string name="composer_replying_to">返信先: %1$s</string>
     <string name="composer_cancel_reply">返信をやめる</string>
     <string name="composer_cancel_quote">引用をやめる</string>
-    <string name="account_menu">アカウント</string>
+    <string name="private_mentions">非公開の返信</string>
+    <string name="private_mentions_empty">非公開の返信はまだありません</string>
+    <string name="follow_requests_empty">フォローリクエストはありません</string>
+    <string name="personal_posts_error">読み込めませんでした: %1$s</string>
+    <string name="search_hint">検索</string>
+    <string name="search_clear">クリア</string>
+    <string name="search_tab_accounts">アカウント</string>
+    <string name="search_tab_posts">投稿</string>
+    <string name="search_tab_hashtags">ハッシュタグ</string>
+    <string name="search_empty">見つかりませんでした</string>
+    <string name="search_error">検索できませんでした: %1$s</string>
+    <string name="open_menu">メニューを開く</string>
     <!-- 操作の前の確認 -->
     <string name="confirm_post_title">投稿しますか？</string>
     <string name="confirm_post">投稿</string>

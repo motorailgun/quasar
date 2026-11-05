@@ -307,7 +307,18 @@
     <string name="composer_replying_to">Replying to %1$s</string>
     <string name="composer_cancel_reply">Cancel reply</string>
     <string name="composer_cancel_quote">Remove quote</string>
-    <string name="account_menu">Account</string>
+    <string name="private_mentions">Private mentions</string>
+    <string name="private_mentions_empty">No private mentions yet</string>
+    <string name="follow_requests_empty">No follow requests</string>
+    <string name="personal_posts_error">Failed to load: %1$s</string>
+    <string name="search_hint">Search</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_tab_accounts">Accounts</string>
+    <string name="search_tab_posts">Posts</string>
+    <string name="search_tab_hashtags">Hashtags</string>
+    <string name="search_empty">No results</string>
+    <string name="search_error">Failed to search: %1$s</string>
+    <string name="open_menu">Open menu</string>
     <!-- 操作の前の確認 -->
     <string name="ok" translatable="false">OK</string>
     <string name="confirm_post_title">Post this?</string>

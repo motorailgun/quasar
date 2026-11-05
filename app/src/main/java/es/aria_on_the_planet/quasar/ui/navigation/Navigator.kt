@@ -7,6 +7,7 @@ import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
 import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
 
 /**
@@ -37,6 +38,11 @@ interface Navigator {
     /** メディアビューア。ポストの添付以外 (プロフィールのアイコン等) はこちらを直接使う。 */
     fun openMediaViewer(args: MediaViewerArgs)
     fun openSettings()
+
+    /** 自分のお気に入り / ブックマーク / 非公開の返信の一覧。 */
+    fun openPersonalPosts(list: PersonalPostList)
+    fun openFollowRequests()
+    fun openSearch()
 
     /** 今の画面を閉じる (一番下の画面ならアプリを閉じる)。 */
     fun back()

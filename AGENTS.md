@@ -101,6 +101,9 @@ es.aria_on_the_planet.quasar
     ├── follows/                    フォロー / フォロワー一覧 (Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── hashtag/                    ハッシュタグのタイムライン (Screen / ViewModel)
+    ├── search/                     検索 (SearchScreen / ViewModel。アカウント / 投稿 / ハッシュタグのタブ)
+    ├── personal/                   ドロワーから開く自分の一覧: お気に入り / ブックマーク / 非公開の返信 (PersonalPostsScreen / ViewModel)、
+    │                               フォローリクエスト (FollowRequestsScreen / ViewModel)
     ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
@@ -268,6 +271,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | ブロック / 解除 | `POST /api/v1/accounts/:id/block` / `unblock` (応答は Relationship) |
 | ミュート / 解除 | `POST /api/v1/accounts/:id/mute` / `unmute` (期限なし・通知もミュート = API の既定) |
 | ブーストの非表示 / 表示 | `POST /api/v1/accounts/:id/follow` (form `reblogs=false/true`。フォロー中のときだけ。フォロー外だとフォローになる) |
+| 自分へのフォローリクエストの一覧 | `GET /api/v1/follow_requests` (**Link ヘッダ**でページング。`AccountRepository.fetchFollowRequests`) |
+| 非公開の返信 (ダイレクト) の会話 | `GET /api/v1/conversations` (**Link ヘッダ**でページング。各会話の `last_status` だけを出す。`TimelineRepository.fetchConversations`) |
 | 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (応答は Relationship) |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` |
 | 通知 (グループ) | `GET /api/v2/notifications` (Mastodon 4.3+、既定) |
@@ -288,6 +293,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
+| 検索 | `GET /api/v2/search?q=...&type=accounts/statuses/hashtags&limit=20&offset=...` (種類ごとに `offset` でページング。最初のページだけ `resolve=true`。`SearchRepository.searchAccounts` 等) |
 | URL・`@user@domain` を引く | `GET /api/v2/search?q=...&resolve=true&limit=1` (サーバが知らなければ AP / WebFinger で取りに行く。`SearchRepository.resolve`) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 | OAuth クライアントの登録 | `POST /api/v1/apps` (ログインのたびに登録) |
@@ -634,7 +640,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (`ConfirmTarget.RejectFollowRequest`、既定でオン) で確認する。`ProfileViewModel.answerFollowRequest` が応答の関係で置き換え、
     承認なら相手のフォロー数を手元で +1。カードは `AnimatedVisibility` (motionScheme) で閉じ、フォローボタンは「Follow back」等に変わる。
     失敗はログのみで、ボタンが押せる状態に戻る。follow_request の通知のタップはこれまでどおりプロフィール。
-    フォローリクエストの一覧画面 (`GET /api/v1/follow_requests`) は未実装。
+    フォローリクエストの一覧はドロワーから (`Route.FollowRequests`)。
   * **構成**: `CollapsingHeaderLayout` で 上からヘッダ (`ProfileHeader`) / タブ (`ConnectedTabRow`) / `HorizontalPager`
     (タブごとの `PostList`、それぞれ別の LazyListState)。一覧を上へスクロールするとまずヘッダが畳まれ (nested scroll の
     pre-scroll)、タブは上端に残る。下へは一覧が先頭に着いてからヘッダが開き、開き切った余りが pull-to-refresh へ回る。
@@ -793,8 +799,16 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
-  * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct (タップで自分のプロフィール)・
-    設定。未取得は汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
+  * ヘッダ: 左にメニューのボタン (≡。タップで左から `ModalNavigationDrawer` のドロワー `TimelineDrawerSheet` (X のアプリの形):
+    ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) / 設定 /
+    検索 (`Route.Search`。トップバーが検索欄で、キーボードの検索で確定。結果は `ConnectedTabRow` (Accounts / Posts / Hashtags) +
+    `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
+    投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
+    お気に入り・ブックマーク・非公開の返信 (`Route.PersonalPosts`。`DetailScaffold` + `PostList`、`PostFeed.linked`。外しても一覧からは
+    消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く)。
+    どれも詳細のパネルで開く。
+    開くのはボタンだけ (左右のスワイプはカラムの切り替え)、状態は保存しないので別画面から戻ると閉じている)、
+    右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。
     未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。表示中のカラムのボタンをもう一度押すと一覧の先頭へ
@@ -1130,7 +1144,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `columnLayout` (タイムラインのカラムの並べ方: `Auto` (既定。幅 840dp 以上で 2 カラム) / `Single` / `Double`)、
   `avatarShape` (ユーザーのアイコンの切り取り: `AvatarShape.Circle` (既定) / `RoundedSquare` (角の半径は一辺の 20%))。
   アイコンの形は**必ず `avatarShape()` (`ui/component/user/AvatarShape.kt`) から取る** (`UserIcon` / `ComposerAccountIcon` の既定の
-  `shape`)。例外としてクイック投稿バーとタイムラインのヘッダ (左上のメニュー) のアイコンは設定に関わらず円 (`shape = CircleShape`)。背景色で縁取る枠は `avatarShape(ring = 縁の幅)` で角をアイコンと同心にする。
+  `shape`)。例外としてクイック投稿バーのアイコンは設定に関わらず円 (`shape = CircleShape`)。背景色で縁取る枠は `avatarShape(ring = 縁の幅)` で角をアイコンと同心にする。
   `uiScale` (UI 全体の倍率) / `fontScale` (文字だけの倍率、`uiScale` と端末の文字サイズに重ねて掛かる)。どちらも 0.75〜1.25 を
   0.025 刻み (`DisplaySettings.ScaleRange` / `ScaleStep`、表記は「x1.0」「x1.025」)。`QuasarAppContent` が `LocalDensity` を `Density(density * uiScale, fontScale * fontScale)` に
   差し替えて効かせるので、Activity の作り直しは要らない。Compose の外で描くもの (埋め込みの Photo Picker) には効かない。
@@ -1142,7 +1156,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   設定画面の Confirmations の「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
-* **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP
+* **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` /
   `SettingsPosting` / `SettingsConfirmations`) は他の画面と同じバックスタックに積む。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。

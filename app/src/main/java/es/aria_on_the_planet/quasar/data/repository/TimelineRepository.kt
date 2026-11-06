@@ -44,12 +44,19 @@ class TimelineRepository(
     /**
      * 非公開の返信 (ダイレクト) の会話を新しい順に、それぞれの最新のポストで返す (ポストの無い会話は除く)。
      * `max_id` は会話の ID なので [Page.nextMaxId] を使う。
+     *
+     * ポストの無い会話 (後始末を通らずに消えたポストを指したまま残ったもの) だけのページは、続きがあれば次のページを読む。
+     * 空のページを返すと終端と見なされ、その先が読めなくなるため。
      */
     suspend fun fetchConversations(session: Session, maxId: String? = null): Page<Post> {
-        val version = cache.issue()
-        val page = api.conversations(session.serverUrl, session.accessToken, maxId)
-        val statuses = page.items.mapNotNull { it.lastStatus }
-        cache.putStatuses(statuses, version)
-        return Page(statuses.map { it.toDomain() }, page.nextMaxId)
+        var nextMaxId = maxId
+        while (true) {
+            val version = cache.issue()
+            val page = api.conversations(session.serverUrl, session.accessToken, nextMaxId)
+            val statuses = page.items.mapNotNull { it.lastStatus }
+            cache.putStatuses(statuses, version)
+            if (statuses.isNotEmpty() || page.nextMaxId == null) return Page(statuses.map { it.toDomain() }, page.nextMaxId)
+            nextMaxId = page.nextMaxId
+        }
     }
 }

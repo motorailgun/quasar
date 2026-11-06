@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.ui.component.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -10,18 +11,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -144,6 +154,86 @@ fun SettingsActionItem(
         modifier = modifier,
         leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         supportingContent = Summary(summary),
+        content = { Text(title) },
+    )
+}
+
+/** [SettingsDropdownItem] のメニューの下に、別のまとまりで並べる操作 (一覧から外す等)。 */
+class SettingsMenuAction(
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+    val destructive: Boolean = false,
+)
+
+/**
+ * 選択肢から 1 つ選ぶ項目のドロップダウン版。右端に今の値と ▾ を出し、行を押すとそこからメニュー (Expressive の
+ * まとまりのあるメニュー。選んでいるものに ✓)。[SettingsChoiceItem] (ダイアログ) と違って選択肢の補足は出せない。
+ *
+ * @param menuLabel メニューの中の選択肢の表示名 (既定は [label])。
+ * @param action 選択肢の下に並べる操作。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun <T> SettingsDropdownItem(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    menuLabel: @Composable (T) -> String = label,
+    action: SettingsMenuAction? = null,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    SegmentedListItem(
+        onClick = { expanded = true },
+        shapes = itemShapes(),
+        colors = itemColors(),
+        modifier = modifier,
+        trailingContent = {
+            // メニューは右端の値から出す
+            Box {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(label(selected), style = MaterialTheme.typography.bodyMedium)
+                    Icon(Symbols.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenuPopup(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    val groups = if (action == null) 1 else 2
+                    DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, groups)) {
+                        options.forEachIndexed { index, option ->
+                            SelectableDropdownMenuItem(
+                                selected = option == selected,
+                                onClick = {
+                                    expanded = false
+                                    onSelect(option)
+                                },
+                                text = { Text(menuLabel(option)) },
+                                shapes = MenuDefaults.itemShape(index, options.size),
+                                // ✓ の分を空けて、選んでいないものの文字の位置を揃える
+                                leadingIcon = { Spacer(Modifier.size(24.dp)) },
+                                selectedLeadingIcon = { Icon(Symbols.Filled.Check, contentDescription = null) },
+                            )
+                        }
+                    }
+                    if (action != null) {
+                        Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+                        DropdownMenuGroup(shapes = MenuDefaults.groupShape(1, groups)) {
+                            val color = if (action.destructive) MaterialTheme.colorScheme.error else Color.Unspecified
+                            DropdownMenuItem(
+                                text = { Text(action.label) },
+                                onClick = {
+                                    expanded = false
+                                    action.onClick()
+                                },
+                                leadingIcon = { Icon(action.icon, contentDescription = null) },
+                                colors = MenuDefaults.itemColors(textColor = color, leadingIconColor = color),
+                            )
+                        }
+                    }
+                }
+            }
+        },
         content = { Text(title) },
     )
 }

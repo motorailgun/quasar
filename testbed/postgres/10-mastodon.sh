@@ -8,3 +8,9 @@ CREATE ROLE mastodon_$s LOGIN PASSWORD '$DB_PASS';
 CREATE DATABASE mastodon_$s OWNER mastodon_$s;
 EOF
 done
+
+# Misskey (パスワードは misskey/default.yml と同じ固定値。DB は外に出られないネットワークにだけいる)
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<EOF2
+CREATE ROLE misskey LOGIN PASSWORD 'misskey-testbed';
+CREATE DATABASE misskey OWNER misskey;
+EOF2

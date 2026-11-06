@@ -77,6 +77,7 @@ ICONS = [
     ("SubdirectoryArrowRight", "subdirectory_arrow_right", True, [O]),
     ("Sync", "sync", False, [O]),
     ("TaskAlt", "task_alt", False, [O]),
+    ("Translate", "translate", False, [O]),
     ("Verified", "verified", False, [O]),
     ("Visibility", "visibility", False, [O]),
     ("VisibilityOff", "visibility_off", False, [O]),

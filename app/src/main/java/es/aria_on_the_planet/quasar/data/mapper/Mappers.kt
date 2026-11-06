@@ -138,6 +138,7 @@ fun StatusDto.toDomain(): Post {
         mentions = body.mentions.map { Mention(it.id, it.username, it.acct, it.url) },
         tags = body.tags.map { Hashtag(it.name, it.url) },
         url = body.url ?: body.uri,
+        language = body.language?.takeIf { it.isNotBlank() },
     )
 }
 

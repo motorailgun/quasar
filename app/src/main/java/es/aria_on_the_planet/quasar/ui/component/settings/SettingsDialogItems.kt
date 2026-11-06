@@ -56,33 +56,55 @@ fun <T> SettingsChoiceItem(
         showChevron = false,
     )
     if (open) {
-        AlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text(title) },
-            text = {
-                Column(
-                    Modifier
-                        .selectableGroup()
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    options.forEach { option ->
-                        ChoiceRow(
-                            label = label(option),
-                            description = description?.invoke(option),
-                            selected = option == selected,
-                            onClick = {
-                                open = false
-                                onSelect(option)
-                            },
-                        )
-                    }
-                }
+        SettingsChoiceDialog(
+            title = title,
+            options = options,
+            selected = selected,
+            label = label,
+            description = description,
+            onSelect = {
+                open = false
+                onSelect(it)
             },
-            confirmButton = {
-                TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { open = false },
         )
     }
+}
+
+/** [SettingsChoiceItem] のダイアログ。選んだ時点で [onSelect] (閉じるのは呼び出し側)。 */
+@Composable
+private fun <T> SettingsChoiceDialog(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+    description: (@Composable (T) -> String?)?,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                Modifier
+                    .selectableGroup()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                options.forEach { option ->
+                    ChoiceRow(
+                        label = label(option),
+                        description = description?.invoke(option),
+                        selected = option == selected,
+                        onClick = { onSelect(option) },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 @Composable

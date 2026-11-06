@@ -1,11 +1,13 @@
 """テスト環境のアカウントを動かす (標準ライブラリのみ)。
 
-  python bots.py wait          3 サーバの API が応答するまで待つ
+  python bots.py wait          全サーバの API が応答するまで待つ
+  python bots.py misskey-accounts  Misskey の管理者と userN を作り、トークンの JSON を出す (testbed.sh が state/ に書く)
   python bots.py setup         プロフィールの設定・全員を相互フォロー (冪等)
   python bots.py run           投稿・返信・お気に入り等を一定間隔で続ける (BOT_INTERVAL 秒、既定 12)
   python bots.py burst N       N 回の操作をすぐに行う
 
-トークンは testbed.sh が state/tokens/<server>.json に書いたものを使う。
+トークンは testbed.sh が state/tokens/<server>.json に書いたものを使う。Misskey (misskey.quasar.test) は
+state/tokens/misskey.json があるときだけ加わる。
 """
 
 import json
@@ -25,6 +27,11 @@ STATE = Path("/testbed/state")
 SERVERS = ["alpha", "stable", "legacy"]
 # 鍵アカウントにする番号 (フォローがリクエストになる)
 LOCKED = {"user10"}
+MISSKEY_DOMAIN = "misskey.quasar.test"
+MISSKEY_USERS = 5
+MISSKEY_PASSWORD = "quasar-testbed"
+# misskey/default.yml の setupPassword
+MISSKEY_SETUP_PASSWORD = "quasar-testbed"
 
 
 def log(*args):
@@ -37,12 +44,15 @@ class ApiError(Exception):
         self.status = status
 
 
-def request(url, method="GET", token=None, form=None, files=None, timeout=60):
+def request(url, method="GET", token=None, form=None, files=None, timeout=60, json_body=None):
     headers = {"User-Agent": "quasar-testbed-bots"}
     data = None
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    if files:
+    if json_body is not None:
+        data = json.dumps(json_body).encode()
+        headers["Content-Type"] = "application/json"
+    elif files:
         boundary = uuid.uuid4().hex
         data = multipart(boundary, form or [], files)
         headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
@@ -158,9 +168,63 @@ class Bot:
         return [s for s in self.get("/api/v1/timelines/home", limit=limit) if s["account"]["id"] != self.id]
 
 
+class MisskeyServer:
+    """Misskey。API は POST /api/<endpoint> に JSON (トークンは i)。"""
+
+    name = "misskey"
+    domain = MISSKEY_DOMAIN
+    base = f"https://{MISSKEY_DOMAIN}"
+    emojis = []
+
+    def __init__(self, data):
+        self.bots = [MisskeyBot(self, a) for a in data["accounts"]]
+
+
+class MisskeyBot:
+    def __init__(self, server, account):
+        self.server = server
+        self.username = account["username"]
+        self.id = account["id"]
+        self.token = account["token"]
+
+    @property
+    def acct(self):
+        return f"{self.username}@{self.server.domain}"
+
+    def __str__(self):
+        return f"@{self.acct}"
+
+    def api(self, endpoint, **body):
+        return request(f"{self.server.base}/api/{endpoint}", "POST", json_body={"i": self.token, **body})
+
+    def resolve(self, other):
+        """他のアカウントの、Misskey 内でのユーザー ID (ap/show で取り込む)。"""
+        if other.server is self.server:
+            return other.id
+        res = self.api("ap/show", uri=f"https://{other.server.domain}/@{other.username}")
+        if res.get("type") != "User":
+            raise ApiError(404, f"could not resolve {other}")
+        return res["object"]["id"]
+
+    def upload_png(self, width, height, seed, name):
+        boundary_form = [("i", self.token), ("name", name)]
+        return request(f"{self.server.base}/api/drive/files/create", "POST", None, boundary_form,
+                       [("file", name, "image/png", png(width, height, seed))])
+
+    def timeline(self, limit=30):
+        return [n for n in self.api("notes/timeline", limit=limit) if n["userId"] != self.id]
+
+
+def misskey_server():
+    path = STATE / "tokens" / "misskey.json"
+    return MisskeyServer(json.loads(path.read_text())) if path.exists() else None
+
+
 def load():
+    """(Mastodon のサーバ, Mastodon の bots, Misskey の bots)。"""
     servers = [Server(n) for n in SERVERS]
-    return servers, [b for s in servers for b in s.bots]
+    misskey = misskey_server()
+    return servers, [b for s in servers for b in s.bots], misskey.bots if misskey else []
 
 
 # ---- 文面 ----
@@ -338,6 +402,65 @@ def act_refollow(bot, everyone):
     return f"followed {other}"
 
 
+# ---- Misskey の操作 ----
+
+MISSKEY_PHRASES = [
+    "Misskey からのテスト投稿です", "Hello from Misskey!", "今日はいい天気", "This note has no language metadata.",
+    "日本語の文章を書いてみるテスト。翻訳されるかな？", "English sentence from Misskey for translation tests.",
+    "Bonjour depuis Misskey", "Hola desde Misskey", "안녕하세요, 미스키에서 왔어요", "**太字** と <i>MFM</i> のテスト $[x2 大きい]",
+]
+
+
+def mk_post(bot, everyone):
+    parts = [random.choice(MISSKEY_PHRASES)]
+    if random.random() < 0.25:
+        other = random.choice([b for b in everyone if b is not bot])
+        parts.insert(0, f"@{other.username}" if other.server is bot.server else f"@{other.acct}")
+    if random.random() < 0.3:
+        parts.append(" ".join(f"#{t}" for t in random.sample(TAGS, random.randint(1, 2))))
+    body = {"text": "\n".join(parts), "visibility": random.choices(["public", "home", "followers"], [6, 2, 1])[0]}
+    if random.random() < 0.15:
+        body["cw"] = random.choice(["ネタバレ", "CW test"])
+    if random.random() < 0.1:
+        body["poll"] = {"choices": random.sample(["りんご", "みかん", "Option A", "Option B"], 3), "multiple": False}
+    elif random.random() < 0.1:
+        f = bot.upload_png(320, 240, random.random(), "image.png")
+        body["fileIds"] = [f["id"]]
+    n = bot.api("notes/create", **body)["createdNote"]
+    return f"noted {n['id']} ({n['visibility']})"
+
+
+def mk_react(bot, everyone):
+    notes = [n for n in bot.timeline() if n.get("renoteId") is None or n.get("text")]
+    if not notes:
+        return None
+    n = random.choice(notes)
+    if n.get("myReaction"):
+        return None
+    bot.api("notes/reactions/create", noteId=n["id"], reaction=random.choice(["👍", "❤", "🎉", "😆"]))
+    return f"reacted to {n['id']}"
+
+
+def mk_renote(bot, everyone):
+    notes = [n for n in bot.timeline() if n["visibility"] in ("public", "home") and n.get("renoteId") is None]
+    if not notes:
+        return None
+    n = random.choice(notes)
+    r = bot.api("notes/create", renoteId=n["id"])["createdNote"]
+    return f"renoted {n['id']} -> {r['id']}"
+
+
+def mk_reply(bot, everyone):
+    notes = [n for n in bot.timeline() if n.get("renoteId") is None]
+    if not notes:
+        return None
+    n = random.choice(notes)
+    r = bot.api("notes/create", replyId=n["id"], text=random.choice(["それな", "いいね！", "Nice!", "わかる"]))["createdNote"]
+    return f"replied {r['id']} -> {n['id']}"
+
+
+MISSKEY_ACTIONS = [(mk_post, 40), (mk_react, 30), (mk_renote, 10), (mk_reply, 15)]
+
 ACTIONS = [
     (act_post, 30), (act_reply, 15), (act_toggle("favourite"), 25), (act_toggle("reblog"), 10),
     (act_toggle("bookmark"), 4), (act_quote, 5), (act_vote, 6), (act_edit, 2), (act_delete, 1),
@@ -345,9 +468,12 @@ ACTIONS = [
 ]
 
 
-def step(everyone):
-    bot = random.choice(everyone)
-    fn = random.choices([a for a, _ in ACTIONS], [w for _, w in ACTIONS])[0]
+def step(everyone, misskey=()):
+    bot = random.choice([*everyone, *misskey])
+    actions = MISSKEY_ACTIONS if isinstance(bot, MisskeyBot) else ACTIONS
+    fn = random.choices([a for a, _ in actions], [w for _, w in actions])[0]
+    # Mastodon の bots の操作の相手 (メンション・フォロー) には Misskey の bots も入れる
+    everyone = [*everyone, *misskey]
     try:
         result = fn(bot, everyone)
         if result:
@@ -360,11 +486,14 @@ def step(everyone):
 
 def cmd_wait():
     deadline = time.time() + 600
-    for name in SERVERS:
+    for name in [*SERVERS, "misskey"]:
         url = f"https://{name}.quasar.test/api/v1/instance"
         while True:
             try:
-                v = request(url, timeout=10)["version"]
+                if name == "misskey":
+                    v = request(f"https://{MISSKEY_DOMAIN}/api/meta", "POST", json_body={}, timeout=10)["version"]
+                else:
+                    v = request(url, timeout=10)["version"]
                 log(f"{name}: up ({v})")
                 break
             except Exception as e:
@@ -373,8 +502,57 @@ def cmd_wait():
                 time.sleep(3)
 
 
+def cmd_misskey_accounts():
+    """管理者 (admin) と user1〜N を作り、トークンを JSON で標準出力の最後の行に出す。既にいれば作らない (失敗する)。"""
+    base = f"https://{MISSKEY_DOMAIN}/api"
+    admin = request(f"{base}/admin/accounts/create", "POST", json_body={
+        "username": "admin", "password": MISSKEY_PASSWORD, "setupPassword": MISSKEY_SETUP_PASSWORD})
+    # 新しいサーバは連合しない設定 (federation: none) で始まる
+    request(f"{base}/admin/update-meta", "POST", json_body={"i": admin["token"], "federation": "all"})
+    # API のレート制限 (ap/show は 1 時間に 30 回等) を外す。0 なら数えない
+    request(f"{base}/admin/roles/update-default-policies", "POST",
+            json_body={"i": admin["token"], "policies": {"rateLimitFactor": 0}})
+    accounts = []
+    for n in range(1, MISSKEY_USERS + 1):
+        u = request(f"{base}/admin/accounts/create", "POST", json_body={
+            "i": admin["token"], "username": f"user{n}", "password": MISSKEY_PASSWORD})
+        accounts.append({"username": u["username"], "id": u["id"], "token": u["token"]})
+        log(f"misskey: created user{n}")
+    print(json.dumps({"domain": MISSKEY_DOMAIN, "password": MISSKEY_PASSWORD,
+                      "admin": {"id": admin["id"], "token": admin["token"]}, "accounts": accounts}))
+
+
+def setup_misskey(misskey, everyone):
+    for bot in misskey:
+        n = int(bot.username.removeprefix("user"))
+        try:
+            avatar = bot.upload_png(128, 128, f"{bot.acct}-avatar", "avatar.png")
+            banner = bot.upload_png(600, 200, f"{bot.acct}-header", "header.png")
+            bot.api("i/update", name=f"Misskey {n:02d}", description=f"misskey サーバのテスト用アカウント {n} 号です。\n#quasar #testbed",
+                    avatarId=avatar["id"], bannerId=banner["id"])
+            log(f"{bot}: profile updated")
+        except ApiError as e:
+            log(f"{bot}: profile failed: {e}")
+    for bot in misskey:
+        followed = 0
+        for other in everyone + misskey:
+            if other is bot:
+                continue
+            try:
+                uid = bot.resolve(other)
+                rel = bot.api("users/relation", userId=[uid])[0]
+                if not rel["isFollowing"] and not rel["hasPendingFollowRequestFromYou"]:
+                    bot.api("following/create", userId=uid)
+                    followed += 1
+            except ApiError as e:
+                log(f"{bot}: follow {other} failed: {e}")
+        log(f"{bot}: followed {followed} accounts")
+
+
 def cmd_setup():
-    servers, everyone = load()
+    servers, everyone, misskey = load()
+    if misskey:
+        setup_misskey(misskey, everyone)
     for bot in everyone:
         n = int(bot.username.removeprefix("user"))
         form = [
@@ -397,7 +575,7 @@ def cmd_setup():
 
     for bot in everyone:
         followed = 0
-        for other in everyone:
+        for other in everyone + misskey:
             if other is bot:
                 continue
             try:
@@ -422,24 +600,26 @@ def cmd_setup():
 
 
 def cmd_run():
-    _, everyone = load()
+    _, everyone, misskey = load()
     interval = float(os.environ.get("BOT_INTERVAL", "12"))
-    log(f"running {len(everyone)} bots, interval {interval}s")
+    log(f"running {len(everyone) + len(misskey)} bots, interval {interval}s")
     while True:
-        step(everyone)
+        step(everyone, misskey)
         time.sleep(random.uniform(interval * 0.5, interval * 1.5))
 
 
 def cmd_burst(n):
-    _, everyone = load()
+    _, everyone, misskey = load()
     for _ in range(n):
-        step(everyone)
+        step(everyone, misskey)
 
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "run"
     if cmd == "wait":
         cmd_wait()
+    elif cmd == "misskey-accounts":
+        cmd_misskey_accounts()
     elif cmd == "setup":
         cmd_setup()
     elif cmd == "run":

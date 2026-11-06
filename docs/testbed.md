@@ -1,6 +1,6 @@
 # testbed: 動作確認用の連合環境の使い方
 
-`testbed/` は Docker の中に Mastodon を 3 台立てて互いに連合させ、bots が投稿・リアクションし合う環境。
+`testbed/` は Docker の中に Mastodon を 3 台と Misskey を 1 台立てて互いに連合させ、bots が投稿・リアクションし合う環境。
 自分の管理下にない実サーバで条件に合う投稿を探したり、版ごとの API の違いを確かめたりする代わりに使う。
 環境そのものの構成 (compose・CA・アカウント・bots の中身) は [testbed/README.md](../testbed/README.md)。
 ここには、Quasar の開発で使うときの設定とセットアップの手順をまとめる。
@@ -10,6 +10,7 @@
 | `alpha.quasar.test` | main の nightly を日付で固定 (`ALPHA_TAG`。alpha は版で tag されない) |
 | `stable.quasar.test` | 最新安定版 (`STABLE_TAG`) |
 | `legacy.quasar.test` | 3.5.19 (`LEGACY_TAG`) |
+| `misskey.quasar.test` | Misskey (`MISSKEY_TAG`)。Mastodon 以外から届くポストの確かめ用 (ログインはしない) |
 
 ## 前提
 
@@ -113,11 +114,17 @@ android:networkSecurityConfig="@xml/network_security_config"
   バージョン判定はまだ無い。
 * **3.5.19**: 引用を知らないので、4.x からの引用ポストは本文の「RE: <リンク>」として届く (サーバ側の仕様)。
 * 引用 (bots の quote) は 4.5 以降のサーバだけで行う。
+* **Misskey (2026.10.1) のノートには言語が無い**: AP の Note に `contentMap` (言語) を付けないので、どの版の Mastodon でも
+  `language` が `null` になる (ノートの作成で `lang` を渡しても同じ)。オンデバイス翻訳は言語の無いポストに出ない。
 
 ## つまずいたこと
 
 * nginx で `location` に `proxy_set_header` を書くと `server` レベルのものが消え、`Host` が渡らず全リクエストが 403 に
   なった。ヘッダは各 `location` に書いてある (`proxy/nginx.conf`)。
+* Misskey: 新しいサーバは連合しない (`federation: none`) で始まり、`ap/show` 等のレート制限 (1 時間に 30 回等) で
+  相互フォローの途中から 429 になった。`bots.py misskey-accounts` が両方を設定する。`users/relation` は配列を返す。
+* Postgres の初期化スクリプト (`postgres/`) はデータが空のときしか走らないので、後から足した Misskey の DB は
+  `testbed.sh up` (`prepare_misskey_db`) が作る。
 * 3.5.19 のイメージは `/opt/mastodon` (4.x は `/mastodon`)。メディアのボリュームは root で作られるので、`up` が
   `chown 991:991` している。
 * `init` はホストのユーザーで走らせる (root で作ると `state/` にホスト側から書けない)。

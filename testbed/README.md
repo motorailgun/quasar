@@ -1,13 +1,14 @@
 # testbed: 動作確認用の連合環境
 
-自分の管理下にない実サーバで確かめる代わりに、Docker の中に Mastodon を 3 台立てて互いに連合させ、
-10 アカウントずつが投稿・リアクションし合う環境。
+自分の管理下にない実サーバで確かめる代わりに、Docker の中に Mastodon を 3 台と Misskey を 1 台立てて互いに連合させ、
+各アカウントが投稿・リアクションし合う環境。
 
 | ドメイン | 版 (`.env`) |
 | --- | --- |
 | `alpha.quasar.test` | latest alpha (`ALPHA_TAG`。alpha は版で tag されないので main の nightly を日付で固定) |
 | `stable.quasar.test` | latest stable (`STABLE_TAG`) |
 | `legacy.quasar.test` | 3.5.19 (`LEGACY_TAG`) |
+| `misskey.quasar.test` | Misskey (`MISSKEY_TAG`) |
 
 ## 使い方
 
@@ -32,6 +33,10 @@
   `mastodon/accounts.rb` (`rails runner`) が作ったトークン (`tokens/<server>.json`)。各コンテナは CA を `SSL_CERT_FILE` で信頼する。
 * アカウント: 各サーバに `user1`〜`user10` (パスワード `quasar-testbed`、メールは `userN@<domain>`)。`user10` は鍵
   アカウント (フォローリクエストを半分だけ承認済み)、`user9` は bot。カスタム絵文字 `:quasar:` `:testbed:` `:blobok:`。
+* Misskey: 設定は `misskey/default.yml` (DB のパスワード等は固定値)。DB は共有の Postgres の `misskey`。アカウントは
+  `bots.py misskey-accounts` が API で作る (管理者 `admin` と `user1`〜`user5`、パスワード `quasar-testbed`。トークンは
+  `tokens/misskey.json`)。その際に連合を有効 (新しいサーバは `federation: none` で始まる) にし、API のレート制限を外す
+  (既定のロールの `rateLimitFactor` = 0)。Mastodon の全員と相互フォロー。
 * `bots/bots.py` (標準ライブラリのみ): 投稿 (CW・投票・画像・メンション・ハッシュタグ・長文)・返信・お気に入り・ブースト・
   ブックマーク・引用 (4.5+)・投票・編集・削除・フォローリクエストへの返事・フォロー / 解除。
 

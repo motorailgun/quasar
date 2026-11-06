@@ -17,6 +17,8 @@ import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.TranslationMode
+import es.aria_on_the_planet.quasar.domain.model.settings.TranslationSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,6 +47,12 @@ class SettingsPreferencesTest {
         confirmations = setOf(ConfirmTarget.Post, ConfirmTarget.Unboost),
         defaultVisibility = PostVisibility.Private,
         predictiveBack = PredictiveBackSettings(maxDragFraction = 0.5f, dragLogSteepness = 5f, transitionMillis = 200),
+        translation = TranslationSettings(
+            enabled = true,
+            defaultMode = TranslationMode.Hidden,
+            languageModes = mapOf("es" to TranslationMode.Automatic, "zh-hans" to TranslationMode.Offer),
+            targetLanguage = "en",
+        ),
     )
 
     private fun written(before: AppSettings, after: AppSettings) =
@@ -85,6 +93,17 @@ class SettingsPreferencesTest {
         // 既定値が null の項目 (アカウントの既定) を明示的に選び直した場合も null
         val visibility = written(AppSettings(defaultVisibility = PostVisibility.Public), AppSettings()).toAppSettings()
         assertEquals(null, visibility.defaultVisibility)
+        // 翻訳先の「端末の言語」も同じ
+        val target = written(AppSettings(translation = TranslationSettings(targetLanguage = "en")), AppSettings()).toAppSettings()
+        assertEquals(null, target.translation.targetLanguage)
+        // 翻訳の言語ごとの扱いは、空にした一覧と「まだ変えていない」(null) を分ける
+        val emptied = written(AppSettings(), AppSettings(translation = TranslationSettings(languageModes = emptyMap())))
+        assertEquals(emptyMap<String, TranslationMode>(), emptied.toAppSettings().translation.languageModes)
+        val untouched = mutablePreferencesOf().also {
+            writeSettingsChanges(it, AppSettings(), AppSettings(translation = TranslationSettings(languageModes = emptyMap())))
+            writeSettingsChanges(it, AppSettings(translation = TranslationSettings(languageModes = emptyMap())), AppSettings())
+        }
+        assertEquals(null, untouched.toAppSettings().translation.languageModes)
     }
 
     @Test

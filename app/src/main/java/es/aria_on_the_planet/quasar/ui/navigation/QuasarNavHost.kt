@@ -77,6 +77,8 @@ import es.aria_on_the_planet.quasar.ui.settings.ConfirmationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.PostingSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
+import es.aria_on_the_planet.quasar.ui.settings.TranslationSettingsPage
+import es.aria_on_the_planet.quasar.ui.component.post.LocalPostTranslations
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
@@ -153,6 +155,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
         LocalNavigator provides navigator,
         LocalAccountActions provides accountActions,
         LocalOwnPostActions provides ownPostActions,
+        LocalPostTranslations provides container.postTranslations,
         LocalFloatingPanelInset provides panel.coveredWidth,
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -611,6 +614,7 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         val session by container.sessionStore.session.collectAsStateWithLifecycle()
         SettingsTopPage(
             serverUrl = session?.serverUrl,
+            translationAvailable = container.postTranslations != null,
             onNavigate = navigate,
             onLogout = container.oauthLogin::logout,
             onBack = navigator::back,
@@ -626,6 +630,14 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
     entry<Route.SettingsPosting> { WithSettings(container) { PostingSettingsPage(it, update, onBack = navigator::back) } }
     entry<Route.SettingsConfirmations> {
         WithSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
+    }
+    entry<Route.SettingsTranslation> {
+        val translations = container.postTranslations
+        if (translations == null) {
+            LaunchedEffect(Unit) { navigator.back() }
+        } else {
+            WithSettings(container) { TranslationSettingsPage(it.translation, translations, update, onBack = navigator::back) }
+        }
     }
 }
 

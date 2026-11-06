@@ -17,6 +17,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoic
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.TranslationMode
 
 /**
  * [AppSettings] と DataStore (Preferences) の対応。項目ごとに 1 つのキーを持つ。
@@ -92,6 +93,12 @@ private fun float(
 private inline fun <reified E : Enum<E>> enumOrNull(name: String): E? = enumValues<E>().firstOrNull { it.name == name }
 
 private const val AccountDefaultVisibility = "account"
+
+/** 翻訳先の「端末の言語」(`null`)。 */
+private const val DeviceTranslationTarget = "device"
+
+/** 翻訳の言語ごとの扱いの「まだ変えていない」(`null`。端末の言語を出さない一覧)。空の一覧とは別。 */
+private const val DeviceLanguageModes = "device"
 
 private val SettingFields: List<SettingField<*, *>> = listOf(
     optionalPositiveInt(
@@ -194,6 +201,40 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
     ),
     boolean("compress_oversized_images", { it.compressOversizedImages }) { s, v -> s.copy(compressOversizedImages = v) },
     boolean("strip_image_metadata", { it.stripImageMetadata }) { s, v -> s.copy(stripImageMetadata = v) },
+    boolean("translation_enabled", { it.translation.enabled }) { s, v -> s.copy(translation = s.translation.copy(enabled = v)) },
+    SettingField(
+        stringPreferencesKey("translation_default_mode"),
+        { it.translation.defaultMode },
+        { s, v -> s.copy(translation = s.translation.copy(defaultMode = v)) },
+        encode = { it.name },
+        decode = { stored -> enumOrNull<TranslationMode>(stored)?.let(::Decoded) },
+    ),
+    SettingField(
+        stringSetPreferencesKey("translation_language_modes"),
+        { it.translation.languageModes },
+        { s, v -> s.copy(translation = s.translation.copy(languageModes = v)) },
+        encode = { modes -> modes?.mapTo(HashSet()) { (code, mode) -> "$code=${mode.name}" } ?: setOf(DeviceLanguageModes) },
+        decode = { stored ->
+            if (stored == setOf(DeviceLanguageModes)) {
+                Decoded(null)
+            } else {
+                // 読めない項目だけ飛ばす
+                Decoded(
+                    stored.mapNotNull { entry ->
+                        val code = entry.substringBefore('=', "").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                        enumOrNull<TranslationMode>(entry.substringAfter('='))?.let { code to it }
+                    }.toMap(),
+                )
+            }
+        },
+    ),
+    SettingField(
+        stringPreferencesKey("translation_target"),
+        { it.translation.targetLanguage },
+        { s, v -> s.copy(translation = s.translation.copy(targetLanguage = v)) },
+        encode = { it ?: DeviceTranslationTarget },
+        decode = { stored -> Decoded(stored.takeIf { it != DeviceTranslationTarget && it.isNotBlank() }) },
+    ),
     float(
         "predictive_back_max_drag_fraction",
         PredictiveBackSettings.MaxDragFractionRange,

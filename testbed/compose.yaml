@@ -3,6 +3,7 @@
 #   alpha.quasar.test   Mastodon nightly (latest alpha)
 #   stable.quasar.test  Mastodon latest stable
 #   legacy.quasar.test  Mastodon 3.5.19
+#   misskey.quasar.test Misskey latest
 #
 # Mastodon と Postgres / Redis / bots は外に出られない internal ネットワークだけに繋ぐ。
 # proxy (nginx) だけが外向きのネットワークにも繋がり、3 つのドメインの別名を持って TLS を終端する。
@@ -107,6 +108,7 @@ services:
   alpha-redis: *redis
   stable-redis: *redis
   legacy-redis: *redis
+  misskey-redis: *redis
 
   alpha-web:
     <<: *alpha
@@ -151,6 +153,24 @@ services:
     command: node ./streaming
     volumes: *mastodon-volumes
 
+  # Misskey (投稿に言語が付かない等、Mastodon 以外から届くポストの確かめ用)。DB は共有の Postgres の misskey
+  misskey:
+    image: misskey/misskey:${MISSKEY_TAG}
+    environment:
+      NODE_ENV: production
+      NODE_EXTRA_CA_CERTS: /testbed/state/certs/ca.crt
+    volumes:
+      - ./misskey/default.yml:/misskey/.config/default.yml:ro
+      - misskey-files:/misskey/files
+      - ./state:/testbed/state:ro
+    networks: [fediverse]
+    restart: unless-stopped
+    depends_on: { db: { condition: service_healthy }, misskey-redis: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -X POST -H 'Content-Type: application/json' -d '{}' localhost:3000/api/meta >/dev/null || exit 1"]
+      interval: 10s
+      start_period: 120s
+
   proxy:
     image: nginx:1.29-alpine
     volumes:
@@ -159,7 +179,7 @@ services:
     networks:
       fediverse:
         ipv4_address: 172.31.89.10
-        aliases: [alpha.quasar.test, stable.quasar.test, legacy.quasar.test]
+        aliases: [alpha.quasar.test, stable.quasar.test, legacy.quasar.test, misskey.quasar.test]
       edge: {}
     ports:
       - "${TESTBED_BIND:-127.0.0.1}:${TESTBED_HTTPS_PORT:-443}:443"
@@ -206,3 +226,4 @@ volumes:
   alpha-system:
   stable-system:
   legacy-system:
+  misskey-files:

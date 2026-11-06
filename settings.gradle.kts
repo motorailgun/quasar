@@ -24,4 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Quasar"
 include(":app")
+// llama.cpp (third_party/llama.cpp) の JNI。オンデバイス翻訳 (PLaMo 3 Translate) 用。今は debug / benchmark だけ
+include(":llama")
  

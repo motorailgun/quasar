@@ -330,6 +330,14 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
         PostDetailGallery(text, onBack)
         return
     }
+    if (scenario == GalleryScenario.Translation) {
+        TranslationGallery(remember(text) { GalleryFixtures.posts(text) }, onBack)
+        return
+    }
+    if (scenario == GalleryScenario.TranslationLanguages) {
+        TranslationLanguagesGallery(onBack)
+        return
+    }
     if (scenario == GalleryScenario.AccountReactions) {
         // 画面の骨組みごと本物を使う (トップバーの文言も確かめたいので、ギャラリーの DetailScaffold には載せない)
         val fixture = remember(text) { GalleryFixtures.profile(text) }
@@ -430,6 +438,8 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
 
             GalleryScenario.AccountReactions,
             GalleryScenario.PostDetail,
+            GalleryScenario.Translation,
+            GalleryScenario.TranslationLanguages,
             GalleryScenario.MyProfile,
             GalleryScenario.OtherProfile -> Unit
 

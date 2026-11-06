@@ -49,6 +49,8 @@ data class Post(
     val tags: List<Hashtag> = emptyList(),
     /** 元のサーバでのページ (`url`、無ければ `uri`)。 */
     val url: String? = null,
+    /** 本文の言語 (`language`、ISO 639 / BCP 47。投稿者が選んだもの)。無いことがある。 */
+    val language: String? = null,
 )
 
 /**

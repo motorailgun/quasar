@@ -1,6 +1,8 @@
 package es.aria_on_the_planet.quasar.di
 
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.net.Uri
 import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
 import es.aria_on_the_planet.quasar.data.cache.CacheDatabase
@@ -25,12 +27,20 @@ import es.aria_on_the_planet.quasar.data.session.SecureStorage
 import es.aria_on_the_planet.quasar.data.session.SessionStore
 import es.aria_on_the_planet.quasar.data.settings.SettingsStore
 import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
+import es.aria_on_the_planet.quasar.data.translation.PostTranslator
+import es.aria_on_the_planet.quasar.data.translation.TextClassifierLanguageDetector
+import es.aria_on_the_planet.quasar.data.translation.TranslationModelFiles
+import es.aria_on_the_planet.quasar.data.translation.createTranslationEngine
+import es.aria_on_the_planet.quasar.ui.translation.PostTranslationStore
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.EditTarget
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.PostEditStore
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -145,4 +155,49 @@ class AppContainer(context: Context) {
     )
 
     val streamingClient = StreamingClient(okHttpClient, json, instanceRepository, cache)
+
+    /**
+     * ポストの訳 (端末内のモデル)。モデルを持たないビルド (lite) では null で、翻訳の表示・設定は出ない。
+     * 状態はメインスレッドで持つ (一覧の各項目が読む)。モデルは最初に訳すときに読み込む。
+     */
+    val postTranslations: PostTranslationStore?
+
+    init {
+        val translationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val modelFiles = TranslationModelFiles(context, translationScope)
+        val engine = createTranslationEngine(context, modelFiles.file, appScope)
+        postTranslations = engine?.let {
+            PostTranslationStore(
+                translator = PostTranslator(it),
+                model = modelFiles,
+                settings = settingsStore.settings,
+                scope = translationScope,
+                languageDetector = TextClassifierLanguageDetector(context),
+            ).also { store -> observeAppState(context, store) }
+        }
+        // lite: full から入れ替えたときに残ったモデル (数百 MB)・ダウンロードを消す
+        if (engine == null) appScope.launch { modelFiles.delete() }
+    }
+
+    /** 裏に回った・メモリが足りないときに翻訳のモデルを解放させる (Application を作った直後、メインスレッドで呼ぶ)。 */
+    private fun observeAppState(context: Context, translations: PostTranslationStore) {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) = translations.onForeground()
+            override fun onStop(owner: LifecycleOwner) = translations.onBackground()
+        })
+        context.registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                // 裏に回ったこと (UI_HIDDEN) は onStop で扱う。前面での RUNNING_LOW / CRITICAL (Android 13 まで) と、
+                // 裏で終わらされそうな BACKGROUND 以上で解放する
+                @Suppress("DEPRECATION")
+                if (level != ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+                    translations.onMemoryPressure()
+                }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onLowMemory() = translations.onMemoryPressure()
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+        })
+    }
 }

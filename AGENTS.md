@@ -19,6 +19,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
+| オンデバイス翻訳 (試作) | llama.cpp (git submodule `third_party/llama.cpp`、タグ b12129) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
 
 DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。
 
@@ -40,6 +41,10 @@ es.aria_on_the_planet.quasar
 │   ├── session/                    SessionStore (サーバ URL / アクセストークン / OAuth クライアント) + SecureStorage (Keystore で暗号化)
 │   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
 │   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
+│   ├── translation/                オンデバイス翻訳 (PlamoPrompt = PLaMo 3 Translate の PFML3 の組み立て・言語コード /
+│   │                               TranslatableHtml = 本文の HTML と訳させる形の変換・訳文の検査 / PostTranslator =
+│   │                               ポストを訳す + translationOfferFor / TranslationModelFiles = モデルのダウンロード・削除 /
+│   │                               TranslationEngine。実装はフレーバーごと: src/full = llama.cpp、src/lite = 無し)
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
@@ -107,6 +112,7 @@ es.aria_on_the_planet.quasar
     ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
+    ├── translation/                ポストの訳の状態 (PostTranslationStore。アプリ全体で 1 つ、LocalPostTranslations) / 言語の表示名
     ├── reactions/                  通知のユーザー単位のまとめの中身 (AccountReactionsScreen / ViewModel) /
     │                               ポストをブースト・お気に入りにしたユーザーの一覧 (PostReactionsScreen / ViewModel)
     ├── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
@@ -121,6 +127,14 @@ debug / benchmark ビルドだけに入るもの (`app/src/debug/`、release に
 es.aria_on_the_planet.quasar.debug  DebugGalleryActivity / GalleryScenario (+ 表示設定の上書き) / GalleryFixtures
 assets/gallery/                     固定データ (API と同じ形の JSON + 画像)。scripts/gallery/generate.py が生成
 ```
+
+別モジュール `:llama` (`llama/`、パッケージ `es.aria_on_the_planet.quasar.llama`): llama.cpp の JNI (`src/main/cpp/quasar_llama.cpp`) と
+`LlamaModel` (読み込み・生成)。llama.cpp の API はこの中だけで使う。app からはフレーバー `full` だけ (`fullImplementation`)。
+
+**フレーバー** (次元 `translation`): `full` (端末内の翻訳あり、既定) / `lite` (無し)。build type (debug / benchmark / release) と
+掛け合わせて `fullDebug`・`liteRelease` 等。applicationId は同じで、互いに上書きして入れ替えられる (lite は起動時に full の残した
+モデル・ダウンロードを消す。翻訳の設定の値は残るが lite では使わない)。翻訳のギャラリーは `src/fullDebug` (lite は
+`src/liteDebug` の「無い」と出すだけ。benchmark は `src/{full,lite}Debug` を共有)。
 
 `scripts/gallery/generate.py` (ギャラリーの固定データの生成)、`scripts/icons/generate.py` (アイコンの生成)、`scripts/perf/measure.sh` (描画の負荷の測定)。
 
@@ -184,6 +198,7 @@ data class Post(
     val inReplyToId: String?,      // in_reply_to_id (中身の値)
     val mentions: List<Mention>,   // mentions (id / username / acct / url)。返信の宛先・本文のメンションのタップに使う
     val tags: List<Hashtag>,       // tags (name / url)。本文のハッシュタグのタップに使う
+    val language: String?,         // language (ISO 639)。翻訳の元の言語。無いことがある
 )
 
 /** ログイン中ユーザーから見た状態。 */
@@ -1019,6 +1034,40 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 
+## オンデバイス翻訳 (試作。`:llama` + `data/translation/`)
+
+PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。アプリへの組み込みは試作でフレーバー `full` だけ
+(`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「〇〇語から翻訳 /
+原文を表示 / 翻訳を表示」(`PostTranslationBar`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「翻訳」。状態はアプリ全体で
+1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
+**裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、
+UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持ったまま裏にいるとアプリごと終わらされやすい)。訳しかけは順番待ちに戻す。
+**設計・実験の結果・確かめ方は [docs/translation-ondevice.md](docs/translation-ondevice.md)**。以前の ML Kit + サーバー側翻訳の
+設計は `origin/translation` ブランチの `docs/translation.md`。
+
+* 流れ: `toTranslatableHtml` (本文の HTML を簡略化) → `plamoTranslationPrompt` (PFML3) → `LlamaModel.generate` (`:llama`) →
+  `restoreTranslatedHtml` (検査して戻す。崩れていたら null) → `EmojiText(isHtml = true)`。変換は純粋関数で、
+  `PlamoPromptTest` / `TranslatableHtmlTest`。**挙動を変えたらテストとドキュメントの実験結果の節も直す**。
+* 言語の無いポスト (Misskey は送ってこない) は本文から端末の TextClassifier (`detectLanguage`) で推定する
+  (`detectPostLanguage`、`LanguageDetectionTest`)。`PostTranslationStore` が裏で推定してから翻訳の表示を出す。
+* **ポストの本文は他人が書いたものなので、本文の `<|plamo:…|>` でプロンプトの構造を変えさせない**。llama.cpp の PLaMo 3 の
+  トークナイザは `parse_special = false` でも制御トークンにするため、ユーザーの文字列は `neutralizeSpecialTokens` で崩し、
+  JNI は特殊でない断片から制御トークンが出たら生成しない。llama.cpp を上げたら `llama-tokenize --no-parse-special` で挙動を確かめる。
+* 本文は平文ではなく簡略化した HTML で渡す (平文だとハッシュタグが訳され、絵文字が動く)。カスタム絵文字は `<img alt=":x:">`。
+  メンション・ハッシュタグ・URL のリンクは訳されていても元の `<a>` に戻す。
+* モデルは APK に入れず、設定の「翻訳」をオンにしたときに Hugging Face からダウンロードする (`TranslationModelFiles`。
+  リビジョンを固定し、sha256 を確かめてから使う。OS の DownloadManager で、アプリが終わっても続き通知に進み具合が出る)。
+  置き場所は `Android/data/<pkg>/files/models/` (バックアップ・端末間の移行から除外)。オフにするときにモデルも消せる。
+  adb で置いても大きさが合えば使う (ディレクトリはアプリに作らせる。adb shell で作ると読めない)。
+* `:llama` は llama.cpp の CPU の版を実行時に選ぶので、full は `useLegacyPackaging`。OpenMP は使わない (ggml のスレッドプール)。
+* Snapdragon の NPU (Hexagon) は `local.properties` の `quasar.hexagonSdk` (Hexagon SDK のパス) を書いたときだけビルドに入る
+  (SDK は Qualcomm の Docker イメージから取り出す。手順はドキュメント)。OnePlus 13 でアプリの中から動くことを確認済み。訳文は CPU と
+  同じで、プロンプトは約 4 倍速く、生成は約 25% 遅い。CPU の使用時間は約 70% 減る。`LlamaParams.cpuOnly` / ギャラリーの
+  `--es device cpu` で CPU だけ。
+* **Hexagon v73 の一部 (8s Gen 3/4・7 Gen 4 等。FP16 の HMX が無い) は HMX を使うと訳文が壊れる** (Nothing の 8s Gen 4 で確認。
+  llama.cpp #29473 / #31645、修正の PR #29740 は未マージ) ので、JNI が版を調べて v73 では HMX を切る (HVX のみ)。v73 未満・不明なら
+  Hexagon のバックエンドを外して CPU で動かす。llama.cpp を上げたら #29740 が入ったかを見て、v73 の実機で確かめる。
+
 ## キャッシュ (`data/cache/`)
 
 * Room の 1 テーブル (`cache_entries`: 種類 + ID → API の JSON (DTO そのまま)・版・取得時刻)。種類 (`CacheKind`) は
@@ -1119,7 +1168,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 設定
 
-* 設定全体は `AppSettings` (`domain/model/settings/`): 表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
+* 設定全体は `AppSettings` (`domain/model/settings/`): 翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
+  設定画面に出る)・表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
   (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
   アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
   log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
@@ -1206,17 +1256,20 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 開発メモ
 
-* ビルド: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug`
+* ビルド: `./gradlew :app:assembleFullDebug` (翻訳なしなら `assembleLiteDebug`。タスク名はフレーバー込み: `installFullDebug`・
+  `testFullDebugUnitTest`・`assembleFullBenchmark` 等)
   (システムに Java が無いので Android Studio 同梱の JBR を使う)
-* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテスト)。計装テストは Room の SQL (`CacheDaoTest`) だけで、
-  エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (終わるとアプリが消えるので、
+* `:llama` (full) のビルドには llama.cpp の submodule (`git submodule update --init`)、NDK 29.0.14206865・CMake 4.1.2 (SDK の
+  パッケージ。`android sdk install ndk/29.0.14206865 cmake/4.1.2`) が要る。最初のビルドは llama.cpp を 2 ABI 分作るので数分かかる。
+* テスト: `./gradlew :app:testFullDebugUnitTest` (JVM のユニットテスト)。計装テストは Room の SQL (`CacheDaoTest`) だけで、
+  エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedFullDebugAndroidTest` (終わるとアプリが消えるので、
   ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
-* 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
-* Compose コンパイラのレポート (skippable / 引数の安定性): `./gradlew :app:compileBenchmarkKotlin -PcomposeReports --rerun`
+* 性能の測定用ビルド: `./gradlew :app:assembleFullBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
+* Compose コンパイラのレポート (skippable / 引数の安定性): `./gradlew :app:compileFullBenchmarkKotlin -PcomposeReports --rerun`
   → `app/build/compose_compiler/`。
 * **動作確認用の連合環境** (`testbed/`。使い方・設定・セットアップは [docs/testbed.md](docs/testbed.md)、環境の構成は
-  [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) を立てて連合させ、bots が
+  [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) と Misskey 1 台を立てて連合させ、bots が
   投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れ、手元だけで
   アプリにユーザーの CA を信頼させれば (`network_security_config`。**コミットしない**) debug ビルドからログインできる。
   版ごとの API の違い (3.5 には v2 通知が無い等) はここで確かめる。
@@ -1260,7 +1313,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / post-detail (ポスト詳細の本体を
-  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
+  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
+  translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
+  translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ)。
   表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率、`--ei long_post_max_lines 3` で長文の折りたたみの行数、`--es avatar_shape RoundedSquare` でアイコンの形)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
@@ -1331,7 +1386,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ### ビルド
 * Gradle のインクリメンタルコンパイルが古い結果を返して、正しいコードでも型エラーになることがあった。
-  不可解なエラーは `./gradlew :app:compileDebugKotlin --rerun` で確かめる。
+  不可解なエラーは `./gradlew :app:compileFullDebugKotlin --rerun` で確かめる。
 * release / benchmark ビルドは R8 (`optimization { enable = true }`、リソースの削減込み) 有効。APK は約 68MB → 8MB、main スレッドの
   CPU は約半分。独自の keep ルールは無い (各ライブラリの consumer rules で足りている)。リフレクションや JNI を足したら
   benchmark ビルドで動作 (起動・画面遷移・プロセス再生成後の復元・APNG) を確かめる。
@@ -1341,7 +1396,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   つながっている端末が無い・寝ているときに確認を諦めたりユーザーに頼んだりせず、自分で立ち上げる:
   SDK は `~/Library/Android/sdk`。AVD は `~/.android/bin/android-cli emulator list` で確かめ (今は `medium_phone`。無ければ
   `android-cli emulator create` で作る。avdmanager は入っていない)、`android-cli emulator start medium_phone` をバックグラウンドで
-  起動 (起動し終わるまで待って返る) → `installDebug` (`ANDROID_SERIAL=emulator-5554` で端末を絞る)。
+  起動 (起動し終わるまで待って返る) → `installFullDebug` (`ANDROID_SERIAL=emulator-5554` で端末を絞る)。
   エミュレーターは未ログインのことが多い (ログイン画面以外は開けない)。まずギャラリーにシナリオを足して確かめ、それでも足りない
   (実際の API・遷移を通したい) ときはその旨をユーザーに伝える。メモリに余裕が無いときは下記の実機を使う。
 * **見た目・動作を確かめるだけの簡単な UI の確認は、エミュレーターが既に立ち上がっていればそちらを使う** (実機がつながっていても)。
@@ -1354,9 +1409,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ポストを開くときはアクション行の空き部分をタップする。
 * 先頭へ戻るために下方向スワイプを繰り返すと pull-to-refresh が発動し一覧が読み直される (gap も消える)。
   ボタン等を探すときは fling しないよう長めの duration (1500ms 程度) でゆっくりスクロールする。
-* **`./gradlew connectedDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
-  計測をするなら `installDebug` / `installDebugAndroidTest` + `adb shell am instrument` を使う。
-* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleBenchmark`。
+* **`./gradlew connectedFullDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
+  計測をするなら `installFullDebug` / `installFullDebugAndroidTest` + `adb shell am instrument` を使う。
+* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleFullBenchmark`。
   release と同じ設定 + debug 鍵の署名 + ギャラリー入り。applicationId が debug と同じなので入れ替えてもデータは残る) を入れ、
   `scripts/perf/measure.sh <label> <秒> [swipe]` で測る (端末が複数なら `ADB="adb -t 3"`)。終わったら debug を入れ直す。
   benchmark は debuggable ではないので `run-as` は使えない (`profileable` なので Perfetto の CPU プロファイルは取れる)。

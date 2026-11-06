@@ -16,4 +16,6 @@
     <string name="gallery_my_profile">Own profile (tabs)</string>
     <string name="gallery_other_profile">Other profile (tabs)</string>
     <string name="gallery_post_detail">Post detail (reactions)</string>
+    <string name="gallery_translation">On-device translation</string>
+    <string name="gallery_translation_languages">Translation languages</string>
 </resources>

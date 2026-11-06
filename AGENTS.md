@@ -1043,7 +1043,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 ## オンデバイス翻訳 (試作。`:llama` + `data/translation/`)
 
 PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。アプリへの組み込みは試作でフレーバー `full` だけ
-(`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「〇〇語から翻訳 /
+(`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「PLaMoで〇〇語から翻訳 (規約の第 5 条で、モデルの出力だと示す。省略させず折り返す) ·
 原文を表示 / 翻訳を表示」(`PostTranslationBar`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「翻訳」。状態はアプリ全体で
 1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
 **裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、

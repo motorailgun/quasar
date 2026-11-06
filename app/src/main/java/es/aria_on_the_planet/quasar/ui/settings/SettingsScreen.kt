@@ -88,6 +88,14 @@ fun SettingsTopPage(
             }
         }
         SettingsGroup(title = null) {
+            SettingsNavigationItem(
+                title = stringResource(R.string.settings_licenses),
+                summary = stringResource(R.string.settings_licenses_summary),
+                icon = Symbols.Outlined.License,
+                onClick = { onNavigate(Route.SettingsLicenses) },
+            )
+        }
+        SettingsGroup(title = null) {
             SettingsActionItem(
                 title = stringResource(R.string.logout),
                 summary = serverUrl?.toHttpUrlOrNull()?.host,

@@ -41,6 +41,9 @@ es.aria_on_the_planet.quasar
 │   ├── session/                    SessionStore (サーバ URL / アクセストークン / OAuth クライアント) + SecureStorage (Keystore で暗号化)
 │   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
 │   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
+│   ├── licenses/                   設定の「ライセンス」(LicenseRepository。依存の一覧 = AboutLibraries のプラグインが作る raw の JSON を
+│   │                               parseLibraryDefinitions で読む + BundledComponent = POM の無いもの。本文は assets/licenses/。
+│   │                               llama.cpp・libc++・PLaMo はフレーバー full の FlavorLicenses)
 │   ├── translation/                オンデバイス翻訳 (PlamoPrompt = PLaMo 3 Translate の PFML3 の組み立て・言語コード /
 │   │                               TranslatableHtml = 本文の HTML と訳させる形の変換・訳文の検査 / PostTranslator =
 │   │                               ポストを訳す + translationOfferFor / TranslationModelFiles = モデルのダウンロード・削除 /
@@ -1208,6 +1211,11 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
   投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン。編集なら `EditPost`)、削除はポスト画面から使う。
   設定画面の Confirmations の「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
+* **ライセンス** (`Route.SettingsLicenses` / `SettingsLicense(id)`、`LicensesPage.kt`): 設定のトップから。翻訳のモデル (PLaMo。
+  規約の第 4 条で規約の写しと「Built with PLaMo」が要る) / 同梱のソフトウェア / 依存のライブラリ。依存の一覧は
+  `com.mikepenz.aboutlibraries.plugin.android` がビルド時に POM から `res/raw/aboutlibraries.json` を作る (ランタイムのライブラリは
+  入れていない)。本文は SPDX の雛形なので MIT 等の著作権者は入らない。**Maven 以外のもの (ネイティブ・アイコン・モデル) を
+  足したら `BundledComponent` と assets の本文も足す** (llama.cpp のタグを上げたら版と本文も)。
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP

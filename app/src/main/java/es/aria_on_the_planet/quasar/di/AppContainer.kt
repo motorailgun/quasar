@@ -7,6 +7,7 @@ import android.net.Uri
 import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
 import es.aria_on_the_planet.quasar.data.cache.CacheDatabase
 import es.aria_on_the_planet.quasar.data.cache.EntityCache
+import es.aria_on_the_planet.quasar.data.licenses.LicenseRepository
 import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
 import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
 import es.aria_on_the_planet.quasar.data.media.ImageReencoder
@@ -97,6 +98,9 @@ class AppContainer(context: Context) {
     val instanceRepository = InstanceRepository(api)
     val emojiRepository = EmojiRepository(api)
     val mediaRepository = MediaRepository(api)
+
+    /** 設定の「ライセンス」の中身。 */
+    val licenseRepository = LicenseRepository(context)
 
     private val contentResolver = context.applicationContext.contentResolver
 

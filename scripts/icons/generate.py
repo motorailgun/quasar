@@ -45,6 +45,7 @@ ICONS = [
     ("Image", "image", False, [O, F]),
     ("KeyboardArrowRight", "keyboard_arrow_right", True, [F]),
     ("Language", "language", False, [O]),
+    ("License", "license", False, [O]),
     ("ContentCopy", "content_copy", False, [O]),
     ("Lock", "lock", False, [O]),
     ("Logout", "logout", True, [O]),

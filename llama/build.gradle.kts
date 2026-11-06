@@ -98,6 +98,8 @@ androidComponents {
             skels.from(fileTree(".cxx") { include("**/arm64-v8a/build-llama/ggml/src/ggml-hexagon/libggml-htp-v*.so") })
         }
         variant.sources.jniLibs?.addGeneratedSourceDirectory(copy, CopyHtpSkels::outputDir)
+        // SDK の BSD-3-Clause のヘッダの表記 (app の設定の「ライセンス」が、あれば出す)。SDK を上げたら著作権の行も見直す
+        variant.sources.assets?.addStaticSourceDirectory("src/hexagon/assets")
     }
 }
 

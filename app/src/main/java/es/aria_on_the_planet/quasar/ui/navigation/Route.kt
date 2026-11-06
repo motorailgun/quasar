@@ -76,4 +76,8 @@ sealed interface Route : NavKey {
     @Serializable data object SettingsPosting : Route
     @Serializable data object SettingsConfirmations : Route
     @Serializable data object SettingsTranslation : Route
+    @Serializable data object SettingsLicenses : Route
+
+    /** ライセンスの本文。[id] は `LicensedComponent.id` (Maven の依存なら `group:artifact`)。 */
+    @Serializable data class SettingsLicense(val id: String) : Route
 }

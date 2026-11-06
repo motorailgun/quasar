@@ -459,4 +459,13 @@
     <string name="translation_translating">翻訳中…</string>
     <string name="translation_failed">翻訳できませんでした</string>
     <string name="translation_retry">再試行</string>
+    <string name="settings_licenses">ライセンス</string>
+    <string name="settings_licenses_summary">このアプリで使っているオープンソースソフトウェア</string>
+    <string name="licenses_translation_model">翻訳モデル</string>
+    <string name="licenses_bundled">同梱のソフトウェア</string>
+    <string name="licenses_libraries">ライブラリ</string>
+    <string name="licenses_website">ウェブサイト</string>
+    <string name="licenses_version">バージョン %1$s</string>
+    <string name="licenses_open_license">ライセンスをウェブで見る</string>
+    <string name="licenses_load_failed">ライセンスを読み込めませんでした</string>
 </resources>

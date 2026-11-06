@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
+    // 設定の「ライセンス」に出す依存のライブラリの一覧を、ビルド時に依存の POM から res/raw/aboutlibraries.json に
+    // 書き出す (ビルドの種類ごと)。読むのは data/licenses (AboutLibraries のランタイムのライブラリは使わない)
+    alias(libs.plugins.aboutlibraries.android)
 }
 
 // OAuth の戻り先のスキーム (applicationId 由来の逆ドメイン。スキームに `_` は使えないので `-`)。

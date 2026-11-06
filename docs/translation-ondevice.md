@@ -91,6 +91,20 @@ echo "quasar.hexagonSdk=$HOME/Qualcomm/Hexagon_SDK/6.7.0.0" >> local.properties
 
 SDK の hexagon-clang・qaic (IDL) は Linux x86_64 のホストでそのまま動く (Docker の中でビルドしなくてよい)。
 
+ライセンス (2026-11-07 に確認。release に full を出すなら要判断):
+
+* APK に入る SDK 由来のもの: `libggml-hexagon.so` (CPU 側) に SDK のヘッダ (`remote.h`・`HAP_farf.h`・`dspqueue.h` 等は
+  「Confidential and Proprietary」、`AEEStdDef.h`・`AEEStdErr.h`・`rpcmem.h` は BSD-3-Clause) と qaic が作った FastRPC の
+  stub。`libggml-htp-v*.so` (NPU 側) に qaic の skel と、Hexagon Tools の `initS.o`・`finiS.o` (静的)。`libc.so`・`libgcc.so` は
+  DSP 側にあるものを動的に使う (APK には入らない)。SDK のライブラリ (rpcmem・qprintf・worker_pool 等) はリンクしていない。
+* BSD-3-Clause のヘッダは表記が要るので、Hexagon 入りのビルドだけ `:llama` が `src/hexagon/assets/licenses/hexagon-sdk.txt` を
+  入れ、設定の「ライセンス」に出る (`FlavorLicenses.kt`)。
+* それ以外は SDK の利用許諾 (Qualcomm Software Center でダウンロード時に同意するもの) に従うが、手元の SDK (snapdragon-toolchain
+  の Docker イメージ = 文書を削った再パッケージ) には許諾の文書が無く、ビルドした物の再配布の条件は確かめられていない。
+  ggml-org の llama.cpp は同じイメージで作った `libggml-htp-v*.so` 入りのバイナリ (`*-bin-android-arm64-snapdragon`) を MIT の
+  LICENSE だけで配っている (前例であって許諾の根拠ではない)。公式の SDK を落として許諾を読むか、Qualcomm に確かめる。
+* `__FILE__` 等でビルドした場所の絶対パス (`/home/<user>/...`) が strip 後の .so に残る。CI でビルドすればランナーのパスになる。
+
 ビルドの仕組み:
 
 * `-DGGML_HEXAGON=ON -DHEXAGON_SDK_ROOT=… -DPREBUILT_LIB_DIR=android_aarch64` (最後のは llama.cpp の公式の preset と同じ。
@@ -385,7 +399,8 @@ TranslationModelFiles (data/translation/): モデルのファイル・ダウン�
   * 共有の「ダウンロード」等 (ユーザーが触れる所) に置くこともできるが、再インストール・データの削除の後は自分で作った
     ファイルとして扱われなくなり、読むにはユーザーにファイルを選び直してもらう (SAF) 必要がある。ユーザーが動かす・消すことも
     あるので使っていない。
-* PLaMo Community License は「Built with PLaMo」の表示を求めるので、設定のモデルの項目に出している (商用の条件等は要確認)。
+* PLaMo Community License は「Built with PLaMo」の表示と規約の写しを求める (第 4 条) ので、設定のモデルの項目と設定の「ライセンス」
+  (本文はモデルのリビジョンの LICENSE/en・ja を `src/full/assets/licenses/` に置いたもの) に出している (商用の条件等は要確認)。
 
 ## 次
 

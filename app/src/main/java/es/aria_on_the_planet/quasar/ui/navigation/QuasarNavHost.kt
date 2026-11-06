@@ -75,6 +75,8 @@ import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsViewModel
 import es.aria_on_the_planet.quasar.ui.settings.AnimationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.ConfirmationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.LicenseDetailPage
+import es.aria_on_the_planet.quasar.ui.settings.LicensesPage
 import es.aria_on_the_planet.quasar.ui.settings.PostingSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
 import es.aria_on_the_planet.quasar.ui.settings.TranslationSettingsPage
@@ -638,6 +640,12 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         } else {
             WithSettings(container) { TranslationSettingsPage(it.translation, translations, update, onBack = navigator::back) }
         }
+    }
+    entry<Route.SettingsLicenses> {
+        LicensesPage(container.licenseRepository, onOpen = { navigate(Route.SettingsLicense(it)) }, onBack = navigator::back)
+    }
+    entry<Route.SettingsLicense> { key ->
+        LicenseDetailPage(container.licenseRepository, key.id, onBack = navigator::back)
     }
 }
 

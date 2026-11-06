@@ -487,4 +487,14 @@
     <string name="translation_translating">Translating…</string>
     <string name="translation_failed">Couldn\'t translate</string>
     <string name="translation_retry">Retry</string>
+    <string name="settings_licenses">Licenses</string>
+    <string name="settings_licenses_summary">Open source software used in this app</string>
+    <string name="licenses_translation_model">Translation model</string>
+    <string name="licenses_bundled">Included software</string>
+    <string name="licenses_libraries">Libraries</string>
+    <string name="licenses_built_with_plamo" translatable="false">Built with PLaMo</string>
+    <string name="licenses_website">Website</string>
+    <string name="licenses_version">Version %1$s</string>
+    <string name="licenses_open_license">View license online</string>
+    <string name="licenses_load_failed">Couldn\'t load the licenses</string>
 </resources>

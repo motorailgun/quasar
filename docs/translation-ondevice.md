@@ -298,7 +298,12 @@ TranslationModelFiles (data/translation/): モデルのファイル・ダウン�
 * **状態**: アプリ全体で 1 つ (`PostTranslationStore`、`LocalPostTranslations` で配る。`LocalAccountActions` と同じ形) なので、
   どの画面 (タイムライン・通知・プロフィール・ハッシュタグ・ポスト詳細) でも同じポストは同じ訳。ポストごとの状態
   (`PostTranslationEntry.state` / `showingOriginal`) は snapshot の状態で、1 件訳し終えても他の項目は描き直されない。
-  キーは statusId。原文が編集されたら作り直す。1000 件を超えたら古いものから捨てる。
+  キーは statusId。原文が編集されたら作り直す。1000 件を超えたら古いものから捨てる。推定した言語も 1000 件を超えたら古いものから
+  1 つずつ捨てる (丸ごと消すと表示中のものが一斉に推定し直しになる)。
+* **組み立ての中では軽く・書かない**: `entryFor` はポストを組み立てるたびに呼ばれるので、端末の言語は覚えておき、構成が変わった
+  ときだけ (`onConfigurationChanged`、`AppContainer` の ComponentCallbacks) 読み直す (変わったら作り直す)。自動で訳すかの切り替えは
+  設定が変わったときに `updateOffers` が entry に当て、`entryFor` では状態を書かない。アプリの言語を adb で日本語にすると、
+  開いたままの画面でも訳す先が日本語になることをエミュレーターで確認。
 * **長い本文**: 1 回の訳は出力 1024 トークン・コンテキスト 4096 まで。HTML で 800 文字を超える本文は `TranslatableHtml.split`
   (`TranslatableHtmlTest`) で段落等の切れ目、それでも長い段落はその中の `<br>` で分け、1 つずつ訳してつなぐ (リンク・絵文字は
   分けた先へ順に配り、`restoreTranslatedHtml` もそれぞれで検査する。分けた段落の `<p>` や区切りの `<br>` は訳さずに残す)。

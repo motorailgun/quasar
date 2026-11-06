@@ -115,8 +115,17 @@ class PostTranslationStore(
     /** 言語の無いポストの推定した言語 (statusId ごと)。snapshot の状態で、推定が終わると読んだ項目が描き直される。 */
     private val detectedLanguages = mutableStateMapOf<String, DetectedLanguage>()
 
+    /** [detectedLanguages] に入れた順 (古いものから捨てる)。 */
+    private val detectedOrder = ArrayDeque<String>()
+
     /** 推定している statusId。 */
     private val detecting = HashSet<String>()
+
+    /**
+     * 端末の言語 ([deviceLanguageTags])。ポストを組み立てるたびに読み直さないよう覚えておき、構成が変わったら
+     * ([onConfigurationChanged]) 読み直す。
+     */
+    private var deviceLanguages = deviceLanguageTags()
 
     private val pending = ArrayDeque<PostTranslationEntry>()
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -138,7 +147,7 @@ class PostTranslationStore(
             settings.filterNotNull().map { it.translation }.collect {
                 val previous = this@PostTranslationStore.settings
                 this@PostTranslationStore.settings = it
-                if (it.targetLanguage != previous.targetLanguage) reset()
+                if (it.targetLanguage != previous.targetLanguage) reset() else if (it != previous) updateOffers()
                 if (!it.enabled && previous.enabled) releaseModel()
                 wake.trySend(Unit)
             }
@@ -181,12 +190,12 @@ class PostTranslationStore(
     fun entryFor(post: Post): PostTranslationEntry? {
         if (!modelAvailable) return null
         val source = post.language ?: detectedLanguageOf(post) ?: return null
-        val offer = translationOfferFor(post, settings, deviceLanguageTags(), source) ?: return null
+        val offer = translationOfferFor(post, settings, deviceLanguages, source) ?: return null
         val existing = entries[post.statusId]
+        // 自動で訳すかは設定が変わったときに updateOffers が合わせる (組み立ての中では状態を書かない)
         if (existing != null && existing.offer.copy(automatic = offer.automatic) == offer &&
             existing.post.text == post.text && existing.post.contentWarning == post.contentWarning
         ) {
-            if (existing.offer != offer) existing.offer = offer
             return existing
         }
         existing?.let(pending::remove)
@@ -203,7 +212,11 @@ class PostTranslationStore(
                 val language = detectPostLanguage(post, languageDetector)
                 withContext(Dispatchers.Main) {
                     detecting.remove(post.statusId)
-                    if (detectedLanguages.size >= MaxEntries) detectedLanguages.clear()
+                    if (post.statusId !in detectedLanguages) {
+                        detectedOrder.addLast(post.statusId)
+                        // 丸ごと消すと表示中のものも一斉に推定し直しになるので、古いものから 1 つずつ捨てる
+                        while (detectedOrder.size > MaxEntries) detectedLanguages.remove(detectedOrder.removeFirst())
+                    }
                     detectedLanguages[post.statusId] = DetectedLanguage(post.text, post.contentWarning, language)
                 }
             }
@@ -238,6 +251,15 @@ class PostTranslationStore(
         }
         // 押したものはメモリが足りないと言われた後の待ちを切り上げて訳す
         cooldown?.cancel()
+        wake.trySend(Unit)
+    }
+
+    /** 構成が変わった (`onConfigurationChanged`)。端末・アプリの言語が変わったら、訳す先が変わりうるので作り直す。 */
+    fun onConfigurationChanged() {
+        val languages = deviceLanguageTags()
+        if (languages == deviceLanguages) return
+        deviceLanguages = languages
+        reset()
         wake.trySend(Unit)
     }
 
@@ -310,6 +332,14 @@ class PostTranslationStore(
             } finally {
                 running = null
             }
+        }
+    }
+
+    /** 言語ごとの扱いが変わった。訳は残し、自動で訳すかだけを合わせる (表示中で新しく自動になったものは訳し始める)。 */
+    private fun updateOffers() {
+        for (entry in entries.values) {
+            val automatic = translationOfferFor(entry.post, settings, deviceLanguages, entry.offer.source)?.automatic ?: continue
+            if (entry.offer.automatic != automatic) entry.offer = entry.offer.copy(automatic = automatic)
         }
     }
 

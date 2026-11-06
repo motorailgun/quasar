@@ -179,7 +179,10 @@ class AppContainer(context: Context) {
         if (engine == null) appScope.launch { modelFiles.delete() }
     }
 
-    /** 裏に回った・メモリが足りないときに翻訳のモデルを解放させる (Application を作った直後、メインスレッドで呼ぶ)。 */
+    /**
+     * 裏に回った・メモリが足りないときに翻訳のモデルを解放させ、言語が変わったら訳す先を合わせさせる
+     * (Application を作った直後、メインスレッドで呼ぶ)。
+     */
     private fun observeAppState(context: Context, translations: PostTranslationStore) {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) = translations.onForeground()
@@ -197,7 +200,7 @@ class AppContainer(context: Context) {
 
             @Deprecated("Deprecated in Java")
             override fun onLowMemory() = translations.onMemoryPressure()
-            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+            override fun onConfigurationChanged(newConfig: Configuration) = translations.onConfigurationChanged()
         })
     }
 }

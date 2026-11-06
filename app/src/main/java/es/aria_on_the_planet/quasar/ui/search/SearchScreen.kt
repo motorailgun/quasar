@@ -53,7 +53,7 @@ import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
 import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
-import es.aria_on_the_planet.quasar.ui.component.post.PostList
+import es.aria_on_the_planet.quasar.ui.component.post.PostFeedList
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailRefreshBox
 import es.aria_on_the_planet.quasar.ui.component.scaffold.backIcon
@@ -208,18 +208,12 @@ private fun PostResults(viewModel: SearchViewModel, feed: PostFeedState, callbac
         onRefresh = { viewModel.refresh(SearchTab.Posts) },
         modifier = Modifier.fillMaxSize(),
     ) {
-        PostList(
-            items = feed.items,
-            modifier = Modifier.fillMaxSize(),
-            state = rememberLazyListState(),
-            isLoadingMore = feed.isLoadingMore,
+        PostFeedList(
+            feed = feed,
+            empty = stringResource(R.string.search_empty),
+            errorFormat = R.string.search_error,
             onLoadMore = { viewModel.loadMore(SearchTab.Posts) },
             callbacks = callbacks,
-            header = {
-                if (feed.items.isEmpty()) {
-                    item(key = "status", contentType = "status") { SearchStatus(feed) }
-                }
-            },
         )
     }
 }

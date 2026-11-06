@@ -61,6 +61,7 @@ es.aria_on_the_planet.quasar
     │   ├── post/PostCallbacks.kt   ポストへの操作の口 (タップ・投票・アクション・返信・ハッシュタグ) をまとめたもの
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
+    │   ├── post/PostFeedList.kt    PostFeedState の PostList + 空・読み込み中・失敗の表示 (PTR は含まない。DetailScaffold 等が持つ)
     │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
     │   ├── post/PostTime.kt        詳細日時のフォーマット
     │   ├── post/QuotedPost.kt      引用ポストの縮小表示 / 表示不可時のプレースホルダ
@@ -488,6 +489,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
+* `PagedFeed` の一覧を出すときは `PostFeedList(feed, empty, errorFormat, ...)` (空のときの `ListStatus` 込み。`header` は
+  その上に置く。ハッシュタグ・お気に入り等・プロフィールのタブ・検索の投稿のタブ)。ユーザー版の `UserFeedList` と違い PTR は含まない。
 
 ### 相対時刻の更新 (`ui/component/time/Now.kt`)
 * 一覧の時刻は `postTimeText(at)` (`ui/component/post/PostTime.kt`)。1 週間未満は「3m」等の経過時間、それ以上は日付

@@ -1,6 +1,5 @@
 package es.aria_on_the_planet.quasar.ui.profile
 
-import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -57,7 +56,7 @@ import es.aria_on_the_planet.quasar.ui.component.layout.rememberCollapsingHeader
 import es.aria_on_the_planet.quasar.ui.component.list.scrollToTop
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
-import es.aria_on_the_planet.quasar.ui.component.post.PostList
+import es.aria_on_the_planet.quasar.ui.component.post.PostFeedList
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailLoading
@@ -400,15 +399,19 @@ private fun ProfileTabPage(
 ) {
     // ピン留めは一覧の上に入るので、先頭にいるときに後から出たら (取得が一覧より遅かった) 先頭に留まって見せる
     StickToTopEffect(listState, pinnedPosts.isNotEmpty())
-    PostList(
-        items = feed.items,
-        modifier = Modifier.fillMaxSize(),
+    PostFeedList(
+        feed = feed,
+        empty = if (blockedBy != null) {
+            stringResource(R.string.profile_blocked_by_posts, blockedBy)
+        } else {
+            stringResource(tab.emptyMessage())
+        },
+        errorFormat = R.string.timeline_error,
+        onLoadMore = onLoadMore,
+        callbacks = callbacks,
         state = listState,
         // 先頭はタブの裏に隠れないようタブの高さ分あける
         contentPadding = PaddingValues(top = topPadding),
-        isLoadingMore = feed.isLoadingMore,
-        onLoadMore = onLoadMore,
-        callbacks = callbacks,
         header = {
             // 通常の一覧にも同じポストが含まれうるので、ピン留めは 1 アイテムにまとめてキー衝突を避ける
             if (pinnedPosts.isNotEmpty()) {
@@ -416,19 +419,6 @@ private fun ProfileTabPage(
                     PinnedPosts(
                         posts = pinnedPosts,
                         callbacks = callbacks,
-                    )
-                }
-            }
-            if (feed.items.isEmpty()) {
-                item(key = "feed_status", contentType = "status") {
-                    ListStatus(
-                        loading = !feed.loaded || feed.isRefreshing,
-                        error = feed.error?.let { stringResource(R.string.timeline_error, it) },
-                        empty = if (blockedBy != null) {
-                            stringResource(R.string.profile_blocked_by_posts, blockedBy)
-                        } else {
-                            stringResource(tab.emptyMessage())
-                        },
                     )
                 }
             }

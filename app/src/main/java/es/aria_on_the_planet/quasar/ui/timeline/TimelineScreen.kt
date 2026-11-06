@@ -56,6 +56,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -137,6 +140,12 @@ fun TimelineScreen(
 
     // ≡ で左から出るドロワー。開いたまま別の画面へ移って戻ってきたときは閉じているよう、保存しない状態で持つ
     val drawerState = remember { DrawerState(DrawerValue.Closed) }
+    // 開いている (開きかけを含む) 間の「戻る」はドロワーを閉じる。ModalNavigationDrawer 自身は「戻る」を受けない
+    NavigationBackHandler(
+        state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
+        isBackEnabled = drawerState.targetValue == DrawerValue.Open,
+        onBackCompleted = { scope.launch { drawerState.close() } },
+    )
     // 開くのはボタンだけ (左右のスワイプはカラムの切り替え)。開いている間はスワイプでも閉じられる
     ModalNavigationDrawer(
         drawerState = drawerState,

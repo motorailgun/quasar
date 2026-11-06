@@ -825,7 +825,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     お気に入り・ブックマーク・非公開の返信 (`Route.PersonalPosts`。`DetailScaffold` + `PostList`、`PostFeed.linked`。外しても一覧からは
     消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く)。
     どれも詳細のパネルで開く。
-    開くのはボタンだけ (左右のスワイプはカラムの切り替え)、状態は保存しないので別画面から戻ると閉じている)、
+    開くのはボタンだけ (左右のスワイプはカラムの切り替え)、状態は保存しないので別画面から戻ると閉じている。開いている間の「戻る」は閉じる (`NavigationBackHandler`。`ModalNavigationDrawer` 自身は「戻る」を受けない))、
     右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。

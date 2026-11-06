@@ -63,6 +63,13 @@ llama.cpp を選んだ。
 * `BUILD_SHARED_LIBS` + `GGML_BACKEND_DL` + `GGML_CPU_ALL_VARIANTS`: CPU の機能ごとの版 (arm64 は armv8.0〜armv9.2 の 7 つ、
   x86_64 は 14) を作り、実行時に選ぶ。選ぶには .so がファイルとして要るので、app の full は
   `useLegacyPackaging` (`androidComponents` でフレーバーごと)。
+  * APK に入れる版は絞っている (`app/build.gradle.kts` の `droppedCpuVariants` を packaging の excludes に入れる。ggml は
+    nativeLibraryDir の `libggml-cpu-*.so` を走査して選ぶので、無い版は候補にならないだけ): arm64 は armv8.0 (NEON)・armv8.2_2
+    (dotprod + FP16)・armv8.6 (i8mm)、x86_64 は sse42・haswell (AVX2)。NPU が無いときの予備なので。SVE2・SME の版の CPU は
+    armv8.6 で動く (8 Elite・8s Gen 4 はもともと armv8.6)。x86_64 の Android は SSE4.2 が必須なので x64 は要らない。エミュレーター
+    (ゲストに見えるのが AVX・F16C まで) は ivybridge から sse42 になった (翻訳できることは確認済み)。
+  * 絞った結果 (release、2026-11-07): arm64 の APK 14.7MB → 13.2MB・インストール後 (APK + 展開した .so) 約 33MB → 約 28MB、
+    x86_64 の APK 16.6MB → 10.1MB・インストール後 約 44MB → 約 20MB。llama.cpp は全部の版をビルドするので、ビルドの時間は変わらない。
 * KleidiAI は使っていない (ビルド時に取りに行くため)。OpenMP は使わない (2026-11-06 に外した。ggml 自身のスレッドプールで動き、
   libomp.so 約 1.2MB が要らなくなる。llama.cpp の docs/android.md も OFF。外した後の arm64 の速さは未計測)。STL は `c++_shared`。
 * 大きさ (arm64、Hexagon 入り): debug は strip されず .so が計 99MB。strip すると 19MB、APK の中 (圧縮) では約 8.6MB
@@ -90,6 +97,11 @@ echo "quasar.hexagonSdk=$HOME/Qualcomm/Hexagon_SDK/6.7.0.0" >> local.properties
 ```
 
 SDK の hexagon-clang・qaic (IDL) は Linux x86_64 のホストでそのまま動く (Docker の中でビルドしなくてよい)。
+
+CI の release は Docker のイメージではなく、同じ再パッケージの tarball (snapdragon-toolchain/hexagon-sdk の
+`hexagon-sdk-v6.7.0.0-amd64-lnx.tar.xz`、742MB) を sha256 を固定して取る (中身は上のイメージの `/opt/hexagon/6.7.0.0` と
+ファイル単位で同じことを確認済み)。NDK・CMake は sdkmanager で入れる。ワークフローは full の APK がそれぞれの ABI だけを持つこと、arm64 版に NPU のカーネル・
+SDK の表記が入っていること、`.so` に `.debug_info` が残っていないことを確かめてから出す。
 
 ライセンス (2026-11-07 に確認。release に full を出すなら要判断):
 
@@ -300,7 +312,10 @@ TranslationModelFiles (data/translation/): モデルのファイル・ダウン�
 
 * **ビルド**: フレーバー (次元 `translation`) で `full` (翻訳あり、既定) / `lite` (無し) を分ける。`:llama` は `fullImplementation`
   で、モデルで訳す部分 (`createTranslationEngine`) をフレーバーごとのソースセットに置いた。lite は null を返し、翻訳の表示・
-  設定は出ない (NDK も submodule も要らない。CI の release は `assembleLiteRelease`)。翻訳のギャラリーは `src/fullDebug`
+  設定は出ない (NDK も submodule も要らない)。CI のビルドは `.github/workflows/build.yml` (再利用ワークフロー) にまとめ、手動の確認 (`check.yml`。テスト + lite・full
+  (NPU 込み) の debug ビルドだけで何も出さない) とリリース (`release.yml`、`v*` のタグ) が呼ぶ。リリースは lite と、
+  NPU 入りの full を ABI ごとに 2 つ (`-Pquasar.fullAbi=arm64-v8a` / `x86_64`。x86_64 の llama.cpp だけで約 10MB あり、一緒に
+  入れると full が 25MB、分けると arm64 版 13.2MB・x86_64 版 10.1MB。CPU の版を絞った後) 作る。プロパティを付けなければ full は全 ABI 入り。翻訳のギャラリーは `src/fullDebug`
   (lite は `src/liteDebug` の「無い」と出すだけの画面)。benchmark は `src/debug`・`src/{full,lite}Debug` を共有する。
 * **入れ替え**: applicationId は同じなので、full と lite は互いに上書きして入れられる。lite は起動時に full の残したモデル
   (548MB)・DownloadManager のダウンロードを消す (`TranslationModelFiles.delete`)。翻訳の設定の値は残るが lite では読まない。

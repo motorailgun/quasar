@@ -1277,6 +1277,9 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedFullDebugAndroidTest` (終わるとアプリが消えるので、
   ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
+* CI (`.github/workflows/`): ビルドの本体は再利用ワークフロー `build.yml`。`check.yml` (手動実行。ユニットテスト + lite・full
+  (NPU 込み) の debug ビルドが通るかだけ) と `release.yml` (`v*` のタグ。署名付きの lite・full (arm64)・full (x86_64) を作って確かめ、
+  attestation 付きで GitHub Release に出す) が呼ぶ。詳しくは [docs/translation-ondevice.md](docs/translation-ondevice.md) の「ビルド」。
 * 性能の測定用ビルド: `./gradlew :app:assembleFullBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
 * Compose コンパイラのレポート (skippable / 引数の安定性): `./gradlew :app:compileFullBenchmarkKotlin -PcomposeReports --rerun`
   → `app/build/compose_compiler/`。

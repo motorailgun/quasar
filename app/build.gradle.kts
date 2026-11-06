@@ -88,6 +88,11 @@ android {
         create("full") {
             dimension = "translation"
             isDefault = true
+            // 配布用の full は ABI ごとに分けて作る (CI の release が arm64-v8a・x86_64 で 1 回ずつ)。llama.cpp の .so は
+            // x86_64 だけで約 10MB あり、端末 (arm64) 向けに入れると倍近くになるため。指定しなければ全部入り (開発・エミュレーター)
+            providers.gradleProperty("quasar.fullAbi").orNull?.let { abi ->
+                ndk { abiFilters += abi }
+            }
         }
         create("lite") {
             dimension = "translation"
@@ -124,9 +129,23 @@ if (providers.gradleProperty("composeReports").isPresent) {
 }
 
 // オンデバイス翻訳 (:llama) の .so をファイルとして展開する。llama.cpp は CPU の機能ごとのバックエンド
-// (libggml-cpu-*.so) を nativeLibraryDir から探して読むため (APK の中のままでは見つからない)
+// (libggml-cpu-*.so) を nativeLibraryDir から探して読むため (APK の中のままでは見つからない)。
+// CPU の版は llama.cpp が全部作る (arm64 7 つ・x86_64 14 個) が、NPU が無いときの予備なので APK には次だけを入れる
+// (無い版は探す対象にならず、その CPU で動く残りのうち最も良いものが選ばれる):
+//   arm64: armv8.0 (NEON) / armv8.2_2 (dotprod + FP16) / armv8.6 (i8mm)。SVE2・SME の版の CPU は armv8.6 で動く
+//   x86_64: sse42 / haswell (AVX2)。Android の x86_64 は SSE4.2 が必須なので x64 は要らない。AVX2 の無いエミュレーター
+//   (ゲストに見えるのが AVX・F16C まで) は sse42 になる
+// llama.cpp を上げて版が増えたら、ここと release のワークフローの確認 (CPU の版の一覧) を見直す
+val droppedCpuVariants = listOf(
+    "android_armv8.2_1", "android_armv9.0_1", "android_armv9.2_1", "android_armv9.2_2",
+    "x64", "sandybridge", "ivybridge", "piledriver", "alderlake",
+    "skylakex", "cannonlake", "cascadelake", "icelake", "cooperlake", "zen4", "sapphirerapids",
+)
 androidComponents {
-    onVariants(selector().withFlavor("translation" to "full")) { it.packaging.jniLibs.useLegacyPackaging.set(true) }
+    onVariants(selector().withFlavor("translation" to "full")) { variant ->
+        variant.packaging.jniLibs.useLegacyPackaging.set(true)
+        variant.packaging.jniLibs.excludes.addAll(droppedCpuVariants.map { "**/libggml-cpu-$it.so" })
+    }
 }
 
 // Room のスキーマ (版ごとの JSON)。キャッシュなので移行は書かず作り直すが、変更の履歴として残す

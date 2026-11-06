@@ -1,0 +1,187 @@
+name: Build
+
+# 確認 (check.yml) とリリース (release.yml) で共有するビルド。ユニットテスト → lite と full (llama.cpp + NPU) のビルド。
+# release = false: debug で両方を作れることだけを確かめ、何も出さない。
+# release = true: 署名付きの release を作って中身・署名を確かめ、アーティファクト "release-apks" に置く
+# (Release を作る・attestation を付けるのは呼び出し側。鍵を持つこのジョブには書き込みの権限を渡さない)
+on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 鍵は Environment "release" の secret に置く (保護ルールで v* タグ・承認者を絞る)。確認では Environment を使わない
+    environment: ${{ inputs.release && 'release' || '' }}
+    # full は llama.cpp (2 ABI 分の CPU の版) と NPU 側のカーネル (5 世代分) を作るので長い
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      # アクションはタグではなくコミット SHA で固定する (タグは付け替えられる)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # full の :llama が third_party/llama.cpp をビルドする
+          submodules: true
+
+      - name: Check tag matches versionName
+        if: inputs.release
+        run: |
+          version_name=$(sed -nE 's/^\s*versionName = "(.*)"/\1/p' app/build.gradle.kts)
+          if [ "v${version_name}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match versionName ${version_name}"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # リリースのビルドはキャッシュを使わない (他のワークフローが書いたキャッシュの汚染を避ける)。
+      # Gradle Wrapper の検証は setup-gradle が行う
+      - uses: gradle/actions/setup-gradle@b9bee63ef481cc545e4517ec730544a4d8b1dfa0 # v6.4.0
+        with:
+          cache-disabled: ${{ inputs.release }}
+
+      - name: Unit tests
+        run: ./gradlew :app:testLiteDebugUnitTest
+
+      # full の :llama (llama.cpp) のビルドに使う NDK・CMake。版は llama/build.gradle.kts と揃える
+      - name: Install NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;29.0.14206865" "cmake;4.1.2"
+
+      # NPU (Hexagon) のバックエンドを作る Hexagon SDK。llama.cpp の CI と同じ SDK (snapdragon-toolchain が CI 向けに
+      # 文書等を削って再パッケージしたもの) を、版と sha256 を固定して取る。上げるときは両方を変え、
+      # docs/translation-ondevice.md の版・BSD のヘッダの表記 (llama/src/hexagon/assets) も見直す
+      - name: Download Hexagon SDK
+        env:
+          HEXAGON_SDK_URL: https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v6.7.0.0/hexagon-sdk-v6.7.0.0-amd64-lnx.tar.xz
+          HEXAGON_SDK_SHA256: 00725fc449916d7b9af2c2a3c6b54d61f3c872d5dbc1d3ca3fd2f839b1d5dc70
+        run: |
+          archive="$RUNNER_TEMP/hexagon-sdk.tar.xz"
+          curl -fsSL --retry 3 -o "$archive" "$HEXAGON_SDK_URL"
+          echo "$HEXAGON_SDK_SHA256  $archive" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/hexagon"
+          tar -C "$RUNNER_TEMP/hexagon" -xJf "$archive"
+          rm "$archive"
+          test -f "$RUNNER_TEMP/hexagon/6.7.0.0/hexagon_sdk.json"
+
+      # 確認: debug で両方を作れるか (full は全 ABI 入り)。出力は捨てる
+      - name: Build debug APKs
+        if: ${{ !inputs.release }}
+        run: |
+          ./gradlew :app:assembleLiteDebug :app:assembleFullDebug \
+            "-Pquasar.hexagonSdk=$RUNNER_TEMP/hexagon/6.7.0.0"
+
+      - name: Decode keystore
+        if: inputs.release
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
+      - name: Build release APKs
+        if: inputs.release
+        env:
+          QUASAR_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          QUASAR_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          QUASAR_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          QUASAR_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        # lite (端末内の翻訳なし) と、full (llama.cpp + NPU) を ABI ごとに (arm64-v8a = 端末、x86_64 = エミュレーター・
+        # x86 の Chromebook)。full の 2 回目は同じ出力先に書くので、1 回ごとに out/ へ写す。llama.cpp は 1 回目で両方の ABI が
+        # できているので、2 回目は詰め直すだけ。.so は AGP が app の ndkVersion の NDK で strip する
+        run: |
+          mkdir out
+          hexagon="-Pquasar.hexagonSdk=$RUNNER_TEMP/hexagon/6.7.0.0"
+          ./gradlew :app:assembleLiteRelease :app:assembleFullRelease "$hexagon" -Pquasar.fullAbi=arm64-v8a
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk out/lite.apk
+          cp app/build/outputs/mapping/liteRelease/mapping.txt out/lite-mapping.txt
+          cp app/build/outputs/apk/full/release/app-full-release.apk out/full.apk
+          cp app/build/outputs/mapping/fullRelease/mapping.txt out/full-mapping.txt
+          ./gradlew :app:assembleFullRelease "$hexagon" -Pquasar.fullAbi=x86_64
+          cp app/build/outputs/apk/full/release/app-full-release.apk out/full-x86_64.apk
+
+      - name: Remove keystore
+        if: always() && inputs.release
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+      # full の APK がそれぞれの ABI だけを持ち、CPU の版が app/build.gradle.kts で絞ったとおりで、arm64 に NPU のカーネルが
+      # 入り、.so が strip されているかを確かめる (SDK が見つからない等で黙って CPU だけのビルドになる・デバッグ情報付きで入る・
+      # ABI や CPU の版の絞り込みが効かない・llama.cpp を上げて増えた版が黙って入るのを防ぐ)
+      - name: Check full APK contents
+        if: inputs.release
+        run: |
+          readelf="$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          check() {
+            apk=$1 abi=$2 cpu=$3
+            shift 3
+            libs=$(unzip -Z1 "$apk" 'lib/*')
+            echo "$libs"
+            abis=$(echo "$libs" | cut -d/ -f2 | sort -u)
+            [ "$abis" = "$abi" ] || { echo "::error::$apk has ABIs: $abis"; exit 1; }
+            variants=$(echo "$libs" | sed -nE "s|^lib/$abi/libggml-cpu-(.*)\.so$|\1|p" | sort | xargs)
+            [ "$variants" = "$cpu" ] || { echo "::error::$apk has CPU variants: $variants (expected: $cpu)"; exit 1; }
+            for lib in libllama.so "$@"; do
+              echo "$libs" | grep -qx "lib/$abi/$lib" || { echo "::error::$apk: $lib is missing"; exit 1; }
+            done
+            work="$RUNNER_TEMP/apk-libs"
+            unzip -q "$apk" "lib/$abi/*" -d "$work"
+            for so in "$work/lib/$abi"/*.so; do
+              if "$readelf" -S "$so" | grep -q '\.debug_info'; then
+                echo "::error::$apk: $(basename "$so") is not stripped"
+                exit 1
+              fi
+            done
+            rm -rf "$work"
+          }
+          check out/full.apk arm64-v8a "android_armv8.0_1 android_armv8.2_2 android_armv8.6_1" \
+            libggml-hexagon.so libggml-htp-v73.so libggml-htp-v79.so
+          check out/full-x86_64.apk x86_64 "haswell sse42"
+          unzip -Z1 out/full.apk assets/licenses/hexagon-sdk.txt > /dev/null \
+            || { echo "::error::Hexagon SDK notice is missing"; exit 1; }
+
+      # 署名が想定した証明書かを確かめる (RELEASE_CERT_SHA256 は公開してよい値なので Variables に置く)
+      - name: Verify signatures
+        if: inputs.release
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.RELEASE_CERT_SHA256 }}
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          expected=$(echo "$EXPECTED_CERT_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')
+          for apk in out/*.apk; do
+            # 出力の形は build-tools の版で変わる (36 まで "Signer #1 certificate ...", 37 は "V2 Signer: certificate ...")
+            certs=$("$apksigner" verify --print-certs "$apk")
+            echo "$certs"
+            actual=$(echo "$certs" | sed -nE 's/^.*certificate SHA-256 digest: //p' | sort -u)
+            if [ -z "$expected" ] || [ "$actual" != "$expected" ]; then
+              echo "::error::${apk}: signing certificate mismatch (got ${actual})"
+              exit 1
+            fi
+          done
+
+      - name: Prepare assets
+        if: inputs.release
+        run: |
+          mkdir dist
+          # full の 2 つはコードが同じなので mapping は 1 つ
+          for f in out/*; do
+            cp "$f" "dist/quasar-${GITHUB_REF_NAME}-$(basename "$f")"
+          done
+          cd dist && sha256sum * > SHA256SUMS
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.release
+        with:
+          name: release-apks
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

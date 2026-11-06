@@ -1,0 +1,19 @@
+name: Check
+
+# 手動で、ユニットテストと lite / full (NPU 込み) の debug ビルドが通るかだけを確かめる。何も出さない
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      release: false
+    permissions:
+      contents: read

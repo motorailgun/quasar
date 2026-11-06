@@ -127,7 +127,7 @@ fun restoreTranslatedHtml(source: TranslatableHtml, output: String): String? {
         when (val token = tokens[i]) {
             is HtmlToken.Text -> {
                 if (!sourceHasLooseText && open.none { it in BlockTags } && token.raw.isNotBlank()) return null
-                out.append(token.raw.replace("<", "&lt;").replace(">", "&gt;"))
+                out.append(escapeText(token.raw))
             }
             is HtmlToken.Start -> when (token.name) {
                 "a" -> {
@@ -144,7 +144,7 @@ fun restoreTranslatedHtml(source: TranslatableHtml, output: String): String? {
                     if (!link.translatable || text.trim() == link.text.trim()) {
                         out.append(link.html)
                     } else {
-                        out.append(link.html.substringBefore('>')).append('>').append(text).append("</a>")
+                        out.append(link.html.substringBefore('>')).append('>').append(escapeText(text)).append("</a>")
                     }
                     i += if (text.isEmpty()) 1 else 2
                 }
@@ -308,6 +308,36 @@ private fun closingIndex(tokens: List<HtmlToken>, start: Int): Int {
 /** 分けた単位の端に残して訳さないもの (`<br>`・空白)。 */
 private fun HtmlToken.isSeparator(): Boolean =
     (this is HtmlToken.Start && name == "br") || (this is HtmlToken.Text && raw.isBlank())
+
+/** 正しい形の文字参照 (名前付き・10 進・16 進。セミコロンまで)。 */
+private val CharacterReferenceRegex = Regex("""&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);""")
+
+/**
+ * モデルの出力の文字 (タグでない部分。リンクの中の文字も) を表示用の HTML に入れられる形にする。タグに見えない `<` / `>` と、
+ * 正しい文字参照になっていない `&` (`AT&T`、セミコロンの無い `&copy` 等) をエスケープする。表示側 (`fromHtml`) が `<b c` を
+ * タグと読んで続きを飲み込んだり、`&copy` を文字参照と読んだりしないように。正しい文字参照 (`&amp;` 等) はそのまま。
+ */
+internal fun escapeText(raw: String): String {
+    val out = StringBuilder()
+    var last = 0
+    for (match in CharacterReferenceRegex.findAll(raw)) {
+        out.appendEscaped(raw, last, match.range.first).append(match.value)
+        last = match.range.last + 1
+    }
+    return out.appendEscaped(raw, last, raw.length).toString()
+}
+
+private fun StringBuilder.appendEscaped(text: String, start: Int, end: Int): StringBuilder {
+    for (i in start until end) {
+        when (val c = text[i]) {
+            '&' -> append("&amp;")
+            '<' -> append("&lt;")
+            '>' -> append("&gt;")
+            else -> append(c)
+        }
+    }
+    return this
+}
 
 private fun StringBuilder.appendTextWithEmojis(text: String, known: Set<String>, emojis: MutableList<String>) {
     var last = 0

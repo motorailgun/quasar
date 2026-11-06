@@ -219,4 +219,23 @@ class TranslatableHtmlTest {
     fun plainTextBackToInlineHtml() {
         assertEquals("a &lt;b&gt;<br>c", plainTextToInlineHtml("a <b>\nc\n"))
     }
+
+    @Test
+    fun escapesTranslatedLinkText() {
+        val source = toTranslatableHtml("""<p>see <a href="https://b.invalid/page">this page</a></p>""", emptySet())
+        // タグに見えない < (表示側ではタグと読まれうる) も、裸の & も、リンクの中で訳された文字でエスケープする
+        assertEquals(
+            """<p>見て <a href="https://b.invalid/page">a &lt;b c &amp; d</a></p>""",
+            restoreTranslatedHtml(source, """<p>見て <a href="https://b.invalid/page">a <b c & d</a></p>"""),
+        )
+    }
+
+    @Test
+    fun escapesBareAmpersandsButKeepsCharacterReferences() {
+        assertEquals("AT&amp;T &amp;copy right", escapeText("AT&T &copy right"))
+        assertEquals("&amp; &lt; &#39; &#x1F600; &copy; x &gt; y", escapeText("&amp; &lt; &#39; &#x1F600; &copy; x > y"))
+        assertEquals("&amp;#; &amp;#xZZ; &amp;;", escapeText("&#; &#xZZ; &;"))
+        val source = toTranslatableHtml("<p>a &amp; b</p>", emptySet())
+        assertEquals("<p>AT&amp;T &amp; b</p>", restoreTranslatedHtml(source, "<p>AT&T &amp; b</p>"))
+    }
 }

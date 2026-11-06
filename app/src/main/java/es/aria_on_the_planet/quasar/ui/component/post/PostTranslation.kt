@@ -48,7 +48,7 @@ internal fun rememberPostTranslation(post: Post, enabled: Boolean): PostTranslat
     return entry
 }
 
-/** 本文の上の 1 行 (X の形): 「[文A] スペイン語から翻訳  原文を表示」/「[文A] 翻訳を表示」/ 訳している間 / 失敗。 */
+/** 本文の上の 1 行 (X の形): 「[文A] スペイン語から翻訳 (切れたら「一部を翻訳」)  原文を表示」/「[文A] 翻訳を表示」/ 訳している間 / 失敗。 */
 @Composable
 internal fun PostTranslationBar(
     entry: PostTranslationEntry,
@@ -74,7 +74,11 @@ internal fun PostTranslationBar(
                 Action(stringResource(R.string.translation_show))
             } else {
                 Text(
-                    stringResource(R.string.translation_translated_from, languageDisplayName(state.translation.sourceLanguage)),
+                    stringResource(
+                        // 長すぎて途中で切れた訳は「一部を翻訳」
+                        if (state.translation.truncated) R.string.translation_translated_from_partial else R.string.translation_translated_from,
+                        languageDisplayName(state.translation.sourceLanguage),
+                    ),
                     style = style,
                     color = muted,
                     maxLines = 1,

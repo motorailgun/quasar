@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import es.aria_on_the_planet.quasar.llama.LlamaModel
 import es.aria_on_the_planet.quasar.llama.PromptPiece
+import es.aria_on_the_planet.quasar.llama.StopReason
 import java.io.File
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CoroutineScope
@@ -34,7 +35,7 @@ private class LlamaTranslationEngine(
     private var model: LlamaModel? = null
     private var unload: Job? = null
 
-    override suspend fun generate(prompt: List<PromptSegment>, maxTokens: Int): String = mutex.withLock {
+    override suspend fun generate(prompt: List<PromptSegment>, maxTokens: Int): GeneratedText = mutex.withLock {
         unload?.cancel()
         try {
             // 読み込みの途中で取り消されても読んだものを失わないよう、ブロックの中で持つ (release で解放される)
@@ -49,7 +50,7 @@ private class LlamaTranslationEngine(
                 prompt = prompt.map { PromptPiece(it.text, it.special) },
                 stops = PlamoStopTokens,
                 maxTokens = maxTokens,
-            ).text
+            ).let { GeneratedText(it.text, truncated = it.stopReason == StopReason.Length) }
         } finally {
             unload = scope.launch {
                 delay(IdleUnloadDelay)

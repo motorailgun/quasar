@@ -278,7 +278,8 @@ PostCard / PostDetail → PostBody (translatable)
 PostTranslationStore (ui/translation/、AppContainer.postTranslations。アプリ全体で 1 つ、Main で動く)
    translationOfferFor (純粋関数、TranslationOfferTest): 何語から何語へか・自動で訳すか
    順番待ち (LIFO) → 1 件ずつ PostTranslator.translate
-PostTranslator (data/translation/): toTranslatableHtml → 訳す → restoreTranslatedHtml (崩れたら平文で訳し直す)、CW も訳す
+PostTranslator (data/translation/): toTranslatableHtml → split (長ければ段落・<br> で分ける) → 1 つずつ訳す →
+   restoreTranslatedHtml (崩れた・切れたらその分だけ平文で訳し直す)、CW も訳す
 TranslationEngine (interface)。createTranslationEngine は src/full (llama.cpp、LlamaTranslationEngine) / src/lite (null)
 TranslationModelFiles (data/translation/): モデルのファイル・ダウンロード (DownloadManager)・削除
 ```
@@ -298,6 +299,15 @@ TranslationModelFiles (data/translation/): モデルのファイル・ダウン�
   どの画面 (タイムライン・通知・プロフィール・ハッシュタグ・ポスト詳細) でも同じポストは同じ訳。ポストごとの状態
   (`PostTranslationEntry.state` / `showingOriginal`) は snapshot の状態で、1 件訳し終えても他の項目は描き直されない。
   キーは statusId。原文が編集されたら作り直す。1000 件を超えたら古いものから捨てる。
+* **長い本文**: 1 回の訳は出力 1024 トークン・コンテキスト 4096 まで。HTML で 800 文字を超える本文は `TranslatableHtml.split`
+  (`TranslatableHtmlTest`) で段落等の切れ目、それでも長い段落はその中の `<br>` で分け、1 つずつ訳してつなぐ (リンク・絵文字は
+  分けた先へ順に配り、`restoreTranslatedHtml` もそれぞれで検査する。分けた段落の `<p>` や区切りの `<br>` は訳さずに残す)。
+  文の途中では分けないので、`<br>` の無い長い段落は 1 つのまま。訳文が上限で切れた (`StopReason.Length`) 分は平文で訳し直し、
+  それでも切れたら `PostTranslation.truncated` で「〇〇語から一部を翻訳」と出す。プロンプト自体がコンテキストを超える分は
+  失敗になる。エミュレーターで 930 文字・4 段落の Misskey のノートを最後まで訳せることを確認 (約 20 秒)。
+* **止めた・作り直した訳**: 止めた訳 (メモリ・裏に回った) は順番待ちに戻すが、訳す先が変わって作り直した・編集で別の entry に
+  なったものは戻さない (`entries` の今の entry と同じときだけ)。モデルを消している間 (`deleteModel`) は次を訳さない
+  (訳し始めると消すファイルを読み込み直す)。
 * **訳す先・自動**: `translationOfferFor`: ポストの `language` (`Status.language`、`Post.language` を足した) を
   `plamoLanguageOf` でモデルの言語にする。訳す先は設定 (既定は端末の言語、対応していなければ英語)。同じ言語・言語が無い・
   対応していない・本文も CW も空なら何も出さない。訳す先を変えたら訳を全部捨て、言語ごとの扱いだけを変えたときは訳を残す

@@ -453,6 +453,7 @@
     <string name="translation_mode_hidden">表示しない</string>
     <string name="translation_mode_default">%1$s (既定)</string>
     <string name="translation_translated_from">%1$sから翻訳</string>
+    <string name="translation_translated_from_partial">%1$sから一部を翻訳</string>
     <string name="translation_show_original">原文を表示</string>
     <string name="translation_show">翻訳を表示</string>
     <string name="translation_translating">翻訳中…</string>

@@ -176,6 +176,139 @@ fun restoreTranslatedHtml(source: TranslatableHtml, output: String): String? {
     return out.toString().takeIf { it.isNotBlank() }
 }
 
+/** 本文を訳す単位に分けたもの ([split])。全部の [html] をつなげると元の [TranslatableHtml.html] になる。 */
+sealed interface TranslatablePart {
+    val html: String
+
+    /** 訳さずにそのまま出すタグ・空白 (分けた段落の `<p>` / `</p>`、区切りの `<br>` 等)。 */
+    data class Markup(override val html: String) : TranslatablePart
+
+    /**
+     * 1 回で訳す分 ([restoreTranslatedHtml] にはこの [source] を渡す)。[inline] は段落等の中の一部 (段落を分けたもの・
+     * 段落の外の文字) で、平文で訳し直したときに `<p>` で包まない ([plainTextToInlineHtml])。
+     */
+    data class Text(val source: TranslatableHtml, val inline: Boolean) : TranslatablePart {
+        override val html: String get() = source.html
+    }
+}
+
+/** 段落と同じく、丸ごと 1 つの単位にする要素。 */
+private val BlockLevelTags = BlockTags + setOf("ul", "ol")
+
+/**
+ * 長い本文を、1 回の訳 (モデルの出力の上限・コンテキスト) に収まるよう [maxLength] 文字 (HTML の文字数) 以下ずつに分ける。
+ * 収まれば分けない。分けるのは段落等の切れ目で、それでも長い段落はその中の `<br>` の切れ目で分ける (中の分は [inline])。
+ * 文の途中では分けないので、`<br>` の無い長い段落は [maxLength] を超えたまま 1 つになる。
+ */
+fun TranslatableHtml.split(maxLength: Int): List<TranslatablePart> {
+    if (html.isBlank()) return emptyList()
+    val parts = mutableListOf<TranslatablePart>()
+    var nextLink = 0
+    var nextEmoji = 0
+
+    fun markup(token: HtmlToken) {
+        val last = parts.lastOrNull()
+        if (last is TranslatablePart.Markup) parts[parts.lastIndex] = TranslatablePart.Markup(last.html + token.raw) else parts += TranslatablePart.Markup(token.raw)
+    }
+
+    fun text(tokens: List<HtmlToken>) {
+        var start = 0
+        var end = tokens.size
+        while (start < end && tokens[start].isSeparator()) start++
+        while (end > start && tokens[end - 1].isSeparator()) end--
+        tokens.subList(0, start).forEach(::markup)
+        if (start < end) {
+            val body = tokens.subList(start, end)
+            val links = body.count { it is HtmlToken.Start && it.name == "a" }
+            val emojis = body.count { it is HtmlToken.Start && it.name == "img" }
+            val source = TranslatableHtml(
+                html = body.joinToString("") { it.raw },
+                links = this.links.subList(nextLink, nextLink + links),
+                emojis = this.emojis.subList(nextEmoji, nextEmoji + emojis),
+            )
+            parts += TranslatablePart.Text(source, inline = hasLooseText(body))
+            nextLink += links
+            nextEmoji += emojis
+        }
+        tokens.subList(end, tokens.size).forEach(::markup)
+    }
+
+    fun splitTokens(tokens: List<HtmlToken>) {
+        val current = mutableListOf<HtmlToken>()
+        var length = 0
+        for (unit in splitUnits(tokens)) {
+            val unitLength = unit.sumOf { it.raw.length }
+            if (length + unitLength > maxLength && current.isNotEmpty()) {
+                text(current.toList())
+                current.clear()
+                length = 0
+            }
+            val open = unit.first() as? HtmlToken.Start
+            val close = unit.last() as? HtmlToken.End
+            val inner = if (unit.size > 2 && open != null && open.name in KeptTags && close?.name == open.name) unit.subList(1, unit.size - 1) else null
+            if (unitLength > maxLength && inner != null && splitUnits(inner).size > 1) {
+                // 長い段落等で、中に切れ目がある: 中を分ける
+                markup(unit.first())
+                splitTokens(inner)
+                markup(unit.last())
+            } else {
+                current += unit
+                length += unitLength
+            }
+        }
+        if (current.isNotEmpty()) text(current.toList())
+    }
+
+    splitTokens(lexHtml(html))
+    return parts
+}
+
+/**
+ * [tokens] (同じ深さの並び) を分けてよい単位にする: 段落等の要素 1 つ / `<br>` 1 つ / その間の文字・リンク・絵文字・
+ * `<strong>` 等のひと続き (文の途中では分けない)。
+ */
+private fun splitUnits(tokens: List<HtmlToken>): List<List<HtmlToken>> {
+    val units = mutableListOf<List<HtmlToken>>()
+    val inline = mutableListOf<HtmlToken>()
+    fun flushInline() {
+        if (inline.isNotEmpty()) units += inline.toList()
+        inline.clear()
+    }
+    var i = 0
+    while (i < tokens.size) {
+        val token = tokens[i]
+        val end = if (token is HtmlToken.Start && token.name !in VoidTags && !token.selfClosing) closingIndex(tokens, i) else i
+        val atom = tokens.subList(i, end + 1)
+        when {
+            token is HtmlToken.Start && (token.name in BlockLevelTags || token.name == "br") -> {
+                flushInline()
+                units += atom
+            }
+            else -> inline += atom
+        }
+        i = end + 1
+    }
+    flushInline()
+    return units
+}
+
+/** [start] の開きタグに対応する閉じタグの位置 (無ければ最後)。 */
+private fun closingIndex(tokens: List<HtmlToken>, start: Int): Int {
+    var depth = 0
+    for (i in start until tokens.size) {
+        when (val token = tokens[i]) {
+            is HtmlToken.Start -> if (token.name !in VoidTags && !token.selfClosing) depth++
+            is HtmlToken.End -> if (token.name !in VoidTags && --depth == 0) return i
+            is HtmlToken.Text -> Unit
+        }
+    }
+    return tokens.lastIndex
+}
+
+/** 分けた単位の端に残して訳さないもの (`<br>`・空白)。 */
+private fun HtmlToken.isSeparator(): Boolean =
+    (this is HtmlToken.Start && name == "br") || (this is HtmlToken.Text && raw.isBlank())
+
 private fun StringBuilder.appendTextWithEmojis(text: String, known: Set<String>, emojis: MutableList<String>) {
     var last = 0
     for (match in ShortcodeRegex.findAll(text)) {
@@ -303,9 +436,15 @@ fun TranslatableHtml.plainText(): String {
 
 /** 平文 (平文で訳した訳文) を表示用の HTML にする。空行で段落を分け、改行は `<br>`。 */
 fun plainTextToHtml(text: String): String =
-    text.trim().split(Regex("""\n\s*\n""")).filter { it.isNotBlank() }.joinToString("") { paragraph ->
-        "<p>" + paragraph.trim().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>") + "</p>"
+    text.trim().split(BlankLineRegex).filter { it.isNotBlank() }.joinToString("") { paragraph ->
+        "<p>" + plainTextToInlineHtml(paragraph) + "</p>"
     }
+
+/** 平文を段落の中に置く HTML にする (段落を分けて訳した一部 ([TranslatablePart.Text.inline]) 用)。改行は `<br>`。 */
+fun plainTextToInlineHtml(text: String): String =
+    text.trim().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+
+private val BlankLineRegex = Regex("""\n\s*\n""")
 
 private fun decodeEntities(text: String): String = text
     .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'")

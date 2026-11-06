@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.data.translation
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TranslatableHtmlTest {
@@ -158,5 +159,64 @@ class TranslatableHtmlTest {
             "<p>a &lt;b&gt; &amp; c<br>d</p><p>e :blobcat:</p>",
             plainTextToHtml("a <b> & c\nd\n\n\ne :blobcat:\n"),
         )
+    }
+
+    @Test
+    fun splitKeepsShortBodyWhole() {
+        val source = toTranslatableHtml("<p>$mention hi :blobcat:</p><p>two</p>", emojis)
+        assertEquals(listOf(TranslatablePart.Text(source, inline = false)), source.split(maxLength = 1000))
+        assertEquals(emptyList<TranslatablePart>(), toTranslatableHtml("", emptySet()).split(maxLength = 1000))
+    }
+
+    @Test
+    fun splitAtParagraphs() {
+        val source = toTranslatableHtml(
+            "<p>${"a".repeat(30)} $mention</p><p>${"b".repeat(30)} :blobcat:</p><ul><li>c</li></ul><p>$hashtag d</p>",
+            emojis,
+        )
+        val parts = source.split(maxLength = 90)
+        assertEquals(source.html, parts.joinToString("") { it.html })
+        val texts = parts.filterIsInstance<TranslatablePart.Text>()
+        assertEquals(parts.size, texts.size)
+        // 段落の途中では分けない
+        assertTrue(texts.all { it.html.startsWith("<p>") || it.html.startsWith("<ul>") })
+        assertTrue(texts.size > 1)
+        assertTrue(texts.none { it.inline })
+        // リンク・絵文字はそれぞれの分へ順に配られる
+        assertEquals(source.links, texts.flatMap { it.source.links })
+        assertEquals(source.emojis, texts.flatMap { it.source.emojis })
+        texts.forEach { text ->
+            assertEquals(Regex("<a ").findAll(text.html).count(), text.source.links.size)
+            assertEquals(Regex("<img ").findAll(text.html).count(), text.source.emojis.size)
+        }
+    }
+
+    @Test
+    fun splitLongParagraphAtLineBreaks() {
+        val line = "x".repeat(40)
+        val source = toTranslatableHtml("<p>$line $mention<br />$line :blobcat:<br /><br />$line</p><p>short</p>", emojis)
+        val parts = source.split(maxLength = 100)
+        assertEquals(source.html, parts.joinToString("") { it.html })
+        assertEquals(TranslatablePart.Markup("<p>"), parts.first())
+        val inner = parts.takeWhile { it.html != "</p>" }.filterIsInstance<TranslatablePart.Text>()
+        // 段落の中の分は段落の外に文字があるものとして扱い、区切りの <br> は訳さない
+        assertTrue(inner.size >= 2)
+        assertTrue(inner.all { it.inline && !it.html.startsWith("<br>") && !it.html.endsWith("<br>") })
+        assertTrue(TranslatablePart.Markup("<br><br>") in parts)
+        // 分けた一部の訳もそのまま戻せる
+        val first = inner.first()
+        assertEquals(first.html.replace(line, "y"), restoreTranslatedHtml(first.source, first.html.replace(line, "y"))?.replace(mention.removePrefix("""<span class="h-card" translate="no">""").removeSuffix("</span>"), """<a href="https://a.invalid/@alice">@alice</a>"""))
+    }
+
+    @Test
+    fun splitDoesNotBreakSentences() {
+        // <br> の無い長い段落は分けられないので 1 つのまま
+        val source = toTranslatableHtml("<p>${"z".repeat(200)} $hashtag ${"z".repeat(200)}</p>", emptySet())
+        assertEquals(listOf(TranslatablePart.Text(source, inline = false)), source.split(maxLength = 100))
+    }
+
+    @Test
+    fun plainTextBackToInlineHtml() {
+        assertEquals("a &lt;b&gt;<br>c", plainTextToInlineHtml("a <b>\nc\n"))
     }
 }

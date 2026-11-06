@@ -1049,7 +1049,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 設計は `origin/translation` ブランチの `docs/translation.md`。
 
 * 流れ: `toTranslatableHtml` (本文の HTML を簡略化) → `plamoTranslationPrompt` (PFML3) → `LlamaModel.generate` (`:llama`) →
-  `restoreTranslatedHtml` (検査して戻す。崩れていたら null) → `EmojiText(isHtml = true)`。変換は純粋関数で、
+  `restoreTranslatedHtml` (検査して戻す。崩れていたら null) → `EmojiText(isHtml = true)`。長い本文 (HTML で 800 文字超) は
+  `TranslatableHtml.split` で段落・`<br>` の切れ目で分けて 1 つずつ訳し、それでも上限で切れたら「一部を翻訳」と出す。変換は純粋関数で、
   `PlamoPromptTest` / `TranslatableHtmlTest`。**挙動を変えたらテストとドキュメントの実験結果の節も直す**。
 * 言語の無いポスト (Misskey は送ってこない) は本文から端末の TextClassifier (`detectLanguage`) で推定する
   (`detectPostLanguage`、`LanguageDetectionTest`)。`PostTranslationStore` が裏で推定してから翻訳の表示を出す。

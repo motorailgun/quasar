@@ -130,6 +130,9 @@ class PostTranslationStore(
     /** メモリが足りないと言われてから、まだ訳さない間。 */
     private var cooldown: Job? = null
 
+    /** モデルのファイルを消している ([deleteModel])。 */
+    private var deleting = false
+
     init {
         scope.launch {
             settings.filterNotNull().map { it.translation }.collect {
@@ -160,10 +163,17 @@ class PostTranslationStore(
 
     /** 読み込んだモデルを解放してから、モデルのファイル (ダウンロード中なら止めて) を消す。 */
     fun deleteModel() {
+        // 消し終わるまで (モデルの状態が Missing になるまで) は次を訳さない。訳し始めると消すファイルを読み込み直す
+        deleting = true
         stopRunning()
         scope.launch {
-            translator.release()
-            model.delete()
+            try {
+                translator.release()
+                model.delete()
+            } finally {
+                deleting = false
+                wake.trySend(Unit)
+            }
         }
     }
 
@@ -266,7 +276,7 @@ class PostTranslationStore(
         running?.cancel()
     }
 
-    private val canTranslate: Boolean get() = modelAvailable && foreground && cooldown?.isActive != true
+    private val canTranslate: Boolean get() = modelAvailable && foreground && !deleting && cooldown?.isActive != true
 
     private fun enqueue(entry: PostTranslationEntry) {
         entry.state = PostTranslationState.Queued
@@ -285,10 +295,15 @@ class PostTranslationStore(
             entry.state = try {
                 PostTranslationState.Translated(job.await())
             } catch (e: CancellationException) {
-                // 自分が取り消されたのでなければ、止められた (メモリ・裏に回った) ので順番待ちに戻す
+                // 自分が取り消されたのでなければ、止められた (メモリ・裏に回った) ので順番待ちに戻す。
+                // 訳す先が変わって作り直した ([reset]) ・編集で別の entry になったものは戻さない (もう表示されない)
                 currentCoroutineContext().ensureActive()
-                pending.addLast(entry)
-                PostTranslationState.Queued
+                if (entries[entry.statusId] === entry) {
+                    pending.addLast(entry)
+                    PostTranslationState.Queued
+                } else {
+                    PostTranslationState.Idle
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "translation failed: ${e.javaClass.simpleName}")
                 PostTranslationState.Failed

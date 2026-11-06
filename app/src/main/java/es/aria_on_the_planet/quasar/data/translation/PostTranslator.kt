@@ -38,23 +38,47 @@ fun plamoLanguagesOf(languageTags: List<String>): List<String> = languageTags.ma
 /** [source] から [target] へ訳せる。[automatic] なら表示したときに訳す (でなければ「翻訳を表示」で)。 */
 data class TranslationOffer(val source: String, val target: String, val automatic: Boolean)
 
-/** ポストを [TranslationEngine] で訳す。本文は HTML のまま訳させ ([toTranslatableHtml])、崩れたら平文で訳し直す。 */
+/**
+ * ポストを [TranslationEngine] で訳す。本文は HTML のまま訳させ ([toTranslatableHtml])、崩れたら平文で訳し直す。
+ * 長い本文は段落等の切れ目で分けて 1 つずつ訳す ([split])。HTML か平文かは分けた 1 つごとに決める。
+ */
 class PostTranslator(private val engine: TranslationEngine) {
     /** 読み込んだモデルを解放する ([TranslationEngine.release])。 */
     suspend fun release() = engine.release()
 
     suspend fun translate(post: Post, offer: TranslationOffer): PostTranslation = withContext(Dispatchers.Default) {
         val source = toTranslatableHtml(post.text, post.emojis.mapTo(HashSet()) { it.shortcode })
-        val restored = if (source.html.isBlank()) "" else restoreTranslatedHtml(source, translateText(source.html, offer))
+        var plain = false
+        var truncated = false
+        val html = buildString {
+            for (part in source.split(MaxPartLength)) when (part) {
+                is TranslatablePart.Markup -> append(part.html)
+                is TranslatablePart.Text -> {
+                    val translated = translateText(part.source.html, offer)
+                    // 切れた HTML は閉じていないので戻せない (戻せても途中まで)。平文なら短く収まることがある
+                    val restored = if (translated.truncated) null else restoreTranslatedHtml(part.source, translated.text)
+                    if (restored != null) {
+                        append(restored)
+                    } else {
+                        val retried = translateText(part.source.plainText(), offer)
+                        plain = true
+                        truncated = truncated || retried.truncated
+                        append(if (part.inline) plainTextToInlineHtml(retried.text) else plainTextToHtml(retried.text))
+                    }
+                }
+            }
+        }
+        val contentWarning = post.contentWarning?.let { translateText(it, offer) }
         PostTranslation(
-            html = restored ?: plainTextToHtml(translateText(source.plainText(), offer)),
-            contentWarning = post.contentWarning?.let { translateText(it, offer).trim() },
+            html = html,
+            contentWarning = contentWarning?.text?.trim(),
             sourceLanguage = offer.source,
-            plain = restored == null,
+            plain = plain,
+            truncated = truncated || contentWarning?.truncated == true,
         )
     }
 
-    private suspend fun translateText(text: String, offer: TranslationOffer): String = engine.generate(
+    private suspend fun translateText(text: String, offer: TranslationOffer): GeneratedText = engine.generate(
         plamoTranslationPrompt(PlamoTranslationRequest(text, targetLanguage = offer.target, sourceLanguage = offer.source)),
         MaxTokens,
     )
@@ -62,5 +86,11 @@ class PostTranslator(private val engine: TranslationEngine) {
     private companion object {
         /** 訳文の上限 (トークン)。Mastodon の 500 文字の投稿の HTML なら収まる。 */
         const val MaxTokens = 1024
+
+        /**
+         * 1 回で訳す本文の長さの目安 (HTML の文字数)。訳文が [MaxTokens] に収まり、プロンプトがコンテキスト (4096) を超えない
+         * よう、これを超える本文は段落等で分ける。日本語は 1 文字 1 トークン前後なので、英語等へ訳しても収まる大きさ。
+         */
+        const val MaxPartLength = 800
     }
 }

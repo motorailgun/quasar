@@ -1,0 +1,28 @@
+# misskey.quasar.test の設定 (/misskey/.config/default.yml に読み取り専用で置く)。
+# ネットワークは外に出られない internal なので、DB のパスワード等は固定でよい。
+url: https://misskey.quasar.test/
+port: 3000
+
+db:
+  host: db
+  port: 5432
+  db: misskey
+  user: misskey
+  pass: misskey-testbed
+
+dbReplications: false
+
+redis:
+  host: misskey-redis
+  port: 6379
+
+id: aidx
+
+# 最初の管理者を API (admin/accounts/create) で作るときに要る
+setupPassword: quasar-testbed
+
+# 連合先 (proxy) はプライベートアドレスにいる
+allowedPrivateNetworks:
+  - 172.31.89.0/24
+
+clusterLimit: 1

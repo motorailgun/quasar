@@ -2,6 +2,7 @@
 # Quasar の動作確認用の連合環境 (README.md)。
 #
 #   ./testbed.sh up            初期化 (初回のみ) → DB の準備 → 全サーバ起動 → アカウント作成 → 相互フォロー
+#                              (Misskey は misskey.quasar.test。アカウントは bots.py setup が API で作る)
 #   ./testbed.sh down          止める (データは残す)
 #   ./testbed.sh reset         データごと消す (state/ の CA・トークンも)
 #   ./testbed.sh bots start    自動投稿を始める (stop / logs / burst [N] / setup)
@@ -43,6 +44,15 @@ prepare_db() {
   fi
 }
 
+# Postgres の初期化スクリプト (postgres/) はデータが空の初回しか走らないので、後から足した Misskey の DB はここで作る
+prepare_misskey_db() {
+  has=$(dc exec -T db psql -U postgres -tAc "select 1 from pg_roles where rolname = 'misskey'")
+  [ "$has" = 1 ] && return
+  log "misskey: create role + database"
+  dc exec -T db psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE misskey LOGIN PASSWORD 'misskey-testbed'" \
+    -c "CREATE DATABASE misskey OWNER misskey"
+}
+
 create_accounts() {
   s=$1
   log "$s: accounts"
@@ -55,6 +65,18 @@ create_accounts() {
   printf '%s\n' "$out" > "state/tokens/$s.json"
 }
 
+# Misskey の管理者と userN を作る。作れるのは最初の 1 回だけ (管理者は setupPassword で、DB が空のときしか作れない)
+create_misskey_accounts() {
+  [ -f state/tokens/misskey.json ] && return
+  log "misskey: accounts"
+  out=$(dc run --rm bots python -u bots.py misskey-accounts | tail -n 1)
+  case "$out" in
+    '{'*) ;;
+    *) echo "misskey: accounts failed" >&2; exit 1 ;;
+  esac
+  printf '%s\n' "$out" > state/tokens/misskey.json
+}
+
 cmd_up() {
   log "init (CA, secrets)"
   mkdir -p state
@@ -62,16 +84,20 @@ cmd_up() {
   dc up -d db alpha-redis stable-redis legacy-redis
   wait_healthy db
   for s in $SERVERS; do prepare_db "$s"; done
+  prepare_misskey_db
   log "starting servers"
   dc up -d --remove-orphans
   # メディアのボリュームは root で作られるので、Mastodon (uid 991) が書けるようにする
   for s in $SERVERS; do
     docker run --rm -v "quasar-testbed_$s-system:/v" alpine:3.22 chown 991:991 /v
   done
-  wait_healthy alpha-web stable-web legacy-web
+  # Misskey も uid 991
+  docker run --rm -v quasar-testbed_misskey-files:/v alpine:3.22 chown 991:991 /v
+  wait_healthy alpha-web stable-web legacy-web misskey
   for s in $SERVERS; do create_accounts "$s"; done
   log "bots: wait + setup (profiles, follows)"
   dc run --rm bots python -u bots.py wait
+  create_misskey_accounts
   dc run --rm bots python -u bots.py setup
   log "ready. ./testbed.sh bots start で自動投稿を始める"
 }
@@ -88,7 +114,7 @@ cmd_bots() {
 }
 
 cmd_accounts() {
-  for s in $SERVERS; do
+  for s in $SERVERS misskey; do
     [ -f "state/tokens/$s.json" ] || continue
     docker run --rm -i python:3.13-alpine python -c '
 import json, sys

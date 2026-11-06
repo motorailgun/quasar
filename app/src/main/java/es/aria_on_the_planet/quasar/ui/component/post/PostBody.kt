@@ -30,6 +30,7 @@ import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
  * @param collapsedMaxLines 長文をこの行数で折りたたむ。`null` なら全文。
  * @param extras 投票・リンクプレビュー・引用も出すか (返信先の表示 [PostCardMode.ReplyContext] では出さない)。
  * @param fixed 開閉させない ([PostCardMode.Preview])。CW は開いたまま、長文は開閉のボタン無しで切ってフェードさせる。
+ * @param translatable 訳を出す ([LocalPostTranslations] があれば)。訳したら本文・CW を訳に差し替え、上に「〇〇語から翻訳」を出す。
  */
 @Composable
 internal fun PostBody(
@@ -41,15 +42,28 @@ internal fun PostBody(
     collapsedMaxLines: Int? = null,
     extras: Boolean = true,
     fixed: Boolean = false,
+    translatable: Boolean = extras && !fixed,
 ) {
     var expanded by rememberContentWarningExpanded(post)
+    val translation = rememberPostTranslation(post, translatable)
+    val translated = translation?.shownTranslation
+    val text = translated?.html ?: post.text
+    val contentWarning = translated?.contentWarning ?: post.contentWarning
+    if (translation != null) {
+        val store = LocalPostTranslations.current
+        PostTranslationBar(
+            entry = translation,
+            onToggle = { store?.toggle(translation) },
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+    }
     // 開いたままなら隠す部分は無いのと同じ (アニメーションの入れ物も作らない)
-    val hasWarning = post.contentWarning != null && !fixed
+    val hasWarning = contentWarning != null && !fixed
     if (fixed) {
-        post.contentWarning?.let { cw ->
+        contentWarning?.let { cw ->
             FixedContentWarning(cw, post, textStyle, Modifier.padding(bottom = spacing))
         }
-    } else post.contentWarning?.let { cw ->
+    } else contentWarning?.let { cw ->
         ContentWarning(
             text = cw,
             emojis = post.emojis,
@@ -60,7 +74,7 @@ internal fun PostBody(
     }
     ContentWarningBody(hasWarning = hasWarning, expanded = expanded) {
         CollapsiblePostText(
-            html = post.text,
+            html = text,
             emojis = post.emojis,
             stateKey = post.statusId,
             maxCollapsedLines = collapsedMaxLines,

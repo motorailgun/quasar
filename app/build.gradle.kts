@@ -22,6 +22,9 @@ android {
         }
     }
 
+    // .so の strip (release / benchmark) に使う NDK。:llama と揃える (無いと AGP の既定の版を探し、無ければ strip せずに入れる)
+    ndkVersion = "29.0.14206865"
+
     defaultConfig {
         applicationId = "es.aria_on_the_planet.quasar"
         minSdk = 33
@@ -75,8 +78,23 @@ android {
             oauthRedirectScheme("$oauthRedirectScheme.debug")
         }
     }
+    // 端末内の翻訳 (llama.cpp + PLaMo 3 Translate) を入れるか。full = 入れる (NDK・llama.cpp の submodule が要る)、
+    // lite = 入れない。applicationId は同じなので、互いに上書きして入れ替えられる (lite は full の残したモデルを消す)
+    flavorDimensions += "translation"
+    productFlavors {
+        create("full") {
+            dimension = "translation"
+            isDefault = true
+        }
+        create("lite") {
+            dimension = "translation"
+        }
+    }
     sourceSets {
         getByName("benchmark").setRoot("src/debug")
+        // ギャラリーの翻訳の画面 (full は :llama を直に使う、lite は無いと出すだけ)
+        maybeCreate("fullBenchmark").setRoot("src/fullDebug")
+        maybeCreate("liteBenchmark").setRoot("src/liteDebug")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -100,6 +118,12 @@ if (providers.gradleProperty("composeReports").isPresent) {
         reportsDestination = layout.buildDirectory.dir("compose_compiler")
         metricsDestination = layout.buildDirectory.dir("compose_compiler")
     }
+}
+
+// オンデバイス翻訳 (:llama) の .so をファイルとして展開する。llama.cpp は CPU の機能ごとのバックエンド
+// (libggml-cpu-*.so) を nativeLibraryDir から探して読むため (APK の中のままでは見つからない)
+androidComponents {
+    onVariants(selector().withFlavor("translation" to "full")) { it.packaging.jniLibs.useLegacyPackaging.set(true) }
 }
 
 // Room のスキーマ (版ごとの JSON)。キャッシュなので移行は書かず作り直すが、変更の履歴として残す
@@ -153,6 +177,10 @@ dependencies {
     implementation(libs.androidx.media3.ui.compose)
     implementation(libs.androidx.media3.ui.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // オンデバイス翻訳 (llama.cpp)。full のフレーバーだけ
+    "fullImplementation"(project(":llama"))
+    // アプリが前面か (裏に回ったら翻訳のモデルを解放する)
+    implementation(libs.androidx.lifecycle.process)
     // 性能の測定: Perfetto のトレースに Composable 単位の区間を出す (composition tracing)
     "benchmarkImplementation"(libs.androidx.compose.runtime.tracing)
     "benchmarkImplementation"(libs.androidx.tracing.perfetto.binary)

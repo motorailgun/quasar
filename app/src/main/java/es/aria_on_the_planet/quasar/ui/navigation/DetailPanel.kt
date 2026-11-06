@@ -96,7 +96,8 @@ class DetailPanelState(private val pop: () -> Unit) {
  */
 internal fun NavKey.opensInPanel(): Boolean = when (this) {
     is Route.Post, is Route.Profile, is Route.Hashtag, is Route.FollowList,
-    is Route.AccountReactions, is Route.PostReactions, is Route.OpenLink -> true
+    is Route.AccountReactions, is Route.PostReactions, is Route.OpenLink,
+    is Route.PersonalPosts, is Route.FollowRequests, is Route.Search -> true
     else -> false
 }
 

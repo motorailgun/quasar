@@ -300,6 +300,15 @@ data class StatusSourceDto(
     @SerialName("spoiler_text") val spoilerText: String = "",
 )
 
+/** https://docs.joinmastodon.org/entities/Conversation/ */
+@Serializable
+data class ConversationDto(
+    val id: String,
+    val unread: Boolean = false,
+    val accounts: List<AccountDto> = emptyList(),
+    @SerialName("last_status") val lastStatus: StatusDto? = null,
+)
+
 /** https://docs.joinmastodon.org/entities/Status/ */
 @Serializable
 data class StatusDto(
@@ -314,6 +323,8 @@ data class StatusDto(
     @SerialName("spoiler_text") val spoilerText: String = "",
     val sensitive: Boolean = false,
     val visibility: String = "public",
+    /** 本文の言語 (ISO 639)。無いことがある。 */
+    val language: String? = null,
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
     @SerialName("in_reply_to_account_id") val inReplyToAccountId: String? = null,
     val mentions: List<MentionDto> = emptyList(),

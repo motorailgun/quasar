@@ -24,7 +24,66 @@ data class AppSettings(
      */
     val stripImageMetadata: Boolean = false,
     val predictiveBack: PredictiveBackSettings = PredictiveBackSettings(),
+    val translation: TranslationSettings = TranslationSettings(),
 )
+
+/**
+ * ポストの翻訳 (端末内のモデル。full のフレーバーだけ)。言語は翻訳のモデル (PLaMo 3 Translate) の言語コード
+ * (`ja`・`en`・`zh-hans` 等)。
+ *
+ * 言語ごとの扱いは「その他の言語」([defaultMode]) と、それと違う扱いにする言語の一覧 ([languageModes]) で決める。
+ * 訳す先の言語のポストには、どちらにも関わらず出さない。
+ */
+data class TranslationSettings(
+    /** 翻訳を使う (オンにするとモデルをダウンロードする)。オフなら翻訳の表示を出さない。 */
+    val enabled: Boolean = false,
+    /** 一覧 ([languageModes]) に無い言語の扱い。 */
+    val defaultMode: TranslationMode = TranslationMode.Offer,
+    /**
+     * 言語ごとの扱い。`null` はまだ一覧を変えていない状態で、端末の言語を [TranslationMode.Hidden] にした一覧として扱う
+     * ([languageModesOr])。端末の言語を変えたときに追従させるため、変えるまでは保存しない。
+     */
+    val languageModes: Map<String, TranslationMode>? = null,
+    /** 訳す先。`null` なら端末の言語。 */
+    val targetLanguage: String? = null,
+) {
+    /** 言語ごとの扱いの一覧。まだ変えていなければ [deviceLanguages] (端末の言語) を出さない一覧。 */
+    fun languageModesOr(deviceLanguages: List<String>): Map<String, TranslationMode> =
+        languageModes ?: deviceLanguages.associateWith { TranslationMode.Hidden }
+
+    /** [language] のポストの扱い。 */
+    fun modeOf(language: String, deviceLanguages: List<String>): TranslationMode =
+        languageModesOr(deviceLanguages)[language] ?: defaultMode
+
+    /** 一覧の [language] を [mode] にする (無ければ足す)。 */
+    fun withLanguageMode(language: String, mode: TranslationMode, deviceLanguages: List<String>): TranslationSettings =
+        copy(languageModes = languageModesOr(deviceLanguages) + (language to mode))
+
+    /** 一覧から [language] を外す (「その他の言語」の扱いになる)。 */
+    fun withoutLanguage(language: String, deviceLanguages: List<String>): TranslationSettings =
+        copy(languageModes = languageModesOr(deviceLanguages) - language)
+}
+
+/** ある言語のポストに翻訳をどう出すか。 */
+enum class TranslationMode {
+    /** 表示したときに自動で訳す。 */
+    Automatic,
+
+    /** 「翻訳を表示」を出す (押したら訳す)。 */
+    Offer,
+
+    /** 翻訳の表示を出さない。 */
+    Hidden,
+    ;
+
+    /** 「その他の言語」がこれのとき、一覧に足した言語の最初の扱い (足すのは違う扱いにしたいから)。 */
+    val addedLanguageMode: TranslationMode
+        get() = when (this) {
+            Automatic -> Hidden
+            Offer -> Automatic
+            Hidden -> Offer
+        }
+}
 
 /** 通知の取得に使う API。 */
 enum class NotificationApi {

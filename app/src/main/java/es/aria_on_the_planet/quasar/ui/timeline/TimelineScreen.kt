@@ -16,10 +16,13 @@ import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -53,6 +56,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -115,7 +121,7 @@ fun TimelineScreen(
     val barState = rememberQuickPostBarState()
     var headerHeight by remember { mutableStateOf(0.dp) }
     val composer = drafts.current.collectAsStateWithLifecycle().value
-    // ヘッダ左のアイコンに出すログイン中のアカウント (投稿用に取得しているものを使う)
+    // ドロワーに出すログイン中のアカウント (投稿用に取得しているものを使う)
     val account: User? = composer?.state?.collectAsStateWithLifecycle()?.value?.account
     // 返信ボタン: 下書き (返信と通常の投稿で共有) の返信先にしてバーで書き始める
     val onReply: ((Post) -> Unit)? = composer?.let { session ->
@@ -132,86 +138,123 @@ fun TimelineScreen(
         }
     }
 
-    QuickComposerHost(
-        drafts = drafts,
-        hazeState = hazeState,
-        snackbarHostState = snackbarHostState,
-        barState = barState,
-        onMediaClick = navigator::openMedia,
-    ) { barSpace ->
-        // 一覧の上端はヘッダ (ステータスバーを含む) の分だけ空ける。一覧自体は画面の最上端から描き、スクロールすると
-        // ステータスバーやヘッダの裏に入る
-        val topPadding = headerHeight
-        // 一覧の下端はバー (と下の余白・ナビゲーションバー) の分だけ空け、最後の項目がバーに隠れないようにする
-        val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + barSpace
-        // トップバーは置かず、ヘッダ (アイコン + タブ) を一覧の上に浮かべる
-        Scaffold { _ ->
-            Box(Modifier.fillMaxSize()) {
-                val pageSize = remember(visibleColumns) {
-                    if (visibleColumns == 1) PageSize.Fill else ColumnsPageSize(visibleColumns)
-                }
-                val dividerColor = MaterialTheme.colorScheme.outlineVariant
-                HorizontalPager(
-                    state = pagerState,
-                    // 上下ともヘッダ・バーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
-                    key = { ColumnType.entries[it] },
-                    // 2 カラムでは 1 ページを幅の半分にして 2 ページを同時に見せる (スワイプでは 1 カラムずつずれる)
-                    pageSize = pageSize,
-                    // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
-                    flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),
-                ) { page ->
-                    val column = ColumnType.entries[page]
-                    // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
-                    val start = startOf(pagerState.settledPage)
-                    val shouldLoad = dragging || page in start until start + visibleColumns
-                    LaunchedEffect(column, shouldLoad) {
-                        if (shouldLoad) viewModel.ensureLoaded(column)
+    // ≡ で左から出るドロワー。開いたまま別の画面へ移って戻ってきたときは閉じているよう、保存しない状態で持つ
+    val drawerState = remember { DrawerState(DrawerValue.Closed) }
+    // 開いている (開きかけを含む) 間の「戻る」はドロワーを閉じる。ModalNavigationDrawer 自身は「戻る」を受けない
+    NavigationBackHandler(
+        state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
+        isBackEnabled = drawerState.targetValue == DrawerValue.Open,
+        onBackCompleted = { scope.launch { drawerState.close() } },
+    )
+    // 開くのはボタンだけ (左右のスワイプはカラムの切り替え)。開いている間はスワイプでも閉じられる
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = drawerState.isOpen,
+        drawerContent = {
+            TimelineDrawerSheet(
+                account = account,
+                onOpenProfile = { user ->
+                    navigator.openProfile(user)
+                    scope.launch { drawerState.close() }
+                },
+                onOpenSettings = {
+                    navigator.openSettings()
+                    scope.launch { drawerState.close() }
+                },
+                onOpenPersonalPosts = { list ->
+                    navigator.openPersonalPosts(list)
+                    scope.launch { drawerState.close() }
+                },
+                onOpenFollowRequests = {
+                    navigator.openFollowRequests()
+                    scope.launch { drawerState.close() }
+                },
+                onOpenSearch = {
+                    navigator.openSearch()
+                    scope.launch { drawerState.close() }
+                },
+            )
+        },
+    ) {
+        QuickComposerHost(
+            drafts = drafts,
+            hazeState = hazeState,
+            snackbarHostState = snackbarHostState,
+            barState = barState,
+            onMediaClick = navigator::openMedia,
+        ) { barSpace ->
+            // 一覧の上端はヘッダ (ステータスバーを含む) の分だけ空ける。一覧自体は画面の最上端から描き、スクロールすると
+            // ステータスバーやヘッダの裏に入る
+            val topPadding = headerHeight
+            // 一覧の下端はバー (と下の余白・ナビゲーションバー) の分だけ空け、最後の項目がバーに隠れないようにする
+            val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + barSpace
+            // トップバーは置かず、ヘッダ (アイコン + タブ) を一覧の上に浮かべる
+            Scaffold { _ ->
+                Box(Modifier.fillMaxSize()) {
+                    val pageSize = remember(visibleColumns) {
+                        if (visibleColumns == 1) PageSize.Fill else ColumnsPageSize(visibleColumns)
                     }
-                    ColumnPage(
-                        modifier = if (visibleColumns > 1 && page > 0) {
-                            // 並べたカラムの間の区切り線 (左端)
-                            Modifier.drawBehind {
-                                drawLine(dividerColor, Offset.Zero, Offset(0f, size.height), strokeWidth = 1.dp.toPx())
+                    val dividerColor = MaterialTheme.colorScheme.outlineVariant
+                    HorizontalPager(
+                        state = pagerState,
+                        // 上下ともヘッダ・バーの後ろまで描き (ぼかしの元)、余白は一覧の contentPadding で取る
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
+                        key = { ColumnType.entries[it] },
+                        // 2 カラムでは 1 ページを幅の半分にして 2 ページを同時に見せる (スワイプでは 1 カラムずつずれる)
+                        pageSize = pageSize,
+                        // 指を離した後はテーマの spring で吸着させる (Expressive では少し行き過ぎて戻る)
+                        flingBehavior = PagerDefaults.flingBehavior(state = pagerState, snapAnimationSpec = pageSpring),
+                    ) { page ->
+                        val column = ColumnType.entries[page]
+                        // 隣のカラムは指で引き出し始めた時点で読み込む。ボタンで遠くへ飛ぶときに通過するカラムは読まない
+                        val start = startOf(pagerState.settledPage)
+                        val shouldLoad = dragging || page in start until start + visibleColumns
+                        LaunchedEffect(column, shouldLoad) {
+                            if (shouldLoad) viewModel.ensureLoaded(column)
+                        }
+                        ColumnPage(
+                            modifier = if (visibleColumns > 1 && page > 0) {
+                                // 並べたカラムの間の区切り線 (左端)
+                                Modifier.drawBehind {
+                                    drawLine(dividerColor, Offset.Zero, Offset(0f, size.height), strokeWidth = 1.dp.toPx())
+                                }
+                            } else {
+                                Modifier
+                            },
+                            column = column,
+                            state = state,
+                            listState = listStates.getValue(column),
+                            viewModel = viewModel,
+                            topPadding = topPadding,
+                            bottomPadding = bottomPadding,
+                            onReply = onReply,
+                            onQuote = onQuote,
+                        )
+                    }
+                    StatusBarScrim(Modifier.align(Alignment.TopCenter))
+                    TimelineHeader(
+                        pagerState = pagerState,
+                        visibleColumns = visibleColumns,
+                        hazeState = hazeState,
+                        onSelect = { column ->
+                            val current = startOf(pagerState.currentPage)
+                            val start = startColumnFor(column.ordinal, current, visibleColumns, columnCount)
+                            if (start == current && !pagerState.isScrollInProgress) {
+                                // 表示中のカラムのボタンをもう一度押したら先頭へ
+                                scope.launch { listStates.getValue(column).scrollToTop() }
+                            } else {
+                                viewModel.select(ColumnType.entries[start])
+                                scope.launch { pagerState.animateScrollToPage(start, animationSpec = pageSpring) }
                             }
-                        } else {
-                            Modifier
                         },
-                        column = column,
-                        state = state,
-                        listState = listStates.getValue(column),
-                        viewModel = viewModel,
-                        topPadding = topPadding,
-                        bottomPadding = bottomPadding,
-                        onReply = onReply,
-                        onQuote = onQuote,
+                        onOpenMenu = { scope.launch { drawerState.open() } },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
                     )
                 }
-                StatusBarScrim(Modifier.align(Alignment.TopCenter))
-                TimelineHeader(
-                    account = account,
-                    pagerState = pagerState,
-                    visibleColumns = visibleColumns,
-                    hazeState = hazeState,
-                    onSelect = { column ->
-                        val current = startOf(pagerState.currentPage)
-                        val start = startColumnFor(column.ordinal, current, visibleColumns, columnCount)
-                        if (start == current && !pagerState.isScrollInProgress) {
-                            // 表示中のカラムのボタンをもう一度押したら先頭へ
-                            scope.launch { listStates.getValue(column).scrollToTop() }
-                        } else {
-                            viewModel.select(ColumnType.entries[start])
-                            scope.launch { pagerState.animateScrollToPage(start, animationSpec = pageSpring) }
-                        }
-                    },
-                    onOpenProfile = navigator::openProfile,
-                    onOpenSettings = navigator::openSettings,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
-                )
             }
         }
     }

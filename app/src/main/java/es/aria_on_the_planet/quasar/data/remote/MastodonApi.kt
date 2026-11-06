@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.data.remote
 
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.ContextDto
+import es.aria_on_the_planet.quasar.data.remote.dto.ConversationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
 import es.aria_on_the_planet.quasar.data.remote.dto.FamiliarFollowersDto
 import es.aria_on_the_planet.quasar.data.remote.dto.GroupedNotificationsResultsDto
@@ -378,6 +379,32 @@ class MastodonApi(
     suspend fun bookmarks(serverUrl: String, accessToken: String, maxId: String? = null, limit: Int = DEFAULT_LIMIT) =
         linkedStatuses(serverUrl, accessToken, "api/v1/bookmarks", maxId, limit)
 
+    /**
+     * 自分へのフォローリクエスト (https://docs.joinmastodon.org/methods/follow_requests/#get)。要認証。
+     * `max_id` はリクエストの ID なので、次ページの `max_id` は Link ヘッダから取る。
+     */
+    suspend fun followRequests(serverUrl: String, accessToken: String, maxId: String? = null, limit: Int = DEFAULT_LIMIT) =
+        linkedAccounts(serverUrl, accessToken, "api/v1/follow_requests", maxId, limit)
+
+    /**
+     * 非公開の返信 (ダイレクト) の会話 (https://docs.joinmastodon.org/methods/conversations/#get)。要認証。
+     * 次ページの `max_id` は Link ヘッダから取る。
+     */
+    suspend fun conversations(
+        serverUrl: String,
+        accessToken: String,
+        maxId: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): LinkedPage<ConversationDto> {
+        val url = serverUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/v1/conversations")
+            .apply { maxId?.let { addQueryParameter("max_id", it) } }
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        val (items, headers) = executeWithHeaders<List<ConversationDto>>(Request.Builder().url(url), accessToken)
+        return LinkedPage(items, nextMaxIdFromLinkHeader(headers["Link"]))
+    }
+
     private suspend fun linkedStatuses(
         serverUrl: String,
         accessToken: String,
@@ -397,6 +424,7 @@ class MastodonApi(
     /**
      * https://docs.joinmastodon.org/methods/search/#v2 (`resolve` は要認証)。
      * [resolve] なら、URL・`user@domain` で接続中サーバがまだ知らないものを ActivityPub / WebFinger で取りに行く。
+     * [type] (`accounts` / `statuses` / `hashtags`) で 1 種類に絞ると [offset] で続きを取れる。
      */
     suspend fun search(
         serverUrl: String,
@@ -404,10 +432,14 @@ class MastodonApi(
         query: String,
         resolve: Boolean,
         limit: Int,
+        type: String? = null,
+        offset: Int = 0,
     ): SearchResultsDto = get(serverUrl, accessToken, "api/v2/search") {
         addQueryParameter("q", query)
         addQueryParameter("resolve", resolve.toString())
         addQueryParameter("limit", limit.toString())
+        type?.let { addQueryParameter("type", it) }
+        if (offset > 0) addQueryParameter("offset", offset.toString())
     }
 
     /** https://docs.joinmastodon.org/methods/accounts/#relationships (要認証) */

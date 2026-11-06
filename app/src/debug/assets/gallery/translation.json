@@ -1,0 +1,459 @@
+[
+ {
+  "id": "1049",
+  "url": "https://gallery.invalid/@bob/1049",
+  "uri": "https://gallery.invalid/users/bob/statuses/1049",
+  "created_at": "2025-12-31T23:11:00.000Z",
+  "account": {
+   "id": "2",
+   "username": "bob",
+   "acct": "bob",
+   "url": "https://gallery.invalid/@bob",
+   "display_name": "Bob :blink_gif: :spin_fast:",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_gif.gif",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_gif_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [
+    {
+     "shortcode": "blink_gif",
+     "url": "file:///android_asset/gallery/images/blink_gif.gif",
+     "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+     "visible_in_picker": true,
+     "category": null
+    },
+    {
+     "shortcode": "spin_fast",
+     "url": "file:///android_asset/gallery/images/spin_fast.png",
+     "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+     "visible_in_picker": true,
+     "category": null
+    }
+   ],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p><span class=\"h-card\" translate=\"no\"><a href=\"https://gallery.invalid/@alice\" class=\"u-url mention\">@<span>alice</span></a></span> thanks for the review! I'll fix it tomorrow :spin_slow:</p>",
+  "visibility": "public",
+  "emojis": [
+   {
+    "shortcode": "spin_slow",
+    "url": "file:///android_asset/gallery/images/spin_slow.png",
+    "static_url": "file:///android_asset/gallery/images/spin_slow_static.png",
+    "visible_in_picker": true,
+    "category": null
+   }
+  ],
+  "replies_count": 1,
+  "reblogs_count": 4,
+  "favourites_count": 0
+ },
+ {
+  "id": "1050",
+  "url": "https://gallery.invalid/@alice/1050",
+  "uri": "https://gallery.invalid/users/alice/statuses/1050",
+  "created_at": "2025-12-31T23:10:00.000Z",
+  "account": {
+   "id": "1",
+   "username": "alice",
+   "acct": "alice",
+   "url": "https://gallery.invalid/@alice",
+   "display_name": "Alice",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_static.png",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>今日は <a href=\"https://gallery.invalid/tags/%E6%9D%B1%E4%BA%AC\" class=\"mention hashtag\" rel=\"tag\">#<span>東京</span></a> で <a href=\"https://gallery.invalid/tags/%E3%82%AB%E3%83%95%E3%82%A7%E5%B7%A1%E3%82%8A\" class=\"mention hashtag\" rel=\"tag\">#<span>カフェ巡り</span></a> してきた :bounce_gif:<br />3軒目のケーキが最高だった</p>",
+  "visibility": "public",
+  "emojis": [
+   {
+    "shortcode": "bounce_gif",
+    "url": "file:///android_asset/gallery/images/bounce_gif.gif",
+    "static_url": "file:///android_asset/gallery/images/bounce_gif_static.png",
+    "visible_in_picker": true,
+    "category": null
+   }
+  ],
+  "replies_count": 2,
+  "reblogs_count": 0,
+  "favourites_count": 1
+ },
+ {
+  "id": "1051",
+  "url": "https://gallery.invalid/@carol/1051",
+  "uri": "https://gallery.invalid/users/carol/statuses/1051",
+  "created_at": "2025-12-31T23:09:00.000Z",
+  "account": {
+   "id": "3",
+   "username": "carol",
+   "acct": "carol",
+   "url": "https://gallery.invalid/@carol",
+   "display_name": "Carol :wobble_webp:",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_apng.png",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_apng_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [
+    {
+     "shortcode": "wobble_webp",
+     "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+     "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+     "visible_in_picker": true,
+     "category": null
+    }
+   ],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>Read the docs at <a href=\"https://docs.gallery.invalid/methods/statuses/#create\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">docs.gallery.invalid/methods/s</span><span class=\"invisible\">tatuses/#create</span></a> before opening an issue, please.</p>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 0,
+  "reblogs_count": 1,
+  "favourites_count": 2
+ },
+ {
+  "id": "1052",
+  "url": "https://gallery.invalid/@bob/1052",
+  "uri": "https://gallery.invalid/users/bob/statuses/1052",
+  "created_at": "2025-12-31T23:08:00.000Z",
+  "account": {
+   "id": "2",
+   "username": "bob",
+   "acct": "bob",
+   "url": "https://gallery.invalid/@bob",
+   "display_name": "Bob :blink_gif: :spin_fast:",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_gif.gif",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_gif_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [
+    {
+     "shortcode": "blink_gif",
+     "url": "file:///android_asset/gallery/images/blink_gif.gif",
+     "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+     "visible_in_picker": true,
+     "category": null
+    },
+    {
+     "shortcode": "spin_fast",
+     "url": "file:///android_asset/gallery/images/spin_fast.png",
+     "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+     "visible_in_picker": true,
+     "category": null
+    }
+   ],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>Huge thanks to <span class=\"h-card\" translate=\"no\"><a href=\"https://gallery.invalid/@carol\" class=\"u-url mention\">@<span>carol</span></a></span> and <span class=\"h-card\" translate=\"no\"><a href=\"https://remote.invalid/@dave\" class=\"u-url mention\">@<span>dave</span></a></span> for helping me debug this :wobble_webp:</p>",
+  "visibility": "public",
+  "emojis": [
+   {
+    "shortcode": "wobble_webp",
+    "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+    "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+    "visible_in_picker": true,
+    "category": null
+   }
+  ],
+  "replies_count": 1,
+  "reblogs_count": 2,
+  "favourites_count": 3
+ },
+ {
+  "id": "1053",
+  "url": "https://gallery.invalid/@alice/1053",
+  "uri": "https://gallery.invalid/users/alice/statuses/1053",
+  "created_at": "2025-12-31T23:07:00.000Z",
+  "account": {
+   "id": "1",
+   "username": "alice",
+   "acct": "alice",
+   "url": "https://gallery.invalid/@alice",
+   "display_name": "Alice",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_static.png",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p><span class=\"h-card\" translate=\"no\"><a href=\"https://gallery.invalid/@bob\" class=\"u-url mention\">@<span>bob</span></a></span> 了解です！明日の <a href=\"https://gallery.invalid/tags/Quasar%E5%8B%89%E5%BC%B7%E4%BC%9A\" class=\"mention hashtag\" rel=\"tag\">#<span>Quasar勉強会</span></a> で話しましょう :still:<br />詳細はこちら <a href=\"https://gallery.invalid/events/42\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"\">gallery.invalid/events/42</span><span class=\"invisible\"></span></a></p>",
+  "visibility": "public",
+  "emojis": [
+   {
+    "shortcode": "still",
+    "url": "file:///android_asset/gallery/images/still.png",
+    "static_url": "file:///android_asset/gallery/images/still.png",
+    "visible_in_picker": true,
+    "category": null
+   }
+  ],
+  "replies_count": 2,
+  "reblogs_count": 3,
+  "favourites_count": 4
+ },
+ {
+  "id": "1054",
+  "url": "https://remote.invalid/@dave/1054",
+  "uri": "https://remote.invalid/users/dave/statuses/1054",
+  "created_at": "2025-12-31T23:06:00.000Z",
+  "account": {
+   "id": "4",
+   "username": "dave",
+   "acct": "dave@remote.invalid",
+   "url": "https://remote.invalid/@dave",
+   "display_name": "Dave",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_webp.webp",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_webp_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>Release notes for v2.0:</p><ul><li>New timeline engine (2x faster)</li><li>Support for <code>quote_approval</code></li><li>Fixed a crash when opening <strong>very</strong> long threads</li></ul><p>Thanks everyone who tested the beta :pulse_webp:</p>",
+  "visibility": "public",
+  "emojis": [
+   {
+    "shortcode": "pulse_webp",
+    "url": "file:///android_asset/gallery/images/pulse_webp.webp",
+    "static_url": "file:///android_asset/gallery/images/pulse_webp_static.png",
+    "visible_in_picker": true,
+    "category": null
+   }
+  ],
+  "replies_count": 0,
+  "reblogs_count": 4,
+  "favourites_count": 5
+ },
+ {
+  "id": "1055",
+  "url": "https://gallery.invalid/@carol/1055",
+  "uri": "https://gallery.invalid/users/carol/statuses/1055",
+  "created_at": "2025-12-31T23:05:00.000Z",
+  "account": {
+   "id": "3",
+   "username": "carol",
+   "acct": "carol",
+   "url": "https://gallery.invalid/@carol",
+   "display_name": "Carol :wobble_webp:",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_apng.png",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_apng_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [
+    {
+     "shortcode": "wobble_webp",
+     "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+     "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+     "visible_in_picker": true,
+     "category": null
+    }
+   ],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<blockquote><p>設定は変えなくていい</p></blockquote><p>って書いてあったけど、実際は <code>max_id</code> を指定しないと 2 ページ目が取れなかった…</p><pre><code>GET /api/v1/timelines/home?max_id=123</code></pre>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 1,
+  "reblogs_count": 0,
+  "favourites_count": 6
+ },
+ {
+  "id": "1056",
+  "url": "https://remote.invalid/@dave/1056",
+  "uri": "https://remote.invalid/users/dave/statuses/1056",
+  "created_at": "2025-12-31T23:04:00.000Z",
+  "account": {
+   "id": "4",
+   "username": "dave",
+   "acct": "dave@remote.invalid",
+   "url": "https://remote.invalid/@dave",
+   "display_name": "Dave",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_webp.webp",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_webp_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p class=\"quote-inline\">RE: <a href=\"https://gallery.invalid/@alice/1001\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"\">gallery.invalid/@alice/1001</span><span class=\"invisible\"></span></a></p><p>Totally agree, see <a href=\"https://remote.invalid/notes/abc\" rel=\"nofollow noopener\">this note</a> too</p>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 2,
+  "reblogs_count": 1,
+  "favourites_count": 0
+ },
+ {
+  "id": "1057",
+  "url": "https://gallery.invalid/@alice/1057",
+  "uri": "https://gallery.invalid/users/alice/statuses/1057",
+  "created_at": "2025-12-31T23:03:00.000Z",
+  "account": {
+   "id": "1",
+   "username": "alice",
+   "acct": "alice",
+   "url": "https://gallery.invalid/@alice",
+   "display_name": "Alice",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_static.png",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>lol same</p>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 0,
+  "reblogs_count": 2,
+  "favourites_count": 1
+ },
+ {
+  "id": "1058",
+  "url": "https://gallery.invalid/@carol/1058",
+  "uri": "https://gallery.invalid/users/carol/statuses/1058",
+  "created_at": "2025-12-31T23:02:00.000Z",
+  "account": {
+   "id": "3",
+   "username": "carol",
+   "acct": "carol",
+   "url": "https://gallery.invalid/@carol",
+   "display_name": "Carol :wobble_webp:",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_apng.png",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_apng_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [
+    {
+     "shortcode": "wobble_webp",
+     "url": "file:///android_asset/gallery/images/wobble_webp.webp",
+     "static_url": "file:///android_asset/gallery/images/wobble_webp_static.png",
+     "visible_in_picker": true,
+     "category": null
+    }
+   ],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>Bonjour <span class=\"h-card\" translate=\"no\"><a href=\"https://gallery.invalid/@alice\" class=\"u-url mention\">@<span>alice</span></a></span>, je teste la traduction sur l'appareil ce soir <a href=\"https://gallery.invalid/tags/quasar\" class=\"mention hashtag\" rel=\"tag\">#<span>quasar</span></a></p>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 1,
+  "reblogs_count": 3,
+  "favourites_count": 2
+ },
+ {
+  "id": "1059",
+  "url": "https://gallery.invalid/@bob/1059",
+  "uri": "https://gallery.invalid/users/bob/statuses/1059",
+  "created_at": "2025-12-31T23:01:00.000Z",
+  "account": {
+   "id": "2",
+   "username": "bob",
+   "acct": "bob",
+   "url": "https://gallery.invalid/@bob",
+   "display_name": "Bob :blink_gif: :spin_fast:",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_gif.gif",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_gif_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [
+    {
+     "shortcode": "blink_gif",
+     "url": "file:///android_asset/gallery/images/blink_gif.gif",
+     "static_url": "file:///android_asset/gallery/images/blink_gif_static.png",
+     "visible_in_picker": true,
+     "category": null
+    },
+    {
+     "shortcode": "spin_fast",
+     "url": "file:///android_asset/gallery/images/spin_fast.png",
+     "static_url": "file:///android_asset/gallery/images/spin_fast_static.png",
+     "visible_in_picker": true,
+     "category": null
+    }
+   ],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>今天的天气很好，我们一起去公园散步吧。</p>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 2,
+  "reblogs_count": 4,
+  "favourites_count": 3
+ },
+ {
+  "id": "1060",
+  "url": "https://remote.invalid/@dave/1060",
+  "uri": "https://remote.invalid/users/dave/statuses/1060",
+  "created_at": "2025-12-31T23:00:00.000Z",
+  "account": {
+   "id": "4",
+   "username": "dave",
+   "acct": "dave@remote.invalid",
+   "url": "https://remote.invalid/@dave",
+   "display_name": "Dave",
+   "note": "",
+   "avatar": "file:///android_asset/gallery/images/avatar_webp.webp",
+   "avatar_static": "file:///android_asset/gallery/images/avatar_webp_static.png",
+   "header": "https://gallery.invalid/headers/original/missing.png",
+   "header_static": "https://gallery.invalid/headers/original/missing.png",
+   "emojis": [],
+   "created_at": "2024-04-01T00:00:00.000Z",
+   "statuses_count": 1234,
+   "following_count": 56,
+   "followers_count": 78
+  },
+  "content": "<p>오늘 저녁에 같이 밥 먹을래요? 새로 생긴 식당이 있어요</p>",
+  "visibility": "public",
+  "emojis": [],
+  "replies_count": 0,
+  "reblogs_count": 0,
+  "favourites_count": 4
+ }
+]

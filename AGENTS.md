@@ -19,6 +19,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
+| オンデバイス翻訳 (試作) | llama.cpp (git submodule `third_party/llama.cpp`、タグ b12129) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
 
 DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。
 
@@ -40,6 +41,10 @@ es.aria_on_the_planet.quasar
 │   ├── session/                    SessionStore (サーバ URL / アクセストークン / OAuth クライアント) + SecureStorage (Keystore で暗号化)
 │   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
 │   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
+│   ├── translation/                オンデバイス翻訳 (PlamoPrompt = PLaMo 3 Translate の PFML3 の組み立て・言語コード /
+│   │                               TranslatableHtml = 本文の HTML と訳させる形の変換・訳文の検査 / PostTranslator =
+│   │                               ポストを訳す + translationOfferFor / TranslationModelFiles = モデルのダウンロード・削除 /
+│   │                               TranslationEngine。実装はフレーバーごと: src/full = llama.cpp、src/lite = 無し)
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
@@ -56,6 +61,7 @@ es.aria_on_the_planet.quasar
     │   ├── post/PostCallbacks.kt   ポストへの操作の口 (タップ・投票・アクション・返信・ハッシュタグ) をまとめたもの
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
+    │   ├── post/PostFeedList.kt    PostFeedState の PostList + 空・読み込み中・失敗の表示 (PTR は含まない。DetailScaffold 等が持つ)
     │   ├── post/PostDetail.kt      詳細画面の主役ポスト (大きめ本文 + 詳細日時)
     │   ├── post/PostTime.kt        詳細日時のフォーマット
     │   ├── post/QuotedPost.kt      引用ポストの縮小表示 / 表示不可時のプレースホルダ
@@ -101,9 +107,13 @@ es.aria_on_the_planet.quasar
     ├── follows/                    フォロー / フォロワー一覧 (Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
     ├── hashtag/                    ハッシュタグのタイムライン (Screen / ViewModel)
+    ├── search/                     検索 (SearchScreen / ViewModel。アカウント / 投稿 / ハッシュタグのタブ)
+    ├── personal/                   ドロワーから開く自分の一覧: お気に入り / ブックマーク / 非公開の返信 (PersonalPostsScreen / ViewModel)、
+    │                               フォローリクエスト (FollowRequestsScreen / ViewModel)
     ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
+    ├── translation/                ポストの訳の状態 (PostTranslationStore。アプリ全体で 1 つ、LocalPostTranslations) / 言語の表示名
     ├── reactions/                  通知のユーザー単位のまとめの中身 (AccountReactionsScreen / ViewModel) /
     │                               ポストをブースト・お気に入りにしたユーザーの一覧 (PostReactionsScreen / ViewModel)
     ├── share/                      他アプリからの共有 (ShareActivity / ShareViewModel / SharedContent = intent の解釈)
@@ -118,6 +128,14 @@ debug / benchmark ビルドだけに入るもの (`app/src/debug/`、release に
 es.aria_on_the_planet.quasar.debug  DebugGalleryActivity / GalleryScenario (+ 表示設定の上書き) / GalleryFixtures
 assets/gallery/                     固定データ (API と同じ形の JSON + 画像)。scripts/gallery/generate.py が生成
 ```
+
+別モジュール `:llama` (`llama/`、パッケージ `es.aria_on_the_planet.quasar.llama`): llama.cpp の JNI (`src/main/cpp/quasar_llama.cpp`) と
+`LlamaModel` (読み込み・生成)。llama.cpp の API はこの中だけで使う。app からはフレーバー `full` だけ (`fullImplementation`)。
+
+**フレーバー** (次元 `translation`): `full` (端末内の翻訳あり、既定) / `lite` (無し)。build type (debug / benchmark / release) と
+掛け合わせて `fullDebug`・`liteRelease` 等。applicationId は同じで、互いに上書きして入れ替えられる (lite は起動時に full の残した
+モデル・ダウンロードを消す。翻訳の設定の値は残るが lite では使わない)。翻訳のギャラリーは `src/fullDebug` (lite は
+`src/liteDebug` の「無い」と出すだけ。benchmark は `src/{full,lite}Debug` を共有)。
 
 `scripts/gallery/generate.py` (ギャラリーの固定データの生成)、`scripts/icons/generate.py` (アイコンの生成)、`scripts/perf/measure.sh` (描画の負荷の測定)。
 
@@ -181,6 +199,7 @@ data class Post(
     val inReplyToId: String?,      // in_reply_to_id (中身の値)
     val mentions: List<Mention>,   // mentions (id / username / acct / url)。返信の宛先・本文のメンションのタップに使う
     val tags: List<Hashtag>,       // tags (name / url)。本文のハッシュタグのタップに使う
+    val language: String?,         // language (ISO 639)。翻訳の元の言語。無いことがある
 )
 
 /** ログイン中ユーザーから見た状態。 */
@@ -268,6 +287,8 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | ブロック / 解除 | `POST /api/v1/accounts/:id/block` / `unblock` (応答は Relationship) |
 | ミュート / 解除 | `POST /api/v1/accounts/:id/mute` / `unmute` (期限なし・通知もミュート = API の既定) |
 | ブーストの非表示 / 表示 | `POST /api/v1/accounts/:id/follow` (form `reblogs=false/true`。フォロー中のときだけ。フォロー外だとフォローになる) |
+| 自分へのフォローリクエストの一覧 | `GET /api/v1/follow_requests` (**Link ヘッダ**でページング。`AccountRepository.fetchFollowRequests`) |
+| 非公開の返信 (ダイレクト) の会話 | `GET /api/v1/conversations` (**Link ヘッダ**でページング。各会話の `last_status` だけを出す。`TimelineRepository.fetchConversations`) |
 | 相手からのフォローリクエストの承認 / 拒否 | `POST /api/v1/follow_requests/:account_id/authorize` / `reject` (応答は Relationship) |
 | 自分がフォローしている人のうちのフォロワー | `GET /api/v1/accounts/familiar_followers?id[]=:id` |
 | 通知 (グループ) | `GET /api/v2/notifications` (Mastodon 4.3+、既定) |
@@ -288,6 +309,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
+| 検索 | `GET /api/v2/search?q=...&type=accounts/statuses/hashtags&limit=20&offset=...` (種類ごとに `offset` でページング。最初のページだけ `resolve=true`。`SearchRepository.searchAccounts` 等) |
 | URL・`@user@domain` を引く | `GET /api/v2/search?q=...&resolve=true&limit=1` (サーバが知らなければ AP / WebFinger で取りに行く。`SearchRepository.resolve`) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 | OAuth クライアントの登録 | `POST /api/v1/apps` (ログインのたびに登録) |
@@ -467,6 +489,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * `LazyColumn` + `key = post.id`。末尾付近で `onLoadMore` を呼ぶ。
 * データ取得には関与しない (呼び出し側の ViewModel が担当)。
 * 末尾付近にいる間は項目数が増えるたびに `onLoadMore` を再度呼ぶ (1 ページが画面に収まる場合も続きを読む)。
+* `PagedFeed` の一覧を出すときは `PostFeedList(feed, empty, errorFormat, ...)` (空のときの `ListStatus` 込み。`header` は
+  その上に置く。ハッシュタグ・お気に入り等・プロフィールのタブ・検索の投稿のタブ)。ユーザー版の `UserFeedList` と違い PTR は含まない。
 
 ### 相対時刻の更新 (`ui/component/time/Now.kt`)
 * 一覧の時刻は `postTimeText(at)` (`ui/component/post/PostTime.kt`)。1 週間未満は「3m」等の経過時間、それ以上は日付
@@ -634,7 +658,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (`ConfirmTarget.RejectFollowRequest`、既定でオン) で確認する。`ProfileViewModel.answerFollowRequest` が応答の関係で置き換え、
     承認なら相手のフォロー数を手元で +1。カードは `AnimatedVisibility` (motionScheme) で閉じ、フォローボタンは「Follow back」等に変わる。
     失敗はログのみで、ボタンが押せる状態に戻る。follow_request の通知のタップはこれまでどおりプロフィール。
-    フォローリクエストの一覧画面 (`GET /api/v1/follow_requests`) は未実装。
+    フォローリクエストの一覧はドロワーから (`Route.FollowRequests`)。
   * **構成**: `CollapsingHeaderLayout` で 上からヘッダ (`ProfileHeader`) / タブ (`ConnectedTabRow`) / `HorizontalPager`
     (タブごとの `PostList`、それぞれ別の LazyListState)。一覧を上へスクロールするとまずヘッダが畳まれ (nested scroll の
     pre-scroll)、タブは上端に残る。下へは一覧が先頭に着いてからヘッダが開き、開き切った余りが pull-to-refresh へ回る。
@@ -793,8 +817,16 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 未対応の種別 (admin.* 等) は `Unknown` として汎用文言。
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
-  * ヘッダ: 左にログイン中のアカウントのアイコン (`ComposerSession` が取得したものを使う。タップでメニュー: 名前・@acct (タップで自分のプロフィール)・
-    設定。未取得は汎用のアイコン)、右にカラムのタブ (Expressive の連結 `ToggleButton`)。
+  * ヘッダ: 左にメニューのボタン (≡。タップで左から `ModalNavigationDrawer` のドロワー `TimelineDrawerSheet` (X のアプリの形):
+    ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) / 設定 /
+    検索 (`Route.Search`。トップバーが検索欄で、キーボードの検索で確定。結果は `ConnectedTabRow` (Accounts / Posts / Hashtags) +
+    `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
+    投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
+    お気に入り・ブックマーク・非公開の返信 (`Route.PersonalPosts`。`DetailScaffold` + `PostList`、`PostFeed.linked`。外しても一覧からは
+    消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く)。
+    どれも詳細のパネルで開く。
+    開くのはボタンだけ (左右のスワイプはカラムの切り替え)、状態は保存しないので別画面から戻ると閉じている。開いている間の「戻る」は閉じる (`NavigationBackHandler`。`ModalNavigationDrawer` 自身は「戻る」を受けない))、
+    右にカラムのタブ (Expressive の連結 `ToggleButton`)。
     連結ボタンは押下・選択で形が変わり、ボタンごとのぼかしは切り抜きを合わせられないので、ぼかしはタブ全体の後ろに
     形の変わらないカプセルを 1 枚敷く (クイック投稿バーと同じ `hazeState`。`backgroundColor` 必須は同様)。
     未選択のボタンは透明 (カプセルが見える)、選択中は primary で塗る。表示中のカラムのボタンをもう一度押すと一覧の先頭へ
@@ -1005,6 +1037,41 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 
+## オンデバイス翻訳 (試作。`:llama` + `data/translation/`)
+
+PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。アプリへの組み込みは試作でフレーバー `full` だけ
+(`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「〇〇語から翻訳 /
+原文を表示 / 翻訳を表示」(`PostTranslationBar`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「翻訳」。状態はアプリ全体で
+1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
+**裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、
+UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持ったまま裏にいるとアプリごと終わらされやすい)。訳しかけは順番待ちに戻す。
+**設計・実験の結果・確かめ方は [docs/translation-ondevice.md](docs/translation-ondevice.md)**。以前の ML Kit + サーバー側翻訳の
+設計は `origin/translation` ブランチの `docs/translation.md`。
+
+* 流れ: `toTranslatableHtml` (本文の HTML を簡略化) → `plamoTranslationPrompt` (PFML3) → `LlamaModel.generate` (`:llama`) →
+  `restoreTranslatedHtml` (検査して戻す。崩れていたら null) → `EmojiText(isHtml = true)`。長い本文 (HTML で 800 文字超) は
+  `TranslatableHtml.split` で段落・`<br>` の切れ目で分けて 1 つずつ訳し、それでも上限で切れたら「一部を翻訳」と出す。変換は純粋関数で、
+  `PlamoPromptTest` / `TranslatableHtmlTest`。**挙動を変えたらテストとドキュメントの実験結果の節も直す**。
+* 言語の無いポスト (Misskey は送ってこない) は本文から端末の TextClassifier (`detectLanguage`) で推定する
+  (`detectPostLanguage`、`LanguageDetectionTest`)。`PostTranslationStore` が裏で推定してから翻訳の表示を出す。
+* **ポストの本文は他人が書いたものなので、本文の `<|plamo:…|>` でプロンプトの構造を変えさせない**。llama.cpp の PLaMo 3 の
+  トークナイザは `parse_special = false` でも制御トークンにするため、ユーザーの文字列は `neutralizeSpecialTokens` で崩し、
+  JNI は特殊でない断片から制御トークンが出たら生成しない。llama.cpp を上げたら `llama-tokenize --no-parse-special` で挙動を確かめる。
+* 本文は平文ではなく簡略化した HTML で渡す (平文だとハッシュタグが訳され、絵文字が動く)。カスタム絵文字は `<img alt=":x:">`。
+  メンション・ハッシュタグ・URL のリンクは訳されていても元の `<a>` に戻す。
+* モデルは APK に入れず、設定の「翻訳」をオンにしたときに Hugging Face からダウンロードする (`TranslationModelFiles`。
+  リビジョンを固定し、sha256 を確かめてから使う。OS の DownloadManager で、アプリが終わっても続き通知に進み具合が出る)。
+  置き場所は `Android/data/<pkg>/files/models/` (バックアップ・端末間の移行から除外)。オフにするときにモデルも消せる。
+  adb で置いても大きさが合えば使う (ディレクトリはアプリに作らせる。adb shell で作ると読めない)。
+* `:llama` は llama.cpp の CPU の版を実行時に選ぶので、full は `useLegacyPackaging`。OpenMP は使わない (ggml のスレッドプール)。
+* Snapdragon の NPU (Hexagon) は `local.properties` の `quasar.hexagonSdk` (Hexagon SDK のパス) を書いたときだけビルドに入る
+  (SDK は Qualcomm の Docker イメージから取り出す。手順はドキュメント)。OnePlus 13 でアプリの中から動くことを確認済み。訳文は CPU と
+  同じで、プロンプトは約 4 倍速く、生成は約 25% 遅い。CPU の使用時間は約 70% 減る。`LlamaParams.cpuOnly` / ギャラリーの
+  `--es device cpu` で CPU だけ。
+* **Hexagon v73 の一部 (8s Gen 3/4・7 Gen 4 等。FP16 の HMX が無い) は HMX を使うと訳文が壊れる** (Nothing の 8s Gen 4 で確認。
+  llama.cpp #29473 / #31645、修正の PR #29740 は未マージ) ので、JNI が版を調べて v73 では HMX を切る (HVX のみ)。v73 未満・不明なら
+  Hexagon のバックエンドを外して CPU で動かす。llama.cpp を上げたら #29740 が入ったかを見て、v73 の実機で確かめる。
+
 ## キャッシュ (`data/cache/`)
 
 * Room の 1 テーブル (`cache_entries`: 種類 + ID → API の JSON (DTO そのまま)・版・取得時刻)。種類 (`CacheKind`) は
@@ -1105,7 +1172,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 設定
 
-* 設定全体は `AppSettings` (`domain/model/settings/`): 表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
+* 設定全体は `AppSettings` (`domain/model/settings/`): 翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
+  設定画面に出る)・表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
   (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
   アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
   log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
@@ -1130,7 +1198,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `columnLayout` (タイムラインのカラムの並べ方: `Auto` (既定。幅 840dp 以上で 2 カラム) / `Single` / `Double`)、
   `avatarShape` (ユーザーのアイコンの切り取り: `AvatarShape.Circle` (既定) / `RoundedSquare` (角の半径は一辺の 20%))。
   アイコンの形は**必ず `avatarShape()` (`ui/component/user/AvatarShape.kt`) から取る** (`UserIcon` / `ComposerAccountIcon` の既定の
-  `shape`)。例外としてクイック投稿バーとタイムラインのヘッダ (左上のメニュー) のアイコンは設定に関わらず円 (`shape = CircleShape`)。背景色で縁取る枠は `avatarShape(ring = 縁の幅)` で角をアイコンと同心にする。
+  `shape`)。例外としてクイック投稿バーのアイコンは設定に関わらず円 (`shape = CircleShape`)。背景色で縁取る枠は `avatarShape(ring = 縁の幅)` で角をアイコンと同心にする。
   `uiScale` (UI 全体の倍率) / `fontScale` (文字だけの倍率、`uiScale` と端末の文字サイズに重ねて掛かる)。どちらも 0.75〜1.25 を
   0.025 刻み (`DisplaySettings.ScaleRange` / `ScaleStep`、表記は「x1.0」「x1.025」)。`QuasarAppContent` が `LocalDensity` を `Density(density * uiScale, fontScale * fontScale)` に
   差し替えて効かせるので、Activity の作り直しは要らない。Compose の外で描くもの (埋め込みの Photo Picker) には効かない。
@@ -1142,7 +1210,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   設定画面の Confirmations の「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
-* **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのアカウントメニュー): AOSP
+* **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` /
   `SettingsPosting` / `SettingsConfirmations`) は他の画面と同じバックスタックに積む。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
@@ -1192,17 +1260,20 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ## 開発メモ
 
-* ビルド: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug`
+* ビルド: `./gradlew :app:assembleFullDebug` (翻訳なしなら `assembleLiteDebug`。タスク名はフレーバー込み: `installFullDebug`・
+  `testFullDebugUnitTest`・`assembleFullBenchmark` 等)
   (システムに Java が無いので Android Studio 同梱の JBR を使う)
-* テスト: `./gradlew :app:testDebugUnitTest` (JVM のユニットテスト)。計装テストは Room の SQL (`CacheDaoTest`) だけで、
-  エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (終わるとアプリが消えるので、
+* `:llama` (full) のビルドには llama.cpp の submodule (`git submodule update --init`)、NDK 29.0.14206865・CMake 4.1.2 (SDK の
+  パッケージ。`android sdk install ndk/29.0.14206865 cmake/4.1.2`) が要る。最初のビルドは llama.cpp を 2 ABI 分作るので数分かかる。
+* テスト: `./gradlew :app:testFullDebugUnitTest` (JVM のユニットテスト)。計装テストは Room の SQL (`CacheDaoTest`) だけで、
+  エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedFullDebugAndroidTest` (終わるとアプリが消えるので、
   ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。
   ギャラリーの固定データの検査 (`GalleryFixturesTest`) は `src/testDebug` にあり、これも同じコマンドで走る。
-* 性能の測定用ビルド: `./gradlew :app:assembleBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
-* Compose コンパイラのレポート (skippable / 引数の安定性): `./gradlew :app:compileBenchmarkKotlin -PcomposeReports --rerun`
+* 性能の測定用ビルド: `./gradlew :app:assembleFullBenchmark` (下記「デバッグ用ギャラリー」「実機での確認」)。
+* Compose コンパイラのレポート (skippable / 引数の安定性): `./gradlew :app:compileFullBenchmarkKotlin -PcomposeReports --rerun`
   → `app/build/compose_compiler/`。
 * **動作確認用の連合環境** (`testbed/`。使い方・設定・セットアップは [docs/testbed.md](docs/testbed.md)、環境の構成は
-  [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) を立てて連合させ、bots が
+  [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) と Misskey 1 台を立てて連合させ、bots が
   投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れ、手元だけで
   アプリにユーザーの CA を信頼させれば (`network_security_config`。**コミットしない**) debug ビルドからログインできる。
   版ごとの API の違い (3.5 には v2 通知が無い等) はここで確かめる。
@@ -1246,7 +1317,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / post-detail (ポスト詳細の本体を
-  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。
+  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
+  translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
+  translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ)。
   表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率、`--ei long_post_max_lines 3` で長文の折りたたみの行数、`--es avatar_shape RoundedSquare` でアイコンの形)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
@@ -1317,7 +1390,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 ### ビルド
 * Gradle のインクリメンタルコンパイルが古い結果を返して、正しいコードでも型エラーになることがあった。
-  不可解なエラーは `./gradlew :app:compileDebugKotlin --rerun` で確かめる。
+  不可解なエラーは `./gradlew :app:compileFullDebugKotlin --rerun` で確かめる。
 * release / benchmark ビルドは R8 (`optimization { enable = true }`、リソースの削減込み) 有効。APK は約 68MB → 8MB、main スレッドの
   CPU は約半分。独自の keep ルールは無い (各ライブラリの consumer rules で足りている)。リフレクションや JNI を足したら
   benchmark ビルドで動作 (起動・画面遷移・プロセス再生成後の復元・APNG) を確かめる。
@@ -1327,7 +1400,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   つながっている端末が無い・寝ているときに確認を諦めたりユーザーに頼んだりせず、自分で立ち上げる:
   SDK は `~/Library/Android/sdk`。AVD は `~/.android/bin/android-cli emulator list` で確かめ (今は `medium_phone`。無ければ
   `android-cli emulator create` で作る。avdmanager は入っていない)、`android-cli emulator start medium_phone` をバックグラウンドで
-  起動 (起動し終わるまで待って返る) → `installDebug` (`ANDROID_SERIAL=emulator-5554` で端末を絞る)。
+  起動 (起動し終わるまで待って返る) → `installFullDebug` (`ANDROID_SERIAL=emulator-5554` で端末を絞る)。
   エミュレーターは未ログインのことが多い (ログイン画面以外は開けない)。まずギャラリーにシナリオを足して確かめ、それでも足りない
   (実際の API・遷移を通したい) ときはその旨をユーザーに伝える。メモリに余裕が無いときは下記の実機を使う。
 * **見た目・動作を確かめるだけの簡単な UI の確認は、エミュレーターが既に立ち上がっていればそちらを使う** (実機がつながっていても)。
@@ -1340,9 +1413,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   ポストを開くときはアクション行の空き部分をタップする。
 * 先頭へ戻るために下方向スワイプを繰り返すと pull-to-refresh が発動し一覧が読み直される (gap も消える)。
   ボタン等を探すときは fling しないよう長めの duration (1500ms 程度) でゆっくりスクロールする。
-* **`./gradlew connectedDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
-  計測をするなら `installDebug` / `installDebugAndroidTest` + `adb shell am instrument` を使う。
-* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleBenchmark`。
+* **`./gradlew connectedFullDebugAndroidTest` は終了時にアプリをアンインストールする** (ログイン情報も消える)。端末上で一時的な
+  計測をするなら `installFullDebug` / `installFullDebugAndroidTest` + `adb shell am instrument` を使う。
+* 性能の測定は debug ビルドでは行わない (Compose が最適化されず数倍遅い)。**benchmark ビルド** (`assembleFullBenchmark`。
   release と同じ設定 + debug 鍵の署名 + ギャラリー入り。applicationId が debug と同じなので入れ替えてもデータは残る) を入れ、
   `scripts/perf/measure.sh <label> <秒> [swipe]` で測る (端末が複数なら `ADB="adb -t 3"`)。終わったら debug を入れ直す。
   benchmark は debuggable ではないので `run-as` は使えない (`profileable` なので Perfetto の CPU プロファイルは取れる)。

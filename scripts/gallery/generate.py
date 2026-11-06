@@ -216,6 +216,27 @@ def p(text):
     return f"<p>{text}</p>"
 
 
+# Mastodon (4.x) が返す本文の HTML の形。翻訳 (translation) の変換の確認用
+def mention(acc):
+    return (f'<span class="h-card" translate="no"><a href="{acc["url"]}" class="u-url mention">'
+            f'@<span>{acc["username"]}</span></a></span>')
+
+
+def hashtag(name):
+    from urllib.parse import quote
+    return f'<a href="{SERVER}/tags/{quote(name)}" class="mention hashtag" rel="tag">#<span>{name}</span></a>'
+
+
+def link(url):
+    # 長い URL は先頭の https:// と 30 文字より後ろを隠す (invisible / ellipsis)
+    scheme, rest = url.split("://", 1)
+    visible, hidden = rest[:30], rest[30:]
+    ellipsis = "ellipsis" if hidden else ""
+    return (f'<a href="{url}" target="_blank" rel="nofollow noopener" translate="no">'
+            f'<span class="invisible">{scheme}://</span><span class="{ellipsis}">{visible}</span>'
+            f'<span class="invisible">{hidden}</span></a>')
+
+
 def build_fixtures(e, avatars, header, media, tall):
     E = {code: emoji_json(code, urls) for code, urls in e.items()}
     animated = [c for c in e if c != "still"]
@@ -321,6 +342,33 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(bob, p("ブーストされた投稿"), reblog=st.make(carol, p("ブーストの中身 :pulse_webp:"), ems("pulse_webp"))),
     ]
 
+    # --- translation: オンデバイス翻訳の HTML の変換 (メンション・ハッシュタグ・短縮表示の URL・絵文字・書式・引用の RE:)
+    translation = [
+        st.make(bob, p(f"{mention(alice)} thanks for the review! I'll fix it tomorrow :spin_slow:"), ems("spin_slow")),
+        st.make(alice, p(f"今日は {hashtag('東京')} で {hashtag('カフェ巡り')} してきた :bounce_gif:<br />3軒目のケーキが最高だった"),
+                ems("bounce_gif")),
+        st.make(carol, p(f"Read the docs at {link('https://docs.gallery.invalid/methods/statuses/#create')} before opening an issue, please.")),
+        st.make(bob, p(f"Huge thanks to {mention(carol)} and {mention(dave)} for helping me debug this :wobble_webp:"),
+                ems("wobble_webp")),
+        st.make(alice, p(f"{mention(bob)} 了解です！明日の {hashtag('Quasar勉強会')} で話しましょう :still:<br />"
+                         f"詳細はこちら {link(SERVER + '/events/42')}"), ems("still")),
+        st.make(dave, p("Release notes for v2.0:") +
+                "<ul><li>New timeline engine (2x faster)</li><li>Support for <code>quote_approval</code></li>"
+                "<li>Fixed a crash when opening <strong>very</strong> long threads</li></ul>" +
+                p("Thanks everyone who tested the beta :pulse_webp:"), ems("pulse_webp")),
+        st.make(carol, "<blockquote>" + p("設定は変えなくていい") + "</blockquote>" +
+                p("って書いてあったけど、実際は <code>max_id</code> を指定しないと 2 ページ目が取れなかった…") +
+                "<pre><code>GET /api/v1/timelines/home?max_id=123</code></pre>"),
+        # 引用のフォールバック (RE:) は訳さずに除く。文字が URL でないリンク (他サーバの HTML) は訳される
+        st.make(dave, f'<p class="quote-inline">RE: {link(SERVER + "/@alice/1001")}</p>' +
+                p(f'Totally agree, see <a href="https://remote.invalid/notes/abc" rel="nofollow noopener">this note</a> too')),
+        st.make(alice, p("lol same")),
+        # 言語 (language) の無いポストの推定用 (Misskey 等は言語を送らない。固定データは全部 language 無し)
+        st.make(carol, p(f"Bonjour {mention(alice)}, je teste la traduction sur l'appareil ce soir {hashtag('quasar')}")),
+        st.make(bob, p("今天的天气很好，我们一起去公园散步吧。")),
+        st.make(dave, p("오늘 저녁에 같이 밥 먹을래요? 새로 생긴 식당이 있어요")),
+    ]
+
     return {
         "animated-emoji.json": animated_emoji,
         "animated-avatars.json": animated_avatars,
@@ -328,6 +376,7 @@ def build_fixtures(e, avatars, header, media, tall):
         "emoji-picker.json": picker,
         "profile.json": {"account": profile_account, "statuses": profile_posts},
         "post-variety.json": post_variety,
+        "translation.json": translation,
     }
 
 

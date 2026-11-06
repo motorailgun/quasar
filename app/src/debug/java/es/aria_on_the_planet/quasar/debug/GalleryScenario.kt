@@ -34,6 +34,10 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
      * リアクションしたユーザーの一覧 (ユーザーは post-variety の投稿者)。
      */
     PostDetail("post-detail", R.string.gallery_post_detail, "post-variety.json"),
+    /** オンデバイス翻訳 (PLaMo 3 Translate + llama.cpp)。原文の例は Mastodon の形の HTML (メンション・ハッシュタグ等)。[TranslationGallery]。 */
+    Translation("translation", R.string.gallery_translation, "translation.json"),
+    /** 翻訳の設定の言語ごとの扱い。設定は手元だけ。固定データは使わない (translation を指しているだけ)。[TranslationLanguagesGallery]。 */
+    TranslationLanguages("translation-languages", R.string.gallery_translation_languages, "translation.json"),
     ;
 
     companion object {

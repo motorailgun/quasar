@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,10 +23,7 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,10 +31,6 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,17 +50,15 @@ import es.aria_on_the_planet.quasar.ui.component.blur.SurfaceBlurStyle
 import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlur
 import es.aria_on_the_planet.quasar.ui.component.blur.rememberSurfaceBlurStyle
 import es.aria_on_the_planet.quasar.R
-import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 
 /**
  * メイン画面の上端に浮かぶヘッダ (Google マップの検索欄・チップ風)。背景は無く、一覧はステータスバーの裏まで描かれる。
  *
  * ```
- * (icon)  [⌂ Home ][🔔][👥][🌐]
+ * (≡)  [⌂ Home ][🔔][👥][🌐]
  * ```
  *
- * * 左: ログイン中のアカウントのアイコン。タップでメニュー (名前・@acct = タップで自分のプロフィール・設定)。未取得は汎用のアイコン。
+ * * 左: メニューのボタン (≡)。タップで [onOpenMenu] (画面の左から出るドロワー。[TimelineDrawerSheet])。
  * * 右: カラムの切り替え (Expressive の連結 `ToggleButton`)。全体の後ろに後ろの一覧をぼかしたカプセルを 1 枚敷き
  *   ([hazeState])、未選択のボタンは透明、選択中は primary で塗る。選択中のみラベルを出し、幅はページ位置 (小数) から
  *   決めてスワイプに追従する。選択中のボタンを押したときも [onSelect] を呼ぶ (画面側で一覧を先頭へスクロールする)。
@@ -79,13 +69,11 @@ import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
  */
 @Composable
 fun TimelineHeader(
-    account: User?,
     pagerState: PagerState,
     visibleColumns: Int,
     hazeState: HazeState,
     onSelect: (ColumnType) -> Unit,
-    onOpenProfile: (User) -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val blurStyle = rememberSurfaceBlurStyle()
@@ -96,13 +84,7 @@ fun TimelineHeader(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AccountButton(
-            account = account,
-            hazeState = hazeState,
-            blurStyle = blurStyle,
-            onOpenProfile = onOpenProfile,
-            onOpenSettings = onOpenSettings,
-        )
+        MenuButton(hazeState = hazeState, blurStyle = blurStyle, onClick = onOpenMenu)
         Spacer(Modifier.width(10.dp))
         ColumnTabs(
             pagerState = pagerState,
@@ -132,76 +114,17 @@ private fun Modifier.blurredSurface(hazeState: HazeState, style: SurfaceBlurStyl
     .surfaceBlur(hazeState, style)
 
 @Composable
-private fun AccountButton(
-    account: User?,
-    hazeState: HazeState,
-    blurStyle: SurfaceBlurStyle,
-    onOpenProfile: (User) -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    Box {
-        val description = account?.nameOrAcct
-        if (account != null) {
-            UserIcon(
-                user = account,
-                size = AccountIconSize,
-                // ヘッダのアイコンは設定のアイコンの形に関わらず円
-                shape = CircleShape,
-                modifier = Modifier
-                    // 影は凸形 (円) で付ける。凹みのある形の影は RenderThread での計算が非常に重い (AGENTS.md)
-                    .shadow(HeaderShadowElevation, CircleShape)
-                    .clickable(role = Role.Button) { menuOpen = true },
-            )
-        } else {
-            Box(
-                Modifier
-                    .size(AccountIconSize)
-                    .shadow(HeaderShadowElevation, CircleShape)
-                    .blurredSurface(hazeState, blurStyle, CircleShape)
-                    .clickable(role = Role.Button) { menuOpen = true },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Symbols.Outlined.Person, contentDescription = stringResource(R.string.account_menu))
-            }
-        }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            if (account != null) {
-                // 名前の部分のタップで自分のプロフィール
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) {
-                            menuOpen = false
-                            onOpenProfile(account)
-                        }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        description.orEmpty(),
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "@${account.fullScreenName}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                HorizontalDivider()
-            }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.settings)) },
-                leadingIcon = { Icon(Symbols.Outlined.Settings, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    onOpenSettings()
-                },
-            )
-        }
+private fun MenuButton(hazeState: HazeState, blurStyle: SurfaceBlurStyle, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(MenuButtonSize)
+            .shadow(HeaderShadowElevation, CircleShape)
+            .blurredSurface(hazeState, blurStyle, CircleShape)
+            .border(surfaceBlurBorder(), CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Symbols.Outlined.Menu, contentDescription = stringResource(R.string.open_menu))
     }
 }
 
@@ -292,7 +215,7 @@ private val CircleCorner = CornerSize(50)
 private val GroupInnerCorner = CornerSize(6.dp)
 
 private const val SelectedWeight = 1.8f
-private val AccountIconSize: Dp = 44.dp
+private val MenuButtonSize: Dp = 44.dp
 private val TabHeight: Dp = 44.dp
 private val TabInset: Dp = 4.dp
 private val HeaderShadowElevation: Dp = 12.dp

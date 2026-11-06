@@ -4,13 +4,16 @@
 -->
 <data-extraction-rules>
     <!-- セッション (アクセストークン) は Keystore の鍵で暗号化しており、鍵は端末の外に出ないので移しても読めない。
-         session.xml は以前の平文の保存 (起動時に secure.xml へ移して消す) -->
+         session.xml は以前の平文の保存 (起動時に secure.xml へ移して消す)。
+         models/ は翻訳のモデル (数百 MB。ダウンロードし直せる) -->
     <cloud-backup>
         <exclude domain="sharedpref" path="secure.xml" />
         <exclude domain="sharedpref" path="session.xml" />
+        <exclude domain="external" path="models/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="secure.xml" />
         <exclude domain="sharedpref" path="session.xml" />
+        <exclude domain="external" path="models/" />
     </device-transfer>
 </data-extraction-rules>

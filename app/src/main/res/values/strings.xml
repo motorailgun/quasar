@@ -307,7 +307,18 @@
     <string name="composer_replying_to">Replying to %1$s</string>
     <string name="composer_cancel_reply">Cancel reply</string>
     <string name="composer_cancel_quote">Remove quote</string>
-    <string name="account_menu">Account</string>
+    <string name="private_mentions">Private mentions</string>
+    <string name="private_mentions_empty">No private mentions yet</string>
+    <string name="follow_requests_empty">No follow requests</string>
+    <string name="personal_posts_error">Failed to load: %1$s</string>
+    <string name="search_hint">Search</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_tab_accounts">Accounts</string>
+    <string name="search_tab_posts">Posts</string>
+    <string name="search_tab_hashtags">Hashtags</string>
+    <string name="search_empty">No results</string>
+    <string name="search_error">Failed to search: %1$s</string>
+    <string name="open_menu">Open menu</string>
     <!-- 操作の前の確認 -->
     <string name="ok" translatable="false">OK</string>
     <string name="confirm_post_title">Post this?</string>
@@ -434,4 +445,46 @@
     <string name="open_link_open_in_browser">Open in browser</string>
     <string name="open_link_no_link">There\'s no link to open.</string>
     <string name="open_link_not_logged_in">Log in to open links in Quasar.</string>
+    <!-- ポストの翻訳 (端末内のモデル) -->
+    <string name="settings_translation">Translation</string>
+    <string name="settings_translation_summary">Target language, showing translations per language</string>
+    <string name="settings_translation_model">On-device translation model</string>
+    <string name="settings_translation_model_ready">Downloaded (%1$s) · Built with PLaMo</string>
+    <string name="settings_translation_model_missing">Not downloaded. Tap to download (%1$s)</string>
+    <string name="settings_translation_enabled">Translate on this device</string>
+    <string name="settings_translation_enabled_summary">Translates posts with PLaMo 3 Translate without sending them anywhere</string>
+    <string name="settings_translation_model_downloading">Downloading… %1$s / %2$s</string>
+    <string name="settings_translation_model_waiting">Waiting for the network…</string>
+    <string name="settings_translation_model_verifying">Checking the download…</string>
+    <string name="settings_translation_model_failed_storage">Not enough storage. Tap to retry</string>
+    <string name="settings_translation_model_failed_network">Couldn\'t download. Tap to retry</string>
+    <string name="settings_translation_model_failed_corrupted">The download was corrupted. Tap to retry</string>
+    <string name="settings_translation_download_title">Download the translation model?</string>
+    <string name="settings_translation_download_message">PLaMo 3 Translate 0.8B (%1$s) will be downloaded from Hugging Face. Translation runs on this device and posts aren\'t sent anywhere. Downloading over mobile data uses your data plan.</string>
+    <string name="settings_translation_download">Download</string>
+    <string name="settings_translation_cancel_download_title">Stop downloading?</string>
+    <string name="settings_translation_cancel_download">Stop</string>
+    <string name="settings_translation_disable_title">Turn off translation?</string>
+    <string name="settings_translation_disable_delete">Also delete the downloaded model (%1$s)</string>
+    <string name="settings_translation_disable">Turn off</string>
+    <string name="translation_model_download_title">Translation model</string>
+    <string name="settings_translation_target">Translate to</string>
+    <string name="settings_translation_target_device">Device language (%1$s)</string>
+    <string name="settings_translation_languages">Showing translations</string>
+    <string name="settings_translation_other_languages">Other languages</string>
+    <string name="settings_translation_per_language">Per language</string>
+    <string name="settings_translation_add_language">Add a language</string>
+    <string name="settings_translation_remove_language">Remove from list</string>
+    <string name="settings_translation_search_language">Search languages</string>
+    <string name="translation_mode_automatic">Auto-translate</string>
+    <string name="translation_mode_offer">Show button</string>
+    <string name="translation_mode_hidden">Don’t show</string>
+    <string name="translation_mode_default">%1$s (default)</string>
+    <string name="translation_translated_from">Translated from %1$s</string>
+    <string name="translation_translated_from_partial">Partially translated from %1$s</string>
+    <string name="translation_show_original">Show original</string>
+    <string name="translation_show">Show translation</string>
+    <string name="translation_translating">Translating…</string>
+    <string name="translation_failed">Couldn\'t translate</string>
+    <string name="translation_retry">Retry</string>
 </resources>

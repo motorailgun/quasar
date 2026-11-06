@@ -4,6 +4,7 @@ import androidx.navigation3.runtime.NavKey
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.ui.follows.FollowListTab
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
+import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
 import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsTab
 import kotlinx.serialization.Serializable
 
@@ -37,6 +38,15 @@ sealed interface Route : NavKey {
         val statusIds: List<String>,
     ) : Route
 
+    /** 自分のお気に入り / ブックマーク / 非公開の返信の一覧 (ドロワーから)。 */
+    @Serializable data class PersonalPosts(val list: PersonalPostList) : Route
+
+    /** 検索 (ドロワーから)。 */
+    @Serializable data object Search : Route
+
+    /** 自分へのフォローリクエストの一覧 (ドロワーから)。 */
+    @Serializable data object FollowRequests : Route
+
     /** ポストの詳細。ブーストなら中身の ID。 */
     @Serializable data class Post(val statusId: String) : Route
 
@@ -65,4 +75,5 @@ sealed interface Route : NavKey {
     @Serializable data object SettingsTimelines : Route
     @Serializable data object SettingsPosting : Route
     @Serializable data object SettingsConfirmations : Route
+    @Serializable data object SettingsTranslation : Route
 }

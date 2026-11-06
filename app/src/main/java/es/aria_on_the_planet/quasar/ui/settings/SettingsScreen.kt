@@ -41,9 +41,16 @@ typealias UpdateSettings = ((AppSettings) -> AppSettings) -> Unit
  * トップ: 各ページへの入口 + ログアウト。ログアウトは設定に関わらず必ず確認する。
  *
  * @param serverUrl ログイン中のサーバ (ログアウトの項目の補足に出す)。
+ * @param translationAvailable 翻訳の入ったビルドか (翻訳のページを出す)。
  */
 @Composable
-fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: () -> Unit, onBack: () -> Unit) {
+fun SettingsTopPage(
+    serverUrl: String?,
+    translationAvailable: Boolean,
+    onNavigate: (Route) -> Unit,
+    onLogout: () -> Unit,
+    onBack: () -> Unit,
+) {
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
     SettingsScaffold(title = stringResource(R.string.settings), onBack = onBack) {
         SettingsGroup(title = null) {
@@ -71,6 +78,14 @@ fun SettingsTopPage(serverUrl: String?, onNavigate: (Route) -> Unit, onLogout: (
                 icon = Symbols.Outlined.TaskAlt,
                 onClick = { onNavigate(Route.SettingsConfirmations) },
             )
+            if (translationAvailable) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_translation),
+                    summary = stringResource(R.string.settings_translation_summary),
+                    icon = Symbols.Outlined.Translate,
+                    onClick = { onNavigate(Route.SettingsTranslation) },
+                )
+            }
         }
         SettingsGroup(title = null) {
             SettingsActionItem(

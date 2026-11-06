@@ -1,0 +1,77 @@
+package es.aria_on_the_planet.quasar.ui.personal
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.repository.StatusRepository
+import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
+import es.aria_on_the_planet.quasar.data.repository.withPoll
+import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostAction
+import es.aria_on_the_planet.quasar.ui.feed.PostActionController
+import es.aria_on_the_planet.quasar.ui.feed.PostFeed
+import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
+import es.aria_on_the_planet.quasar.ui.feed.submitVote
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+/** ログイン中のユーザー自身のポストの一覧 (ドロワーから開く)。 */
+enum class PersonalPostList { Favourites, Bookmarks, PrivateMentions }
+
+/**
+ * [list] の一覧。どれも `max_id` が項目の ID ではないので Link ヘッダの次ページでたどる ([PostFeed.linked])。
+ * ストリーミングは受けず、PTR と追加読み込みのみ。ここでお気に入り・ブックマークを外しても一覧からは消さない
+ * (プロフィールのタブ・Mastodon Web と同じ)。
+ */
+class PersonalPostsViewModel(
+    private val session: Session,
+    val list: PersonalPostList,
+    accountRepository: AccountRepository,
+    timelineRepository: TimelineRepository,
+    private val statusRepository: StatusRepository,
+) : ViewModel() {
+
+    private val posts = PostFeed.linked(viewModelScope) { maxId ->
+        when (list) {
+            PersonalPostList.Favourites -> accountRepository.fetchFavourites(session, maxId, PageSize)
+            PersonalPostList.Bookmarks -> accountRepository.fetchBookmarks(session, maxId, PageSize)
+            PersonalPostList.PrivateMentions -> timelineRepository.fetchConversations(session, maxId)
+        }
+    }
+
+    val state: StateFlow<PostFeedState> = posts.state
+
+    init {
+        refresh()
+        // 自分の編集・削除を当てる
+        viewModelScope.launch {
+            statusRepository.postChanges.collect(posts::applyChange)
+        }
+    }
+
+    fun refresh() = posts.refresh()
+
+    fun loadMore() = posts.loadMore()
+
+    suspend fun vote(post: Post, choices: List<Int>): Boolean =
+        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+            posts.updatePosts { it.withPoll(poll) }
+        }
+
+    private val postActions = PostActionController(
+        scope = viewModelScope,
+        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        update = posts::updatePosts,
+        onError = { message, error -> Log.w(TAG, message, error) },
+    )
+
+    /** ブースト・お気に入り・ブックマーク (またはその取り消し) を行う。 */
+    fun performAction(post: Post, action: PostAction) = postActions.perform(post, action)
+
+    private companion object {
+        const val TAG = "PersonalPostsViewModel"
+        const val PageSize = 40
+    }
+}

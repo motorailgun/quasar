@@ -7,4 +7,6 @@
     <exclude domain="sharedpref" path="secure.xml" />
     <!-- 以前の平文の保存 (起動時に secure.xml へ移して消す) -->
     <exclude domain="sharedpref" path="session.xml" />
+    <!-- 翻訳のモデル (数百 MB。バックアップの上限を超え、ダウンロードし直せる) -->
+    <exclude domain="external" path="models/" />
 </full-backup-content>

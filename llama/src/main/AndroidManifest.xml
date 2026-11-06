@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Snapdragon の NPU (Hexagon) を FastRPC で呼ぶ。端末のライブラリ (/vendor) をアプリから読むには宣言が要る。
+             無い端末 (Snapdragon 以外・エミュレーター) でも入れられるよう required="false" -->
+        <uses-native-library
+            android:name="libcdsprpc.so"
+            android:required="false" />
+    </application>
+
+</manifest>

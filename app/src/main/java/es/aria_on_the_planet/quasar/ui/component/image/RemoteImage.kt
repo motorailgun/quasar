@@ -1,11 +1,15 @@
 package es.aria_on_the_planet.quasar.ui.component.image
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.preferredFrameRate
 import coil3.compose.AsyncImage
 import coil3.compose.ConstraintsSizeResolver
 import coil3.compose.LocalPlatformContext
@@ -14,6 +18,7 @@ import coil3.size.Dimension
 import coil3.size.Precision
 import coil3.size.SizeResolver
 import es.aria_on_the_planet.quasar.ui.component.image.loader.animate
+import es.aria_on_the_planet.quasar.ui.component.image.loader.isApngAnimation
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 
 /**
@@ -22,6 +27,7 @@ import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
  * アニメーション画像 (GIF / APNG / Motion WebP) を動かすかは [kind] と `DisplaySettings` で決まる。止めるときは
  * [staticUrl] (API の `static_url` / `avatar_static` 等) があればそれを読み (通信量も減る)、無ければ先頭のフレームを出す。
  * 絵文字・アイコンは描き直しの上限 (`DisplaySettings.emojiAvatarAnimationMaxFps`) も掛かる (今は APNG のみ)。
+ * 上限のある APNG は、描き直すたびにその fps を画面のリフレッシュレートの希望として出す (下記 [QuasarAsyncImage])。
  *
  * @param onLoaded 読み込めたときに画像の本来の大きさ (px) を受け取る。縦横比を後から決める表示に使う。
  * @param fitHeight 読み込む大きさを表示の高さだけで決める (幅は画像の縦横比のまま)。読み込んでから枠の幅を画像に合わせる
@@ -105,14 +111,22 @@ private fun QuasarAsyncImage(
             }
             .build()
     }
+    // 上限のある APNG は、描き直すたびに上限の fps を数値で希望する (`preferredFrameRate`。その要素が描かれたフレームだけ
+    // 効く)。希望を出さないと Android 16 の View は Normal のカテゴリを出すだけで、端末 (OnePlus 13) はそれでは 120Hz から
+    // 下げない。数値なら 60Hz に下がり、タッチ中は 120Hz に上がる。GIF / WebP は RenderThread だけで進むので出せない
+    var votesFrameRate by remember(request) { mutableStateOf(false) }
+    val frameRate = if (votesFrameRate && maxFps != null) Modifier.preferredFrameRate(maxFps.toFloat()) else Modifier
     AsyncImage(
         model = request,
         contentDescription = contentDescription,
-        modifier = if (heightResolver != null) modifier.then(heightResolver.constraints) else modifier,
+        modifier = (if (heightResolver != null) modifier.then(heightResolver.constraints) else modifier).then(frameRate),
         placeholder = placeholder,
         error = error,
         contentScale = contentScale,
-        onSuccess = onLoaded?.let { callback -> { state -> callback(state.painter.intrinsicSize) } },
+        onSuccess = { state ->
+            votesFrameRate = state.result.image.isApngAnimation
+            onLoaded?.invoke(state.painter.intrinsicSize)
+        },
         onError = onError?.let { callback -> { callback() } },
     )
 }

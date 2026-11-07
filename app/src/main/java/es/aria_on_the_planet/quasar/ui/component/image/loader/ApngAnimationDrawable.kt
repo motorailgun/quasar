@@ -7,6 +7,8 @@ import android.graphics.Rect
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.os.SystemClock
+import coil3.DrawableImage
+import coil3.Image
 import com.linecorp.apng.ApngDrawable
 
 /**
@@ -111,3 +113,6 @@ internal class ApngAnimationDrawable(
     /** インスタンスごとに専用の [frames] を持っているので、複製しなくてよい (Coil の Compose 側が描く前に呼ぶ)。 */
     override fun mutate(): Drawable = this
 }
+
+/** 自前で再生する APNG ([ApngAnimationDrawable]) か。 */
+internal val Image.isApngAnimation: Boolean get() = (this as? DrawableImage)?.drawable is ApngAnimationDrawable

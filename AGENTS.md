@@ -398,6 +398,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (`animate(enabled, maxFps)`) → `ApngDecoderFactory` → `ApngAnimationDrawable` と届く。次の描き直しの時刻を
     `nextDrawTime` (純粋関数) で時刻 0 起点・`1000 / maxFps` ms の共通の刻みに切り上げるので、1 つあたり上限以下になり、
     同じ画面の APNG の描き直しも同じフレームにまとまる。**APNG のみ** (GIF / WebP は上記のとおり Coil 任せ)。
+    上限のある APNG が読めたら、`RemoteImage` がその要素に `Modifier.preferredFrameRate(上限)` を付け、描き直すたびに画面の
+    リフレッシュレートの希望を**数値で**出す。付けないと Android 16 の View は `Normal` のカテゴリを出すだけで、OnePlus 13 は
+    カテゴリ (Low でも) では 120Hz から下げなかった (数値なら 60Hz、タッチ中・fling 中は 120Hz)。GIF / WebP
+    (`AnimatedImageDrawable`) は RenderThread だけでコマを進め、View が希望を出す機会が無いので 120Hz のまま。確かめ方は
+    `dumpsys SurfaceFlinger` の `activeMode=` と、アプリのレイヤの `requestedFrameRate`。
   * メモリ不足: `ApngFrameCache` は `ComponentCallbacks2` (`newQuasarImageLoader` で登録)。Coil のメモリキャッシュと同じく
     `TRIM_MEMORY_BACKGROUND` 以上 / `onLowMemory` で空にする (logcat の `ApngFrameCache` に空けた量)。表示中のコピーはフレームを
     共有しているが、空けた後も再生・展開し直しとも問題ないことを実機で確認済み (`am send-trim-memory <pkg> BACKGROUND`)。

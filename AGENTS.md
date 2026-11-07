@@ -1051,7 +1051,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 
 PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。アプリへの組み込みは試作でフレーバー `full` だけ
 (`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「PLaMoで〇〇語から翻訳 (規約の第 5 条で、モデルの出力だと示す。省略させず折り返す) ·
-原文を表示 / 翻訳を表示」(`PostTranslationBar`。順番待ち・訳している間は「翻訳しています…」を薄くし、その上を濃い帯が流れる = `Modifier.shimmer`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「翻訳」。状態はアプリ全体で
+原文を表示 / 翻訳を表示」(`PostTranslationBar`。順番待ち・訳している間は「翻訳しています…」を薄くし、その上を濃い帯が流れる = `Modifier.shimmer`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「実験的機能」→「翻訳」。状態はアプリ全体で
 1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
 **裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、
 UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持ったまま裏にいるとアプリごと終わらされやすい)。訳しかけは順番待ちに戻す。
@@ -1227,12 +1227,12 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` /
-  `SettingsPosting` / `SettingsConfirmations`) は他の画面と同じバックスタックに積む。
+  `SettingsPosting` / `SettingsConfirmations` / `SettingsExperimental` (実験的機能。今は翻訳の入口だけで、翻訳の無いビルドでは出さない)) は他の画面と同じバックスタックに積む。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
     (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
     `SettingsSwitchItem` / `SettingsSplitSwitchItem` (左は詳細ページ、縦線の右はスイッチ) / `SettingsNavigationItem` /
-    `SettingsChoiceItem` (ラジオのダイアログ) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。
+    `SettingsChoiceItem` (ラジオのダイアログ) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。 `SettingsFooter` はページ末尾の注意書き (AOSP の FooterPreference: 丸い面の情報アイコン + 控えめな文)。
   * 面の色は surfaceBright (背景は surfaceContainer)。`SegmentedListItem` の checked 版は選択中の色・形に変わるので、
     selected 系の色と `selectedShape` を通常と同じにしている (AOSP は面の色でオン / オフを示さない)。
 * **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取り、`Modifier.surfaceBlur` で

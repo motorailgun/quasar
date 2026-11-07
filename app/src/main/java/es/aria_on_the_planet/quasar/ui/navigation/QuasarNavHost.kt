@@ -75,6 +75,7 @@ import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsViewModel
 import es.aria_on_the_planet.quasar.ui.settings.AnimationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.ConfirmationSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.DisplaySettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.ExperimentalSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.LicenseDetailPage
 import es.aria_on_the_planet.quasar.ui.settings.LicensesPage
 import es.aria_on_the_planet.quasar.ui.settings.PostingSettingsPage
@@ -633,6 +634,7 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
     entry<Route.SettingsConfirmations> {
         WithSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
     }
+    entry<Route.SettingsExperimental> { ExperimentalSettingsPage(onNavigate = navigate, onBack = navigator::back) }
     entry<Route.SettingsTranslation> {
         val translations = container.postTranslations
         if (translations == null) {

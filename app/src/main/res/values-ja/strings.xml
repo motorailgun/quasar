@@ -418,6 +418,9 @@
     <string name="open_link_no_link">開けるリンクがありません。</string>
     <string name="open_link_not_logged_in">Quasar でリンクを開くにはログインしてください。</string>
     <!-- ポストの翻訳 (端末内のモデル) -->
+    <string name="settings_experimental">実験的機能</string>
+    <string name="settings_experimental_summary">端末内の翻訳</string>
+    <string name="settings_experimental_note">これらの機能は試験的なもので、正しく動作しないことがあります。今後のアップデートで変更・削除される可能性があります。</string>
     <string name="settings_translation">翻訳</string>
     <string name="settings_translation_summary">翻訳先の言語・言語ごとの翻訳の表示</string>
     <string name="settings_translation_model">端末内の翻訳モデル</string>

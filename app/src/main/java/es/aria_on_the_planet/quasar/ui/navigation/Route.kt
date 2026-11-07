@@ -75,6 +75,7 @@ sealed interface Route : NavKey {
     @Serializable data object SettingsTimelines : Route
     @Serializable data object SettingsPosting : Route
     @Serializable data object SettingsConfirmations : Route
+    @Serializable data object SettingsExperimental : Route
     @Serializable data object SettingsTranslation : Route
     @Serializable data object SettingsLicenses : Route
 

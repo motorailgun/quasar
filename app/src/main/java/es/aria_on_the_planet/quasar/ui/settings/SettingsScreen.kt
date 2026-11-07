@@ -23,6 +23,7 @@ import es.aria_on_the_planet.quasar.ui.component.post.labelRes
 import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsActionItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsChoiceItem
+import es.aria_on_the_planet.quasar.ui.component.settings.SettingsFooter
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsGroup
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsNavigationItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsScaffold
@@ -78,12 +79,13 @@ fun SettingsTopPage(
                 icon = Symbols.Outlined.TaskAlt,
                 onClick = { onNavigate(Route.SettingsConfirmations) },
             )
+            // 今の実験的機能は翻訳だけなので、翻訳の無いビルドではページごと出さない
             if (translationAvailable) {
                 SettingsNavigationItem(
-                    title = stringResource(R.string.settings_translation),
-                    summary = stringResource(R.string.settings_translation_summary),
-                    icon = Symbols.Outlined.Translate,
-                    onClick = { onNavigate(Route.SettingsTranslation) },
+                    title = stringResource(R.string.settings_experimental),
+                    summary = stringResource(R.string.settings_experimental_summary),
+                    icon = Symbols.Outlined.Science,
+                    onClick = { onNavigate(Route.SettingsExperimental) },
                 )
             }
         }
@@ -439,6 +441,22 @@ fun ConfirmationSettingsPage(confirmations: Set<ConfirmTarget>, update: UpdateSe
         SettingsGroup(title = stringResource(R.string.settings_follow_requests)) {
             Item(R.string.settings_confirm_reject_follow_request, ConfirmTarget.RejectFollowRequest)
         }
+    }
+}
+
+/** 実験的機能: 試作の機能 (今は端末内の翻訳だけ) の入口 + 末尾の注意書き。 */
+@Composable
+fun ExperimentalSettingsPage(onNavigate: (Route) -> Unit, onBack: () -> Unit) {
+    SettingsScaffold(title = stringResource(R.string.settings_experimental), onBack = onBack) {
+        SettingsGroup(title = null) {
+            SettingsNavigationItem(
+                title = stringResource(R.string.settings_translation),
+                summary = stringResource(R.string.settings_translation_summary),
+                icon = Symbols.Outlined.Translate,
+                onClick = { onNavigate(Route.SettingsTranslation) },
+            )
+        }
+        SettingsFooter(stringResource(R.string.settings_experimental_note))
     }
 }
 

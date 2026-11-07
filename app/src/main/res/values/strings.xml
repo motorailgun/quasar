@@ -446,6 +446,9 @@
     <string name="open_link_no_link">There\'s no link to open.</string>
     <string name="open_link_not_logged_in">Log in to open links in Quasar.</string>
     <!-- ポストの翻訳 (端末内のモデル) -->
+    <string name="settings_experimental">Experimental features</string>
+    <string name="settings_experimental_summary">On-device translation</string>
+    <string name="settings_experimental_note">These features are experimental and may not work properly. They may change or be removed in future updates.</string>
     <string name="settings_translation">Translation</string>
     <string name="settings_translation_summary">Target language, showing translations per language</string>
     <string name="settings_translation_model">On-device translation model</string>

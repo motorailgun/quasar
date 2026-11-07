@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
 import androidx.compose.material3.DropdownMenuGroup
@@ -78,6 +80,27 @@ fun SettingsGroup(
             verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
             content = content,
         )
+    }
+}
+
+/**
+ * ページの末尾の注意書き (AOSP の FooterPreference)。丸い面に入れた情報のアイコンの下に、控えめな色の文。
+ * まとまりの外 (面の無い所) に置く。
+ */
+@Composable
+fun SettingsFooter(text: String, modifier: Modifier = Modifier, icon: ImageVector = Symbols.Outlined.Info) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).background(colors.tertiaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.onTertiaryContainer, modifier = Modifier.size(24.dp))
+        }
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
     }
 }
 

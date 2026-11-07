@@ -354,6 +354,8 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
   * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
     (横長の絵文字は横長に表示)。API はサイズを返さないため、画像読み込み時に `EmojiAspectRatios` (URL ごとの
     アプリ全体キャッシュ) へ記録し、記録されると再レイアウトする。未読み込みの間は正方形。比率は 1/4〜8 に丸める。
+    画像は高さだけで大きさを決めて読む (`RemoteImage(fitHeight = true)`)。Coil は最初に測った枠の大きさで縮めて読み、枠が
+    後から広がっても読み直さないので、仮の正方形の枠で読むと横長の絵文字が引き伸ばされてぼやけたままになる。
 * 変換処理 (`replaceEmojiShortcodes`, `simplifyMastodonHtml`) は純粋関数として分離し、ユニットテスト可能にする。
 
 ### UserName (`ui/component/user/UserName.kt`)

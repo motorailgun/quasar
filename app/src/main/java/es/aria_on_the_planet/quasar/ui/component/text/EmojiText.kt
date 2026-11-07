@@ -116,6 +116,8 @@ private fun emojiInlineContent(
                 contentDescription = ":${emoji.shortcode}:",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
+                // 枠は縦横比が分かるまで仮の正方形なので、その幅で縮めて読ませない
+                fitHeight = true,
                 // 静止版を読んだときも縦横比は同じなので、アニメーション版の URL で記録する
                 onLoaded = { size -> EmojiAspectRatios.record(emoji.url, size.width, size.height) },
             )

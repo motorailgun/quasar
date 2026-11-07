@@ -7,8 +7,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
+import coil3.compose.ConstraintsSizeResolver
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
+import coil3.size.Dimension
+import coil3.size.Precision
+import coil3.size.SizeResolver
 import es.aria_on_the_planet.quasar.ui.component.image.loader.animate
 import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
 
@@ -20,6 +24,9 @@ import es.aria_on_the_planet.quasar.ui.settings.LocalDisplaySettings
  * 絵文字・アイコンは描き直しの上限 (`DisplaySettings.emojiAvatarAnimationMaxFps`) も掛かる (今は APNG のみ)。
  *
  * @param onLoaded 読み込めたときに画像の本来の大きさ (px) を受け取る。縦横比を後から決める表示に使う。
+ * @param fitHeight 読み込む大きさを表示の高さだけで決める (幅は画像の縦横比のまま)。読み込んでから枠の幅を画像に合わせる
+ *   表示 (絵文字) 用。既定では最初に測った枠に収まるよう縮めて読み、後から枠が広がっても読み直さないので、仮の正方形の
+ *   枠で読んだ横長の画像が引き伸ばされてぼやける。
  * @param onError 読み込めなかったとき。別の URL を試す等は呼び出し側で行う。
  */
 @Composable
@@ -34,6 +41,7 @@ fun RemoteImage(
     contentScale: ContentScale = ContentScale.Fit,
     onLoaded: ((Size) -> Unit)? = null,
     onError: (() -> Unit)? = null,
+    fitHeight: Boolean = false,
 ) {
     val settings = LocalDisplaySettings.current
     val animate = settings.animates(kind)
@@ -48,6 +56,7 @@ fun RemoteImage(
         contentScale = contentScale,
         onLoaded = onLoaded,
         onError = onError,
+        fitHeight = fitHeight,
     )
 }
 
@@ -80,24 +89,38 @@ private fun QuasarAsyncImage(
     contentScale: ContentScale,
     onLoaded: ((Size) -> Unit)? = null,
     onError: (() -> Unit)? = null,
+    fitHeight: Boolean = false,
 ) {
     val context = LocalPlatformContext.current
-    val request = remember(context, data, animate, maxFps) {
+    val heightResolver = if (fitHeight) remember { HeightSizeResolver() } else null
+    val request = remember(context, data, animate, maxFps, heightResolver) {
         ImageRequest.Builder(context)
             .data(data)
             // Coil の既定 (URL そのもの) と同じだが、APNG の展開結果のキャッシュのキーとしてデコーダに渡すため明示する
             .diskCacheKey(data)
             .animate(animate, maxFps)
+            .apply {
+                // 大きめに読んだ結果がメモリキャッシュにあればそれを使えるよう INEXACT (縮めずに出す)
+                if (heightResolver != null) size(heightResolver).precision(Precision.INEXACT)
+            }
             .build()
     }
     AsyncImage(
         model = request,
         contentDescription = contentDescription,
-        modifier = modifier,
+        modifier = if (heightResolver != null) modifier.then(heightResolver.constraints) else modifier,
         placeholder = placeholder,
         error = error,
         contentScale = contentScale,
         onSuccess = onLoaded?.let { callback -> { state -> callback(state.painter.intrinsicSize) } },
         onError = onError?.let { callback -> { callback() } },
     )
+}
+
+/** 測った枠の高さだけを読み込む大きさにする (幅は決めない = 画像の縦横比のまま)。 */
+private class HeightSizeResolver : SizeResolver {
+    /** 枠の大きさを測る。AsyncImage の Modifier に付ける。 */
+    val constraints = ConstraintsSizeResolver()
+
+    override suspend fun size(): coil3.size.Size = coil3.size.Size(Dimension.Undefined, constraints.size().height)
 }

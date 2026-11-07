@@ -1068,7 +1068,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   adb で置いても大きさが合えば使う (ディレクトリはアプリに作らせる。adb shell で作ると読めない)。
 * `:llama` は llama.cpp の CPU の版を実行時に選ぶので、full は `useLegacyPackaging`。OpenMP は使わない (ggml のスレッドプール)。
 * Snapdragon の NPU (Hexagon) は `local.properties` の `quasar.hexagonSdk` (Hexagon SDK のパス) を書いたときだけビルドに入る
-  (SDK は Qualcomm の Docker イメージから取り出す。手順はドキュメント)。OnePlus 13 でアプリの中から動くことを確認済み。訳文は CPU と
+  (SDK は snapdragon-toolchain の Docker イメージから取り出し、`StudioProjects` の下 (例 `~/StudioProjects/hexagon-sdk`) に置く。手順はドキュメント)。OnePlus 13 でアプリの中から動くことを確認済み。訳文は CPU と
   同じで、プロンプトは約 4 倍速く、生成は約 25% 遅い。CPU の使用時間は約 70% 減る。`LlamaParams.cpuOnly` / ギャラリーの
   `--es device cpu` で CPU だけ。
 * **Hexagon v73 の一部 (8s Gen 3/4・7 Gen 4 等。FP16 の HMX が無い) は HMX を使うと訳文が壊れる** (Nothing の 8s Gen 4 で確認。
@@ -1273,6 +1273,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   (システムに Java が無いので Android Studio 同梱の JBR を使う)
 * `:llama` (full) のビルドには llama.cpp の submodule (`git submodule update --init`)、NDK 29.0.14206865・CMake 4.1.2 (SDK の
   パッケージ。`android sdk install ndk/29.0.14206865 cmake/4.1.2`) が要る。最初のビルドは llama.cpp を 2 ABI 分作るので数分かかる。
+* **インターネットから取ってきたバイナリはまず Docker の中で動かす** (ホストで直に実行しない)。Gradle と連携する等で Docker に
+  閉じ込められないもの (Hexagon SDK) だけはホストに置くが、`StudioProjects` の下に置き、ホームの他の場所や PATH には入れない。
 * テスト: `./gradlew :app:testFullDebugUnitTest` (JVM のユニットテスト)。計装テストは Room の SQL (`CacheDaoTest`) だけで、
   エミュレーターで `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedFullDebugAndroidTest` (終わるとアプリが消えるので、
   ログインしている実機では走らせない。`ANDROID_SERIAL` で端末を絞る)。UI テストは無い。

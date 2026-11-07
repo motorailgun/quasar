@@ -83,20 +83,32 @@ llama.cpp を選んだ。
 既定のビルドには入らない。Hexagon SDK を用意して `local.properties` に `quasar.hexagonSdk=<SDK のパス>` を書いた (または
 `-Pquasar.hexagonSdk=…`) ときだけ、arm64 に Hexagon のバックエンドを足す。
 
-SDK の用意 (Qualcomm の Docker イメージから取り出す。SDK 単体の Linux 版の配布は無い。llama.cpp の `setup-sdk.py` は
-Windows on Snapdragon 用):
+SDK の用意 (snapdragon-toolchain の Docker イメージから取り出す。Qualcomm の公式の org ではなく、llama.cpp の Hexagon
+バックエンドを書いている Qualcomm の開発者が CI 向けに文書等を削って再パッケージしたもので、llama.cpp 本家の CI・release も
+これを使う。SDK 単体の Linux 版の配布は無い。llama.cpp の `setup-sdk.py` は Windows on Snapdragon 用)。
+
+SDK の hexagon-clang・qaic (IDL) は Gradle (CMake) から呼ぶので、ホストに取り出して使うしかない。**置き場所は `StudioProjects`
+の下 (このリポジトリと並べる)** にし、ホームの他の場所には置かない (インターネットから取ってきたバイナリをホームに散らばらせ
+ない。下記「外から取ってきたバイナリ」)。イメージはタグではなく digest で固定して取る:
 
 ```
-docker pull ghcr.io/snapdragon-toolchain/arm64-android:v0.8
-mkdir -p ~/Qualcomm/Hexagon_SDK
+image=ghcr.io/snapdragon-toolchain/arm64-android@sha256:e39e5e9c0957550a92c0de756b7556d81196c7c7f7328ed80de252bfb4878adf   # v0.8
+docker pull "$image"
+sdk_root="$(cd .. && pwd)/hexagon-sdk"   # = ~/StudioProjects/hexagon-sdk
+mkdir -p "$sdk_root"
 # docker cp は中の権限で失敗するので tar で取り出す (3.3GB。Hexagon SDK 6.7.0.1 / Hexagon Tools 21.0.04)
-docker run --rm ghcr.io/snapdragon-toolchain/arm64-android:v0.8 tar -C /opt/hexagon -cf - 6.7.0.0 \
-    | tar -C ~/Qualcomm/Hexagon_SDK -xf - --no-same-owner
-chmod -R u+rwX ~/Qualcomm/Hexagon_SDK/6.7.0.0
-echo "quasar.hexagonSdk=$HOME/Qualcomm/Hexagon_SDK/6.7.0.0" >> local.properties
+docker run --rm "$image" tar -C /opt/hexagon -cf - 6.7.0.0 | tar -C "$sdk_root" -xf - --no-same-owner
+chmod -R u+rwX "$sdk_root/6.7.0.0"
+echo "quasar.hexagonSdk=$sdk_root/6.7.0.0" >> local.properties
 ```
 
-SDK の hexagon-clang・qaic (IDL) は Linux x86_64 のホストでそのまま動く (Docker の中でビルドしなくてよい)。
+SDK の場所を変えたら `llama/.cxx` を消す (CMake のキャッシュが前のパスを覚えている)。
+
+#### 外から取ってきたバイナリ
+
+インターネットから取ってきたバイナリ (ツール・SDK・検査用のコマンド等) は、**まず Docker の中で動かす** (ホストで直に
+実行しない)。ビルド (Gradle・CMake) から呼ぶ等で Docker に閉じ込められないものだけはホストに置くが、そのときも
+`StudioProjects` の下に置き、ホームの他の場所 (`~/Qualcomm` 等) や PATH には入れない。
 
 CI の release は Docker のイメージではなく、同じ再パッケージの tarball (snapdragon-toolchain/hexagon-sdk の
 `hexagon-sdk-v6.7.0.0-amd64-lnx.tar.xz`、742MB) を sha256 を固定して取る (中身は上のイメージの `/opt/hexagon/6.7.0.0` と

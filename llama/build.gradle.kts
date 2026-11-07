@@ -5,7 +5,7 @@ plugins {
 }
 
 // Snapdragon の NPU (Hexagon) のバックエンドも作るか。Hexagon SDK の場所を local.properties (または -P) の
-// quasar.hexagonSdk で渡したときだけ (SDK は Qualcomm の Docker イメージから取り出す。docs/translation-ondevice.md)
+// quasar.hexagonSdk で渡したときだけ (SDK は snapdragon-toolchain の Docker イメージから取り出して StudioProjects の下に置く。docs/translation-ondevice.md)
 val hexagonSdk: String? = providers.gradleProperty("quasar.hexagonSdk").orNull
     ?: rootProject.file("local.properties").takeIf { it.exists() }
         ?.let { file -> Properties().apply { file.inputStream().use(::load) }.getProperty("quasar.hexagonSdk") }

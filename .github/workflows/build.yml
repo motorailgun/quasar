@@ -10,6 +10,16 @@ on:
       release:
         type: boolean
         default: false
+    # 呼び出し側 (release.yml) が 1 つずつ渡す。渡さないとこのワークフローの secrets は空になる。確認では渡さない
+    secrets:
+      RELEASE_KEYSTORE_BASE64:
+        required: false
+      RELEASE_KEYSTORE_PASSWORD:
+        required: false
+      RELEASE_KEY_ALIAS:
+        required: false
+      RELEASE_KEY_PASSWORD:
+        required: false
 
 permissions: {}
 
@@ -84,9 +94,19 @@ jobs:
 
       - name: Decode keystore
         if: inputs.release
+        # 空の secret のままだと長いビルドの最後 (署名) まで進んでから落ちるので、ここで止める
         env:
           KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::secret RELEASE_${name} is empty"
+              exit 1
+            fi
+          done
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
 
       - name: Build release APKs

@@ -18,6 +18,12 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       release: true
+    # 再利用ワークフローには secret が自動では渡らない。必要な分だけ 1 つずつ渡す
+    secrets:
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
     permissions:
       contents: read
 

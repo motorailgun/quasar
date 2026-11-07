@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
+import es.aria_on_the_planet.quasar.ui.component.modifier.rememberShimmerProgress
+import es.aria_on_the_planet.quasar.ui.component.modifier.shimmer
 import es.aria_on_the_planet.quasar.ui.translation.PostTranslationEntry
 import es.aria_on_the_planet.quasar.ui.translation.PostTranslationState
 import es.aria_on_the_planet.quasar.ui.translation.PostTranslationStore
@@ -74,8 +76,17 @@ internal fun PostTranslationBar(
         maxLines = 1,
         modifier = Modifier.clip(MaterialTheme.shapes.small).clickable(onClick = onToggle).padding(horizontal = 2.dp, vertical = 2.dp),
     )
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(Symbols.Outlined.Translate, contentDescription = null, tint = muted, modifier = Modifier.size(18.dp))
+    val busy = entry.state == PostTranslationState.Queued || entry.state == PostTranslationState.Translating
+    // 訳している間は、薄くしたアイコンと「翻訳しています…」の上を濃い帯が流れる (帯の位置は描くときだけ読む)
+    val contentColor = if (busy) muted.copy(alpha = BusyContentAlpha) else muted
+    val shimmer = if (busy) {
+        val progress = rememberShimmerProgress()
+        Modifier.shimmer(MaterialTheme.colorScheme.onSurface, progress = { progress.value })
+    } else {
+        Modifier
+    }
+    Row(modifier.then(shimmer), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Symbols.Outlined.Translate, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         when (val state = entry.state) {
             is PostTranslationState.Translated -> if (entry.showingOriginal) {
@@ -107,7 +118,7 @@ internal fun PostTranslationBar(
             }
             PostTranslationState.Idle -> Action(stringResource(R.string.translation_show))
             PostTranslationState.Queued, PostTranslationState.Translating ->
-                Text(stringResource(R.string.translation_translating), style = style, color = muted, maxLines = 1)
+                Text(stringResource(R.string.translation_translating), style = style, color = contentColor, maxLines = 1)
             PostTranslationState.Failed -> {
                 Text(stringResource(R.string.translation_failed), style = style, color = muted, maxLines = 1)
                 Spacer(Modifier.width(6.dp))
@@ -116,3 +127,6 @@ internal fun PostTranslationBar(
         }
     }
 }
+
+/** 訳している間の、帯の通っていない所の濃さ。 */
+private const val BusyContentAlpha = 0.5f

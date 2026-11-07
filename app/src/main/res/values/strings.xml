@@ -447,8 +447,8 @@
     <string name="open_link_not_logged_in">Log in to open links in Quasar.</string>
     <!-- ポストの翻訳 (端末内のモデル) -->
     <string name="settings_experimental">Experimental features</string>
-    <string name="settings_experimental_summary">On-device translation</string>
-    <string name="settings_experimental_note">These features are experimental and may not work properly. They may change or be removed in future updates.</string>
+    <string name="settings_experimental_summary">Features in early development</string>
+    <string name="settings_experimental_note">These features are experimental and may not work properly. These may change or be removed in future updates.</string>
     <string name="settings_translation">Translation</string>
     <string name="settings_translation_summary">Target language, showing translations per language</string>
     <string name="settings_translation_model">On-device translation model</string>
@@ -463,7 +463,7 @@
     <string name="settings_translation_model_failed_network">Couldn\'t download. Tap to retry</string>
     <string name="settings_translation_model_failed_corrupted">The download was corrupted. Tap to retry</string>
     <string name="settings_translation_download_title">Download the translation model?</string>
-    <string name="settings_translation_download_message">PLaMo 3 Translate 0.8B (%1$s) will be downloaded from Hugging Face. Translation runs on this device and posts aren\'t sent anywhere. Downloading over mobile data uses your data plan.</string>
+    <string name="settings_translation_download_message">PLaMo 3 Translate 0.8B (%1$s) will be downloaded from Hugging Face to run translation on this device. Downloading over mobile data uses your data plan.</string>
     <string name="settings_translation_download">Download</string>
     <string name="settings_translation_cancel_download_title">Stop downloading?</string>
     <string name="settings_translation_cancel_download">Stop</string>
@@ -491,7 +491,7 @@
     <string name="translation_failed">Couldn\'t translate</string>
     <string name="translation_retry">Retry</string>
     <string name="settings_licenses">Licenses</string>
-    <string name="settings_licenses_summary">Open source software used in this app</string>
+    <string name="settings_licenses_summary">Open source licenses</string>
     <string name="licenses_translation_model">Translation model</string>
     <string name="licenses_bundled">Included software</string>
     <string name="licenses_libraries">Libraries</string>

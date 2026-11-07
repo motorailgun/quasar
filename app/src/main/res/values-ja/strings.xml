@@ -411,7 +411,7 @@
     <string name="share_target_post">Quasar で投稿</string>
     <string name="share_target_open">Quasar で開く</string>
     <string name="open_link_title">リンクを開く</string>
-    <string name="open_link_not_found">サーバーで見つかりませんでした。非公開か、相手のサーバーに接続できない可能性があります。</string>
+    <string name="open_link_not_found">リンクがサーバー上で見つかりませんでした。非公開になっているか、相手のサーバーに接続できない可能性があります。</string>
     <string name="open_link_failed">リンクを開けませんでした: %1$s</string>
     <string name="open_link_retry">再試行</string>
     <string name="open_link_open_in_browser">ブラウザで開く</string>
@@ -419,7 +419,7 @@
     <string name="open_link_not_logged_in">Quasar でリンクを開くにはログインしてください。</string>
     <!-- ポストの翻訳 (端末内のモデル) -->
     <string name="settings_experimental">実験的機能</string>
-    <string name="settings_experimental_summary">端末内の翻訳</string>
+    <string name="settings_experimental_summary">開発中の機能</string>
     <string name="settings_experimental_note">これらの機能は試験的なもので、正しく動作しないことがあります。今後のアップデートで変更・削除される可能性があります。</string>
     <string name="settings_translation">翻訳</string>
     <string name="settings_translation_summary">翻訳先の言語・言語ごとの翻訳の表示</string>
@@ -427,7 +427,7 @@
     <string name="settings_translation_model_ready">ダウンロード済み (%1$s) · Built with PLaMo</string>
     <string name="settings_translation_model_missing">未ダウンロード。タップしてダウンロード (%1$s)</string>
     <string name="settings_translation_enabled">端末内で翻訳</string>
-    <string name="settings_translation_enabled_summary">PLaMo 3 Translate でポストを翻訳します (本文を外部に送りません)</string>
+    <string name="settings_translation_enabled_summary">PLaMo 3 Translate でポストを翻訳します。処理はオンデバイスで行われます。</string>
     <string name="settings_translation_model_downloading">ダウンロード中… %1$s / %2$s</string>
     <string name="settings_translation_model_waiting">ネットワークを待っています…</string>
     <string name="settings_translation_model_verifying">ダウンロードしたファイルを確認しています…</string>
@@ -435,7 +435,7 @@
     <string name="settings_translation_model_failed_network">ダウンロードできませんでした。タップして再試行</string>
     <string name="settings_translation_model_failed_corrupted">ダウンロードしたファイルが壊れていました。タップして再試行</string>
     <string name="settings_translation_download_title">翻訳モデルをダウンロードしますか？</string>
-    <string name="settings_translation_download_message">PLaMo 3 Translate 0.8B (%1$s) を Hugging Face からダウンロードします。翻訳はこの端末の中で行い、ポストを外部に送りません。モバイルデータ通信では通信量がかかります。</string>
+    <string name="settings_translation_download_message">PLaMo 3 Translate 0.8B (%1$s) を Hugging Face からダウンロードします。モバイルデータ通信では通信量がかかります。</string>
     <string name="settings_translation_download">ダウンロード</string>
     <string name="settings_translation_cancel_download_title">ダウンロードを中止しますか？</string>
     <string name="settings_translation_cancel_download">中止</string>

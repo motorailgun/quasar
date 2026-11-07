@@ -81,15 +81,15 @@ import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 
 object PostCardDefaults {
     val MediaHeight: Dp = 160.dp
-    val AvatarSize: Dp = 40.dp
+    val AvatarSize: Dp = 48.dp
+
+    /** アイコンと本文の列の間。 */
+    val AvatarGap: Dp = 10.dp
     val ContentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 }
 
 /** [PostCardMode.Preview] の本文の行数の上限。 */
 private const val PreviewMaxLines = 6
-
-/** アイコンと本文の列の間。 */
-private val AvatarGap = 12.dp
 
 /** [PostCard] の表示の種類。 */
 enum class PostCardMode {
@@ -145,14 +145,14 @@ fun PostCard(
             .then(if (full) Modifier.clickable { callbacks.onPostClick(post.statusId) } else Modifier)
             .padding(contentPadding),
     ) {
-        if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick, labelStart = avatarSize + AvatarGap)
+        if (full) PostCardLabels(post, pinned, showReplyIndicator, onUserClick, labelStart = avatarSize + PostCardDefaults.AvatarGap)
         Row {
             UserIcon(
                 user = post.author,
                 size = avatarSize,
                 modifier = Modifier.clickable { onUserClick(post.author) },
             )
-            Spacer(Modifier.width(AvatarGap))
+            Spacer(Modifier.width(PostCardDefaults.AvatarGap))
             Column(Modifier.weight(1f)) {
                 AuthorLine(
                     post,

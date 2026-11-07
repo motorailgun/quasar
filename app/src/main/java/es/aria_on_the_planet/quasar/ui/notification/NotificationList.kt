@@ -53,6 +53,7 @@ import es.aria_on_the_planet.quasar.ui.component.list.LoadMoreEffect
 import es.aria_on_the_planet.quasar.ui.component.list.StickToTopEffect
 import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
+import es.aria_on_the_planet.quasar.ui.component.post.PostCardDefaults
 import es.aria_on_the_planet.quasar.ui.component.post.PostExcerpt
 import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.post.postTimeText
@@ -242,8 +243,8 @@ private fun CompactRow(
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        // PostCard のアイコン列 (40dp) に合わせて種別アイコンを置く
-        Box(Modifier.width(40.dp), contentAlignment = Alignment.TopEnd) {
+        // PostCard のアイコン列に合わせて種別アイコンを置く
+        Box(Modifier.width(PostCardDefaults.AvatarSize), contentAlignment = Alignment.TopEnd) {
             Icon(
                 type.filledIcon(),
                 contentDescription = null,
@@ -251,7 +252,7 @@ private fun CompactRow(
                 modifier = Modifier.size(CompactTypeIconSize),
             )
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(PostCardDefaults.AvatarGap))
         Column(Modifier.weight(1f)) {
             avatars()
             Spacer(Modifier.size(8.dp))
@@ -317,8 +318,8 @@ private fun NotificationHeader(group: NotificationGroup, onUserClick: (User) -> 
             .padding(start = 16.dp, end = 16.dp, top = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // PostCard のアイコン列 (40dp) に揃えてアイコンを右寄せで置く
-        Box(Modifier.width(40.dp), contentAlignment = Alignment.CenterEnd) {
+        // PostCard のアイコン列に揃えてアイコンを右寄せで置く
+        Box(Modifier.width(PostCardDefaults.AvatarSize), contentAlignment = Alignment.CenterEnd) {
             Icon(
                 group.type.icon(),
                 contentDescription = null,
@@ -326,7 +327,7 @@ private fun NotificationHeader(group: NotificationGroup, onUserClick: (User) -> 
                 modifier = Modifier.size(18.dp),
             )
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(PostCardDefaults.AvatarGap))
         EmojiText(
             text = group.type.message(name),
             emojis = account?.emojis.orEmpty(),
@@ -356,7 +357,8 @@ private fun AccountRow(user: User, onUserClick: (User) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onUserClick(user) }
-            .padding(start = 68.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+            // 本文の列 (PostCard のアイコン列の右) に揃える
+            .padding(start = 16.dp + PostCardDefaults.AvatarSize + PostCardDefaults.AvatarGap, end = 16.dp, top = 8.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         UserIcon(user = user)

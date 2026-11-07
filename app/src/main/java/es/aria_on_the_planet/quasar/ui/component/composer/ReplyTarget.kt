@@ -32,6 +32,7 @@ import es.aria_on_the_planet.quasar.domain.model.replyRecipients
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
+import es.aria_on_the_planet.quasar.ui.component.post.PostCardDefaults
 import es.aria_on_the_planet.quasar.ui.component.post.PostCardMode
 import es.aria_on_the_planet.quasar.ui.component.post.PostExcerpt
 import es.aria_on_the_planet.quasar.ui.component.post.PostMedia
@@ -150,8 +151,10 @@ fun ReplyContext(
     modifier: Modifier = Modifier,
     onMediaClick: (MediaClick) -> Unit = {},
 ) {
+    // 直下の投稿欄のアイコンと縦線で繋ぐので、アイコンは投稿欄と同じ大きさにする
+    val lineX = ThreadLineDefaults.avatarCenterX(ReplyContextAvatarSize)
     val line = Modifier.threadLines(
-        xs = listOf(ThreadLineDefaults.AvatarCenterX),
+        xs = listOf(lineX),
         color = MaterialTheme.colorScheme.outlineVariant,
     )
     Column(modifier.fillMaxWidth()) {
@@ -160,19 +163,20 @@ fun ReplyContext(
             mode = PostCardMode.ReplyContext,
             mediaHeight = ContextMediaHeight,
             callbacks = PostCallbacks(onMediaClick = onMediaClick),
+            avatarSize = ReplyContextAvatarSize,
             authorTrailing = {
                 CancelButton(onCancel, stringResource(R.string.composer_cancel_reply), size = 32.dp)
             },
             modifier = Modifier.threadLines(
-                xs = listOf(ThreadLineDefaults.AvatarCenterX),
+                xs = listOf(lineX),
                 color = MaterialTheme.colorScheme.outlineVariant,
                 startY = ThreadLineDefaults.AvatarTopY,
             ),
         )
-        // PostCard の本文と同じ列 (左余白 16dp + アイコン 40dp + 12dp) に揃える
+        // PostCard の本文と同じ列 (左余白 16dp + アイコン + 間) に揃える
         ReplyingToLabel(
             accts = replyRecipients(post, myAcct).ifEmpty { listOf(post.author.screenName) },
-            modifier = line.padding(start = 68.dp, end = 16.dp),
+            modifier = line.padding(start = 16.dp + ReplyContextAvatarSize + PostCardDefaults.AvatarGap, end = 16.dp),
         )
         // 投稿欄のアイコンまで縦線を繋ぐ
         Spacer(line.fillMaxWidth().height(ThreadLineDefaults.AvatarTopY))
@@ -219,3 +223,6 @@ private val PreviewMediaHeight = 48.dp
 /** 縮小表示の枠の内側の余白。上は ✕ の押せる範囲 (36dp) がヘッダの行の高さを決めるので 0、右は ✕ の分だけ詰める。 */
 private val PreviewContentPadding = PaddingValues(start = 12.dp, end = 4.dp, bottom = 10.dp)
 private val ContextMediaHeight = 120.dp
+
+/** [ReplyContext] の返信先のアイコン ([ComposerAccountIcon] の既定と同じ)。 */
+private val ReplyContextAvatarSize = 40.dp

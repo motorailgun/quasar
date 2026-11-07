@@ -9,8 +9,11 @@ import androidx.compose.ui.unit.dp
 
 /** スレッドの縦線の位置 ([PostCard] のアイコンに合わせる)。 */
 object ThreadLineDefaults {
-    /** PostCard のアイコン中心の x 座標 (左余白 16dp + アイコン半径 20dp)。 */
-    val AvatarCenterX: Dp = 36.dp
+    /** PostCard のアイコン中心の x 座標 (左余白 16dp + アイコンの半径)。 */
+    val AvatarCenterX: Dp = avatarCenterX(PostCardDefaults.AvatarSize)
+
+    /** 大きさ [avatarSize] のアイコンの中心の x 座標 (アイコンの大きさを変えた PostCard 用)。 */
+    fun avatarCenterX(avatarSize: Dp): Dp = 16.dp + avatarSize / 2
 
     /** PostCard のアイコン上端の y 座標。 */
     val AvatarTopY: Dp = 12.dp

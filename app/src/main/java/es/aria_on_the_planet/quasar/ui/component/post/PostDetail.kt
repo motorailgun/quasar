@@ -76,7 +76,8 @@ fun PostDetail(
                     modifier = Modifier.clickable { onUserClick(post.author) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    UserIcon(user = post.author)
+                    // 一覧 (PostCard) より小さくならないよう同じ大きさにする
+                    UserIcon(user = post.author, size = PostCardDefaults.AvatarSize)
                     Spacer(Modifier.width(12.dp))
                     Column {
                         UserName(post.author, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))

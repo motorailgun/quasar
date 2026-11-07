@@ -442,7 +442,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * `mode = PostCardMode.Preview` はポストのメニューの上の対象のポスト用 (下記「ポストのメニュー」): 出すものは ReplyContext と
   同じだが開閉できない。CW は開いたまま (`PostBody(fixed = true)`: 警告のアイコン + 警告文の下に本文)、長文は設定に関わらず
   6 行で切ってフェードするだけ (`CollapsiblePostText(showToggle = false)`、「Show more」を出さない)。
-* `avatarSize` (既定 40dp。ラベルの左端もこれに合わせる) / `contentPadding` (既定 左右 16dp・上下 12dp) で大きさ・余白を変えられる。
+* `avatarSize` (既定 48dp、本文の列との間は `PostCardDefaults.AvatarGap` = 10dp。ラベルの左端・スレッドの縦線 (`ThreadLineDefaults`)・通知の行の左の列もこれに合わせる。返信画面の返信先 (`ReplyContext`) だけは下の投稿欄のアイコンと繋ぐので 40dp) / `contentPadding` (既定 左右 16dp・上下 12dp) で大きさ・余白を変えられる。
 * `mediaHeight` はそのまま `MediaAttachments` に渡す (`PostList` も同名パラメータで中継する)。
 * アクション行: リプライ数・ブースト数・リアクション数・ブックマーク。`viewer` のフラグが立っているものは
   塗りアイコン + 色付き (ブースト=extendedColors.reblog (緑), リアクション=extendedColors.favourite (黄),

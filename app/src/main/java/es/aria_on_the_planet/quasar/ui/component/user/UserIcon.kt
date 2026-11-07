@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.ui.component.user
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
@@ -22,5 +23,7 @@ fun UserIcon(user: User, modifier: Modifier = Modifier, size: Dp = 40.dp, shape:
         modifier = modifier
             .size(size)
             .clip(shape),
+        // 正方形でないアイコン (サーバによっては切り抜かない) も枠いっぱいに切り抜く
+        contentScale = ContentScale.Crop,
     )
 }

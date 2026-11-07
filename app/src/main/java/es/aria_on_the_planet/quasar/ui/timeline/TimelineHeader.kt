@@ -218,4 +218,4 @@ private const val SelectedWeight = 1.8f
 private val MenuButtonSize: Dp = 44.dp
 private val TabHeight: Dp = 44.dp
 private val TabInset: Dp = 4.dp
-private val HeaderShadowElevation: Dp = 12.dp
+private val HeaderShadowElevation: Dp = 8.dp

@@ -205,11 +205,15 @@ private fun <T : Any> DetailPanel(entries: List<NavEntry<T>>, state: DetailPanel
     // 予測型「戻る」: 引いた量を全画面の「戻る」と同じく抑えて動かし、離したら残りを抜ける。取り消しなら戻す
     val backState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
     LaunchedEffect(backState, pop) {
+        var tracker: BackDragTracker? = null // ジェスチャごと
         snapshotFlow { backState.transitionState }.collectLatest { transition ->
             if (popping) return@collectLatest
             if (transition is NavigationEventTransitionState.InProgress) {
-                backTarget().snapTo(state.backSettings.dampedProgress(transition.latestEvent.progress))
+                val event = transition.latestEvent
+                val t = tracker ?: BackDragTracker(state.backSettings).also { tracker = it }
+                backTarget().snapTo(t.offset(event.progress, event.touchX))
             } else {
+                tracker = null
                 backTarget().animateTo(0f, spec)
             }
         }

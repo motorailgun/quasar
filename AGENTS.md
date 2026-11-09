@@ -620,6 +620,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     * NavDisplay は引いた量をそのまま遷移の進み具合として seek し、離した後は同じ遷移の残りを等速で再生するだけ
       (Nav3 1.2.0 のソースで確認。ドキュメントには無い)。なので遷移 (`predictivePopTransition`) は直線にし、引いている間だけ
       NavEntryDecorator で各画面に補正の translationX を足して、離したら NavDisplay と同じ時間で 0 に戻す。
+    * 指を戻すとき (取り消そうとするとき) は log を逆にたどらず、一番引いたときのずれから指の距離 (`NavigationEvent.touchX`) に
+      比例して戻す (`BackDragTracker`)。log は引き始めほど急なので、たどると少し戻しただけで元の位置まですっと戻っていた。
+      詳細のパネルも同じ。
+    * 引いている間の補正は、届いた進み具合ではなく遷移が実際に表示している位置 (エントリの
+      `LocalNavAnimatedContentScope` の `transition.playTimeNanos / totalDurationNanos`) から描くときに求める。NavDisplay は
+      進み具合を composition で読んで `LaunchedEffect` で seek するので 1 フレームほど遅れ、届いた値で補正すると進み具合が
+      大きく変わったとき (指を戻したとき) に 1 フレームだけ跳ねていた。
     * 補正は NavDisplay がジェスチャを受けているとき (dispatcher の `history` の今の情報が `SceneInfo`) だけ。画面の中の
       `NavigationBackHandler` (下記) が受けたジェスチャには効かない。
     * **Nav3 を上げたら、引いている間・離した後・取り消しの動きを実機で確かめる**。

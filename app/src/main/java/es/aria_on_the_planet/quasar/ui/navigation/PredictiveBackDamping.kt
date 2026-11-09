@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -16,12 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.scene.SceneInfo
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
 import kotlinx.coroutines.flow.collectLatest
+import kotlin.math.abs
 import kotlin.math.ln
+import kotlin.math.max
 
 /*
  * 予測型「戻る」で指で引いている間の動きを抑える (幅いっぱい引いても今の画面は幅の
@@ -30,7 +34,10 @@ import kotlin.math.ln
  * NavDisplay は引いた量 p をそのまま遷移の進み具合として seek し、離した後は同じ遷移の残りを等速で再生する
  * (Nav3 1.2.0 の `NavDisplay` / Compose の `SeekableTransitionState.animateTo` のソースで確認。ドキュメントには無い)。
  * なので遷移 ([predictivePopTransition]) は直線で全部抜ける動きにし、引いている間だけ各画面に
- * 「目標の位置 − p × 幅」の補正を足して見た目を [dampedProgress] にする。離したら補正を NavDisplay の残りの再生と
+ * 「目標の位置 − p × 幅」の補正を足して見た目を [BackDragTracker] の値にする。p は届いた進み具合ではなく、遷移が実際に
+ * 表示している位置 (エントリの `AnimatedContentScope.transition` の再生位置) を描くときに読む。NavDisplay は進み具合を
+ * composition で読んで `LaunchedEffect` で seek するので 1 フレームほど遅れ、届いた値で補正すると進み具合が大きく
+ * 変わったとき (指を戻したとき等) にその 1 フレームだけ跳ねる。離したら補正を NavDisplay の残りの再生と
  * 同じ時間・曲線で 0 に戻すので、見た目は今の位置から終点 (抜けきる / 元の位置) へ一直線に動く。
  * **Nav3 を上げたら、引いている間・離した後・取り消しの動きを実機で確かめる** (上の 2 つの挙動に依存している)。
  */
@@ -42,6 +49,36 @@ import kotlin.math.ln
 internal fun PredictiveBackSettings.dampedProgress(progress: Float): Float =
     maxDragFraction * ln(1f + dragLogSteepness * progress) / ln(1f + dragLogSteepness)
 
+/**
+ * 1 回のジェスチャの間の、今の画面のずれ (幅に対する割合) を決める。進むときは [dampedProgress] (log) で動かし、
+ * 指を戻すときは一番引いたときのずれから**指の距離** (touchX) に比例して 0 へ戻す。log の曲線をそのまま戻ると
+ * (引き始めほど急なので) 指を少し戻しただけで元の位置まですっと戻ってしまうため。
+ * もう一度引けば同じ直線を上って、一番引いた所を超えたら log に戻る。
+ */
+internal class BackDragTracker(private val settings: PredictiveBackSettings) {
+    private var startX = Float.NaN
+    private var hasTouch = false
+    private var peakAmount = 0f
+    private var peakOffset = 0f
+
+    fun offset(progress: Float, touchX: Float): Float {
+        if (startX.isNaN()) startX = touchX
+        val distance = abs(touchX - startX)
+        if (!hasTouch && distance > 0f) {
+            // 指の位置が来るようになった (来ない場合 = ボタン等の進み具合は progress で戻す)
+            hasTouch = true
+            peakAmount = 0f
+        }
+        val amount = if (hasTouch) distance else progress
+        if (amount >= peakAmount) {
+            peakAmount = amount
+            peakOffset = max(peakOffset, settings.dampedProgress(progress))
+            return peakOffset
+        }
+        return peakOffset * amount / peakAmount
+    }
+}
+
 /** 補正の状態。[QuasarNavHost] が 1 つ持ち、[rememberPredictiveBackDampingDecorator] で各画面に当てる。 */
 @Stable
 class PredictiveBackDamping {
@@ -52,16 +89,29 @@ class PredictiveBackDamping {
     private var leavingKey: Any? by mutableStateOf(null)
     private var returningKey: Any? by mutableStateOf(null)
 
-    /** 今の画面に足す補正 (幅に対する割合、0 以下)。戻り先は遷移のずれが 1/[UnderlapFraction] なので補正も同じ比。 */
+    /** 引いている間の今の画面の見た目のずれ (幅に対する割合、[BackDragTracker] の値)。 */
+    private var visual by mutableFloatStateOf(0f)
+
+    /** 引いている間は [visual] − 遷移の位置、離した後は [correction] を補正にする。 */
+    private var dragging by mutableStateOf(false)
+
+    /** 離した後の今の画面に足す補正 (幅に対する割合、0 以下)。 */
     private val correction = Animatable(0f)
+
+    /** 今のジェスチャのずれ。[startTracking] で作り直す。 */
+    private var tracker = BackDragTracker(PredictiveBackSettings())
 
     /** 引いている途中に NavDisplay の onBack が呼ばれた (= 戻ることが決まった)。 */
     private var committed = false
 
-    fun offsetFraction(contentKey: Any): Float = when (contentKey) {
-        leavingKey -> correction.value
-        returningKey -> correction.value / UnderlapFraction
-        else -> 0f
+    /**
+     * [contentKey] の画面に足す補正。[shownProgress] は遷移が今表示している進み具合 (引いている間だけ呼ぶ)。
+     * 戻り先は遷移のずれが 1/[UnderlapFraction] なので補正も同じ比。
+     */
+    fun offsetFraction(contentKey: Any, shownProgress: () -> Float): Float {
+        if (contentKey != leavingKey && contentKey != returningKey) return 0f
+        val offset = if (dragging) visual - shownProgress() else correction.value
+        return if (contentKey == leavingKey) offset else offset / UnderlapFraction
     }
 
     /** NavDisplay の onBack から呼ぶ (ボタンでの「戻る」でも呼ばれるが、引いている間以外は見ない)。 */
@@ -76,10 +126,13 @@ class PredictiveBackDamping {
                 is NavigationEventTransitionState.InProgress -> {
                     if (leavingKey == null && !startTracking(dispatcher)) return@collectLatest
                     progress = state.latestEvent.progress
-                    correction.snapTo(settings.dampedProgress(progress) - progress)
+                    visual = tracker.offset(progress, state.latestEvent.touchX)
+                    dragging = true
                 }
                 NavigationEventTransitionState.Idle -> {
                     if (leavingKey == null) return@collectLatest
+                    correction.snapTo(visual - progress)
+                    dragging = false
                     try {
                         withFrameNanos {} // 戻る場合、onBack は Idle になるのと前後しうるので 1 フレーム待つ
                         // NavDisplay と同じ時間・曲線: 戻るなら残りを等速、取り消しなら tween の既定の曲線
@@ -108,6 +161,7 @@ class PredictiveBackDamping {
         leavingKey = current.scene.entries.last().contentKey
         returningKey = back.scene.entries.last().contentKey
         committed = false
+        tracker = BackDragTracker(settings)
         return true
     }
 }
@@ -119,8 +173,16 @@ fun <T : Any> rememberPredictiveBackDampingDecorator(damping: PredictiveBackDamp
     if (dispatcher != null) LaunchedEffect(damping, dispatcher) { damping.run(dispatcher) }
     return remember(damping) {
         NavEntryDecorator { entry ->
+            val transition = LocalNavAnimatedContentScope.current.transition
             Box(
-                Modifier.graphicsLayer { translationX = damping.offsetFraction(entry.contentKey) * size.width },
+                Modifier.graphicsLayer {
+                    val offset = damping.offsetFraction(entry.contentKey) {
+                        // 予測型「戻る」の遷移は直線なので、再生位置の割合 = 表示している進み具合
+                        val total = transition.totalDurationNanos
+                        if (total > 0) (transition.playTimeNanos.toFloat() / total).coerceIn(0f, 1f) else 0f
+                    }
+                    translationX = offset * size.width
+                },
                 propagateMinConstraints = true,
             ) {
                 entry.Content()

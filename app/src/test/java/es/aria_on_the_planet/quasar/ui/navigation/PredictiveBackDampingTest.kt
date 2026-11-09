@@ -30,4 +30,40 @@ class PredictiveBackDampingTest {
         val steep = PredictiveBackSettings(dragLogSteepness = 30f).dampedProgress(0.1f)
         assertTrue(steep > gentle)
     }
+
+    private val settings = PredictiveBackSettings(maxDragFraction = 0.2f, dragLogSteepness = 30f)
+
+    @Test
+    fun trackerFollowsLogWhileAdvancing() {
+        val tracker = BackDragTracker(settings)
+        tracker.offset(0f, 10f)
+        assertEquals(settings.dampedProgress(0.3f), tracker.offset(0.3f, 310f), 1e-6f)
+    }
+
+    @Test
+    fun trackerRetreatsInProportionToFingerDistance() {
+        val tracker = BackDragTracker(settings)
+        tracker.offset(0f, 0f)
+        val peak = tracker.offset(0.3f, 300f)
+        // 進み具合が急に落ちても、指を 10% 戻しただけならずれも 10% だけ戻る
+        assertEquals(peak * 0.9f, tracker.offset(0.02f, 270f), 1e-6f)
+        assertEquals(0f, tracker.offset(0f, 0f), 1e-6f)
+    }
+
+    @Test
+    fun trackerReturnsToLogPastThePeak() {
+        val tracker = BackDragTracker(settings)
+        tracker.offset(0f, 0f)
+        val peak = tracker.offset(0.3f, 300f)
+        assertEquals(peak / 2, tracker.offset(0.15f, 150f), 1e-6f)
+        assertEquals(peak, tracker.offset(0.3f, 300f), 1e-6f)
+        assertEquals(settings.dampedProgress(0.5f), tracker.offset(0.5f, 500f), 1e-6f)
+    }
+
+    @Test
+    fun trackerUsesProgressWithoutTouchPosition() {
+        val tracker = BackDragTracker(settings)
+        val peak = tracker.offset(0.4f, 0f)
+        assertEquals(peak / 2, tracker.offset(0.2f, 0f), 1e-6f)
+    }
 }

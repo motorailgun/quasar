@@ -55,7 +55,7 @@
   * 中の切り替え: 全画面のときと同じ横スライド (進む: 新しい画面が右から入り、前の画面は左へ少しずれて薄くなる)。
   * 閉じる・戻るは「アニメーションを終えてからバックスタックから外す」(外したエントリは描けないので)。戻るボタンも
     `Navigator.back()` からパネルの「戻る」を通る。
-  * 予測型「戻る」: パネルの中の `NavigationBackHandler` が受け、引いた量を `PredictiveBackSettings.dampedProgress` で抑えて
+  * 予測型「戻る」: パネルの中の `NavigationBackHandler` が受け、引いた量を `PredictiveBackSettings.dampedProgress` で抑えて (指を戻すときは `BackDragTracker`)
     動かす。離したら残りを抜け、取り消しなら戻る。
 * **戻るボタン**: パネルの最初の画面は ← ではなく ✕ (`LocalBackClosesPanel`)。
 * **クイック投稿バー**: パネルを開いている間、タイムラインのバーは左側 (パネルで覆われていない所) の中央に寄せる。

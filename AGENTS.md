@@ -19,7 +19,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
-| オンデバイス翻訳 (試作) | llama.cpp (git submodule `third_party/llama.cpp`、タグ v1.0.0 = b12359) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
+| オンデバイス翻訳 (実験的機能) | llama.cpp (git submodule `third_party/llama.cpp`、タグ v1.0.0 = b12359) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
 
 DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。
 
@@ -1054,11 +1054,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 
-## オンデバイス翻訳 (試作。`:llama` + `data/translation/`)
+## オンデバイス翻訳 (実験的機能。`:llama` + `data/translation/`)
 
-PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。アプリへの組み込みは試作でフレーバー `full` だけ
+PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。フレーバー `full` だけ (v1.4 から配布)
 (`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「PLaMoで〇〇語から翻訳 (規約の第 5 条で、モデルの出力だと示す。省略させず折り返す) ·
-原文を表示 / 翻訳を表示」(`PostTranslationBar`。順番待ち・訳している間は「翻訳しています…」を薄くし、その上を濃い帯が流れる = `Modifier.shimmer`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「実験的機能」→「翻訳」。状態はアプリ全体で
+原文を表示 / 翻訳を表示」(`PostTranslationBar`。順番待ち・訳している間は「翻訳中…」を薄くし、その上を濃い帯が流れる = `Modifier.shimmer`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「実験的機能」→「翻訳」。状態はアプリ全体で
 1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
 **裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、
 UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持ったまま裏にいるとアプリごと終わらされやすい)。訳しかけは順番待ちに戻す。

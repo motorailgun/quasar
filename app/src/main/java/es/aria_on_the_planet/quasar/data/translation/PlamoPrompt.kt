@@ -19,7 +19,7 @@ package es.aria_on_the_planet.quasar.data.translation
  * プロンプトの断片。[special] は `<|plamo:…|>` を特殊トークンとして読むか (構造の部分だけ true)。
  * 原文などユーザーの文字列 (ポストの本文は他人が書いたもの) は false の断片にし、さらに [neutralizeSpecialTokens]
  * を通す: llama.cpp の PLaMo 3 のトークナイザは、特殊トークンとして読まない指定 (`parse_special = false`) でも
- * `<|plamo:tag|>` 等の文字列を制御トークンにしてしまうため (b12129 で確認)。どちらか一方では足りない。
+ * `<|plamo:tag|>` 等の文字列を制御トークンにしてしまうため (b12129・v1.0.0 で確認)。どちらか一方では足りない。
  * 断片は必ず特殊トークンの境目で切れているので、まとめて読んだ場合 (llama-server 等) とトークン列は変わらない。
  */
 data class PromptSegment(val text: String, val special: Boolean)

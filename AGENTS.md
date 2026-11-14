@@ -19,7 +19,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
-| オンデバイス翻訳 (試作) | llama.cpp (git submodule `third_party/llama.cpp`、タグ b12129) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
+| オンデバイス翻訳 (試作) | llama.cpp (git submodule `third_party/llama.cpp`、タグ v1.0.0 = b12359) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
 
 DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。
 

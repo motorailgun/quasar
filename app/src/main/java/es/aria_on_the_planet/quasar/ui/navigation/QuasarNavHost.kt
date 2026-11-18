@@ -83,6 +83,7 @@ import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
 import es.aria_on_the_planet.quasar.ui.settings.TranslationSettingsPage
 import es.aria_on_the_planet.quasar.ui.component.post.LocalPostTranslations
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.flow.Flow
@@ -629,7 +630,12 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
     entry<Route.SettingsAnimation> {
         WithSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
     }
-    entry<Route.SettingsTimelines> { WithSettings(container) { TimelineSettingsPage(it, update, onBack = navigator::back) } }
+    entry<Route.SettingsTimelines> {
+        WithSettings(container) { TimelineSettingsPage(it, update, onNavigate = navigate, onBack = navigator::back) }
+    }
+    entry<Route.SettingsPostMenu> {
+        WithSettings(container) { PostMenuSettingsPage(it.hiddenPostMenuItems, update, onBack = navigator::back) }
+    }
     entry<Route.SettingsPosting> { WithSettings(container) { PostingSettingsPage(it, update, onBack = navigator::back) } }
     entry<Route.SettingsConfirmations> {
         WithSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }

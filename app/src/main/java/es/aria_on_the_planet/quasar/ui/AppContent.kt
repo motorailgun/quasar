@@ -15,6 +15,7 @@ import es.aria_on_the_planet.quasar.ui.component.blur.rememberPowerSaveMode
 import es.aria_on_the_planet.quasar.ui.component.dialog.ActionConfirmationHost
 import es.aria_on_the_planet.quasar.ui.component.link.rememberNewTaskUriHandler
 import es.aria_on_the_planet.quasar.ui.component.player.LocalInlinePlayback
+import es.aria_on_the_planet.quasar.ui.component.post.LocalHiddenPostMenuItems
 import es.aria_on_the_planet.quasar.ui.component.player.rememberInlinePlayback
 import es.aria_on_the_planet.quasar.ui.component.time.LocalNow
 import es.aria_on_the_planet.quasar.ui.component.time.rememberTickingNow
@@ -23,7 +24,7 @@ import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
 import es.aria_on_the_planet.quasar.ui.theme.SyncWindowBackground
 
 /**
- * Activity の setContent の最上位 (アプリ本体の MainActivity とデバッグ用ギャラリー)。テーマとアプリ全体の設定・表示用の現在時刻 ([LocalNow])・外部リンクの開き方 ([LocalUriHandler]) を提供し、
+ * Activity の setContent の最上位 (アプリ本体の MainActivity とデバッグ用ギャラリー)。テーマとアプリ全体の設定 (表示・ポストのメニューの項目)・表示用の現在時刻 ([LocalNow])・外部リンクの開き方 ([LocalUriHandler]) を提供し、
  * 操作の前の確認のダイアログ ([ActionConfirmationHost]) を出す。メニューの背景のぼかしの元 ([BackdropBlurHost]) も置く。ウィンドウの背景もテーマに合わせる ([SyncWindowBackground])。
  * 設定の読み込み前は中身を描かない (既定値で描いてから切り替わらないように。普通は最初のフレームまでに読み終わる)。
  * 表示設定の UI・文字の倍率は [LocalDensity] を差し替えて効かせる ([scaledBy])。
@@ -50,6 +51,7 @@ fun QuasarAppContent(
                 LocalInlinePlayback provides playback,
                 LocalNow provides now,
                 LocalUriHandler provides rememberNewTaskUriHandler(),
+                LocalHiddenPostMenuItems provides loaded.hiddenPostMenuItems,
             ) {
                 // 設定とバッテリーセーバーから決まる。バッテリーセーバー中はどちらもぼかさない
                 val blurAllowed = !rememberPowerSaveMode()

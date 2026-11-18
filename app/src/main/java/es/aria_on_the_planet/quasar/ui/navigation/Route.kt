@@ -73,6 +73,7 @@ sealed interface Route : NavKey {
     @Serializable data object SettingsDisplay : Route
     @Serializable data object SettingsAnimation : Route
     @Serializable data object SettingsTimelines : Route
+    @Serializable data object SettingsPostMenu : Route
     @Serializable data object SettingsPosting : Route
     @Serializable data object SettingsConfirmations : Route
     @Serializable data object SettingsExperimental : Route

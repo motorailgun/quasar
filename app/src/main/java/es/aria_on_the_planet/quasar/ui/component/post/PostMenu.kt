@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
@@ -48,11 +49,17 @@ import es.aria_on_the_planet.quasar.ui.component.text.postPlainText
 import es.aria_on_the_planet.quasar.ui.component.menu.ActionMenu
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
+import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
+import es.aria_on_the_planet.quasar.domain.model.settings.visiblePostMenuItems
+import es.aria_on_the_planet.quasar.ui.component.account.AccountActionType
 import es.aria_on_the_planet.quasar.ui.component.dialog.LocalActionConfirmer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import es.aria_on_the_planet.quasar.ui.component.menu.MenuItemText
+
+/** ポストのメニューに出さない項目 (設定 `AppSettings.hiddenPostMenuItems`)。`QuasarAppContent` が提供する。 */
+val LocalHiddenPostMenuItems = staticCompositionLocalOf { emptySet<PostMenuItem>() }
 
 /** メニューを開いたときに読む相手の状態。 */
 private sealed interface TargetState {
@@ -67,6 +74,7 @@ private sealed interface TargetState {
  * 編集・削除は [LocalOwnPostActions] で、どの画面 (タイムライン・ポスト詳細等) でも同じ。
  * 投稿者との関係は開くたびに読み (キャッシュが新しければそれ)、読み込むまでは仮の関係 ([ProvisionalRelationship]) で出す (自分の ID がまだ分からず、関係の読み込みにも失敗したら項目ごと出さない)。ブロック・ミュートは確認してから行う。
  * [LocalAccountActions] が無い所 (ギャラリー等) では何も出さない。
+ * 設定で出さない項目 ([LocalHiddenPostMenuItems]) は除き、このポストに出る項目が 1 つも無ければ︙自体を出さない。
  *
  * @param compact 投稿者の行 (公開範囲の右) に置く小さいボタン。`false` なら [IconButton] (ポスト詳細の投稿者の行)。
  *   編集の準備・削除の最中は、どちらもボタンの代わりに読み込み中を出し、押せない。
@@ -91,6 +99,23 @@ fun PostMenu(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
+    val hidden = LocalHiddenPostMenuItems.current
+    // 本文の無いポスト (メディアだけ等) には「本文をコピー」を出さない
+    val plainText = remember(post.text) { postPlainText(post.text) }
+    val remoteUrl = remember(post) { post.remoteWebUrl() }
+    // 自分のポストか: 関係を読み込んだ結果、まだなら覚えている自分の ID で決める (自分の ID も分からなければ未定)
+    val myId = actions.myAccountId
+    val state = target
+    val mine = if (state is TargetState.Loaded) state.target == AccountMenuTarget.Me else myId == author.inServerId
+    val visible = visiblePostMenuItems(
+        hidden = hidden,
+        mine = if (state is TargetState.Loaded || myId != null) mine else null,
+        canEditOwn = ownActions != null,
+        hasRemoteUrl = remoteUrl != null,
+        hasText = plainText.isNotEmpty(),
+    )
+    // 出す項目が 1 つも無ければ︙ごと出さない
+    if (visible.isEmpty()) return
 
     LaunchedEffect(expanded, author) {
         if (!expanded) return@LaunchedEffect
@@ -161,12 +186,8 @@ fun PostMenu(
             header = if (preview) ({ PostMenuPreview(post) }) else null,
         ) {
             val dismiss = { expanded = false }
-            // 自分のポストか: 関係を読み込んだ結果、まだなら覚えている自分の ID で決める
-            val myId = actions.myAccountId
-            val state = target
-            val mine = if (state is TargetState.Loaded) state.target == AccountMenuTarget.Me else myId == author.inServerId
             if (mine && ownActions != null) {
-                DropdownMenuItem(
+                if (PostMenuItem.Edit in visible) DropdownMenuItem(
                     text = { MenuItemText(stringResource(R.string.post_edit)) },
                     leadingIcon = { Icon(Symbols.Outlined.Edit, contentDescription = null) },
                     onClick = {
@@ -175,7 +196,7 @@ fun PostMenu(
                     },
                 )
                 val error = MaterialTheme.colorScheme.error
-                DropdownMenuItem(
+                if (PostMenuItem.Delete in visible) DropdownMenuItem(
                     text = { MenuItemText(stringResource(R.string.post_delete)) },
                     leadingIcon = { Icon(Symbols.Outlined.Delete, contentDescription = null) },
                     onClick = {
@@ -189,12 +210,12 @@ fun PostMenu(
             }
             OpenInBrowserMenuItems(
                 localUrl = post.localWebUrl(actions.serverUrl),
-                remoteUrl = post.remoteWebUrl(),
+                remoteUrl = remoteUrl,
                 onDismiss = dismiss,
+                showLocal = PostMenuItem.OpenInBrowser in visible,
+                showRemote = PostMenuItem.OpenOnServer in visible,
             )
-            // 本文の無いポスト (メディアだけ等) には出さない
-            val plainText = remember(post.text) { postPlainText(post.text) }
-            if (plainText.isNotEmpty()) {
+            if (PostMenuItem.CopyText in visible) {
                 DropdownMenuItem(
                     text = { MenuItemText(stringResource(R.string.post_copy_text)) },
                     leadingIcon = { Icon(Symbols.Outlined.ContentCopy, contentDescription = null) },
@@ -219,6 +240,11 @@ fun PostMenu(
                 relationship = relationship,
                 followKnown = state is TargetState.Loaded,
                 named = true,
+                hidden = buildSet {
+                    if (PostMenuItem.Mute in hidden) add(AccountActionType.Mute)
+                    if (PostMenuItem.Block in hidden) add(AccountActionType.Block)
+                    if (PostMenuItem.HideBoosts in hidden) add(AccountActionType.HideBoosts)
+                },
                 onAction = { action ->
                     dismiss()
                     if (action.needsConfirmation) confirming = action else perform(action)

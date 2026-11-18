@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
@@ -17,6 +18,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
+import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import es.aria_on_the_planet.quasar.ui.component.post.descriptionRes
 import es.aria_on_the_planet.quasar.ui.component.post.labelRes
@@ -313,14 +315,21 @@ fun AnimationSettingsPage(display: DisplaySettings, update: UpdateSettings, onBa
     }
 }
 
-/** タイムライン: カラムごとの自動更新・通知の取得方法。 */
+/** タイムライン: ポストのメニュー (別のページ) への入口・カラムごとの自動更新・通知の取得方法。 */
 @Composable
-fun TimelineSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: () -> Unit) {
+fun TimelineSettingsPage(settings: AppSettings, update: UpdateSettings, onNavigate: (Route) -> Unit, onBack: () -> Unit) {
     val streaming = settings.streaming
     fun updateStreaming(transform: StreamingSettings.() -> StreamingSettings) =
         update { it.copy(streaming = it.streaming.transform()) }
     val streamSummary = stringResource(R.string.settings_stream_summary)
     SettingsScaffold(title = stringResource(R.string.settings_timelines), onBack = onBack) {
+        SettingsGroup(title = null) {
+            SettingsNavigationItem(
+                title = stringResource(R.string.settings_post_menu),
+                summary = stringResource(R.string.settings_post_menu_summary),
+                onClick = { onNavigate(Route.SettingsPostMenu) },
+            )
+        }
         SettingsGroup(title = stringResource(R.string.settings_auto_update)) {
             SettingsSwitchItem(
                 title = stringResource(R.string.timeline_home),
@@ -370,6 +379,39 @@ fun TimelineSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: 
                 },
                 onSelect = { api -> update { it.copy(notificationApi = api) } },
             )
+        }
+    }
+}
+
+/**
+ * ポストのメニュー (︙) に出す項目。共通 (見出しなし。ページの題名で分かる) / 自分のポスト / 他人のポストに分けて、項目ごとにオン / オフ。
+ */
+@Composable
+fun PostMenuSettingsPage(hidden: Set<PostMenuItem>, update: UpdateSettings, onBack: () -> Unit) {
+    @Composable
+    fun Item(item: PostMenuItem, title: String, icon: ImageVector) = SettingsSwitchItem(
+        title = title,
+        summary = null,
+        icon = icon,
+        checked = item !in hidden,
+        onCheckedChange = { checked ->
+            update { it.copy(hiddenPostMenuItems = if (checked) it.hiddenPostMenuItems - item else it.hiddenPostMenuItems + item) }
+        },
+    )
+    SettingsScaffold(title = stringResource(R.string.settings_post_menu), onBack = onBack) {
+        SettingsGroup(title = null) {
+            Item(PostMenuItem.OpenInBrowser, stringResource(R.string.menu_open_in_browser), Symbols.Outlined.OpenInBrowser)
+            Item(PostMenuItem.OpenOnServer, stringResource(R.string.settings_post_menu_open_on_server), Symbols.Outlined.Language)
+            Item(PostMenuItem.CopyText, stringResource(R.string.post_copy_text), Symbols.Outlined.ContentCopy)
+        }
+        SettingsGroup(title = stringResource(R.string.settings_post_menu_own)) {
+            Item(PostMenuItem.Edit, stringResource(R.string.post_edit), Symbols.Outlined.Edit)
+            Item(PostMenuItem.Delete, stringResource(R.string.post_delete), Symbols.Outlined.Delete)
+        }
+        SettingsGroup(title = stringResource(R.string.settings_post_menu_others)) {
+            Item(PostMenuItem.Mute, stringResource(R.string.account_mute), Symbols.Outlined.VolumeOff)
+            Item(PostMenuItem.Block, stringResource(R.string.account_block), Symbols.Outlined.Block)
+            Item(PostMenuItem.HideBoosts, stringResource(R.string.account_hide_boosts), Symbols.Outlined.Repeat)
         }
     }
 }

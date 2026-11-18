@@ -74,6 +74,7 @@ val ProvisionalRelationship = Relationship(following = false, requested = false,
  * 3 つ出し、使えないものはグレーアウトする。[relationship] が `null` (まだ分からない) なら全部、[followKnown] が `false`
  * (フォローしているか分からない) ならブーストの非表示を押せなくする。ブーストの非表示はフォロー中の相手にだけ押せる。
  *
+ * @param hidden 出さない項目 (ポストのメニューの設定)。読み込みの状態には依らないので、高さが変わらないのは同じ。
  * @param named ポストのメニュー用に「@acct さんをブロック」の形にする。プロフィールでは「ブロック」だけ。
  * @param onAction 押されたとき。メニューを閉じる・確認するのは呼び出し側。
  */
@@ -84,6 +85,7 @@ fun AccountActionMenuItems(
     named: Boolean,
     onAction: (AccountAction) -> Unit,
     followKnown: Boolean = true,
+    hidden: Set<AccountActionType> = emptySet(),
 ) {
     val known = relationship != null
     val current = relationship ?: ProvisionalRelationship
@@ -92,7 +94,7 @@ fun AccountActionMenuItems(
         if (active) (if (named) offNamed else off) else (if (named) onNamed else on)
 
     val muting = current.muting
-    DropdownMenuItem(
+    if (AccountActionType.Mute !in hidden) DropdownMenuItem(
         text = {
             val res = label(
                 R.string.account_mute, R.string.account_mute_named,
@@ -108,7 +110,7 @@ fun AccountActionMenuItems(
     )
     val blocking = current.blocking
     val error = MaterialTheme.colorScheme.error
-    DropdownMenuItem(
+    if (AccountActionType.Block !in hidden) DropdownMenuItem(
         text = {
             val res = label(
                 R.string.account_block, R.string.account_block_named,
@@ -123,17 +125,17 @@ fun AccountActionMenuItems(
         colors = if (!known) MenuDefaults.itemColors() else MenuDefaults.itemColors(textColor = error, leadingIconColor = error),
     )
     // ブーストの非表示はフォロー中の相手にだけ意味がある (フォローし直す形で変えるので、フォロー外ではフォローになってしまう)
-    val hidden = current.isOn(AccountActionType.HideBoosts)
-    DropdownMenuItem(
+    val boostsHidden = current.isOn(AccountActionType.HideBoosts)
+    if (AccountActionType.HideBoosts !in hidden) DropdownMenuItem(
         text = {
             val res = label(
                 R.string.account_hide_boosts, R.string.account_hide_boosts_named,
-                R.string.account_show_boosts, R.string.account_show_boosts_named, hidden,
+                R.string.account_show_boosts, R.string.account_show_boosts_named, boostsHidden,
             )
             MenuItemText(if (named) stringResource(res, acct) else stringResource(res))
         },
         leadingIcon = { Icon(Symbols.Outlined.Repeat, contentDescription = null) },
-        onClick = { onAction(AccountAction(AccountActionType.HideBoosts, undo = hidden)) },
+        onClick = { onAction(AccountAction(AccountActionType.HideBoosts, undo = boostsHidden)) },
         enabled = known && followKnown && current.following,
     )
 }
@@ -175,12 +177,18 @@ fun AccountActionConfirmDialog(
 
 /**
  * メニューの「ブラウザで開く」(接続中サーバのページ [localUrl]) と、リモートなら「<ホスト> で開く」(元のサーバのページ
- * [remoteUrl])。[onDismiss] はメニューを閉じる。
+ * [remoteUrl])。[onDismiss] はメニューを閉じる。[showLocal] / [showRemote] が `false` ならその項目を出さない (ポストのメニューの設定)。
  */
 @Composable
-fun OpenInBrowserMenuItems(localUrl: String, remoteUrl: String?, onDismiss: () -> Unit) {
+fun OpenInBrowserMenuItems(
+    localUrl: String,
+    remoteUrl: String?,
+    onDismiss: () -> Unit,
+    showLocal: Boolean = true,
+    showRemote: Boolean = true,
+) {
     val uriHandler = LocalUriHandler.current
-    DropdownMenuItem(
+    if (showLocal) DropdownMenuItem(
         text = { MenuItemText(stringResource(R.string.menu_open_in_browser)) },
         leadingIcon = { Icon(Symbols.Outlined.OpenInBrowser, contentDescription = null) },
         onClick = {
@@ -188,6 +196,7 @@ fun OpenInBrowserMenuItems(localUrl: String, remoteUrl: String?, onDismiss: () -
             uriHandler.openUri(localUrl)
         },
     )
+    if (!showRemote) return
     val remote = remoteUrl ?: return
     val host = webHostOf(remote) ?: return
     DropdownMenuItem(

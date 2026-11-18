@@ -23,6 +23,10 @@ data class AppSettings(
      * 作り直さずメタデータだけを除く (HEIC 等それができない形式は作り直す)。既定はオフ。
      */
     val stripImageMetadata: Boolean = false,
+    /**
+     * ポストのメニュー (︙) に出さない項目。出す方ではなく出さない方を持つのは、後から項目を足したときに既定で出るようにするため。
+     */
+    val hiddenPostMenuItems: Set<PostMenuItem> = emptySet(),
     val predictiveBack: PredictiveBackSettings = PredictiveBackSettings(),
     val translation: TranslationSettings = TranslationSettings(),
 )

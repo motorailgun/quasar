@@ -15,6 +15,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
+import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
 import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.TranslationMode
@@ -46,6 +47,7 @@ class SettingsPreferencesTest {
         streaming = StreamingSettings(home = false, notifications = false, local = false, global = true),
         confirmations = setOf(ConfirmTarget.Post, ConfirmTarget.Unboost),
         defaultVisibility = PostVisibility.Private,
+        hiddenPostMenuItems = setOf(PostMenuItem.OpenInBrowser, PostMenuItem.HideBoosts),
         predictiveBack = PredictiveBackSettings(maxDragFraction = 0.5f, dragLogSteepness = 5f, transitionMillis = 200),
         translation = TranslationSettings(
             enabled = true,
@@ -130,6 +132,7 @@ class SettingsPreferencesTest {
             floatPreferencesKey("ui_scale") to 3f,
             floatPreferencesKey("font_scale") to 0f,
             stringSetPreferencesKey("confirm_targets") to setOf("Boost", "Removed"),
+            stringSetPreferencesKey("hidden_post_menu_items") to setOf("Block", "Removed"),
             booleanPreferencesKey("stream_local") to false,
             floatPreferencesKey("predictive_back_max_drag_fraction") to 0f,
             intPreferencesKey("predictive_back_transition_millis") to 0,
@@ -142,6 +145,8 @@ class SettingsPreferencesTest {
         assertEquals(PredictiveBackSettings(), settings.predictiveBack)
         // 個別のキーで持つもの (既定でオン) はキーが無いので既定値
         assertEquals(setOf(ConfirmTarget.Boost) + DefaultConfirmations, settings.confirmations)
+        // 知らない項目は捨てる
+        assertEquals(setOf(PostMenuItem.Block), settings.hiddenPostMenuItems)
         // 読める項目はそのまま
         assertEquals(false, settings.streaming.local)
     }

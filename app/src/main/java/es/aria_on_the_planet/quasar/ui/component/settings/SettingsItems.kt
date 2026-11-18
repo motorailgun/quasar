@@ -261,7 +261,7 @@ fun <T> SettingsDropdownItem(
     )
 }
 
-/** オン / オフの項目。行のどこを押しても切り替わる。 */
+/** オン / オフの項目。行のどこを押しても切り替わる。[icon] は項目が何か (メニューの項目等) を絵で示したいとき。 */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsSwitchItem(
@@ -271,6 +271,7 @@ fun SettingsSwitchItem(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    icon: ImageVector? = null,
 ) {
     SegmentedListItem(
         checked = checked,
@@ -279,6 +280,7 @@ fun SettingsSwitchItem(
         colors = itemColors(),
         modifier = modifier,
         enabled = enabled,
+        leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         supportingContent = Summary(summary),
         trailingContent = { SettingsSwitch(checked, onCheckedChange = null, enabled = enabled) },
         content = { Text(title) },

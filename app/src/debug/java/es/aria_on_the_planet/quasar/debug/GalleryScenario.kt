@@ -38,6 +38,11 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
      * ポスト詳細の本体 (`reactionDetail`: 「N boosts」「M favourites」)。アイコンで操作 (手元だけ)、件数のタップで
      * リアクションしたユーザーの一覧 (ユーザーは post-variety の投稿者)。
      */
+    /**
+     * 設定の「タイムライン」のページと、そこから開く「ポストのメニュー」(本物の設定に書く。項目を変えて post-variety の︙で確かめる)。
+     * 固定データは使わない (post-variety を指しているだけ)。
+     */
+    TimelineSettings("timeline-settings", R.string.gallery_timeline_settings, "post-variety.json"),
     PostDetail("post-detail", R.string.gallery_post_detail, "post-variety.json"),
     /** オンデバイス翻訳 (PLaMo 3 Translate + llama.cpp)。原文の例は Mastodon の形の HTML (メンション・ハッシュタグ等)。[TranslationGallery]。 */
     Translation("translation", R.string.gallery_translation, "translation.json"),

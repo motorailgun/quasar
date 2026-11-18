@@ -15,6 +15,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import es.aria_on_the_planet.quasar.domain.model.Relationship
@@ -47,9 +48,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.QuasarApplication
+import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
+import es.aria_on_the_planet.quasar.ui.component.post.LocalOwnPostActions
 import es.aria_on_the_planet.quasar.ui.component.composer.EmojiPicker
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
@@ -138,7 +143,12 @@ class DebugGalleryActivity : ComponentActivity() {
                     GalleryNavigator(context, backStack, onExit = ::finish)
                 }
                 val accountActions = remember { GalleryAccountActions() }
-                CompositionLocalProvider(LocalNavigator provides navigator, LocalAccountActions provides accountActions) {
+                val ownPostActions = remember { GalleryOwnPostActions(context) }
+                CompositionLocalProvider(
+                    LocalNavigator provides navigator,
+                    LocalAccountActions provides accountActions,
+                    LocalOwnPostActions provides ownPostActions,
+                ) {
                     NavDisplay(
                         backStack = backStack,
                         onBack = navigator::back,
@@ -338,6 +348,26 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
         TranslationLanguagesGallery(onBack)
         return
     }
+    if (scenario == GalleryScenario.TimelineSettings) {
+        // 本物の設定を読み書きする (アプリの設定画面と同じ)
+        val store = (context.applicationContext as QuasarApplication).container.settingsStore
+        val settings by store.settings.collectAsStateWithLifecycle()
+        // 「ポストのメニュー」はこの中で切り替える (ギャラリーの画面遷移には積まない)
+        var postMenuOpen by rememberSaveable { mutableStateOf(false) }
+        settings?.let {
+            if (postMenuOpen) {
+                PostMenuSettingsPage(it.hiddenPostMenuItems, store::launchUpdate, onBack = { postMenuOpen = false })
+            } else {
+                TimelineSettingsPage(
+                    it,
+                    store::launchUpdate,
+                    onNavigate = { route -> if (route == Route.SettingsPostMenu) postMenuOpen = true },
+                    onBack = onBack,
+                )
+            }
+        }
+        return
+    }
     if (scenario == GalleryScenario.QuickPostBar) {
         QuickPostBarGallery(remember(text) { GalleryFixtures.posts(text) }, onBack)
         return
@@ -442,6 +472,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
 
             GalleryScenario.AccountReactions,
             GalleryScenario.QuickPostBar,
+            GalleryScenario.TimelineSettings,
             GalleryScenario.PostDetail,
             GalleryScenario.Translation,
             GalleryScenario.TranslationLanguages,

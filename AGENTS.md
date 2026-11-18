@@ -481,8 +481,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
     出す)、他人のポストなら「ミュート」・「ブロック」/「ブロックを解除」(どちらも error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
     (`domain/model/WebPage.kt`、`WebPageTest`)。
+  * 項目は設定 (Timelines →「ポストのメニュー」のページ、`Route.SettingsPostMenu`) で 1 つずつ出さないようにできる (`AppSettings.hiddenPostMenuItems`。出さない方を
+    持つので、後から足した項目は既定で出る)。`QuasarAppContent` が `LocalHiddenPostMenuItems` で渡し、そのポストに出る項目は純粋関数
+    `visiblePostMenuItems` (`domain/model/settings/PostMenuItems.kt`、`PostMenuItemsTest`) で決める。1 つも無ければ︙自体を出さない。
+    プロフィールのメニューには効かない。項目を足すときは `PostMenuItem` と設定画面 (`PostMenuSettingsPage`) にも足す。
   * 操作の口は `LocalAccountActions` (`ui/component/account/AccountActions.kt`、`QuasarNavHost` が `SessionAccountActions` を
-    提供)。無い所ではメニュー自体を出さない (ギャラリーは手元だけで関係を持つ `GalleryAccountActions` を提供)。関係はメニューを開くたびに読む (キャッシュが新しければそれ)。
+    提供)。無い所ではメニュー自体を出さない (ギャラリーは手元だけで関係を持つ `GalleryAccountActions` を提供。固定データの carol (ID `3`) を自分として扱う)。関係はメニューを開くたびに読む (キャッシュが新しければそれ)。
   * 読み込みの前後でメニューの高さを変えない: 項目 (ミュート・ブロック・ブーストの非表示) は常に 3 つ出し、使えないものは
     グレーアウトする (`AccountActionMenuItems`)。読み込むまでは仮の関係 (`ProvisionalRelationship`: ブロック・ミュートしていない)
     でミュート・ブロックを押せるようにしておく (ミュート・ブロックの API は済みでも成功するので先に押されても困らない)。ブーストの
@@ -751,7 +755,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * **自分のポストの編集・削除**: ポストのメニュー (`PostMenu`) は、自分のポスト (`AccountActions.myAccountId` = `fetchMe` の ID、
     まだなら関係の読み込みの `AccountMenuTarget.Me`) なら、**どの画面 (タイムライン・プロフィール・ハッシュタグ・通知・詳細) でも**
     編集 / error 色の削除 + ブラウザで開く・本文をコピーを出す。口は `LocalOwnPostActions` (`ui/component/post/OwnPostActions.kt`、
-    `QuasarNavHost` が `SessionOwnPostActions` を提供。無い所 = ギャラリーでは出さない)。中身はアプリ全体で 1 つの
+    `QuasarNavHost` が `SessionOwnPostActions` を提供。無い所では出さない。ギャラリーは押すと Toast を出すだけの `GalleryOwnPostActions`)。中身はアプリ全体で 1 つの
     `PostEditStore` (`AppContainer.postEditStore`、`ui/composer/`)。準備・削除の最中は︙が読み込み中になる。
     * 編集: `PostEditStore.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
       を作る。**`DraftStore` の下書きとは別**で、`QuasarNavHost` が全画面の上に `PostEditorHost` で `ComposerScreen` を下から重ねる。中身は純粋関数 `editDraftOf`
@@ -1189,7 +1193,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 
 ## 設定
 
-* 設定全体は `AppSettings` (`domain/model/settings/`): 翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
+* 設定全体は `AppSettings` (`domain/model/settings/`): ポストのメニューに出さない項目 (`hiddenPostMenuItems`)・翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
   設定画面に出る)・表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
   (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
   アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
@@ -1233,7 +1237,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * **新しい投稿の公開範囲**: `ComposerSession` が「設定 → アカウントの既定」の順で入れる。最後に自動で入れた値
   (`appliedVisibility`) から変わっていたら (ユーザーが選び直した・返信で狭めた) 触らない。設定を変えたときも同様に追従する。
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
-  (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` /
+  (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` / `SettingsPostMenu` /
   `SettingsPosting` / `SettingsConfirmations` / `SettingsExperimental` (実験的機能。今は翻訳の入口だけで、翻訳の無いビルドでは出さない)) は他の画面と同じバックスタックに積む。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
@@ -1343,7 +1347,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / post-detail (ポスト詳細の本体を
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定の Timelines のページと、そこから開く Post menu のページ。本物の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる) /
+  post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
   translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
   translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ)。

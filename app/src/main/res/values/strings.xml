@@ -348,7 +348,7 @@
     <string name="settings_display">Display</string>
     <string name="settings_display_summary">Layout, long posts, avatar shape, blur, animation</string>
     <string name="settings_timelines">Timelines</string>
-    <string name="settings_timelines_summary">Auto-update, notifications</string>
+    <string name="settings_timelines_summary">Post menu, auto-update, notifications</string>
     <string name="settings_posting">Posting</string>
     <string name="settings_posting_summary">Default visibility, confirm before posting, images</string>
     <string name="settings_confirmations">Confirmations</string>
@@ -405,6 +405,11 @@
     <string name="settings_notification_api_grouped_description">Similar notifications are combined by the server (Mastodon 4.3 or later)</string>
     <string name="settings_notification_api_ungrouped">Individual</string>
     <string name="settings_notification_api_ungrouped_description">Every notification on its own row</string>
+    <string name="settings_post_menu">Post menu</string>
+    <string name="settings_post_menu_summary">Choose which items to show</string>
+    <string name="settings_post_menu_open_on_server">Open on the original server</string>
+    <string name="settings_post_menu_own">My posts</string>
+    <string name="settings_post_menu_others">Other posts</string>
 
     <string name="settings_default_visibility">Default visibility</string>
     <string name="settings_visibility_account_default">Account default</string>

@@ -13,6 +13,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
+import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
@@ -198,6 +199,14 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
                 enumOrNull<PostVisibility>(stored)?.takeIf { it in DefaultVisibilityChoices }?.let(::Decoded)
             }
         },
+    ),
+    SettingField(
+        stringSetPreferencesKey("hidden_post_menu_items"),
+        { it.hiddenPostMenuItems },
+        { s, v -> s.copy(hiddenPostMenuItems = v) },
+        encode = { items -> items.mapTo(HashSet()) { it.name } },
+        // 知らない名前 (将来消した項目等) は捨てる
+        decode = { names -> Decoded(names.mapNotNullTo(HashSet()) { enumOrNull<PostMenuItem>(it) }) },
     ),
     boolean("compress_oversized_images", { it.compressOversizedImages }) { s, v -> s.copy(compressOversizedImages = v) },
     boolean("strip_image_metadata", { it.stripImageMetadata }) { s, v -> s.copy(stripImageMetadata = v) },

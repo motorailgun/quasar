@@ -325,7 +325,7 @@
     <string name="settings_display">表示</string>
     <string name="settings_display_summary">レイアウト・長い投稿・アイコンの形・ぼかし・アニメーション</string>
     <string name="settings_timelines">タイムライン</string>
-    <string name="settings_timelines_summary">自動更新・通知</string>
+    <string name="settings_timelines_summary">ポストのメニュー・自動更新・通知</string>
     <string name="settings_posting">投稿</string>
     <string name="settings_posting_summary">既定の公開範囲・投稿前の確認・画像</string>
     <string name="settings_confirmations">確認</string>
@@ -378,6 +378,11 @@
     <string name="settings_notification_api_grouped_description">似た通知をサーバーがまとめます (Mastodon 4.3 以降)</string>
     <string name="settings_notification_api_ungrouped">個別</string>
     <string name="settings_notification_api_ungrouped_description">通知を 1 件ずつ表示します</string>
+    <string name="settings_post_menu">ポストのメニュー</string>
+    <string name="settings_post_menu_summary">表示する項目を選ぶ</string>
+    <string name="settings_post_menu_open_on_server">元のサーバーで開く</string>
+    <string name="settings_post_menu_own">自分の投稿</string>
+    <string name="settings_post_menu_others">他の人の投稿</string>
 
     <string name="settings_default_visibility">既定の公開範囲</string>
     <string name="settings_visibility_account_default">アカウントの既定</string>

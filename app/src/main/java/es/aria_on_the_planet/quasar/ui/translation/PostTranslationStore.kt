@@ -121,6 +121,9 @@ class PostTranslationStore(
     /** 推定している statusId。 */
     private val detecting = HashSet<String>()
 
+    /** [clearResults] のたびに増える (それより前に始めた推定の結果を捨てる)。 */
+    private var detectionGeneration = 0
+
     /**
      * 端末の言語 ([deviceLanguageTags])。ポストを組み立てるたびに読み直さないよう覚えておき、構成が変わったら
      * ([onConfigurationChanged]) 読み直す。
@@ -207,10 +210,12 @@ class PostTranslationStore(
         val detected = detectedLanguages[post.statusId]
         if (detected != null && detected.text == post.text && detected.contentWarning == post.contentWarning) return detected.language
         if (detecting.add(post.statusId)) {
+            val generation = detectionGeneration
             // 組み立て (composition) の中から呼ばれるので、結果は後で Main で書く
             scope.launch(Dispatchers.Default) {
                 val language = detectPostLanguage(post, languageDetector)
                 withContext(Dispatchers.Main) {
+                    if (generation != detectionGeneration) return@withContext
                     detecting.remove(post.statusId)
                     if (post.statusId !in detectedLanguages) {
                         detectedOrder.addLast(post.statusId)
@@ -252,6 +257,18 @@ class PostTranslationStore(
         // 押したものはメモリが足りないと言われた後の待ちを切り上げて訳す
         cooldown?.cancel()
         wake.trySend(Unit)
+    }
+
+    /**
+     * 使っているアカウントが変わった。訳と言語の推定の結果を捨てる (statusId はサーバの中でしか一意でないので、別のサーバの
+     * 同じ ID のポストに当たりうる)。推定している途中のものの結果も捨てる。
+     */
+    fun clearResults() {
+        reset()
+        detectedLanguages.clear()
+        detectedOrder.clear()
+        detecting.clear()
+        detectionGeneration++
     }
 
     /** 構成が変わった (`onConfigurationChanged`)。端末・アプリの言語が変わったら、訳す先が変わりうるので作り直す。 */

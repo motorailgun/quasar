@@ -129,16 +129,101 @@ class AccountStoreTest {
     }
 
     @Test
-    fun accountsWithoutIdAreNotMerged() {
-        // 移したアカウントは fetchMe まで ID が無いので、同じアカウントでも別に足される
+    fun migratedAccountWithoutIdIsReusedOnceTheIdIsFilled() {
+        // 移したアカウントは fetchMe まで ID が無い。ログインの前に ID を埋めれば (OAuthLogin)、同じアカウントは足さずに差し替える
+        val storage = MemoryStore(mapOf("session" to """{"serverUrl":"https://a.example","accessToken":"t1"}"""))
+        val store = store(storage)
+        assertEquals(listOf(AccountKey("a")), store.state.value.withoutIdOn("https://a.example/").map { it.key })
+        store.updateProfile(AccountKey("a"), "1", profile)
+        assertTrue(store.state.value.withoutIdOn("https://a.example").isEmpty())
+        val again = store.addLogin("https://a.example", "t2", client, "1", null)
+        assertEquals(AccountKey("a"), again.account.key)
+        assertEquals("t1", again.replaced?.accessToken)
+        assertEquals(1, store.state.value.accounts.size)
+    }
+
+    @Test
+    fun accountsToResolveAreOnlyThoseWithoutIdOnTheSameServer() {
+        val accounts = StoredAccounts(
+            listOf(
+                StoredAccount(AccountKey("a"), "https://a.example", "t1"),
+                StoredAccount(AccountKey("b"), "https://A.example/", "t2"),
+                StoredAccount(AccountKey("c"), "https://a.example", "t3", accountId = "3"),
+                StoredAccount(AccountKey("d"), "https://b.example", "t4"),
+            ),
+        )
+        assertEquals(listOf(AccountKey("a"), AccountKey("b")), accounts.withoutIdOn("https://a.example").map { it.key })
+        assertEquals(listOf(AccountKey("d")), accounts.withoutIdOn("https://b.example").map { it.key })
+        assertTrue(accounts.withoutIdOn("https://c.example").isEmpty())
+    }
+
+    @Test
+    fun reloginReplacesTheTokenOnTheSameKey() {
+        val storage = MemoryStore()
+        val store = store(storage)
+        store.addLogin("https://a.example", "t1", client, "1", profile)
+        store.addLogin("https://b.example", "t2", client, "2", null)
+        val newClient = OAuthClient("id2", "secret2")
+        val result = store.relogin(AccountKey("a"), "https://a.example/", "t3", newClient, "1", null)
+        result as ReloginResult.Replaced
+        assertEquals("t1", result.replaced.accessToken)
+        // キーはそのまま (設定・キャッシュが残る)、使うアカウントになる。表示用の情報は残す
+        assertEquals(listOf(AccountKey("a"), AccountKey("b")), store.state.value.accounts.map { it.key })
+        val active = store.active.value!!
+        assertEquals(AccountKey("a"), active.key)
+        assertEquals("t3", active.accessToken)
+        assertEquals(newClient, active.client)
+        assertEquals(profile, active.profile)
+        assertEquals(store.state.value, store(storage).state.value)
+    }
+
+    @Test
+    fun reloginAsAnotherAccountChangesNothing() {
+        val store = store()
+        store.addLogin("https://a.example", "t1", client, "1", profile)
+        val before = store.state.value
+        assertEquals(ReloginResult.DifferentAccount, store.relogin(AccountKey("a"), "https://a.example", "t2", client, "9", null))
+        assertEquals(ReloginResult.DifferentAccount, store.relogin(AccountKey("a"), "https://b.example", "t2", client, "1", null))
+        assertEquals(ReloginResult.Missing, store.relogin(AccountKey("x"), "https://a.example", "t2", client, "1", null))
+        assertEquals(before, store.state.value)
+    }
+
+    @Test
+    fun reloginFillsTheIdOfAMigratedAccount() {
+        val storage = MemoryStore(mapOf("session" to """{"serverUrl":"https://a.example","accessToken":"t1"}"""))
+        val store = store(storage)
+        val result = store.relogin(AccountKey("a"), "https://a.example", "t2", client, "1", profile)
+        assertTrue(result is ReloginResult.Replaced)
+        assertEquals("1", store.active.value?.accountId)
+        assertEquals("t2", store.active.value?.accessToken)
+    }
+
+    @Test
+    fun reloginOfAMigratedAccountIntoAnAlreadyAddedOneIsRejected() {
+        // 移したアカウント (ID 無し) にログインし直したら、既に足してある別のキーと同じアカウントだった
         val storage = MemoryStore(mapOf("session" to """{"serverUrl":"https://a.example","accessToken":"t1"}"""))
         val store = store(storage)
         store.addLogin("https://a.example", "t2", client, "1", null)
-        assertEquals(2, store.state.value.accounts.size)
-        // ID が埋まれば次のログインからは同じアカウントとして扱う
-        store.updateProfile(AccountKey("a"), "1", profile)
-        val again = store.addLogin("https://a.example", "t3", client, "1", null)
-        assertEquals(AccountKey("a"), again.account.key)
+        val before = store.state.value
+        assertEquals(ReloginResult.AlreadyAdded, store.relogin(AccountKey("a"), "https://a.example", "t3", client, "1", null))
+        assertEquals(before, store.state.value)
+    }
+
+    @Test
+    fun switchingChangesOnlyTheActiveAccount() {
+        val storage = MemoryStore()
+        val store = store(storage)
+        store.addLogin("https://a.example", "t1", client, "1", null)
+        store.addLogin("https://b.example", "t2", client, "2", null)
+        val accounts = store.state.value.accounts
+        store.setActive(AccountKey("a"))
+        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(accounts, store.state.value.accounts)
+        // 保存される (次の起動はこのアカウントから)
+        assertEquals(AccountKey("a"), store(storage).active.value?.key)
+        // 一覧に無いキーには切り替えない
+        store.setActive(AccountKey("x"))
+        assertEquals(AccountKey("a"), store.active.value?.key)
     }
 
     @Test
@@ -162,7 +247,7 @@ class AccountStoreTest {
     fun updateProfileIsSavedAndEmitted() {
         val storage = MemoryStore()
         val store = store(storage)
-        store.addLogin("https://a.example", "t1", client, null, null)
+        store.addLogin("https://a.example", "t1", client, "1", null)
         store.updateProfile(AccountKey("a"), "1", profile)
         assertEquals("1", store.active.value?.accountId)
         assertEquals(profile, store.active.value?.profile)

@@ -78,6 +78,7 @@ import kotlinx.coroutines.launch
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     drafts: DraftStore,
+    accounts: DrawerAccounts? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -153,6 +154,13 @@ fun TimelineScreen(
         drawerContent = {
             TimelineDrawerSheet(
                 account = account,
+                accounts = accounts?.let { accounts ->
+                    // 切り替え・追加はドロワーを閉じてから (切り替えは画面ごと作り直すので閉じるのを待たない)
+                    accounts.copy(onAdd = {
+                        accounts.onAdd()
+                        scope.launch { drawerState.close() }
+                    })
+                },
                 onOpenProfile = { user ->
                     navigator.openProfile(user)
                     scope.launch { drawerState.close() }

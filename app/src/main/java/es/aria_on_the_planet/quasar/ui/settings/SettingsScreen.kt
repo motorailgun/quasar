@@ -44,7 +44,8 @@ typealias UpdateDeviceSettings = ((DeviceSettings) -> DeviceSettings) -> Unit
 typealias UpdateAccountSettings = ((AccountSettings) -> AccountSettings) -> Unit
 
 /**
- * トップ: 「アカウントの設定」(使っているアカウントのもの) と「アプリの設定」(端末共通) の各ページへの入口 + ログアウト。
+ * トップ: 「アカウントの設定」(使っているアカウントのもの) と「アプリの設定」(端末共通) の各ページへの入口 + ログインし直す・
+ * ログアウト。
  * ログアウトは設定に関わらず必ず確認する。
  *
  * @param account 使っているアカウント (`@acct@host`、まだ分からなければサーバのホスト)。見出しとログアウトの補足に出す。
@@ -58,6 +59,7 @@ fun SettingsTopPage(
     onNavigate: (Route) -> Unit,
     onLogout: () -> Unit,
     onBack: () -> Unit,
+    onRelogin: () -> Unit = {},
 ) {
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
     SettingsScaffold(title = stringResource(R.string.settings), onBack = onBack) {
@@ -116,6 +118,13 @@ fun SettingsTopPage(
         }
         if (account != null) {
             SettingsGroup(title = null) {
+                // 設定・キャッシュ・下書きはそのままでトークンだけ取り直す (無効になったとき等)。除くのはログアウトだけ
+                SettingsActionItem(
+                    title = stringResource(R.string.relogin),
+                    summary = stringResource(R.string.relogin_summary),
+                    icon = Symbols.Outlined.Refresh,
+                    onClick = onRelogin,
+                )
                 SettingsActionItem(
                     title = stringResource(R.string.logout),
                     summary = account,

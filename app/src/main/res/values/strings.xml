@@ -3,6 +3,7 @@
     <string name="logout">Log out</string>
     <string name="logout_confirm_title">Log out?</string>
     <string name="logout_confirm_message">You\'ll need to log in again from your browser to use this account.</string>
+    <string name="add_account">Add account</string>
     <string name="login_description">Log in with your Mastodon account. Your server\'s login page will open in the browser.</string>
     <string name="login_server">Server</string>
     <string name="login_submit">Log in</string>
@@ -12,6 +13,13 @@
     <string name="login_error_denied">Authorization was denied.</string>
     <string name="login_error_invalid_response">The login response was invalid. Please try again.</string>
     <string name="login_error_no_browser">No browser is available to open the login page.</string>
+    <string name="relogin">Log in again</string>
+    <string name="relogin_summary">Keeps this account\'s settings and drafts</string>
+    <string name="relogin_description">Log in again as %1$s. Settings and drafts for this account are kept.</string>
+    <string name="login_error_existing_needs_login">%1$s, already added to Quasar, needs to log in again before another account on the same server can be added. Switch to it and choose “Log in again” in Settings, or log it out.</string>
+    <string name="login_error_existing_unavailable">%1$s, already added to Quasar, can\'t be used on the server right now (it may be disabled, awaiting approval or have an unconfirmed e-mail address). Switch to it and choose “Log in again” in Settings, or log it out.</string>
+    <string name="login_error_different_account">You logged in as a different account. Log in as %1$s.</string>
+    <string name="login_error_already_added">This account has already been added.</string>
     <string name="timeline_home">Home</string>
     <string name="timeline_local">Local</string>
     <string name="timeline_global">Global</string>

@@ -92,15 +92,15 @@ private fun ShareScreen(
     onPublished: () -> Unit,
     onOpenApp: () -> Unit,
 ) {
-    val account by container.currentAccount.collectAsStateWithLifecycle()
-    val current = account
+    // 使っているアカウントで投稿する (開いている間に切り替わったら、そのアカウントの下書きを作り直す)
+    val active by container.accountManager.active.collectAsStateWithLifecycle()
+    val current = active?.context
     if (current == null) {
         NotLoggedIn(onClose = onClose, onOpenApp = onOpenApp)
         return
     }
-    val session = current.account.session
     val viewModel: ShareViewModel = viewModel(
-        key = "${session.serverUrl}|${session.accessToken.hashCode()}",
+        key = "${active?.key}#${active?.generation}",
         factory = viewModelFactory {
             initializer {
                 ShareViewModel(

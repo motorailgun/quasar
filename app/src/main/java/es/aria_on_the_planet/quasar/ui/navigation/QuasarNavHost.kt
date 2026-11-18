@@ -31,6 +31,9 @@ import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
 import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.data.account.AccountContext
+import es.aria_on_the_planet.quasar.data.account.AccountKey
+import es.aria_on_the_planet.quasar.data.account.StoredAccount
+import es.aria_on_the_planet.quasar.data.account.customEmoji
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -59,6 +62,7 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostsViewModel
 import es.aria_on_the_planet.quasar.ui.search.SearchScreen
 import es.aria_on_the_planet.quasar.ui.search.SearchViewModel
 import es.aria_on_the_planet.quasar.ui.login.LoginScreen
+import es.aria_on_the_planet.quasar.ui.login.ReloginTarget
 import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
@@ -87,6 +91,8 @@ import es.aria_on_the_planet.quasar.ui.component.post.LocalPostTranslations
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.UpdateAccountSettings
 import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
+import es.aria_on_the_planet.quasar.ui.timeline.DrawerAccount
+import es.aria_on_the_planet.quasar.ui.timeline.DrawerAccounts
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.flow.Flow
@@ -96,28 +102,32 @@ import kotlinx.coroutines.flow.emptyFlow
  * アプリの全画面。画面の行き来は Navigation 3 のバックスタック ([Route]) で、Activity は MainActivity 1 つ。
  * 画面 (`ProfileScreen` 等) へのコールバックは [Navigator] から組み立て、画面の中では [LocalNavigator] でも引ける。
  *
- * * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。
+ * * アカウントごとに作り直される (MainActivity の `AccountScope`)。ログイン中は `[Timeline]`、ログアウト中は `[Login]` から始まる。
+ *   アカウントの追加はログイン中に `Login` を積み、ログインできたら使うアカウントが変わって作り直される。
  * * ViewModel・`rememberSaveable` は画面 (エントリ) ごと。下に積まれた画面はコンポジションから外れる
  *   (ストリーミング・インライン再生は今までの「別の Activity を開くと止まる」と同じく止まる)。
  * * ログイン中のアカウントの依存 ([AccountUiContext]) を各画面に渡す。ViewModel にはそのデータ層の分 ([AccountContext]) を渡し、
  *   ViewModel は寿命の間ずっと同じものを使う。
  * * 書きかけの投稿 (`DraftStore`) はアカウントごとにここで開く (どの画面から復元されても使えるように)。
  *
+ * @param account 使っているアカウントの依存 (ログアウト中は `null`)。作り直されるまで変わらない。
  * @param externalLinks 他のアプリから「Quasar で開く」に共有された URL・`@user@domain` (`linkQueryOf`)。
  *   今の画面の上に開く (ログアウト中なら Toast)。
  * @param onExit 一番下の画面で「戻る」(Activity を閉じる)。
  */
 @Composable
-fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFlow(), onExit: () -> Unit) {
-    val account by container.currentAccount.collectAsStateWithLifecycle()
+fun QuasarNavHost(
+    container: AppContainer,
+    account: AccountUiContext?,
+    externalLinks: Flow<String> = emptyFlow(),
+    onExit: () -> Unit,
+) {
     val current = account
     val backStack = rememberNavBackStack(if (current == null) Route.Login else Route.Timeline)
 
-    // ログイン・ログアウトでバックスタックを作り直す (状態から決めるので、復元時に余計な作り直しはしない)
-    val loggedIn = current != null
-    LaunchedEffect(loggedIn) {
-        val wrongRoot = if (loggedIn) Route.Login in backStack else backStack.toList() != listOf(Route.Login)
-        if (wrongRoot) backStack.resetTo(if (loggedIn) Route.Timeline else Route.Login)
+    // ログアウト中はログインの画面だけ (復元した状態が別の形でも直す)
+    LaunchedEffect(current) {
+        if (current == null && backStack.toList() != listOf(Route.Login)) backStack.resetTo(Route.Login)
     }
     LaunchedEffect(current) {
         if (current != null) {
@@ -129,7 +139,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     val context = LocalContext.current
     LaunchedEffect(externalLinks) {
         externalLinks.collect { query ->
-            if (container.currentAccount.value == null) {
+            if (current == null) {
                 Toast.makeText(context, R.string.open_link_not_logged_in, Toast.LENGTH_SHORT).show()
             } else {
                 // タグのページは検索では引けないので URL から直接開く。同じものを続けて共有されたら積まない
@@ -181,8 +191,24 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
                 popTransitionSpec = { popTransition() },
                 predictivePopTransitionSpec = { predictivePopTransition(backDamping.settings.transitionMillis) },
                 entryProvider = entryProvider {
-                    entry<Route.Login> { LoginScreen(container.oauthLogin) }
-                    entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
+                    entry<Route.Login> {
+                        // ログイン中なら追加のログイン (戻るボタンで今のアカウントに戻る)
+                        LoginScreen(container.oauthLogin, onBack = if (current != null) navigator::back else null)
+                    }
+                    entry<Route.Relogin> {
+                        WithSession(current) { account ->
+                            val stored by container.accountStore.state.collectAsStateWithLifecycle()
+                            val target = stored.find(account.account.key)
+                            LoginScreen(
+                                container.oauthLogin,
+                                onBack = navigator::back,
+                                relogin = target?.let { ReloginTarget(it.key, it.serverUrl, it.label) },
+                            )
+                        }
+                    }
+                    entry<Route.Timeline> {
+                        WithSession(current) { TimelineEntry(container, it, onAddAccount = { backStack.add(Route.Login) }) }
+                    }
                     entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
                     entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(it, key, navigator) } }
                     entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(it, key, navigator) } }
@@ -217,7 +243,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     }
 }
 
-/** ログイン中だけ中身を出す (ログアウト直後、バックスタックを作り直すまでの間は何も出さない)。 */
+/** ログイン中だけ中身を出す (ログアウト中に復元されたエントリは、バックスタックを作り直すまで何も出さない)。 */
 @Composable
 private fun WithSession(account: AccountUiContext?, content: @Composable (AccountUiContext) -> Unit) {
     if (account != null) content(account)
@@ -308,10 +334,8 @@ private class BackStackNavigator(
 }
 
 @Composable
-private fun TimelineEntry(container: AppContainer, account: AccountUiContext) {
-    val session = account.account.session
+private fun TimelineEntry(container: AppContainer, account: AccountUiContext, onAddAccount: () -> Unit) {
     val viewModel: TimelineViewModel = viewModel(
-        key = "${session.serverUrl}|${session.accessToken.hashCode()}",
         factory = viewModelFactory {
             initializer {
                 TimelineViewModel(
@@ -321,11 +345,40 @@ private fun TimelineEntry(container: AppContainer, account: AccountUiContext) {
             }
         },
     )
+    // ドロワーの他のアカウント (仮の UI。段階 6 で作り直す)
+    val stored by container.accountStore.state.collectAsStateWithLifecycle()
+    val accountManager = container.accountManager
+    val switcher = remember(stored, account) {
+        DrawerAccounts(
+            others = stored.accounts.filter { it.key != account.account.key }.map { it.toDrawerAccount() },
+            onSwitch = { key -> accountManager.switchTo(AccountKey(key)) },
+            onAdd = onAddAccount,
+        )
+    }
     TimelineScreen(
         viewModel = viewModel,
         drafts = account.draftStore,
+        accounts = switcher,
     )
 }
+
+/** ドロワーの切り替えの一覧の 1 行 (表示用の情報がまだ無ければサーバだけ)。 */
+private fun StoredAccount.toDrawerAccount(): DrawerAccount = DrawerAccount(
+    key = key.value,
+    user = profile?.let { profile ->
+        User(
+            inServerId = accountId.orEmpty(),
+            screenName = profile.acct,
+            displayName = profile.displayName,
+            serverUrl = serverUrl,
+            iconUrl = profile.avatarUrl,
+            note = "",
+            emojis = profile.emojis.map { it.customEmoji },
+            iconStaticUrl = profile.avatarStaticUrl,
+        )
+    },
+    label = label,
+)
 
 /** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアカウントのもの。 */
 @Composable
@@ -592,10 +645,11 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
     entry<Route.Settings> {
         val stored by container.accountStore.active.collectAsStateWithLifecycle()
         SettingsTopPage(
-            account = stored?.let { account -> account.fullAcct?.let { "@$it" } ?: account.host },
+            account = stored?.label,
             translationAvailable = container.postTranslations != null,
             onNavigate = navigate,
-            onLogout = container.oauthLogin::logout,
+            onLogout = container.accountManager::logoutActive,
+            onRelogin = { navigate(Route.Relogin) },
             onBack = navigator::back,
         )
     }
@@ -657,8 +711,8 @@ private fun WithAccountSettings(
     container: AppContainer,
     content: @Composable (AccountSettings, UpdateAccountSettings) -> Unit,
 ) {
-    val account by container.currentAccount.collectAsStateWithLifecycle()
-    val store = account?.account?.settings ?: return
+    val active by container.accountManager.active.collectAsStateWithLifecycle()
+    val store = active?.context?.account?.settings ?: return
     val settings by store.settings.collectAsStateWithLifecycle()
     settings?.let { content(it, store::launchUpdate) }
 }

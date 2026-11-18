@@ -12,7 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 
 /**
  * アカウント 1 つ分の UI 側の依存 (書きかけの投稿・自分のポストの編集・メニューの操作)。データ層の依存は [account]。
- * `AppContainer.currentAccount` が今のアカウントの分を持ち、`QuasarNavHost` が各画面に渡す (ViewModel には [account])。
+ * `AccountManager` がアカウントごとに持ち (切り替えても閉じずにログアウトまで)、`QuasarNavHost` が使っているアカウントの
+ * 分を各画面に渡す (ViewModel には [account])。
  * [AccountContext] は data 層 (UI のクラスを参照しない) なので、UI のものはこちらに分けている。
  *
  * @param createComposer 投稿欄を作る (`AppContainer` がサーバ・設定の依存を渡す)。

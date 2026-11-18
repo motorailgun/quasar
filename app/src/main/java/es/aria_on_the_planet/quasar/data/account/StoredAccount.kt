@@ -32,6 +32,9 @@ data class StoredAccount(
     /** `user@host` (表示用の情報がまだ無ければ `null`)。 */
     val fullAcct: String? get() = profile?.acct?.let { if ('@' in it) it else "$it@$host" }
 
+    /** 文言に出すときの名前: `@user@host` (表示用の情報がまだ無ければサーバのホスト)。 */
+    val label: String get() = fullAcct?.let { "@$it" } ?: host
+
     /** ログ・例外に出しても漏れないよう、トークン・クライアントは出さない。 */
     override fun toString(): String = "StoredAccount(key=$key, serverUrl=$serverUrl, accountId=$accountId)"
 }
@@ -76,8 +79,9 @@ data class StoredAccounts(
     fun find(key: AccountKey): StoredAccount? = accounts.firstOrNull { it.key == key }
 
     /**
-     * ログインできたアカウントを足して使うアカウントにする。同じアカウント (サーバと [accountId] が同じ。[accountId] が
-     * どちらかに無ければ別のものとして扱う) が既にあれば、足さずにトークン・クライアントを差し替える (キーは同じまま)。
+     * ログインできたアカウントを足して使うアカウントにする。同じアカウント (サーバと [accountId] が同じ) が既にあれば、足さずに
+     * トークン・クライアントを差し替える (キーは同じまま)。ログインで足すアカウントは必ず ID を持つ。同じサーバの ID の無い
+     * アカウント ([withoutIdOn]) は、呼ぶ前に ID を埋めておく (でないと同じアカウントを見分けられない)。
      *
      * @param newKey 足すときのキー (差し替えなら使わない)。
      */
@@ -85,13 +89,11 @@ data class StoredAccounts(
         serverUrl: String,
         accessToken: String,
         client: OAuthClient?,
-        accountId: String?,
+        accountId: String,
         profile: StoredProfile?,
         newKey: AccountKey,
     ): LoginResult {
-        val existing = accountId?.let { id ->
-            accounts.firstOrNull { it.accountId == id && sameServer(it.serverUrl, serverUrl) }
-        }
+        val existing = accounts.firstOrNull { it.accountId == accountId && sameServer(it.serverUrl, serverUrl) }
         if (existing != null) {
             val updated = existing.copy(
                 accessToken = accessToken,
@@ -108,6 +110,40 @@ data class StoredAccounts(
         return LoginResult(copy(accounts = accounts + added, activeKey = newKey), account = added, replaced = null)
     }
 
+    /**
+     * 保存しているアカウント [key] にログインし直した結果を当てる: 同じキーのままトークン・クライアント (・表示用の情報・ID) を
+     * 差し替え、使うアカウントにする (設定・キャッシュ・下書きはキーに結びついているので残る)。
+     *
+     * ログインし直したのが別のアカウントなら差し替えない: サーバが違う・保存している ID と違う ([ReloginResult.DifferentAccount])、
+     * ID の無い (以前の保存から移した) アカウントで、その ID が他に保存しているアカウントのもの ([ReloginResult.AlreadyAdded]。
+     * 差し替えると同じアカウントが 2 つになる)。[key] がもう無い (認可の間にログアウトした) なら [ReloginResult.Missing]。
+     */
+    fun withRelogin(
+        key: AccountKey,
+        serverUrl: String,
+        accessToken: String,
+        client: OAuthClient?,
+        accountId: String,
+        profile: StoredProfile?,
+    ): ReloginResult {
+        val target = find(key) ?: return ReloginResult.Missing
+        if (!sameServer(target.serverUrl, serverUrl)) return ReloginResult.DifferentAccount
+        if (target.accountId != null && target.accountId != accountId) return ReloginResult.DifferentAccount
+        if (accounts.any { it.key != key && it.accountId == accountId && sameServer(it.serverUrl, serverUrl) }) {
+            return ReloginResult.AlreadyAdded
+        }
+        val updated = target.copy(
+            accessToken = accessToken,
+            client = client,
+            accountId = accountId,
+            profile = profile ?: target.profile,
+        )
+        return ReloginResult.Replaced(
+            copy(accounts = accounts.map { if (it.key == key) updated else it }, activeKey = key),
+            replaced = target,
+        )
+    }
+
     /** [key] を除く。使っていたアカウントなら、残りの先頭を使う (無ければログアウト状態)。 */
     fun without(key: AccountKey): StoredAccounts {
         val remaining = accounts.filterNot { it.key == key }
@@ -115,15 +151,41 @@ data class StoredAccounts(
         return StoredAccounts(remaining, active)
     }
 
+    /** [key] に切り替える。一覧に無いキーなら何もしない。 */
+    fun withActive(key: AccountKey): StoredAccounts = if (find(key) == null) this else copy(activeKey = key)
+
     /** [key] の ID と表示用の情報を `fetchMe` の結果で置き換える。無いキーなら何もしない。 */
     fun withProfile(key: AccountKey, accountId: String, profile: StoredProfile): StoredAccounts =
         copy(accounts = accounts.map { if (it.key == key) it.copy(accountId = accountId, profile = profile) else it })
+
+    /**
+     * [serverUrl] でログインする前に ID を確かめておくアカウント: 同じサーバで ID の無いもの (以前の保存から移したものだけ。
+     * ログインで足すものは必ず ID を持つ)。ID を埋めておけば [withLogin] が同じアカウントを見分けられ、同じアカウントが
+     * 2 つ並ぶことは無い。
+     */
+    fun withoutIdOn(serverUrl: String): List<StoredAccount> =
+        accounts.filter { it.accountId == null && sameServer(it.serverUrl, serverUrl) }
 }
 
 /**
  * [StoredAccounts.withLogin] の結果。[replaced] は差し替えた前の値 (古いトークンの無効化用。新しく足したなら `null`)。
  */
 data class LoginResult(val accounts: StoredAccounts, val account: StoredAccount, val replaced: StoredAccount?)
+
+/** [StoredAccounts.withRelogin] の結果。 */
+sealed interface ReloginResult {
+    /** 差し替えた。[replaced] は差し替える前の値 (古いトークンの無効化用)。 */
+    data class Replaced(val accounts: StoredAccounts, val replaced: StoredAccount) : ReloginResult
+
+    /** ログインし直したのが別のアカウントだった (サーバか ID が違う)。 */
+    data object DifferentAccount : ReloginResult
+
+    /** ID の無いアカウントにログインし直したら、その ID は他に保存しているアカウントのものだった。 */
+    data object AlreadyAdded : ReloginResult
+
+    /** ログインし直すアカウントがもう無い。 */
+    data object Missing : ReloginResult
+}
 
 /** サーバの URL の比較 (末尾の `/` と大文字小文字の違いは同じとみなす)。 */
 private fun sameServer(a: String, b: String): Boolean = a.trimEnd('/').equals(b.trimEnd('/'), ignoreCase = true)

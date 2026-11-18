@@ -4,6 +4,7 @@ import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
+import android.util.Log
 import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.account.AccountKey
 import es.aria_on_the_planet.quasar.data.account.AccountStore
@@ -35,6 +36,7 @@ import es.aria_on_the_planet.quasar.data.translation.createTranslationEngine
 import es.aria_on_the_planet.quasar.ui.translation.PostTranslationStore
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.ui.account.AccountManager
 import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.EditTarget
@@ -45,18 +47,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import okhttp3.OkHttpClient
 
 /**
  * 手動 DI コンテナ。アプリ全体で共有するもの (通信・サーバ単位の Repository・端末共通の設定・翻訳等) を持ち、ログイン中の
- * アカウントの分は [currentAccount] ([AccountUiContext] / [AccountContext]) が持つ。
+ * アカウントの分は [accountManager] ([AccountUiContext] / [AccountContext] をアカウントごとに持つ) が持つ。
  */
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -127,7 +128,7 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * アカウント [key] ([session]) 1 つ分の依存を作る。[currentAccount] が使うほか、ギャラリーが `.invalid` のサーバの
+     * アカウント [key] ([session]) 1 つ分の依存を作る。[accountManager] が使うほか、ギャラリーが `.invalid` のサーバの
      * 投稿欄・設定を作るのにも使う (使い終わったら [AccountUiContext.close])。キャッシュの DB を開くので、同じキーのものを
      * 同時に 2 つ作らない。
      *
@@ -161,7 +162,10 @@ class AppContainer(context: Context) {
         }
     }
 
-    /** 保存しているアカウント [stored] の依存。`fetchMe` の結果で一覧の表示用の情報 (と移したアカウントの ID) を埋める。 */
+    /**
+     * 保存しているアカウント [stored] の依存。開いたら `fetchMe` を呼び、その結果 (とプロフィールの編集) で一覧の表示用の
+     * 情報と ID を埋める (ID の無いアカウント = 以前の保存から移したものもここで埋まる)。
+     */
     private fun openStoredAccount(stored: StoredAccount): AccountUiContext =
         createAccount(stored.key, stored.session, migrateLegacySettings = true).also { ui ->
             val account = ui.account
@@ -170,30 +174,29 @@ class AppContainer(context: Context) {
                     accountStore.updateProfile(stored.key, me.user.inServerId, StoredProfile(me.user))
                 }
             }
-        }
-
-    private val _currentAccount = MutableStateFlow(accountStore.active.value?.let(::openStoredAccount))
-
-    /**
-     * ログイン中のアカウント ([AccountStore.active] から作る。ログアウト中は `null`)。使うアカウント・トークンが変わったら
-     * 前のものを閉じてから作り直す (同じアカウントのトークンの差し替えでは同じキャッシュの DB を開くため)。一覧から
-     * 除かれた (ログアウトした) アカウントなら、閉じた後にファイルを消す。
-     */
-    val currentAccount: StateFlow<AccountUiContext?> = _currentAccount.asStateFlow()
-
-    init {
-        // 書きかけの投稿等は Main で動くので、作り直しも Main で行う
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
-            accountStore.active.collect { stored ->
-                val previous = _currentAccount.value
-                if (previous?.account?.key == stored?.key && previous?.account?.session == stored?.session) return@collect
-                previous?.close()
-                _currentAccount.value = stored?.let(::openStoredAccount)
-                val previousKey = previous?.account?.key
-                if (previousKey != null && accountStore.state.value.find(previousKey) == null) deleteAccountData(previousKey)
+            account.scope.launch {
+                try {
+                    account.accountRepository.fetchMe()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // 通信の失敗等。次に使うとき (投稿欄・プロフィール) にまた取りに行く
+                    Log.w(TAG, "fetchMe on open failed: ${e.javaClass.simpleName}")
+                }
             }
         }
-    }
+
+    /**
+     * ログインしているアカウントの依存と、使っているアカウント ([AccountManager.active])。切り替えても依存はログアウトまで持つ。
+     * 書きかけの投稿等は Main で動くので、作り直しも Main で行う。
+     */
+    val accountManager = AccountManager(
+        store = accountStore,
+        open = ::openStoredAccount,
+        deleteData = ::deleteAccountData,
+        logout = oauthLogin::logout,
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    )
 
     /** [account] の投稿欄 1 つ分 ([AccountUiContext.composerSession])。 */
     private fun composerSession(
@@ -237,7 +240,13 @@ class AppContainer(context: Context) {
                 settings = deviceSettings.settings,
                 scope = translationScope,
                 languageDetector = TextClassifierLanguageDetector(context),
-            ).also { store -> observeAppState(context, store) }
+            ).also { store ->
+                observeAppState(context, store)
+                // 訳・言語の推定の結果は statusId (サーバの中でしか一意でない) がキーなので、切り替えたら捨てる
+                translationScope.launch {
+                    accountManager.active.map { it?.key }.distinctUntilChanged().drop(1).collect { store.clearResults() }
+                }
+            }
         }
         // lite: full から入れ替えたときに残ったモデル (数百 MB)・ダウンロードを消す
         if (engine == null) appScope.launch { modelFiles.delete() }
@@ -268,6 +277,8 @@ class AppContainer(context: Context) {
         })
     }
 }
+
+private const val TAG = "AppContainer"
 
 /** 以前の平文の保存 (SharedPreferences `session`)。[AccountStore] が最初の起動で移して消す。 */
 private class LegacyPlaintextSessionPrefs(private val context: Context) : LegacyPlaintextSessionSource {

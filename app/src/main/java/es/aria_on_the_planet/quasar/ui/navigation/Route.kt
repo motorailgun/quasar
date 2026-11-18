@@ -20,6 +20,9 @@ sealed interface Route : NavKey {
     /** ログイン (サーバを入力して OAuth)。ログインしていないときのルート。 */
     @Serializable data object Login : Route
 
+    /** 使っているアカウントにログインし直す (設定のトップから。トークンが無効になったとき等)。 */
+    @Serializable data object Relogin : Route
+
     /** プロフィール。[accountId] は接続中サーバ内の ID。 */
     @Serializable data class Profile(val accountId: String) : Route
 

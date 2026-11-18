@@ -5,6 +5,7 @@
     <string name="logout">ログアウト</string>
     <string name="logout_confirm_title">ログアウトしますか？</string>
     <string name="logout_confirm_message">このアカウントを使うには、ブラウザからもう一度ログインする必要があります。</string>
+    <string name="add_account">アカウントを追加</string>
     <string name="login_description">Mastodon のアカウントでログインします。サーバーのログインページがブラウザで開きます。</string>
     <string name="login_server">サーバー</string>
     <string name="login_submit">ログイン</string>
@@ -14,6 +15,13 @@
     <string name="login_error_denied">承認が拒否されました。</string>
     <string name="login_error_invalid_response">ログインの応答が正しくありません。もう一度お試しください。</string>
     <string name="login_error_no_browser">ログインページを開けるブラウザがありません。</string>
+    <string name="relogin">ログインし直す</string>
+    <string name="relogin_summary">このアカウントの設定・下書きはそのまま</string>
+    <string name="relogin_description">%1$s でログインし直します。このアカウントの設定・下書きはそのままです。</string>
+    <string name="login_error_existing_needs_login">追加済みの %1$s はログインし直す必要があります (同じサーバーのアカウントを追加する前に確かめるため)。そのアカウントに切り替えて設定の「ログインし直す」を選ぶか、ログアウトしてください。</string>
+    <string name="login_error_existing_unavailable">追加済みの %1$s は今サーバーで使えません (無効・承認待ち・メールアドレス未確認の可能性があります)。そのアカウントに切り替えて設定の「ログインし直す」を選ぶか、ログアウトしてください。</string>
+    <string name="login_error_different_account">別のアカウントでログインしました。%1$s でログインしてください。</string>
+    <string name="login_error_already_added">このアカウントは既に追加されています。</string>
     <string name="timeline_home">ホーム</string>
     <string name="timeline_local">ローカル</string>
     <string name="timeline_global">連合</string>

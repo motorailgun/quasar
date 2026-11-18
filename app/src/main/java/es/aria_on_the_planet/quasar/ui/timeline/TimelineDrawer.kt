@@ -18,6 +18,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -54,6 +55,8 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
  * ```
  *
  * 上のアカウントの部分 (アイコン・名前・@acct) のタップで自分のプロフィール。[account] が未取得ならその部分は出さない。
+ * その下に他のアカウントの一覧 (タップで切り替え) と「アカウントを追加」([accounts])。これは確かめるための仮の形で、
+ * 段階 6 (docs/multi-account.md の「切り替えの UI」) で作り直す。
  *
  * 幅は項目に合わせる (M3 の既定は項目が幅いっぱいに広がるので最大の 360dp になる。下限の 240dp は M3 のまま)。
  * アカウントの部分は幅を決めるのに数えず、長い名前は省略する。
@@ -61,6 +64,7 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
 @Composable
 fun TimelineDrawerSheet(
     account: User?,
+    accounts: DrawerAccounts?,
     onOpenProfile: (User) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPersonalPosts: (PersonalPostList) -> Unit,
@@ -94,9 +98,29 @@ fun TimelineDrawerSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             } else {
                 Spacer(Modifier.height(12.dp))
+            }
+            if (accounts != null) {
+                for (other in accounts.others) {
+                    NavigationDrawerItem(
+                        label = { Text(other.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        icon = {
+                            if (other.user != null) {
+                                UserIcon(other.user, size = 24.dp)
+                            } else {
+                                Icon(Symbols.Outlined.Person, contentDescription = null)
+                            }
+                        },
+                        selected = false,
+                        onClick = { accounts.onSwitch(other.key) },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+                DrawerItem(R.string.add_account, Symbols.Filled.Add, accounts.onAdd)
+            }
+            if (account != null || accounts != null) {
+                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             }
             DrawerItem(R.string.settings, Symbols.Outlined.Settings, onOpenSettings)
             DrawerItem(R.string.search_hint, Symbols.Outlined.Search, onOpenSearch)
@@ -130,3 +154,18 @@ private object IgnoreIntrinsicWidth : LayoutModifier {
 
     override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int) = 0
 }
+
+/**
+ * ドロワーのアカウントの切り替え (仮の UI)。[others] は使っていないアカウント、[onSwitch] はそのキー (`AccountKey` の値) で
+ * 切り替える、[onAdd] はアカウントの追加 (ログインの画面を開く)。
+ */
+@Immutable
+data class DrawerAccounts(
+    val others: List<DrawerAccount>,
+    val onSwitch: (String) -> Unit,
+    val onAdd: () -> Unit,
+)
+
+/** 切り替えの一覧の 1 行。[user] は保存している表示用の情報 (まだ無ければ `null`)、[label] は `@acct@host` かサーバ。 */
+@Immutable
+data class DrawerAccount(val key: String, val user: User?, val label: String)

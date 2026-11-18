@@ -1,6 +1,7 @@
 # マルチアカウント
 
-複数のアカウントでログインしておき、ドロワーから切り替える。計画の段階 (「進め方」の 4 まで済み。保存は一覧の形になったが、切り替え・追加はまだ無い)。
+複数のアカウントでログインしておき、ドロワーから切り替える。計画の段階 (「進め方」の 5 まで済み。切り替え・追加・ログアウトは
+動くが、ドロワーの UI は確かめるための仮のもの)。
 
 ## 要求と決めたこと
 
@@ -246,7 +247,7 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
    アカウントは 1 つのまま。計画との違いは下記「段階 2 で決めたこと」。
 3. **設定の分割** (済み): `DeviceSettings` / `AccountSettings`、2 つのストア、移行、設定画面のトップの分割。
 4. **アカウントごとの保存** (済み): `AccountStore` (移行込み)、アカウントごとのキャッシュ DB。計画との違いは下記「段階 3・4 で決めたこと」。
-5. **切り替え・追加・ログアウト**: `AccountManager`、作り直し、追加のログイン、ログアウト。
+5. **切り替え・追加・ログアウト** (済み): `AccountManager`、作り直し、追加のログイン、ログアウト。計画との違いは下記「段階 5 で決めたこと」。
 6. **UI**: ドロワーの切り替え、文字列。
 7. **仕上げ**: テスト、エミュレーター + testbed (サーバの違う 2 アカウント、3.5 と最新の安定版) で確かめる、`AGENTS.md`。
 
@@ -289,12 +290,12 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
     アカウントごとのファイルと結びつかなくなるため (値は小さく、書くのはログイン・ログアウト・表示用の情報が変わったときだけ)。
   * 表示用の情報と `accountId` は、`AppContainer` がアカウントの `myAccount()` (`fetchMe` の結果・プロフィールの編集) を見て埋める
     (変わっていなければ書かない)。設定画面のトップの見出し・ログアウトの補足 (`@acct@host`) がこれを使う。
-* **同じアカウントの判定**: サーバ (末尾の `/`・大文字小文字は無視) と `accountId` が同じもの。どちらかの `accountId` が無ければ
+* **同じアカウントの判定** (段階 5 で ID の無い場合の扱いを変えた。下記「同じアカウントを 2 つ持たない」): サーバ (末尾の `/`・大文字小文字は無視) と `accountId` が同じもの。どちらかの `accountId` が無ければ
   別のものとして足す (移したアカウントは最初の `fetchMe` まで ID が無いので、その間に同じアカウントでログインすると 2 つになる。
   今はログアウト中にしかログインできないので起きない)。同じなら足さずにトークン・クライアント (・表示用の情報) を差し替え、キーは
   そのまま。古いトークンは無効化する。
 * **ログインで `verify_credentials` を呼ぶ** (`OAuthLogin.exchange`)。ID・表示用の情報を確かめてから `addLogin`。失敗してもログインは
-  する (ID 無しで足し、`fetchMe` で埋まる)。ログには失敗の種類だけ。
+  する (段階 5 で、失敗したらログインを失敗にするよう変えた) (ID 無しで足し、`fetchMe` で埋まる)。ログには失敗の種類だけ。
 * **ログアウト**: `OAuthLogin.logout` は `AccountStore.remove(active)` と無効化だけ。ファイルの削除は `AppContainer`: `active` が変わったら
   前の `AccountUiContext` を `close()` し (DB を閉じる)、一覧から消えたキーなら `deleteAccountData` (設定のコルーチンを止め、
   `cacheDir/api-cache/<key>/` と `settings_<key>.preferences_pb` を消す)。途中でプロセスが終わった分は、**起動時に一覧に無いキーの
@@ -349,7 +350,137 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
 * 設定画面で両方を変えて再起動しても残る。ログアウトでアカウントの設定・キャッシュのディレクトリが消え (端末共通は残る。
   `/oauth/revoke` 200)、user1 でログインし直すと既定値から始まった。プロセスの再生成・コールドスタートも問題なし。
 
+## 段階 5 で決めたこと (計画との違い)
+
+### `AccountManager` (`ui/account/AccountManager.kt`)
+
+* 置き場所は `ui/account/` (計画の図では `AppContainer` の下の data 寄りのもの)。持つのが `AccountUiContext` (UI 側) なので、
+  data 層に置くと向きが崩れる。`AppContainer.accountManager` が 1 つ持つ。`AppContainer.currentAccount` は無くなった。
+* `AccountKey → AccountUiContext` を持ち、**使うアカウントになったときに作る** (計画の「必要になったら作る」。今は使っている
+  アカウントにしか要らない)。切り替えても閉じない (下書きが残る)。閉じるのは一覧から消えたとき・トークンが変わったときだけ。
+  使っていないアカウントの依存は画面が無いので通信しない (ストリーミングは画面が collect している間だけ)。
+* 出すのは `active: StateFlow<ActiveAccount?>` (`context` + `generation`)・`switchTo(key)`・`logoutActive()`。`context(key)` (使って
+  いないアカウントの依存を取る) は使う所が無いので作っていない (アカウントをまたいだ操作のときに足す)。
+* 状態は `AccountStore.state` を Main で collect して合わせる (切り替え・ログイン・ログアウトはどれも `AccountStore` を
+  書き換えるだけ)。合わせ方: 一覧から消えた・セッションが変わったキーの依存を閉じる → 一覧から消えたキーのファイルを消す
+  (このプロセスで開いていないものも) → `activeKey` の依存を (無ければ作って) `active` にする。段階 3・4 の不変条件 (閉じてから開く・
+  閉じてから消す・起動時に一覧に無いキーを消す) はそのまま。
+* **`generation`**: そのキーの依存をこのプロセスで作り直した回数 (最初は 0)。同じアカウントでログインし直すとキーが同じまま
+  依存 (セッション) が新しくなるので、画面の作り直しのキー (`key(アカウントのキー, generation)`) とアカウントごとの ViewModelStore の
+  キーに入れる。保存した状態のキー (`SaveableStateProvider`) はアカウントのキーだけ。
+  * 差し替えた後にプロセスが終わると、保存した状態の合成キーに 1 以上の generation が入っていて新しいプロセス (0) と合わないので、
+    復元されず `[Timeline]` から始まる (まれなので受け入れた)。
+* 使っているアカウントは `AccountStore` に保存する (`setActive` → `StoredAccounts.withActive`)。コールドスタートは最後に使った
+  アカウントから。
+
+### 画面の作り直し (`ui/account/AccountScope.kt`)
+
+* 計画のコードのとおり (`key()` + アカウントごとの owner + 外側の `rememberSaveableStateHolder()` + 使っていないキーの
+  `removeState` + `onDispose` で lifecycle が CREATED 以上なら owner を clear)。`AccountScope(active, accountKeys, stores) { account -> ... }`
+  に包み、MainActivity は `QuasarNavHost(container, account, ...)` を中に置く。
+  * 保存のキーは `AccountKey` の値 (String)。value class を `Any` で渡すと箱 (`AccountKey`) になり、Bundle に入らない。
+  * ログアウト中のキーは `""`。`removeState` は「保存しているキー + このプロセスで使ったキー + `""`」から使っているキーを除いたもの
+    (ログアウトしたキーの分も消える)。**使っているキーには `removeState` しない** (`SaveableStateHolderImpl` は登録中のものを外して
+    しまい、以後保存されない。逆アセンブルで確かめた)。
+  * 同じキーのまま作り直す (generation が変わる) とき、新しい `SaveableStateProvider` は作り直しの組み立ての時点の保存 (使っている
+    間は空) から始まり、前のものが破棄で保存した分は新しいものの登録 (`savedStates -= key`) で消える。forget が remember より先に
+    届くので `require(key !in registries)` にも当たらない (エミュレーターで同じアカウントを足し直して落ちないことを確かめた)。
+* `QuasarNavHost` はアカウントを引数で受ける (作り直されるまで変わらない)。「ログインしたら Login を外す / ログアウトしたら
+  `[Login]` に戻す」作り直しは無くなり、ログアウト中に復元したバックスタックが `[Login]` でなければ直すだけ。
+  `TimelineEntry` の ViewModel のキー (トークンのハッシュ) も要らなくなった。
+* `ShareActivity` は `AccountManager.active` の `context` で投稿する。ViewModel のキーは `<アカウントのキー>#<generation>`
+  (開いている間に切り替わったら作り直す)。外から開くリンク (`OpenLink`) は `QuasarNavHost` の中なので、使っているアカウントで引く。
+
+### 追加・ログアウト
+
+* 追加: ドロワーの「アカウントを追加」で `Route.Login` を積む。`LoginScreen(onBack = ...)` はログイン中だけ戻るボタン
+  (タイトル「アカウントを追加」) を出し、押したら進行中のログインもやめる (トークンに換えている途中なら止めない。できたら切り替わる)。
+  システムの「戻る」では止めない (後からブラウザで認可を終えたら、そのアカウントが足されて切り替わる)。
+  ログインの流れ・`PendingAuthorization` は今のまま 1 つ。`addLogin` が使うアカウントにするので、`AccountManager` が切り替える。
+* ログアウト: 設定画面のトップから `AccountManager.logoutActive()` → `OAuthLogin.logout(key)` (`AccountStore.remove` + 無効化)。残りの
+  先頭に切り替わる (`StoredAccounts.without`)。依存を閉じてファイルを消すのは `AccountManager`。
+
+### 同じアカウントを 2 つ持たない・自動では除かない
+
+* **不変条件: サーバ + `accountId` が同じアカウントを 2 つ保存しない**。一時的にも並ばない (並んだ後にまとめる形は取らない)。
+* **保存しているアカウントを自動では除かない** (除くとそのアカウントの設定・キャッシュも消える)。トークンが使えなくなったら
+  「ログインし直す」に案内し、除くのはユーザーのログアウトだけ。
+* ID の無いアカウントがありうるのは、**以前の保存 (1 つのセッション) から移したアカウントだけ**で、最初の `fetchMe` まで。
+  * ログインで足すアカウントは必ず ID を持つ: トークンを得た後の `verify_credentials` に失敗したらログイン自体を失敗にする
+    (`LoginStatus.Failed`。通信なら `Network`、サーバが断ったら `Rejected`)。得たトークンは無効化を試み、`addLogin` は呼ばない
+    (`addLogin` / `withLogin` の `accountId` は non-null)。
+  * 依存を開いたら必ず `fetchMe` を呼ぶ (`AppContainer.openStoredAccount`。表示用の情報も新しくなる)。移したアカウントは使った
+    時点で ID が埋まる。
+* 足すときは `addLogin` の前に、**同じサーバの ID の無いアカウント** (`StoredAccounts.withoutIdOn`、`AccountStoreTest`) の ID を
+  それぞれのトークンで `verify_credentials` を呼んで埋める (`OAuthLogin.resolveMissingIds` → `AccountStore.updateProfile`)。これで
+  `withLogin` の「同じアカウントなら差し替え」が効く。埋められなければ足すのを失敗にし (得たトークンは無効化を試みる)、
+  理由ごとに文言を分ける (`storedTokenError`、`OAuthTest`。Mastodon の `verify_credentials` / `Api::BaseController#require_user!`):
+  * 401 (トークンが無効) / 422 (トークンにユーザーが無い) → `ExistingAccountNeedsLogin`: そのアカウントに切り替えて「ログインし直す」か、
+    ログアウトしてもらう。
+  * 403 (アカウントが無効・凍結・メール未確認・承認待ち) → `ExistingAccountUnavailable`: 今はサーバで使えない。案内は同じ。
+  * 通信・5xx 等 → `Network` / `Rejected` (後でもう一度)。
+  * ログには失敗の種類 (HTTP の状態コード・例外のクラス名) だけを出す。
+* 以前の計画のメモ (段階 3・4) にある「ID が無ければ別のものとして足す」は無くなった。
+
+### ログインし直す
+
+* 設定のトップのアカウントの部分 (ログアウトの上) に「ログインし直す」(`Route.Relogin`)。使っているアカウントのサーバで
+  `LoginScreen(relogin = ReloginTarget)` を開く (サーバは変えられない。戻るボタン付き)。トークンが無効になったとき等に使う。
+* 途中の状態 (`PendingAuthorization`) に対象のキー (`reloginKey`) を持たせる (1 つだけなのは今と同じ)。トークンを得たら
+  `verify_credentials` (失敗ならログインを失敗にする) → `AccountStore.relogin` (純粋関数 `StoredAccounts.withRelogin`、`AccountStoreTest`):
+  * サーバが違う・保存している ID と違う → `DifferentAccount` (「別のアカウントでログインしました」)。保存しているものは触らず、
+    得たトークンは無効化を試みる。
+  * 保存している ID が無い (移したアカウント) → 受け入れて ID を埋める。ただしその ID が他に保存しているアカウントのものなら
+    `AlreadyAdded` (差し替えると同じアカウントが 2 つになる)。
+  * 対象がもう無い (認可の間にログアウトした) → 新しく足すのと同じに扱う。
+  * 差し替えたら同じキーのまま (設定・キャッシュ・下書きが残る) 使うアカウントにし、古いトークンは無効化を試みる。依存は
+    作り直され (`generation` が変わる)、画面はタイムラインから。
+* アカウントの追加・ログインし直しでは、認可の URL に `force_login=true` を付ける (`authorizeUrl(forceLogin = true)`、`OAuthTest`。
+  ドキュメントでは Mastodon 2.6.0 から「同じサーバの複数のアカウントで認可するのに要る」)。保存しているアカウントが無いとき
+  (最初のログイン) は付けない。
+  * **ただし実際にはログインの画面は出ない** (3.5.19・最新安定版の testbed で確かめた)。サーバの実装
+    (`Oauth::AuthorizationsController`) では、同じクライアントの有効なトークンがあるときに認可画面を飛ばして自動で承認するのを
+    止めるだけで、ブラウザのログインはそのまま。Quasar はログインのたびにクライアントを登録するので、もともと自動の承認は
+    起きず、今は効いていない (害も無い)。認可画面は「ログイン中: @user」(4.x は上部、3.5 も表示あり) とログアウトのボタンを
+    出すので、別のユーザーで認可するにはそこでブラウザ側のログアウトをしてもらう。
+
+### 翻訳
+
+* `PostTranslationStore.clearResults()`: アカウントのキーが変わったら (`AppContainer` が `active` を見て呼ぶ) 訳・言語の推定の結果と
+  順番待ちを捨てる。推定の途中のものは世代 (`detectionGeneration`) で結果を捨てる。モデルはそのまま。
+
+### ドロワー (仮)
+
+* 確かめるための最小限: 上のアカウントの部分の下に、他のアカウントの行 (小さなアイコン + `@acct@host`。表示用の情報がまだ無ければ
+  サーバ名。タップで切り替え) と「アカウントを追加」(`DrawerAccounts`)。段階 6 で計画の形 (アイコンを並べる・展開する) に作り直す。
+
+### エミュレーター + testbed で確かめたこと
+
+user1@stable (最新安定版) でログインしている前の段階のビルドの上に入れ、user2@legacy (3.5.19) を足して確かめた (debug、`small_phone`)。
+
+* 追加: ドロワーの「アカウントを追加」→ 戻るボタン付きのログイン → ブラウザで認可 → legacy のタイムラインに切り替わった
+  (投稿欄のアイコン・ドロワーの見出しも legacy、他のアカウントの行に stable)。戻るボタンで今のアカウントに戻れる。
+* 切り替え (両方向): タイムライン・通知はそのアカウントのもの。ストリーミングは前のものが閉じ、新しいアカウントのサーバに
+  繋ぎ直した (logcat の `StreamingClient`)。クイック投稿バーの書きかけは、それぞれ切り替えて戻っても残った。
+* アカウントごとの設定: legacy で通知の Grouping を Individual にすると legacy の通知が出て、stable は Grouped のまま (別のファイル)。
+  設定画面の見出し・ログアウトの補足は使っているアカウント。
+* 回転 (legacy で検索を開いたまま): 画面・下書きとも残った。プロセスの再生成 (legacy でお気に入りを開いて裏に回し `am kill`):
+  legacy のお気に入りの画面に戻り、「戻る」で legacy のタイムライン。コールドスタート (`force-stop`) は最後に使った legacy から。
+* 共有 (`ShareActivity`) は使っているアカウント (stable) の投稿欄、「Quasar で開く」は使っているアカウントで引いた。
+* 同じアカウント (stable) を「アカウントを追加」で足し直す: 足されずにキーはそのまま (キャッシュのディレクトリも同じ)、古い
+  トークンは `/oauth/revoke` 200、画面はタイムラインから作り直され、落ちなかった (同じキーで `SaveableStateProvider` を作り直す道)。
+* ログアウト: legacy (使っている) → stable に切り替わり、legacy のキャッシュのディレクトリ・`settings_<key>` が消え、`/oauth/revoke` 200。
+  最後の stable → ログインの画面 (戻るボタン無し)、ファイルも消えた。コールドスタートもログインの画面。
+* ログインし直す (後から足した。同じく stable + legacy): legacy で通知の Grouping を Individual にしてからログインし直すと、
+  キー・キャッシュのディレクトリ・`settings_<key>`・設定の値はそのままで、古いトークンは無効になった (サーバの DB で Quasar の
+  トークンは 1 つだけ有効)。ブラウザで別のユーザー (user3) にログインして認可すると「別のアカウントでログインしました」が出て、
+  user3 の新しいトークンは無効化され、保存している user2 はそのまま使えた (通知が読めた)。サーバ側 (Rails) で user2 のトークンを
+  無効にしてからログインし直しても同じキーのまま戻った。
+* 確かめていないもの: 足すときに同じサーバの ID の無いアカウントの ID を先に埋める道 (移したアカウントが要る。ユニットテストのみ)、Activity が止まっている間に使うアカウントが変わってから復元する場合 (今は画面の外から切り替える道が無い)、
+  詳細のパネル (タブレット表示) を開いたままの切り替え (ドロワーはタイムラインにしか無いのでパネルの上からは切り替えられない)。
+
 ## 未決
+
 
 * 設定の項目ごとの置き場所 (表は仮。「要検討」は翻訳の言語ごとの扱い・操作前の確認)。
 * 設定画面の「アカウントの設定」/「アプリの設定」それぞれのページの構成。

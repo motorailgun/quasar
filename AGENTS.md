@@ -29,7 +29,7 @@ DI フレームワークは現時点では使わず、`AppContainer` (手動 DI)
 ```
 es.aria_on_the_planet.quasar
 ├── QuasarApplication.kt / MainActivity.kt   MainActivity が主の Activity (中身は QuasarNavHost)。共有の受け口は ui/share/ShareActivity
-├── di/AppContainer.kt              手動 DI (アプリ全体のもの + 今のアカウントの AccountUiContext を作る)
+├── di/AppContainer.kt              手動 DI (アプリ全体のもの + アカウントごとの AccountUiContext を作る。AccountManager を持つ)
 ├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
 ├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody、
 │                                   メディアの保存 (MediaDownloader / SystemMediaDownloader = DownloadManager)
@@ -105,8 +105,9 @@ es.aria_on_the_planet.quasar
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      ログイン画面 (サーバを入力 → ブラウザで OAuth)
-    ├── account/                    今のアカウントの UI 側の依存 (AccountUiContext = 下書き・編集・メニューの操作 + AccountContext /
-    │                               SessionAccountActions / SessionOwnPostActions)
+    ├── account/                    アカウントの UI 側の依存 (AccountUiContext = 下書き・編集・メニューの操作 + AccountContext /
+    │                               SessionAccountActions / SessionOwnPostActions) / AccountManager (アカウントごとの AccountUiContext と
+    │                               使っているアカウント) / AccountScope (切り替えで画面を作り直す + アカウントごとの ViewModelStore)
     ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
     │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド / PredictiveBackDamping = 予測型「戻る」の動きを抑える)
     ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
@@ -158,14 +159,22 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
 * アカウントの保存は `AccountStore` (`data/account/`): SecureStorage の 1 項目 (`accounts`) に `StoredAccount` の一覧 (キー・サーバ・
   トークン・クライアント・`accountId`・表示用の情報 `StoredProfile`) と使っているアカウントのキー。`AccountKey` は端末で振る UUID
   (String の value class。`hashCode` がプロセスをまたいで変わらない) で、アカウントごとのファイルの名前にも使う。変更は純粋関数
-  (`StoredAccounts.withLogin` / `without` / `withProfile`、`AccountStoreTest`)。今は 1 つずつ使う (ログインで足して使う・ログアウトで
-  使っているものを除く)。表示用の情報・`accountId` は `fetchMe` (`myAccount`) の結果で埋める。
-* `AppContainer.currentAccount` (`StateFlow<AccountUiContext?>`) は `AccountStore.active` から作り、使うアカウント・トークンが変わったら
-  前のものを `close()` してから作り直す (同じキーの DB を 2 つ開かない)。一覧から除かれた (ログアウトした) アカウントなら、閉じた後に
-  そのファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時には一覧に無いアカウントのファイルを消す。
-  `QuasarNavHost` (`WithSession`) と `ShareActivity` はこれを読み、ViewModel には `account` を渡す。
-  ViewModel は寿命の間ずっと同じものを使う (「今のアカウント」をその都度読まない)。複数アカウントの計画は
-  [docs/multi-account.md](docs/multi-account.md)。
+  (`StoredAccounts.withLogin` / `without` / `withActive` / `withProfile`、`AccountStoreTest`)。ログインで足して使うアカウントにする・
+  切り替え (`setActive`)・ログアウトで除く (使っていたら残りの先頭に切り替わる)。表示用の情報・`accountId` は `fetchMe` (`myAccount`)
+  の結果で埋める (開いたら必ず `fetchMe` を呼ぶ)。**同じアカウント (サーバ + ID) を 2 つ保存しない** (下記「Login」。ID の無い
+  アカウントは以前の保存から移したものだけ)。
+* **`AccountManager`** (`ui/account/`、`AppContainer.accountManager`) が `AccountKey → AccountUiContext` を持つ: 使うアカウントになったときに
+  作り、**切り替えても閉じずにログアウトまで持つ** (下書きが切り替えて戻っても残る。使っていないアカウントは画面が無いので通信しない)。
+  `active` (`StateFlow<ActiveAccount?>`: `context` と、そのキーの依存を作り直した回数 `generation`)・`switchTo(key)`・`logoutActive()`。
+  `AccountStore.state` を見て、一覧から消えた・トークンが変わったキーの依存を `close()` し (新しいものを開く前に閉じる = 同じキーの DB
+  を 2 つ開かない)、消えたキーはファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時には一覧に無い
+  アカウントのファイルを消す。
+* **切り替えは画面ごと作り直す** (`AccountScope`、MainActivity): `key(アカウントのキー, generation)` + アカウントごとの
+  `ViewModelStoreOwner` (Activity の ViewModel `AccountViewModelStores` に置き、切り替えのときだけ `clear`) + 外側の
+  `SaveableStateHolder` で保存した状態をアカウントごとに分け、使っていないアカウントの分は捨てる。切り替えた先は `[Timeline]` から。
+  `QuasarNavHost` は `account` を引数で受け (作り直されるまで変わらない)、`WithSession` で各画面に渡す。`ShareActivity` は
+  `AccountManager.active` を読む。ViewModel には `account` を渡し、寿命の間ずっと同じものを使う (「今のアカウント」をその都度読まない)。
+  複数アカウントの計画・決めたことは [docs/multi-account.md](docs/multi-account.md)。
 
 ## ドメインモデル
 
@@ -633,8 +642,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * ViewModel は画面 (エントリ) ごと (`rememberViewModelStoreNavEntryDecorator`)。下に積まれた画面はコンポジションから外れる
     (状態は `rememberSaveable` で残る)。`LaunchedEffect` / `repeatOnLifecycle` で動くもの (ストリーミング・インライン再生) は、
     別の画面を開くと止まり、戻ると再開する。
-  * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。`Login` 以外の画面は
-    ログイン中だけ描く (`WithSession`。今のアカウントの `AccountUiContext` を渡す)。書きかけの投稿 (`DraftStore`) は
+  * 使っているアカウントが変わったら (ログイン・切り替え・ログアウト) `QuasarNavHost` ごと作り直す (上記「アカウントの依存」の
+    `AccountScope`)。ログイン中は `[Timeline]`、ログアウト中は `[Login]` から始まる。`Login` 以外の画面は
+    ログイン中だけ描く (`WithSession`。使っているアカウントの `AccountUiContext` を渡す)。書きかけの投稿 (`DraftStore`) は
     `QuasarNavHost` がアカウントごとに開く。
   * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ)。メディアビューアだけは `OverlaySceneStrategy` で
     下の画面に重ね、出入りは自分で描く。
@@ -816,9 +826,25 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     プロセスが終わっても続けられる。戻りを受けた時点で消す (コードは 1 回しか使えない)。進行中のものが無い戻りは無視する。
     state の不一致は `InvalidResponse`。URI の解釈・認可 URL の組み立ては純粋関数 (`OAuth.kt`、`OAuthTest`)。
   * トークンを得たら `verify_credentials` でアカウント (ID・表示用の情報) を確かめて `AccountStore.addLogin` (使うアカウントになる)。
-    確かめられなくてもログインはする (ID は最初の `fetchMe` で埋まる)。同じアカウント (サーバ + `accountId`) が既にあれば足さずに
-    トークン・クライアントを差し替え、古いトークンは無効化する (今はログイン画面がログアウト中にしか出ないので起きない)。
-    ナビゲーションは使っているアカウントの有無で切り替わる。
+    **確かめられなければログインを失敗にする** (得たトークンは無効化を試みる)。ログインで足すアカウントは必ず ID を持つ。
+    同じアカウント (サーバ + `accountId`) が既にあれば足さずにトークン・クライアントを差し替え、古いトークンは無効化する
+    (キーは同じで、依存は作り直す)。
+  * **同じアカウントを 2 つ保存しない・保存しているアカウントを自動では除かない** (除くと設定も消える。除くのはログアウトだけ):
+    `addLogin` の前に、同じサーバの ID の無いアカウント (以前の保存から移したもの。`StoredAccounts.withoutIdOn`) の ID を
+    それぞれのトークンで `verify_credentials` を呼んで埋める (`OAuthLogin.resolveMissingIds`)。埋められなければ足すのを失敗にする:
+    401 / 422 → そのアカウントのログインし直しかログアウトを促す、403 → 今はサーバで使えない (無効・凍結・承認待ち等) と伝える
+    (`storedTokenError`)、通信・5xx → 後でもう一度。ログには失敗の種類だけ。
+  * アカウントの追加・ログインし直しでは認可の URL に `force_login=true` を付ける (最初のログインでは付けない)。ドキュメントの説明と
+    違い、サーバ (3.5 / 4.x) はログインの画面を出さず、同じクライアントのトークンがあるときの自動承認を止めるだけ (Quasar は毎回
+    クライアントを登録するので今は効いていない)。別のユーザーで認可するには、認可画面のブラウザ側のログアウトを使ってもらう。
+  * **ログインし直す** (`Route.Relogin`、設定のトップのログアウトの上): 使っているアカウントのサーバで OAuth をやり直し
+    (`PendingAuthorization.reloginKey`)、同じキーのままトークン・クライアントを差し替える (設定・キャッシュ・下書きが残る。古い
+    トークンは無効化)。別のアカウント (サーバ・ID が違う) でログインしたら失敗にして保存しているものは触らない。ID の無い (移した)
+    アカウントなら ID を埋める (他に同じ ID が保存されていたら失敗)。純粋関数 `StoredAccounts.withRelogin` (`AccountStoreTest`)。
+    使うアカウントが変わると画面が作り直される (`AccountScope`)。
+  * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻ると進行中の
+    認可待ちもやめる)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
+    そのアカウントに切り替わる。
   * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser / Exchanging / Failed(`LoginError`))。
   * 保存: `AccountStore` (上記「アカウントの依存」) は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。書き込みは同期 (`commit`)。
     項目名を AAD にする。`EncryptedSharedPreferences` は非推奨なので使わない)。鍵は端末外に出ないので `secure.xml` は
@@ -826,9 +852,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     以前の 1 つのセッションの保存 (`secure` の `session`、さらに前の平文の SharedPreferences `session`) は、最初の起動で使っている
     1 つ目のアカウントに移して消す (`AccountStore.load`。トークンの無い保存 = 最初期の未ログインでの利用の名残はログアウト状態。
     平文の頃のトークンはクライアント情報が無いのでログアウト時に無効化できない)。
-  * ログアウト: 設定画面のトップの末尾 (error 色、補足に `@acct@host`)。**設定に関わらず必ず** `ConfirmDialog` で確認してから
-    `OAuthLogin.logout` (使っているアカウントを一覧から除いてから `POST /oauth/revoke`。失敗はログのみ)。そのアカウントの
-    キャッシュ・アカウントごとの設定のファイルは `AppContainer` が閉じてから消す。端末共通の設定は残る。
+  * ログアウト: 設定画面のトップの末尾 (error 色、補足に `@acct@host`)。対象は使っているアカウント。**設定に関わらず必ず**
+    `ConfirmDialog` で確認してから `AccountManager.logoutActive` → `OAuthLogin.logout(key)` (一覧から除いてから `POST /oauth/revoke`。
+    失敗はログのみ)。残りのアカウントがあればその先頭に切り替わり、無ければログインの画面。そのアカウントのキャッシュ・
+    アカウントごとの設定のファイルは `AccountManager` が閉じてから消す。端末共通の設定は残る。
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global (常に 4 つ)。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
 * **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
@@ -868,7 +895,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   * ヘッダ: 左にメニューのボタン (≡。タップで左から `ModalNavigationDrawer` のドロワー `TimelineDrawerSheet` (X のアプリの形):
-    ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) / 設定 /
+    ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) /
+    他のアカウントの一覧 (タップで切り替え) +「アカウントを追加」(仮の UI。`DrawerAccounts`) / 設定 /
     検索 (`Route.Search`。トップバーが検索欄で、キーボードの検索で確定。結果は `ConnectedTabRow` (Accounts / Posts / Hashtags) +
     `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
     投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
@@ -1092,7 +1120,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。フレーバー `full` だけ (v1.4 から配布)
 (`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「PLaMoで〇〇語から翻訳 (規約の第 5 条で、モデルの出力だと示す。省略させず折り返す) ·
 原文を表示 / 翻訳を表示」(`PostTranslationBar`。順番待ち・訳している間は「翻訳中…」を薄くし、その上を濃い帯が流れる = `Modifier.shimmer`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「実験的機能」→「翻訳」。状態はアプリ全体で
-1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
+1 つの `PostTranslationStore` (`LocalPostTranslations`。アカウントを切り替えたら訳・言語の推定の結果を捨てる = `clearResults`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
 **裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、
 UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持ったまま裏にいるとアプリごと終わらされやすい)。訳しかけは順番待ちに戻す。
 **設計・実験の結果・確かめ方は [docs/translation-ondevice.md](docs/translation-ondevice.md)**。以前の ML Kit + サーバー側翻訳の
@@ -1514,7 +1542,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 
 ## 未対応・今後の課題
 
-* **認証**: 複数アカウント無し (ログインは 1 つ。保存は一覧の形 `AccountStore` で、切り替え・追加は docs/multi-account.md の段階 5・6)。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
+* **認証**: 複数アカウントの切り替え・追加はあるが、ドロワーの UI は確かめるための仮のもの (他のアカウントの一覧 +「アカウントを追加」。
+  docs/multi-account.md の段階 6 で作り直す)。アカウントをまたいだ操作は無い。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
   OAuth のログインの往復 (ブラウザでの認可 → 戻り) はエミュレータ + testbed (3.5.19) で確認済み (実機は未確認)。
   * **将来: 戻り先を App Links (検証済みの https URL) にする**。今のカスタムスキーム (`es.aria-on-the-planet.quasar://oauth`) は
     他のアプリが同じスキームを登録すると戻りを横取りされうる (PKCE があるので盗まれたコードはトークンにできないが、

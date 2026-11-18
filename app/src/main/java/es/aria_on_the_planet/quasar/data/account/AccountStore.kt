@@ -22,7 +22,7 @@ interface LegacyPlaintextSessionSource {
 
 /**
  * ログインしているアカウントの一覧と使っているアカウント ([StoredAccounts]) を [storage] (SecureStorage = Keystore で暗号化)
- * に保持する。今は 1 つずつ使う (ログインで足して使う・ログアウトで使っているものを除く)。
+ * に保持する。使っているアカウントは [setActive] で切り替える (切り替えに伴う依存の作り直しは `AccountManager`)。
  *
  * 最初の起動では以前の保存 (1 つのセッション) を 1 つ目のアカウントに移す ([load])。
  *
@@ -48,7 +48,7 @@ class AccountStore(
         serverUrl: String,
         accessToken: String,
         client: OAuthClient?,
-        accountId: String?,
+        accountId: String,
         profile: StoredProfile?,
     ): LoginResult = synchronized(this) {
         val result = _state.value.withLogin(serverUrl, accessToken, client, accountId, profile, newKey())
@@ -56,11 +56,33 @@ class AccountStore(
         result
     }
 
+    /** [key] にログインし直した結果を当てる ([StoredAccounts.withRelogin])。差し替えたときだけ保存する。 */
+    fun relogin(
+        key: AccountKey,
+        serverUrl: String,
+        accessToken: String,
+        client: OAuthClient?,
+        accountId: String,
+        profile: StoredProfile?,
+    ): ReloginResult = synchronized(this) {
+        _state.value.withRelogin(key, serverUrl, accessToken, client, accountId, profile).also {
+            if (it is ReloginResult.Replaced) save(it.accounts)
+        }
+    }
+
     /** [key] を除いて、除いたものを返す。使っていたアカウントなら残りの先頭に切り替わる (無ければログアウト状態)。 */
     fun remove(key: AccountKey): StoredAccount? = synchronized(this) {
         val removed = _state.value.find(key) ?: return null
         save(_state.value.without(key))
         removed
+    }
+
+    /** [key] に切り替える (一覧に無ければ何もしない)。 */
+    fun setActive(key: AccountKey) {
+        synchronized(this) {
+            val updated = _state.value.withActive(key)
+            if (updated != _state.value) save(updated)
+        }
     }
 
     /** `fetchMe` の結果で [key] の ID・表示用の情報を更新する。変わっていなければ書かない。 */

@@ -8,7 +8,7 @@ internal val FlavorBundledComponents = listOf(
     BundledComponent(
         id = "llama.cpp",
         name = "llama.cpp / ggml",
-        version = "b12129",
+        version = "v1.0.0",
         website = "https://github.com/ggml-org/llama.cpp",
         licenseName = "MIT License",
         licenseUrl = "https://github.com/ggml-org/llama.cpp/blob/master/LICENSE",

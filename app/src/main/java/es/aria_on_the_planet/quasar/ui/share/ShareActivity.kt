@@ -92,18 +92,19 @@ private fun ShareScreen(
     onPublished: () -> Unit,
     onOpenApp: () -> Unit,
 ) {
-    val session by container.sessionStore.session.collectAsStateWithLifecycle()
-    val current = session
+    val account by container.currentAccount.collectAsStateWithLifecycle()
+    val current = account
     if (current == null) {
         NotLoggedIn(onClose = onClose, onOpenApp = onOpenApp)
         return
     }
+    val session = current.account.session
     val viewModel: ShareViewModel = viewModel(
-        key = "${current.serverUrl}|${current.accessToken.hashCode()}",
+        key = "${session.serverUrl}|${session.accessToken.hashCode()}",
         factory = viewModelFactory {
             initializer {
                 ShareViewModel(
-                    createDraft = { scope, published -> container.composerSession(current, scope, null, published) },
+                    createDraft = { scope, published -> current.composerSession(scope, null, published) },
                     content = content,
                 )
             }

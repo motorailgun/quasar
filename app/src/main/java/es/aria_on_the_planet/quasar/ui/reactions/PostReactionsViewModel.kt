@@ -2,8 +2,7 @@ package es.aria_on_the_planet.quasar.ui.reactions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
@@ -29,14 +28,14 @@ data class PostReactionsState(
 
 /** [statusId] (ブーストなら中身) をブースト / お気に入りにしたユーザー。 */
 class PostReactionsViewModel(
-    private val session: Session,
+    account: AccountContext,
     private val statusId: String,
-    private val repository: StatusRepository,
 ) : ViewModel() {
+    private val repository = account.statusRepository
 
     // max_id はブースト・お気に入りの ID なので、Link ヘッダから得た Page.nextMaxId でページングする
-    private val boosts = userFeed { maxId -> repository.fetchRebloggedBy(session, statusId, maxId) }
-    private val favourites = userFeed { maxId -> repository.fetchFavouritedBy(session, statusId, maxId) }
+    private val boosts = userFeed { maxId -> repository.fetchRebloggedBy(statusId, maxId) }
+    private val favourites = userFeed { maxId -> repository.fetchFavouritedBy(statusId, maxId) }
 
     val state: StateFlow<PostReactionsState> = combine(boosts.state, favourites.state, ::PostReactionsState)
         .stateIn(viewModelScope, SharingStarted.Eagerly, PostReactionsState())

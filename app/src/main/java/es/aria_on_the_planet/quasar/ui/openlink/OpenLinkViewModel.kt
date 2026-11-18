@@ -2,9 +2,8 @@ package es.aria_on_the_planet.quasar.ui.openlink
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.repository.ResolvedLink
-import es.aria_on_the_planet.quasar.data.repository.SearchRepository
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.ui.navigation.Route
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,10 +24,10 @@ sealed interface OpenLinkState {
 
 /** 他のアプリから共有された [query] (URL・`@user@domain`) を接続中サーバで引き、開く画面を決める。 */
 class OpenLinkViewModel(
-    private val session: Session,
+    account: AccountContext,
     val query: String,
-    private val repository: SearchRepository,
 ) : ViewModel() {
+    private val repository = account.searchRepository
     private val _state = MutableStateFlow<OpenLinkState>(OpenLinkState.Loading)
     val state: StateFlow<OpenLinkState> = _state.asStateFlow()
 
@@ -40,7 +39,7 @@ class OpenLinkViewModel(
         _state.value = OpenLinkState.Loading
         viewModelScope.launch {
             _state.value = try {
-                when (val link = repository.resolve(session, query)) {
+                when (val link = repository.resolve(query)) {
                     is ResolvedLink.ToPost -> OpenLinkState.Resolved(Route.Post(link.post.statusId))
                     is ResolvedLink.ToAccount -> OpenLinkState.Resolved(Route.Profile(link.user.inServerId))
                     is ResolvedLink.ToHashtag -> OpenLinkState.Resolved(Route.Hashtag(link.name))

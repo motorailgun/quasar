@@ -16,12 +16,12 @@ import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
  * プロフィールですぐ出すため)。
  */
 class NotificationRepository(
+    private val session: Session,
     private val mastodonApi: MastodonApi,
     private val cache: EntityCache,
 ) {
     /** [maxId] より古い (または [sinceId] より新しい) 通知を [api] で取得する。 */
     suspend fun fetch(
-        session: Session,
         api: NotificationApi,
         maxId: String? = null,
         sinceId: String? = null,

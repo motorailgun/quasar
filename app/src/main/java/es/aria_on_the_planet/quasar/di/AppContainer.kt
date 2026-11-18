@@ -4,6 +4,7 @@ import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
 import es.aria_on_the_planet.quasar.data.cache.CacheDatabase
 import es.aria_on_the_planet.quasar.data.cache.EntityCache
@@ -16,18 +17,11 @@ import es.aria_on_the_planet.quasar.data.media.MediaDownloader
 import es.aria_on_the_planet.quasar.data.media.SystemMediaDownloader
 import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
-import es.aria_on_the_planet.quasar.data.repository.MediaRepository
-import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
-import es.aria_on_the_planet.quasar.data.repository.SearchRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.session.SecureStorage
 import es.aria_on_the_planet.quasar.data.session.SessionStore
 import es.aria_on_the_planet.quasar.data.settings.SettingsStore
-import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
 import es.aria_on_the_planet.quasar.data.translation.PostTranslator
 import es.aria_on_the_planet.quasar.data.translation.TextClassifierLanguageDetector
 import es.aria_on_the_planet.quasar.data.translation.TranslationModelFiles
@@ -35,16 +29,18 @@ import es.aria_on_the_planet.quasar.data.translation.createTranslationEngine
 import es.aria_on_the_planet.quasar.ui.translation.PostTranslationStore
 import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.composer.ComposerSession
 import es.aria_on_the_planet.quasar.ui.composer.EditTarget
-import es.aria_on_the_planet.quasar.ui.composer.DraftStore
-import es.aria_on_the_planet.quasar.ui.composer.PostEditStore
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -52,7 +48,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 
-/** 手動 DI コンテナ。 */
+/**
+ * 手動 DI コンテナ。アプリ全体で共有するもの (通信・サーバ単位の Repository・設定・翻訳等) を持ち、ログイン中の
+ * アカウントの分は [currentAccount] ([AccountUiContext] / [AccountContext]) が持つ。
+ */
 class AppContainer(context: Context) {
     val okHttpClient: OkHttpClient = OkHttpClient()
 
@@ -61,7 +60,7 @@ class AppContainer(context: Context) {
         coerceInputValues = true
     }
 
-    /** API の結果のキャッシュ (Room)。 */
+    /** API の結果のキャッシュ (Room)。今はアプリ全体で 1 つで、各 [AccountContext] に渡す。 */
     private val cache = EntityCache(CacheDatabase.create(context).cacheDao(), json)
 
     private val api = MastodonApi(okHttpClient, json)
@@ -78,11 +77,6 @@ class AppContainer(context: Context) {
 
     /** 設定。ここで作った時点 (起動時) から読み込み始める。 */
     val settingsStore = SettingsStore(context, appScope)
-    val timelineRepository = TimelineRepository(api, cache)
-    val accountRepository = AccountRepository(api, cache)
-    val statusRepository = StatusRepository(api, cache)
-    val notificationRepository = NotificationRepository(api, cache)
-    val searchRepository = SearchRepository(api, cache)
 
     init {
         appScope.launch {
@@ -97,7 +91,6 @@ class AppContainer(context: Context) {
     }
     val instanceRepository = InstanceRepository(api)
     val emojiRepository = EmojiRepository(api)
-    val mediaRepository = MediaRepository(api)
 
     /** 設定の「ライセンス」の中身。 */
     val licenseRepository = LicenseRepository(context)
@@ -116,34 +109,53 @@ class AppContainer(context: Context) {
     /** メディアの保存 (システムの DownloadManager に任せる)。 */
     val mediaDownloader: MediaDownloader = SystemMediaDownloader(context)
 
-    /** 書きかけの投稿 (クイック投稿バーと投稿画面で共有)。 */
-    val draftStore = DraftStore { session, scope, onPublished -> composerSession(session, scope, null, onPublished) }
+    /**
+     * [session] のアカウント 1 つ分の依存を作る。[currentAccount] が使うほか、ギャラリーが `.invalid` のサーバの
+     * 投稿欄を作るのにも使う (使い終わったら [AccountUiContext.close])。
+     */
+    fun createAccount(session: Session): AccountUiContext = AccountUiContext(
+        AccountContext(
+            session = session,
+            cache = cache,
+            api = api,
+            okHttpClient = okHttpClient,
+            json = json,
+            instanceRepository = instanceRepository,
+        ),
+        createComposer = ::composerSession,
+    )
 
-    /** 詳細のパネル (タブレット表示) の中の書きかけの投稿。[draftStore] とは別で、パネルの中の画面だけで共有する。 */
-    val panelDraftStore = DraftStore { session, scope, onPublished -> composerSession(session, scope, null, onPublished) }
-
-    /** 自分のポストの編集・削除 (どの画面のメニューからでも同じ流れ)。 */
-    val postEditStore = PostEditStore(statusRepository) { session, scope, target, onSaved ->
-        composerSession(session, scope, target, onSaved)
-    }
+    private val _currentAccount = MutableStateFlow(sessionStore.session.value?.let(::createAccount))
 
     /**
-     * 投稿欄 1 つ分。[editing] が `null` なら新しい投稿 ([draftStore] が持つ)、あれば自分のポストの編集
-     * ([postEditStore] が持つ)。[onPublished] は投稿・保存できたとき。
+     * ログイン中のアカウント ([SessionStore.session] から作る。ログアウト中は `null`)。セッションが変わったら作り直し、
+     * 前のものは閉じる (下書きのアップロード等を止める)。
      */
-    fun composerSession(
-        session: Session,
+    val currentAccount: StateFlow<AccountUiContext?> = _currentAccount.asStateFlow()
+
+    init {
+        // 書きかけの投稿等は Main で動くので、作り直しも Main で行う
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
+            sessionStore.session.collect { session ->
+                val previous = _currentAccount.value
+                if (previous?.account?.session == session) return@collect
+                _currentAccount.value = session?.let(::createAccount)
+                previous?.close()
+            }
+        }
+    }
+
+    /** [account] の投稿欄 1 つ分 ([AccountUiContext.composerSession])。 */
+    private fun composerSession(
+        account: AccountContext,
         scope: CoroutineScope,
         editing: EditTarget?,
         onPublished: (Post) -> Unit,
     ) = ComposerSession(
-        session = session,
+        account = account,
         scope = scope,
-        accountRepository = accountRepository,
         instanceRepository = instanceRepository,
         emojiRepository = emojiRepository,
-        statusRepository = statusRepository,
-        mediaRepository = mediaRepository,
         defaultVisibilitySetting = settingsStore.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
         openUploadSource = ::uploadSource,
         editing = editing,
@@ -157,8 +169,6 @@ class AppContainer(context: Context) {
         },
         onPublished = onPublished,
     )
-
-    val streamingClient = StreamingClient(okHttpClient, json, instanceRepository, cache)
 
     /**
      * ポストの訳 (端末内のモデル)。モデルを持たないビルド (lite) では null で、翻訳の表示・設定は出ない。

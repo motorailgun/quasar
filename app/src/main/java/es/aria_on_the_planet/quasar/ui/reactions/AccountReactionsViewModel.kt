@@ -3,11 +3,9 @@ package es.aria_on_the_planet.quasar.ui.reactions
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.ui.feed.withPostChange
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
@@ -39,13 +37,13 @@ data class AccountReactionsState(
  * キャッシュに入っているので、普段は期限切れの分だけを取り直す。
  */
 class AccountReactionsViewModel(
-    private val session: Session,
+    account: AccountContext,
     private val accountId: String,
     val type: NotificationType,
     private val statusIds: List<String>,
-    private val accountRepository: AccountRepository,
-    private val statusRepository: StatusRepository,
 ) : ViewModel() {
+    private val accountRepository = account.accountRepository
+    private val statusRepository = account.statusRepository
 
     /** まとめられたポストの数 (読み込み前のタイトル用)。 */
     val postCount: Int = statusIds.size
@@ -83,7 +81,7 @@ class AccountReactionsViewModel(
                     _state.update { it.copy(posts = statusIds.mapNotNull { id -> cached[id]?.value }) }
                 }
                 val stale = statusIds.filter { cached[it]?.isFresh != true }
-                val fetched = if (stale.isEmpty()) emptyMap() else statusRepository.fetchPosts(session, stale).associateBy { it.statusId }
+                val fetched = if (stale.isEmpty()) emptyMap() else statusRepository.fetchPosts(stale).associateBy { it.statusId }
                 val posts = statusIds.mapNotNull { id -> if (id in stale) fetched[id] else cached[id]?.value }
                 _state.update { it.copy(posts = posts, account = account.await() ?: it.account) }
             } catch (e: CancellationException) {
@@ -101,7 +99,7 @@ class AccountReactionsViewModel(
     private suspend fun loadAccount(force: Boolean): User? = try {
         val cached = if (force) null else accountRepository.cachedProfile(accountId)
         cached?.let { hit -> _state.update { it.copy(account = hit.value.user) } }
-        if (cached?.isFresh == true) cached.value.user else accountRepository.fetchProfile(session, accountId).user
+        if (cached?.isFresh == true) cached.value.user else accountRepository.fetchProfile(accountId).user
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -110,13 +108,13 @@ class AccountReactionsViewModel(
     }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+        viewModelScope.submitVote(statusRepository, post, choices) { poll ->
             updatePosts { it.withPoll(poll) }
         }
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        send = { statusId, action -> statusRepository.perform(statusId, action) },
         update = ::updatePosts,
         onError = { message, error -> Log.w(TAG, message, error) },
     )

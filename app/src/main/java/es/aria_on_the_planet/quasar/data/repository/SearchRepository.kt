@@ -20,6 +20,7 @@ sealed interface ResolvedLink {
 
 /** 検索 (`/api/v2/search`)。検索画面と、他のアプリから共有された URL を開くのに使う。 */
 class SearchRepository(
+    private val session: Session,
     private val api: MastodonApi,
     private val cache: EntityCache,
 ) {
@@ -27,7 +28,7 @@ class SearchRepository(
      * [query] (ポスト・プロフィールの URL、`@user@domain`) を接続中サーバで引く (要認証)。サーバがまだ知らないものは
      * サーバが ActivityPub / WebFinger で取りに行く。見られないもの (フォロワー限定等)・取れないものは [ResolvedLink.NotFound]。
      */
-    suspend fun resolve(session: Session, query: String): ResolvedLink {
+    suspend fun resolve(query: String): ResolvedLink {
         val version = cache.issue()
         val results = api.search(session.serverUrl, session.accessToken, query, resolve = true, limit = 1)
         cache.putStatuses(results.statuses, version)
@@ -42,26 +43,25 @@ class SearchRepository(
      * アカウントの検索。続きは `offset` で取るので、次ページの「`max_id`」には次の offset を入れる ([searchPage])。
      * 最初のページだけ `resolve` する (`@user@domain`・URL でサーバがまだ知らないアカウントも引ける)。
      */
-    suspend fun searchAccounts(session: Session, query: String, offset: String?): Page<User> =
-        searchPage(session, query, "accounts", offset) { results, version ->
+    suspend fun searchAccounts(query: String, offset: String?): Page<User> =
+        searchPage(query, "accounts", offset) { results, version ->
             cache.putAccounts(results.accounts, version)
             results.accounts.map { it.toDomain() }
         }
 
     /** ポストの検索。全文検索はサーバの設定 (Elasticsearch 等) 次第で、無ければ自分のポストや URL だけが当たる。 */
-    suspend fun searchPosts(session: Session, query: String, offset: String?): Page<Post> =
-        searchPage(session, query, "statuses", offset) { results, version ->
+    suspend fun searchPosts(query: String, offset: String?): Page<Post> =
+        searchPage(query, "statuses", offset) { results, version ->
             cache.putStatuses(results.statuses, version)
             results.statuses.map { it.toDomain() }
         }
 
-    suspend fun searchHashtags(session: Session, query: String, offset: String?): Page<Hashtag> =
-        searchPage(session, query, "hashtags", offset) { results, _ ->
+    suspend fun searchHashtags(query: String, offset: String?): Page<Hashtag> =
+        searchPage(query, "hashtags", offset) { results, _ ->
             results.hashtags.map { Hashtag(it.name, it.url) }
         }
 
     private suspend fun <T> searchPage(
-        session: Session,
         query: String,
         type: String,
         offset: String?,

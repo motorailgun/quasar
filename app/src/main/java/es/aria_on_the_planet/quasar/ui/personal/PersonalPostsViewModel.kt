@@ -3,11 +3,8 @@ package es.aria_on_the_planet.quasar.ui.personal
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.repository.withPoll
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
@@ -26,18 +23,18 @@ enum class PersonalPostList { Favourites, Bookmarks, PrivateMentions }
  * (プロフィールのタブ・Mastodon Web と同じ)。
  */
 class PersonalPostsViewModel(
-    private val session: Session,
+    account: AccountContext,
     val list: PersonalPostList,
-    accountRepository: AccountRepository,
-    timelineRepository: TimelineRepository,
-    private val statusRepository: StatusRepository,
 ) : ViewModel() {
+    private val accountRepository = account.accountRepository
+    private val timelineRepository = account.timelineRepository
+    private val statusRepository = account.statusRepository
 
     private val posts = PostFeed.linked(viewModelScope) { maxId ->
         when (list) {
-            PersonalPostList.Favourites -> accountRepository.fetchFavourites(session, maxId, PageSize)
-            PersonalPostList.Bookmarks -> accountRepository.fetchBookmarks(session, maxId, PageSize)
-            PersonalPostList.PrivateMentions -> timelineRepository.fetchConversations(session, maxId)
+            PersonalPostList.Favourites -> accountRepository.fetchFavourites(maxId, PageSize)
+            PersonalPostList.Bookmarks -> accountRepository.fetchBookmarks(maxId, PageSize)
+            PersonalPostList.PrivateMentions -> timelineRepository.fetchConversations(maxId)
         }
     }
 
@@ -56,13 +53,13 @@ class PersonalPostsViewModel(
     fun loadMore() = posts.loadMore()
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+        viewModelScope.submitVote(statusRepository, post, choices) { poll ->
             posts.updatePosts { it.withPoll(poll) }
         }
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        send = { statusId, action -> statusRepository.perform(statusId, action) },
         update = posts::updatePosts,
         onError = { message, error -> Log.w(TAG, message, error) },
     )

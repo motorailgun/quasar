@@ -10,6 +10,7 @@ import es.aria_on_the_planet.quasar.domain.model.TimelineType
 
 /** タイムラインの取得。取得したポストはキャッシュ ([cache]) にも書く (ポスト画面・プロフィールですぐ出すため)。 */
 class TimelineRepository(
+    private val session: Session,
     private val api: MastodonApi,
     private val cache: EntityCache,
 ) {
@@ -17,7 +18,6 @@ class TimelineRepository(
      * [maxId] より古い (または [sinceId] より新しい) ポストを取得する。どちらも `null` なら最新から。
      */
     suspend fun fetch(
-        session: Session,
         type: TimelineType,
         maxId: String? = null,
         sinceId: String? = null,
@@ -34,7 +34,7 @@ class TimelineRepository(
     }
 
     /** ハッシュタグ [hashtag] (`#` 無し) を含む公開ポストのうち、[maxId] より古いものを取得する。 */
-    suspend fun fetchHashtag(session: Session, hashtag: String, maxId: String? = null): List<Post> {
+    suspend fun fetchHashtag(hashtag: String, maxId: String? = null): List<Post> {
         val version = cache.issue()
         val statuses = api.hashtagTimeline(session.serverUrl, session.accessToken, hashtag, maxId)
         cache.putStatuses(statuses, version)
@@ -48,7 +48,7 @@ class TimelineRepository(
      * ポストの無い会話 (後始末を通らずに消えたポストを指したまま残ったもの) だけのページは、続きがあれば次のページを読む。
      * 空のページを返すと終端と見なされ、その先が読めなくなるため。
      */
-    suspend fun fetchConversations(session: Session, maxId: String? = null): Page<Post> {
+    suspend fun fetchConversations(maxId: String? = null): Page<Post> {
         var nextMaxId = maxId
         while (true) {
             val version = cache.issue()

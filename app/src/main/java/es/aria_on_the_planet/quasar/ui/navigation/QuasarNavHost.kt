@@ -28,8 +28,9 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
+import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
-import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -96,7 +97,9 @@ import kotlinx.coroutines.flow.emptyFlow
  * * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。
  * * ViewModel・`rememberSaveable` は画面 (エントリ) ごと。下に積まれた画面はコンポジションから外れる
  *   (ストリーミング・インライン再生は今までの「別の Activity を開くと止まる」と同じく止まる)。
- * * 書きかけの投稿 (`DraftStore`) はセッションごとにここで開く (どの画面から復元されても使えるように)。
+ * * ログイン中のアカウントの依存 ([AccountUiContext]) を各画面に渡す。ViewModel にはそのデータ層の分 ([AccountContext]) を渡し、
+ *   ViewModel は寿命の間ずっと同じものを使う。
+ * * 書きかけの投稿 (`DraftStore`) はアカウントごとにここで開く (どの画面から復元されても使えるように)。
  *
  * @param externalLinks 他のアプリから「Quasar で開く」に共有された URL・`@user@domain` (`linkQueryOf`)。
  *   今の画面の上に開く (ログアウト中なら Toast)。
@@ -104,8 +107,8 @@ import kotlinx.coroutines.flow.emptyFlow
  */
 @Composable
 fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFlow(), onExit: () -> Unit) {
-    val session by container.sessionStore.session.collectAsStateWithLifecycle()
-    val current = session
+    val account by container.currentAccount.collectAsStateWithLifecycle()
+    val current = account
     val backStack = rememberNavBackStack(if (current == null) Route.Login else Route.Timeline)
 
     // ログイン・ログアウトでバックスタックを作り直す (状態から決めるので、復元時に余計な作り直しはしない)
@@ -116,15 +119,15 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     }
     LaunchedEffect(current) {
         if (current != null) {
-            container.draftStore.open(current)
-            container.panelDraftStore.open(current)
+            current.draftStore.open()
+            current.panelDraftStore.open()
         }
     }
 
     val context = LocalContext.current
     LaunchedEffect(externalLinks) {
         externalLinks.collect { query ->
-            if (container.sessionStore.session.value == null) {
+            if (container.currentAccount.value == null) {
                 Toast.makeText(context, R.string.open_link_not_logged_in, Toast.LENGTH_SHORT).show()
             } else {
                 // タグのページは検索では引けないので URL から直接開く。同じものを続けて共有されたら積まない
@@ -150,15 +153,12 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     val sceneStrategies = remember(panel, panelEnabled) {
         listOf(OverlaySceneStrategy<NavKey>(), DetailPanelSceneStrategy(panel, panelEnabled))
     }
-    // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
-    val accountActions = remember(current) { current?.let { SessionAccountActions(it, container.accountRepository) } }
-    // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
-    val ownPostActions = remember(current) { current?.let { SessionOwnPostActions(it, container.postEditStore) } }
-    LaunchedEffect(current) { container.postEditStore.closeUnlessOwnedBy(current) }
     CompositionLocalProvider(
         LocalNavigator provides navigator,
-        LocalAccountActions provides accountActions,
-        LocalOwnPostActions provides ownPostActions,
+        // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
+        LocalAccountActions provides current?.accountActions,
+        // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
+        LocalOwnPostActions provides current?.ownPostActions,
         LocalPostTranslations provides container.postTranslations,
         LocalFloatingPanelInset provides panel.coveredWidth,
     ) {
@@ -182,43 +182,43 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
                     entry<Route.Login> { LoginScreen(container.oauthLogin) }
                     entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
                     entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
-                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
-                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
+                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(it, key, navigator) } }
+                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(it, key, navigator) } }
                     entry<Route.PersonalPosts>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { PersonalPostsEntry(container, it, key, navigator) }
+                        WithSession(current) { PersonalPostsEntry(it, key, navigator) }
                     }
                     entry<Route.Search>(metadata = DetailPanelSceneStrategy.panel()) {
-                        WithSession(current) { SearchEntry(container, it, navigator) }
+                        WithSession(current) { SearchEntry(it, navigator) }
                     }
                     entry<Route.FollowRequests>(metadata = DetailPanelSceneStrategy.panel()) {
-                        WithSession(current) { FollowRequestsEntry(container, it, navigator) }
+                        WithSession(current) { FollowRequestsEntry(it, navigator) }
                     }
                     entry<Route.AccountReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
+                        WithSession(current) { AccountReactionsEntry(it, key, navigator) }
                     }
                     entry<Route.PostReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
+                        WithSession(current) { PostReactionsEntry(it, key, navigator) }
                     }
-                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
+                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { PostEntry(it, key, navigator) } }
                     entry<Route.OpenLink>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { session ->
-                            OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
+                        WithSession(current) { account ->
+                            OpenLinkEntry(account, key, navigator) { backStack.replace(key, it) }
                         }
                     }
-                    entry<Route.Composer> { key -> ComposerEntry(container, key, navigator) }
+                    entry<Route.Composer> { key -> WithSession(current) { ComposerEntry(it, key, navigator) } }
                     mediaViewerEntry(container, onBack = navigator::back)
                     settingsEntries(container, navigator) { backStack.add(it) }
                 },
             )
-            PostEditorHost(container.postEditStore)
+            current?.let { PostEditorHost(it.postEditStore) }
         }
     }
 }
 
 /** ログイン中だけ中身を出す (ログアウト直後、バックスタックを作り直すまでの間は何も出さない)。 */
 @Composable
-private fun WithSession(session: Session?, content: @Composable (Session) -> Unit) {
-    if (session != null) content(session)
+private fun WithSession(account: AccountUiContext?, content: @Composable (AccountUiContext) -> Unit) {
+    if (account != null) content(account)
 }
 
 private fun NavBackStack<NavKey>.resetTo(root: Route) {
@@ -306,18 +306,14 @@ private class BackStackNavigator(
 }
 
 @Composable
-private fun TimelineEntry(container: AppContainer, session: Session) {
+private fun TimelineEntry(container: AppContainer, account: AccountUiContext) {
+    val session = account.account.session
     val viewModel: TimelineViewModel = viewModel(
         key = "${session.serverUrl}|${session.accessToken.hashCode()}",
         factory = viewModelFactory {
             initializer {
                 TimelineViewModel(
-                    session,
-                    container.timelineRepository,
-                    container.statusRepository,
-                    container.notificationRepository,
-                    container.accountRepository,
-                    container.streamingClient,
+                    account.account,
                     container.settingsStore.loaded,
                 )
             }
@@ -325,47 +321,45 @@ private fun TimelineEntry(container: AppContainer, session: Session) {
     )
     TimelineScreen(
         viewModel = viewModel,
-        drafts = container.draftStore,
+        drafts = account.draftStore,
     )
 }
 
-/** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアプリ全体のもの。 */
+/** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアカウントのもの。 */
 @Composable
-private fun draftsHere(container: AppContainer): DraftStore =
-    if (LocalInDetailPanel.current) container.panelDraftStore else container.draftStore
+private fun draftsHere(account: AccountUiContext): DraftStore =
+    if (LocalInDetailPanel.current) account.panelDraftStore else account.draftStore
 
 /** クイック投稿バーの無い画面からの返信: 下書き (この画面のもの) の返信先にして投稿画面で書く。 */
 @Composable
-private fun replyInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit {
+private fun replyInComposer(account: AccountUiContext, navigator: Navigator): (Post) -> Unit {
     val inPanel = LocalInDetailPanel.current
-    val drafts = draftsHere(container)
+    val drafts = draftsHere(account)
     return { post ->
-        drafts.open(session).startReply(post)
+        drafts.open().startReply(post)
         navigator.openComposer(panelDraft = inPanel)
     }
 }
 
 /** クイック投稿バーの無い画面からの引用 (ブーストの長押し): 下書きの引用先にして投稿画面で書く。 */
 @Composable
-private fun quoteInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit {
+private fun quoteInComposer(account: AccountUiContext, navigator: Navigator): (Post) -> Unit {
     val inPanel = LocalInDetailPanel.current
-    val drafts = draftsHere(container)
+    val drafts = draftsHere(account)
     return { post ->
-        drafts.open(session).startQuote(post)
+        drafts.open().startQuote(post)
         navigator.openComposer(panelDraft = inPanel)
     }
 }
 
 @Composable
-private fun ProfileEntry(container: AppContainer, session: Session, key: Route.Profile, navigator: Navigator) {
+private fun ProfileEntry(container: AppContainer, account: AccountUiContext, key: Route.Profile, navigator: Navigator) {
     val viewModel: ProfileViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
                 ProfileViewModel(
-                    session = session,
+                    account = account.account,
                     accountId = key.accountId,
-                    repository = container.accountRepository,
-                    statusRepository = container.statusRepository,
                     instanceRepository = container.instanceRepository,
                     emojiRepository = container.emojiRepository,
                     openUploadSource = container::uploadSource,
@@ -391,16 +385,16 @@ private fun ProfileEntry(container: AppContainer, session: Session, key: Route.P
         onFollowingClick = { navigator.openFollowList(key.accountId, FollowListTab.Following) },
         onFollowersClick = { navigator.openFollowList(key.accountId, FollowListTab.Followers) },
         onOpenImage = navigator::openMediaViewer,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun FollowListEntry(container: AppContainer, session: Session, key: Route.FollowList, navigator: Navigator) {
+private fun FollowListEntry(account: AccountUiContext, key: Route.FollowList, navigator: Navigator) {
     val viewModel: FollowListViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { FollowListViewModel(session, key.accountId, container.accountRepository) }
+            initializer { FollowListViewModel(account.account, key.accountId) }
         },
     )
     FollowListScreen(
@@ -412,18 +406,10 @@ private fun FollowListEntry(container: AppContainer, session: Session, key: Rout
 }
 
 @Composable
-private fun HashtagEntry(container: AppContainer, session: Session, key: Route.Hashtag, navigator: Navigator) {
+private fun HashtagEntry(account: AccountUiContext, key: Route.Hashtag, navigator: Navigator) {
     val viewModel: HashtagViewModel = viewModel(
         factory = viewModelFactory {
-            initializer {
-                HashtagViewModel(
-                    session,
-                    key.name,
-                    container.timelineRepository,
-                    container.statusRepository,
-                    container.accountRepository,
-                )
-            }
+            initializer { HashtagViewModel(account.account, key.name) }
         },
     )
     HashtagScreen(
@@ -434,24 +420,16 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
         onMediaClick = navigator::openMedia,
         // 同じハッシュタグからは遷移しない
         onHashtagClick = { tag -> if (!tag.equals(key.name, ignoreCase = true)) navigator.openHashtag(tag) },
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun PersonalPostsEntry(container: AppContainer, session: Session, key: Route.PersonalPosts, navigator: Navigator) {
+private fun PersonalPostsEntry(account: AccountUiContext, key: Route.PersonalPosts, navigator: Navigator) {
     val viewModel: PersonalPostsViewModel = viewModel(
         factory = viewModelFactory {
-            initializer {
-                PersonalPostsViewModel(
-                    session,
-                    key.list,
-                    container.accountRepository,
-                    container.timelineRepository,
-                    container.statusRepository,
-                )
-            }
+            initializer { PersonalPostsViewModel(account.account, key.list) }
         },
     )
     PersonalPostsScreen(
@@ -461,16 +439,16 @@ private fun PersonalPostsEntry(container: AppContainer, session: Session, key: R
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun SearchEntry(container: AppContainer, session: Session, navigator: Navigator) {
+private fun SearchEntry(account: AccountUiContext, navigator: Navigator) {
     val viewModel: SearchViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { SearchViewModel(session, container.searchRepository, container.statusRepository) }
+            initializer { SearchViewModel(account.account) }
         },
     )
     SearchScreen(
@@ -480,23 +458,22 @@ private fun SearchEntry(container: AppContainer, session: Session, navigator: Na
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun FollowRequestsEntry(container: AppContainer, session: Session, navigator: Navigator) {
+private fun FollowRequestsEntry(account: AccountUiContext, navigator: Navigator) {
     val viewModel: FollowRequestsViewModel = viewModel(
-        factory = viewModelFactory { initializer { FollowRequestsViewModel(session, container.accountRepository) } },
+        factory = viewModelFactory { initializer { FollowRequestsViewModel(account.account) } },
     )
     FollowRequestsScreen(viewModel = viewModel, onBack = navigator::back, onUserClick = navigator::openProfile)
 }
 
 @Composable
 private fun AccountReactionsEntry(
-    container: AppContainer,
-    session: Session,
+    account: AccountUiContext,
     key: Route.AccountReactions,
     navigator: Navigator,
 ) {
@@ -504,12 +481,10 @@ private fun AccountReactionsEntry(
         factory = viewModelFactory {
             initializer {
                 AccountReactionsViewModel(
-                    session = session,
+                    account = account.account,
                     accountId = key.accountId,
                     type = key.type,
                     statusIds = key.statusIds,
-                    accountRepository = container.accountRepository,
-                    statusRepository = container.statusRepository,
                 )
             }
         },
@@ -521,27 +496,26 @@ private fun AccountReactionsEntry(
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun PostEntry(container: AppContainer, session: Session, key: Route.Post, navigator: Navigator) {
+private fun PostEntry(account: AccountUiContext, key: Route.Post, navigator: Navigator) {
     val viewModel: PostViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
                 PostViewModel(
-                    session = session,
+                    account = account.account,
                     statusId = key.statusId,
-                    repository = container.statusRepository,
                 )
             }
         },
     )
     PostScreen(
         viewModel = viewModel,
-        drafts = draftsHere(container),
+        drafts = draftsHere(account),
         onBack = navigator::back,
         onUserClick = navigator::openProfile,
         onPostClick = { id -> if (id != key.statusId) navigator.openPost(id) },
@@ -555,10 +529,10 @@ private fun PostEntry(container: AppContainer, session: Session, key: Route.Post
 }
 
 @Composable
-private fun PostReactionsEntry(container: AppContainer, session: Session, key: Route.PostReactions, navigator: Navigator) {
+private fun PostReactionsEntry(account: AccountUiContext, key: Route.PostReactions, navigator: Navigator) {
     val viewModel: PostReactionsViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { PostReactionsViewModel(session, key.statusId, container.statusRepository) }
+            initializer { PostReactionsViewModel(account.account, key.statusId) }
         },
     )
     PostReactionsScreen(
@@ -572,15 +546,14 @@ private fun PostReactionsEntry(container: AppContainer, session: Session, key: R
 /** 共有された URL を開く途中の画面。引けたら行き先の画面に置き換える ([onResolved])。 */
 @Composable
 private fun OpenLinkEntry(
-    container: AppContainer,
-    session: Session,
+    account: AccountUiContext,
     key: Route.OpenLink,
     navigator: Navigator,
     onResolved: (Route) -> Unit,
 ) {
     val viewModel: OpenLinkViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { OpenLinkViewModel(session, key.query, container.searchRepository) }
+            initializer { OpenLinkViewModel(account.account, key.query) }
         },
     )
     OpenLinkScreen(viewModel = viewModel, onBack = navigator::back, onResolved = onResolved)
@@ -588,8 +561,8 @@ private fun OpenLinkEntry(
 
 /** 投稿画面 (単独)。投稿できたら閉じる。閉じても下書きは残す。 */
 @Composable
-private fun ComposerEntry(container: AppContainer, key: Route.Composer, navigator: Navigator) {
-    val drafts = if (key.panelDraft) container.panelDraftStore else container.draftStore
+private fun ComposerEntry(account: AccountUiContext, key: Route.Composer, navigator: Navigator) {
+    val drafts = if (key.panelDraft) account.panelDraftStore else account.draftStore
     val draft by drafts.current.collectAsStateWithLifecycle()
     LaunchedEffect(drafts) {
         drafts.published.collect { navigator.back() }
@@ -615,9 +588,9 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
 ) {
     val update = container.settingsStore::launchUpdate
     entry<Route.Settings> {
-        val session by container.sessionStore.session.collectAsStateWithLifecycle()
+        val account by container.currentAccount.collectAsStateWithLifecycle()
         SettingsTopPage(
-            serverUrl = session?.serverUrl,
+            serverUrl = account?.account?.session?.serverUrl,
             translationAvailable = container.postTranslations != null,
             onNavigate = navigate,
             onLogout = container.oauthLogin::logout,

@@ -47,15 +47,16 @@ internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
     val navigator = LocalNavigator.current
     val session = remember {
         val container = (context.applicationContext as QuasarApplication).container
+        val account = container.createAccount(Session(serverUrl = "https://gallery.invalid", accessToken = "gallery"))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        scope to container.composerSession(
-            session = Session(serverUrl = "https://gallery.invalid", accessToken = "gallery"),
-            scope = scope,
-            editing = null,
-            onPublished = {},
-        )
+        Triple(account, scope, account.composerSession(scope = scope, editing = null, onPublished = {}))
     }
-    DisposableEffect(Unit) { onDispose { session.first.cancel() } }
+    DisposableEffect(Unit) {
+        onDispose {
+            session.second.cancel()
+            session.first.close()
+        }
+    }
     val hazeState = rememberHazeState()
     val listState = rememberLazyListState()
     DetailScaffold(
@@ -74,7 +75,7 @@ internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxSize().surfaceBlurSource(hazeState, LocalSurfaceBlurEnabled.current),
             )
             QuickPostBar(
-                session = session.second,
+                session = session.third,
                 hazeState = hazeState,
                 onExpand = {},
                 modifier = Modifier

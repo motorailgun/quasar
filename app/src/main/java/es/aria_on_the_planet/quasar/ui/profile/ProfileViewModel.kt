@@ -2,6 +2,7 @@ package es.aria_on_the_planet.quasar.ui.profile
 
 import android.util.Log
 import android.net.Uri
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.media.ImageUploadLimits
 import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.media.profileImageLimits
@@ -19,11 +20,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
 import es.aria_on_the_planet.quasar.ui.feed.withPostChange
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
@@ -143,10 +141,8 @@ data class ProfileScreenState(
 }
 
 class ProfileViewModel(
-    private val session: Session,
+    account: AccountContext,
     private val accountId: String,
-    private val repository: AccountRepository,
-    private val statusRepository: StatusRepository,
     private val instanceRepository: InstanceRepository,
     private val emojiRepository: EmojiRepository,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
@@ -154,6 +150,9 @@ class ProfileViewModel(
     /** 上限に合わない画像を作り直す (`ImageReencoder.prepare`)。プロフィールの画像は確かめずに常に通す。 */
     private val prepareImage: suspend (UploadSource, ImageUploadLimits) -> UploadSource = { source, _ -> source },
 ) : ViewModel() {
+    private val serverUrl = account.session.serverUrl
+    private val repository = account.accountRepository
+    private val statusRepository = account.statusRepository
 
     private val profile = MutableStateFlow(ProfileState())
     private val extras = MutableStateFlow(ProfileExtras())
@@ -170,7 +169,6 @@ class ProfileViewModel(
     // 前に開いたときの一覧を先に出す (showCachedPosts)
     private val posts = PostFeed(viewModelScope, firstPageLimit = InitialPostCount) { maxId ->
         repository.fetchPosts(
-            session = session,
             accountId = accountId,
             maxId = maxId,
             limit = if (maxId == null) InitialPostCount else PageSize,
@@ -179,17 +177,17 @@ class ProfileViewModel(
 
     /** メディア付きのポストのみ (メディアのタブ)。初めて開いたときに読み込む。 */
     private val media = PostFeed(viewModelScope) { maxId ->
-        repository.fetchPosts(session = session, accountId = accountId, maxId = maxId, limit = PageSize, onlyMedia = true)
+        repository.fetchPosts(accountId = accountId, maxId = maxId, limit = PageSize, onlyMedia = true)
     }
 
     /** 自分がお気に入りにしたポスト (自分のプロフィールのお気に入りのタブ)。初めて開いたときに読み込む。 */
     private val favourites = PostFeed.linked(viewModelScope) { maxId ->
-        repository.fetchFavourites(session = session, maxId = maxId, limit = PageSize)
+        repository.fetchFavourites(maxId = maxId, limit = PageSize)
     }
 
     /** 自分がブックマークしたポスト (自分のプロフィールのブックマークのタブ)。初めて開いたときに読み込む。 */
     private val bookmarks = PostFeed.linked(viewModelScope) { maxId ->
-        repository.fetchBookmarks(session = session, maxId = maxId, limit = PageSize)
+        repository.fetchBookmarks(maxId = maxId, limit = PageSize)
     }
 
     private val feeds = ProfileTab.entries.associateWith { tab ->
@@ -256,7 +254,7 @@ class ProfileViewModel(
         button.value = current.copy(isUpdating = true)
         viewModelScope.launch {
             try {
-                val updated = repository.setFollowing(session, accountId, follow)
+                val updated = repository.setFollowing(accountId, follow)
                 // フォローリクエストへの返事を送信中でも、その状態は残す
                 button.update { (it as? ProfileButtonState.Follow)?.copy(relationship = updated, isUpdating = false) ?: it }
                 // フォロワー数はプロフィールを読み直さずに手元で合わせる (リクエスト中は数えない)
@@ -283,9 +281,9 @@ class ProfileViewModel(
         viewModelScope.launch {
             try {
                 val updated = when (action.type) {
-                    AccountActionType.Block -> repository.setBlocking(session, accountId, block = !action.undo)
-                    AccountActionType.Mute -> repository.setMuting(session, accountId, mute = !action.undo)
-                    AccountActionType.HideBoosts -> repository.setShowingReblogs(session, accountId, show = action.undo)
+                    AccountActionType.Block -> repository.setBlocking(accountId, block = !action.undo)
+                    AccountActionType.Mute -> repository.setMuting(accountId, mute = !action.undo)
+                    AccountActionType.HideBoosts -> repository.setShowingReblogs(accountId, show = action.undo)
                 }
                 button.update { (it as? ProfileButtonState.Follow)?.copy(relationship = updated, isUpdating = false) ?: it }
                 // ブロックするとフォローが切れる。フォロワー数はプロフィールを読み直さずに手元で合わせる
@@ -311,7 +309,7 @@ class ProfileViewModel(
         button.value = current.copy(answering = accept)
         viewModelScope.launch {
             try {
-                val updated = repository.answerFollowRequest(session, accountId, accept)
+                val updated = repository.answerFollowRequest(accountId, accept)
                 button.update { (it as? ProfileButtonState.Follow)?.copy(relationship = updated, answering = null) ?: it }
                 // 承認したら相手のフォロー数が 1 増える (プロフィールを読み直さずに手元で合わせる)
                 if (accept && updated.followedBy && !current.relationship.followedBy) {
@@ -331,10 +329,10 @@ class ProfileViewModel(
         if (button.value != ProfileButtonState.EditProfile || edit.value != null) return
         edit.value = ProfileEdit.Loading
         editJob = viewModelScope.launch {
-            val limits = async { runOptional("instance") { instanceRepository.instance(session.serverUrl).profileLimits } }
-            val emojis = async { runOptional("emojis") { emojiRepository.pickerEmojis(session.serverUrl) } }
+            val limits = async { runOptional("instance") { instanceRepository.instance(serverUrl).profileLimits } }
+            val emojis = async { runOptional("emojis") { emojiRepository.pickerEmojis(serverUrl) } }
             try {
-                val source = repository.fetchProfileSource(session)
+                val source = repository.fetchProfileSource()
                 edit.value = ProfileEdit.Editing(
                     editor = ProfileEditor(source),
                     limits = limits.await() ?: ProfileLimits(),
@@ -376,11 +374,11 @@ class ProfileViewModel(
                 }
                 // 上限 (2MB) を超える・受け付けない形式の画像は送る前に作り直す (WebP を使えるかは添付の形式から決める)
                 val imageLimits = profileImageLimits(
-                    runOptional("instance") { instanceRepository.instance(session.serverUrl) }?.composeLimits?.supportedMimeTypes,
+                    runOptional("instance") { instanceRepository.instance(serverUrl) }?.composeLimits?.supportedMimeTypes,
                 )
                 val preparedAvatar = avatar?.let { prepareImage(it, imageLimits) }
                 val preparedHeader = header?.let { prepareImage(it, imageLimits) }
-                val updated = repository.updateProfile(session, source, preparedAvatar, preparedHeader)
+                val updated = repository.updateProfile(source, preparedAvatar, preparedHeader)
                 profile.update { it.copy(profile = updated) }
                 edit.value = null
                 // 自分のポストの名前・アイコンも変わるので、一覧を読み直す
@@ -397,14 +395,14 @@ class ProfileViewModel(
     }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+        viewModelScope.submitVote(statusRepository, post, choices) { poll ->
             feeds.values.forEach { feed -> feed.updatePosts { it.withPoll(poll) } }
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map { it.withPoll(poll) }) }
         }
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        send = { statusId, action -> statusRepository.perform(statusId, action) },
         update = { transform ->
             feeds.values.forEach { it.updatePosts(transform) }
             extras.update { e -> e.copy(pinnedPosts = e.pinnedPosts.map(transform)) }
@@ -430,7 +428,7 @@ class ProfileViewModel(
                     profile.update { it.copy(isLoading = false, isRefreshing = false) }
                     return@launch
                 }
-                val loaded = repository.fetchProfile(session, accountId)
+                val loaded = repository.fetchProfile(accountId)
                 profile.update { it.copy(profile = loaded, isLoading = false, isRefreshing = false) }
             } catch (e: CancellationException) {
                 throw e
@@ -457,14 +455,14 @@ class ProfileViewModel(
 
     private fun loadExtras() {
         viewModelScope.launch {
-            val pinned = runOptional("pinned posts") { repository.fetchPinnedPosts(session, accountId) }
+            val pinned = runOptional("pinned posts") { repository.fetchPinnedPosts(accountId) }
             pinned?.let { posts ->
                 pinnedFetched = true
                 extras.update { it.copy(pinnedPosts = posts) }
             }
         }
         viewModelScope.launch {
-            val followers = runOptional("followers you follow") { repository.fetchFamiliarFollowers(session, accountId) }
+            val followers = runOptional("followers you follow") { repository.fetchFamiliarFollowers(accountId) }
             followers?.let { users -> extras.update { it.copy(followersYouFollow = users) } }
         }
     }
@@ -475,7 +473,7 @@ class ProfileViewModel(
      */
     private fun loadRelationship(force: Boolean) {
         viewModelScope.launch {
-            val me = runOptional("current account") { repository.fetchMe(session) } ?: return@launch
+            val me = runOptional("current account") { repository.fetchMe() } ?: return@launch
             if (me.user.inServerId == accountId) {
                 button.value = ProfileButtonState.EditProfile
                 return@launch
@@ -485,7 +483,7 @@ class ProfileViewModel(
                 cached?.let { showRelationship(it.value) }
                 if (cached?.isFresh == true) return@launch
             }
-            val relationship = runOptional("relationship") { repository.fetchRelationship(session, accountId) }
+            val relationship = runOptional("relationship") { repository.fetchRelationship(accountId) }
                 ?: return@launch
             showRelationship(relationship)
         }

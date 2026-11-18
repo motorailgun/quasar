@@ -39,8 +39,8 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
      * リアクションしたユーザーの一覧 (ユーザーは post-variety の投稿者)。
      */
     /**
-     * 設定の「タイムライン」のページと、そこから開く「ポストのメニュー」(本物の設定に書く。項目を変えて post-variety の︙で確かめる)。
-     * 固定データは使わない (post-variety を指しているだけ)。
+     * 設定のトップと、そこから開く「タイムライン」(ギャラリーのアカウントの設定) と「ポストのメニュー」(本物の端末共通の設定に書く。
+     * 項目を変えて post-variety の︙で確かめる)。[TimelineSettingsGallery]。固定データは使わない (post-variety を指しているだけ)。
      */
     TimelineSettings("timeline-settings", R.string.gallery_timeline_settings, "post-variety.json"),
     PostDetail("post-detail", R.string.gallery_post_detail, "post-variety.json"),

@@ -145,9 +145,6 @@ class EntityCache(
     /** 種類ごとに上限 ([CachePolicy.MaxEntries]) を超えた古い分を消す。 */
     suspend fun trim() = write { CachePolicy.MaxEntries.forEach { (kind, keep) -> dao.trim(kind.name, keep) } }
 
-    /** 全部消す (ログアウト・別のアカウントでのログイン)。 */
-    suspend fun clear() = write { dao.clear() }
-
     private fun <T> entry(kind: CacheKind, id: String, serializer: KSerializer<T>, value: T, version: Long) =
         CacheEntry(kind.name, id, json.encodeToString(serializer, value), version, fetchedAt = version)
 

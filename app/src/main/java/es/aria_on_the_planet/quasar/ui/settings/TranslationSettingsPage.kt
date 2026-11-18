@@ -54,7 +54,7 @@ private enum class TranslationDialog { Download, CancelDownload, Disable }
 fun TranslationSettingsPage(
     settings: TranslationSettings,
     translations: PostTranslationStore,
-    update: UpdateSettings,
+    update: UpdateDeviceSettings,
     onBack: () -> Unit,
 ) {
     // 開くたびにモデルのファイル・ダウンロードを見直す (adb で置いた直後・裏で落とし終えた等)

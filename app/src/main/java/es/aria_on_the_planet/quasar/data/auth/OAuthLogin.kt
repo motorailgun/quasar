@@ -1,11 +1,14 @@
 package es.aria_on_the_planet.quasar.data.auth
 
 import android.util.Log
+import es.aria_on_the_planet.quasar.data.account.AccountStore
+import es.aria_on_the_planet.quasar.data.account.StoredAccount
+import es.aria_on_the_planet.quasar.data.account.StoredProfile
+import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
+import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.session.SecureStorage
-import es.aria_on_the_planet.quasar.data.session.Session
-import es.aria_on_the_planet.quasar.data.session.SessionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,12 +56,13 @@ enum class LoginError {
  * 1. [begin]: `POST /api/v1/apps` でクライアントを登録し、認可画面の URL を返す (画面がブラウザで開く)。
  *    途中の状態 ([PendingAuthorization]) は [SecureStorage] に保存する (ブラウザにいる間にプロセスが終わってもよい)。
  * 2. [handleRedirect]: 戻ってきた URI (MainActivity が受ける) のコードを `POST /oauth/token` でトークンに換え、
- *    [SessionStore] に保存する。セッションができればナビゲーションがタイムラインに切り替わる。
+ *    `verify_credentials` でアカウント (ID・表示用の情報) を確かめて [AccountStore] に足し、使うアカウントにする。
+ *    使うアカウントができればナビゲーションがタイムラインに切り替わる。
  */
 class OAuthLogin(
     private val api: MastodonApi,
     private val storage: SecureStorage,
-    private val sessionStore: SessionStore,
+    private val accountStore: AccountStore,
     private val scope: CoroutineScope,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -134,7 +138,18 @@ class OAuthLogin(
                 codeVerifier = pending.codeVerifier,
                 scopes = OAuthConfig.Scopes,
             )
-            sessionStore.save(Session(pending.serverUrl, token.accessToken), pending.client)
+            // 同じアカウントでのログインし直しを見分けるのに ID が要る。確かめられなくてもログインはする (ID は最初の
+            // fetchMe で埋まる。その場合は同じアカウントでも別に足されうる)
+            val me = verify(pending.serverUrl, token.accessToken)
+            val result = accountStore.addLogin(
+                serverUrl = pending.serverUrl,
+                accessToken = token.accessToken,
+                client = pending.client,
+                accountId = me?.id,
+                profile = me?.let { StoredProfile(it.toDomain()) },
+            )
+            // 同じアカウントのトークンを差し替えたら、古いトークンは無効にする
+            result.replaced?.takeIf { it.accessToken != token.accessToken }?.let(::revoke)
             _status.value = LoginStatus.Idle
         } catch (e: CancellationException) {
             throw e
@@ -144,15 +159,31 @@ class OAuthLogin(
         }
     }
 
-    /** ログアウト: 保存したセッションを消し、サーバ側のトークンも無効にする (失敗してもログアウトはする)。 */
+    private suspend fun verify(serverUrl: String, accessToken: String): AccountDto? =
+        try {
+            api.verifyCredentials(serverUrl, accessToken)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Verifying the new account failed", e)
+            null
+        }
+
+    /**
+     * ログアウト: 使っているアカウントを一覧から除き、サーバ側のトークンも無効にする (失敗してもログアウトはする)。
+     * そのアカウントのキャッシュ・設定のファイルは `AppContainer` が閉じてから消す。
+     */
     fun logout() {
-        val session = sessionStore.session.value
-        val client = sessionStore.client
-        sessionStore.clear()
-        if (session == null || client == null) return
+        val active = accountStore.active.value ?: return
+        accountStore.remove(active.key)?.let(::revoke)
+    }
+
+    /** [account] のトークンを無効にする (待たない。失敗はログのみ)。 */
+    private fun revoke(account: StoredAccount) {
+        val client = account.client ?: return
         scope.launch {
             try {
-                api.revokeToken(session.serverUrl, client.clientId, client.clientSecret, session.accessToken)
+                api.revokeToken(account.serverUrl, client.clientId, client.clientSecret, account.accessToken)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

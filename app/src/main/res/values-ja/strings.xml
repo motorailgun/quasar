@@ -322,14 +322,16 @@
 
     <!-- 設定 -->
     <string name="settings">設定</string>
+    <string name="settings_account_section">アカウントの設定 (%1$s)</string>
+    <string name="settings_app_section">アプリの設定</string>
     <string name="settings_display">表示</string>
     <string name="settings_display_summary">レイアウト・長い投稿・アイコンの形・ぼかし・アニメーション</string>
     <string name="settings_timelines">タイムライン</string>
-    <string name="settings_timelines_summary">ポストのメニュー・自動更新・通知</string>
+    <string name="settings_timelines_summary">自動更新・通知</string>
     <string name="settings_posting">投稿</string>
-    <string name="settings_posting_summary">既定の公開範囲・投稿前の確認・画像</string>
+    <string name="settings_posting_summary">既定の公開範囲・画像</string>
     <string name="settings_confirmations">確認</string>
-    <string name="settings_confirmations_summary">ブースト・お気に入り・ブックマーク・自分の投稿</string>
+    <string name="settings_confirmations_summary">投稿・ブースト・お気に入り・ブックマーク・自分の投稿</string>
 
     <string name="settings_scale">大きさ</string>
     <string name="settings_ui_scale">UI の大きさ</string>
@@ -387,7 +389,7 @@
     <string name="settings_default_visibility">既定の公開範囲</string>
     <string name="settings_visibility_account_default">アカウントの既定</string>
     <string name="settings_visibility_account_default_description">サーバーでアカウントに設定している既定の公開範囲</string>
-    <string name="settings_confirm_post">投稿前に確認</string>
+    <string name="settings_confirm_post">投稿</string>
     <string name="settings_compress_oversized_images">大きな画像を圧縮</string>
     <string name="settings_compress_oversized_images_summary">サーバーの上限を超える画像を画質を下げて送信する</string>
     <string name="settings_strip_image_metadata">画像のメタデータを削除</string>

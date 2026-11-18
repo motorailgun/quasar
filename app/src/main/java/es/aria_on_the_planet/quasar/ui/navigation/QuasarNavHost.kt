@@ -36,7 +36,8 @@ import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.DeviceSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.ui.component.layout.LocalFloatingPanelInset
 import es.aria_on_the_planet.quasar.ui.timeline.visibleColumnCount
@@ -84,6 +85,7 @@ import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
 import es.aria_on_the_planet.quasar.ui.settings.TranslationSettingsPage
 import es.aria_on_the_planet.quasar.ui.component.post.LocalPostTranslations
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.UpdateAccountSettings
 import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
@@ -140,7 +142,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     val panel = remember(backStack) { DetailPanelState(pop = { backStack.removeLastOrNull() }) }
     val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, panel, onExit) }
     val backDamping = remember { PredictiveBackDamping() }
-    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
+    val settings by container.deviceSettings.settings.collectAsStateWithLifecycle()
     SideEffect {
         settings?.let {
             backDamping.settings = it.predictiveBack
@@ -314,7 +316,7 @@ private fun TimelineEntry(container: AppContainer, account: AccountUiContext) {
             initializer {
                 TimelineViewModel(
                     account.account,
-                    container.settingsStore.loaded,
+                    account.account.settings.loaded,
                 )
             }
         },
@@ -580,17 +582,17 @@ private fun ComposerEntry(account: AccountUiContext, key: Route.Composer, naviga
     }
 }
 
-/** 設定のページ。 */
+/** 設定のページ。「アカウントの設定」のページは使っているアカウントの設定を、それ以外は端末共通の設定を読み書きする。 */
 private fun EntryProviderScope<NavKey>.settingsEntries(
     container: AppContainer,
     navigator: Navigator,
     navigate: (Route) -> Unit,
 ) {
-    val update = container.settingsStore::launchUpdate
+    val update = container.deviceSettings::launchUpdate
     entry<Route.Settings> {
-        val account by container.currentAccount.collectAsStateWithLifecycle()
+        val stored by container.accountStore.active.collectAsStateWithLifecycle()
         SettingsTopPage(
-            serverUrl = account?.account?.session?.serverUrl,
+            account = stored?.let { account -> account.fullAcct?.let { "@$it" } ?: account.host },
             translationAvailable = container.postTranslations != null,
             onNavigate = navigate,
             onLogout = container.oauthLogin::logout,
@@ -598,20 +600,26 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     entry<Route.SettingsDisplay> {
-        WithSettings(container) { DisplaySettingsPage(it.display, update, onNavigate = navigate, onBack = navigator::back) }
+        WithDeviceSettings(container) { DisplaySettingsPage(it.display, update, onNavigate = navigate, onBack = navigator::back) }
     }
     entry<Route.SettingsAnimation> {
-        WithSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
+        WithDeviceSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
     }
     entry<Route.SettingsTimelines> {
-        WithSettings(container) { TimelineSettingsPage(it, update, onNavigate = navigate, onBack = navigator::back) }
+        WithAccountSettings(container) { settings, updateAccount ->
+            TimelineSettingsPage(settings, updateAccount, onBack = navigator::back)
+        }
     }
     entry<Route.SettingsPostMenu> {
-        WithSettings(container) { PostMenuSettingsPage(it.hiddenPostMenuItems, update, onBack = navigator::back) }
+        WithDeviceSettings(container) { PostMenuSettingsPage(it.hiddenPostMenuItems, update, onBack = navigator::back) }
     }
-    entry<Route.SettingsPosting> { WithSettings(container) { PostingSettingsPage(it, update, onBack = navigator::back) } }
+    entry<Route.SettingsPosting> {
+        WithAccountSettings(container) { settings, updateAccount ->
+            PostingSettingsPage(settings, updateAccount, onBack = navigator::back)
+        }
+    }
     entry<Route.SettingsConfirmations> {
-        WithSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
+        WithDeviceSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
     }
     entry<Route.SettingsExperimental> { ExperimentalSettingsPage(onNavigate = navigate, onBack = navigator::back) }
     entry<Route.SettingsTranslation> {
@@ -619,7 +627,7 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         if (translations == null) {
             LaunchedEffect(Unit) { navigator.back() }
         } else {
-            WithSettings(container) { TranslationSettingsPage(it.translation, translations, update, onBack = navigator::back) }
+            WithDeviceSettings(container) { TranslationSettingsPage(it.translation, translations, update, onBack = navigator::back) }
         }
     }
     entry<Route.SettingsLicenses> {
@@ -631,11 +639,26 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
 }
 
 /**
- * 今の設定で [content] を描く。設定はエントリの中で読む: `NavDisplay` は積まれたエントリ (中身のラムダごと) を
+ * 今の端末共通の設定で [content] を描く。設定はエントリの中で読む: `NavDisplay` は積まれたエントリ (中身のラムダごと) を
  * 使い回すので、`entryProvider` の外で読んだ値を渡すと、開いたときの値のまま変わらない。
  */
 @Composable
-private fun WithSettings(container: AppContainer, content: @Composable (AppSettings) -> Unit) {
-    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
-    content(settings ?: AppSettings())
+private fun WithDeviceSettings(container: AppContainer, content: @Composable (DeviceSettings) -> Unit) {
+    val settings by container.deviceSettings.settings.collectAsStateWithLifecycle()
+    content(settings ?: DeviceSettings())
+}
+
+/**
+ * 使っているアカウントの設定と、それを変える関数で [content] を描く ([WithDeviceSettings] と同じくエントリの中で読む)。
+ * ログアウト中・読み込み前は何も出さない。
+ */
+@Composable
+private fun WithAccountSettings(
+    container: AppContainer,
+    content: @Composable (AccountSettings, UpdateAccountSettings) -> Unit,
+) {
+    val account by container.currentAccount.collectAsStateWithLifecycle()
+    val store = account?.account?.settings ?: return
+    val settings by store.settings.collectAsStateWithLifecycle()
+    settings?.let { content(it, store::launchUpdate) }
 }

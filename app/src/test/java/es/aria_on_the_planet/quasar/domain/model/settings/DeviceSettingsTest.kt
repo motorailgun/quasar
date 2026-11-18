@@ -5,7 +5,7 @@ import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class AppSettingsTest {
+class DeviceSettingsTest {
     @Test
     fun everyPostActionHasItsOwnConfirmTarget() {
         val targets = PostActionType.entries.flatMap { type ->

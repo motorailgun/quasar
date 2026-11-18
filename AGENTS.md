@@ -39,10 +39,11 @@ es.aria_on_the_planet.quasar
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
-│   ├── account/                    AccountContext (アカウント 1 つ分のセッション・キャッシュ・Repository・StreamingClient)
-│   ├── session/                    SessionStore (サーバ URL / アクセストークン / OAuth クライアント) + SecureStorage (Keystore で暗号化)
+│   ├── account/                    AccountContext (アカウント 1 つ分のセッション・キャッシュ・設定・Repository・StreamingClient) /
+│                                   AccountStore (アカウントの一覧 + 使っているアカウント。StoredAccount / AccountKey)
+│   ├── session/                    Session (サーバ URL / アクセストークン) + SecureStorage (Keystore で暗号化。KeyValueStore)
 │   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
-│   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
+│   ├── settings/                   設定の保存 (SettingsStore = DataStore。端末共通 / アカウントごと / SettingsPreferences = 項目とキーの対応)
 │   ├── licenses/                   設定の「ライセンス」(LicenseRepository。依存の一覧 = AboutLibraries のプラグインが作る raw の JSON を
 │   │                               parseLibraryDefinitions で読む + BundledComponent = POM の無いもの。本文は assets/licenses/。
 │   │                               llama.cpp・libc++・PLaMo はフレーバー full の FlavorLicenses)
@@ -149,13 +150,20 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
 ## アカウントの依存 (`AccountContext` / `AccountUiContext`)
 * Repository (Timeline / Account / Status / Notification / Search / Media) と `StreamingClient` はアカウントごとのインスタンスで、
   `Session` をコンストラクタで受ける (**メソッドで `session` を受けない**。別のアカウントのセッションを渡せないように)。まとめて
-  持つのが `data/account/AccountContext` (キャッシュは今はアプリ全体で 1 つのものを渡している)。`InstanceRepository` /
-  `EmojiRepository` (サーバ単位・トークン無し) と `MastodonApi` はアプリ全体で共有。
+  持つのが `data/account/AccountContext` (`key`・`session`・専用のキャッシュの DB・アカウントごとの設定 `settings`・`scope`・
+  `close()` = DB を閉じる)。`InstanceRepository` / `EmojiRepository` (サーバ単位・トークン無し) と `MastodonApi` はアプリ全体で共有。
 * UI 側の 1 アカウント分は `ui/account/AccountUiContext`: `account` (上の `AccountContext`)・`draftStore` / `panelDraftStore` /
   `postEditStore`・`accountActions` / `ownPostActions` (`SessionAccountActions` / `SessionOwnPostActions`)・`composerSession(...)`
-  (投稿欄を作る)・`close()` (下書き・編集を止める)。`AccountContext` は data 層なので UI のものはこちらに分けている。
-* `AppContainer.currentAccount` (`StateFlow<AccountUiContext?>`) は `SessionStore.session` から作り、セッションが変わったら作り直して
-  前のものを `close()` する。`QuasarNavHost` (`WithSession`) と `ShareActivity` はこれを読み、ViewModel には `account` を渡す。
+  (投稿欄を作る)・`close()` (下書き・編集を止め、`AccountContext` も閉じる)。`AccountContext` は data 層なので UI のものはこちらに分けている。
+* アカウントの保存は `AccountStore` (`data/account/`): SecureStorage の 1 項目 (`accounts`) に `StoredAccount` の一覧 (キー・サーバ・
+  トークン・クライアント・`accountId`・表示用の情報 `StoredProfile`) と使っているアカウントのキー。`AccountKey` は端末で振る UUID
+  (String の value class。`hashCode` がプロセスをまたいで変わらない) で、アカウントごとのファイルの名前にも使う。変更は純粋関数
+  (`StoredAccounts.withLogin` / `without` / `withProfile`、`AccountStoreTest`)。今は 1 つずつ使う (ログインで足して使う・ログアウトで
+  使っているものを除く)。表示用の情報・`accountId` は `fetchMe` (`myAccount`) の結果で埋める。
+* `AppContainer.currentAccount` (`StateFlow<AccountUiContext?>`) は `AccountStore.active` から作り、使うアカウント・トークンが変わったら
+  前のものを `close()` してから作り直す (同じキーの DB を 2 つ開かない)。一覧から除かれた (ログアウトした) アカウントなら、閉じた後に
+  そのファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時には一覧に無いアカウントのファイルを消す。
+  `QuasarNavHost` (`WithSession`) と `ShareActivity` はこれを読み、ViewModel には `account` を渡す。
   ViewModel は寿命の間ずっと同じものを使う (「今のアカウント」をその都度読まない)。複数アカウントの計画は
   [docs/multi-account.md](docs/multi-account.md)。
 
@@ -498,7 +506,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
     出す)、他人のポストなら「ミュート」・「ブロック」/「ブロックを解除」(どちらも error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
     (`domain/model/WebPage.kt`、`WebPageTest`)。
-  * 項目は設定 (Timelines →「ポストのメニュー」のページ、`Route.SettingsPostMenu`) で 1 つずつ出さないようにできる (`AppSettings.hiddenPostMenuItems`。出さない方を
+  * 項目は設定 (アプリの設定 →「ポストのメニュー」のページ、`Route.SettingsPostMenu`) で 1 つずつ出さないようにできる (`DeviceSettings.hiddenPostMenuItems`。出さない方を
     持つので、後から足した項目は既定で出る)。`QuasarAppContent` が `LocalHiddenPostMenuItems` で渡し、そのポストに出る項目は純粋関数
     `visiblePostMenuItems` (`domain/model/settings/PostMenuItems.kt`、`PostMenuItemsTest`) で決める。1 つも無ければ︙自体を出さない。
     プロフィールのメニューには効かない。項目を足すときは `PostMenuItem` と設定画面 (`PostMenuSettingsPage`) にも足す。
@@ -555,7 +563,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   → `ViewModel.performAction(post, action)` → `PostActionController` (`ui/feed/PostActions.kt`) → `StatusRepository.perform`。
   画面側は `rememberPostActionHandler(viewModel::performAction)`。
 * **確認モーダルの差し込み口**: `PostActionConfirmation.confirm(post, action): PostAction?`。既定は
-  `rememberPostActionConfirmation()` で、設定 (`AppSettings.confirmations`) で確認する操作なら `LocalActionConfirmer` のダイアログで
+  `rememberPostActionConfirmation()` で、設定 (`DeviceSettings.confirmations`) で確認する操作なら `LocalActionConfirmer` のダイアログで
   答えを待ち、`null` で取りやめ (下記「設定」)。操作を変えて返してもよい (将来ブーストの公開範囲を選ばせる等)。
   ViewModel 側は確認の有無を知らない。
 * `PostActionController`: 見込みで反映 (`Post.withAction`) → 送信 → 応答の件数・状態で上書き (`Post.withInteractionsOf`)、
@@ -807,20 +815,24 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 途中の状態 (`PendingAuthorization`: クライアント・code_verifier・state) は `SecureStorage` に保存し、ブラウザにいる間に
     プロセスが終わっても続けられる。戻りを受けた時点で消す (コードは 1 回しか使えない)。進行中のものが無い戻りは無視する。
     state の不一致は `InvalidResponse`。URI の解釈・認可 URL の組み立ては純粋関数 (`OAuth.kt`、`OAuthTest`)。
-  * トークンを得たら `SessionStore.save(session, client)`。ナビゲーションはセッションの有無で切り替わる。
+  * トークンを得たら `verify_credentials` でアカウント (ID・表示用の情報) を確かめて `AccountStore.addLogin` (使うアカウントになる)。
+    確かめられなくてもログインはする (ID は最初の `fetchMe` で埋まる)。同じアカウント (サーバ + `accountId`) が既にあれば足さずに
+    トークン・クライアントを差し替え、古いトークンは無効化する (今はログイン画面がログアウト中にしか出ないので起きない)。
+    ナビゲーションは使っているアカウントの有無で切り替わる。
   * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser / Exchanging / Failed(`LoginError`))。
-  * 保存: `SessionStore` は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。
+  * 保存: `AccountStore` (上記「アカウントの依存」) は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。書き込みは同期 (`commit`)。
     項目名を AAD にする。`EncryptedSharedPreferences` は非推奨なので使わない)。鍵は端末外に出ないので `secure.xml` は
-    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消し、トークンの無い保存
-    (最初期の未ログインでの利用の名残) はログアウト状態として扱う。
-    以前の平文の保存 (SharedPreferences `session`) は起動時に移して消す (そのトークンはクライアント情報が無いので
-    ログアウト時に無効化できない)。
-  * ログアウト: 設定画面のトップの末尾 (error 色、補足にサーバのホスト)。**設定に関わらず必ず** `ConfirmDialog` で確認してから
-    `OAuthLogin.logout` (保存を消してから `POST /oauth/revoke`。失敗はログのみ)。
+    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消す。
+    以前の 1 つのセッションの保存 (`secure` の `session`、さらに前の平文の SharedPreferences `session`) は、最初の起動で使っている
+    1 つ目のアカウントに移して消す (`AccountStore.load`。トークンの無い保存 = 最初期の未ログインでの利用の名残はログアウト状態。
+    平文の頃のトークンはクライアント情報が無いのでログアウト時に無効化できない)。
+  * ログアウト: 設定画面のトップの末尾 (error 色、補足に `@acct@host`)。**設定に関わらず必ず** `ConfirmDialog` で確認してから
+    `OAuthLogin.logout` (使っているアカウントを一覧から除いてから `POST /oauth/revoke`。失敗はログのみ)。そのアカウントの
+    キャッシュ・アカウントごとの設定のファイルは `AppContainer` が閉じてから消す。端末共通の設定は残る。
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global (常に 4 つ)。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
 * **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
-  * 取得 API は設定 (`AppSettings.notificationApi`) で切り替え、`NotificationRepository.fetch(api, ...)` に渡す。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
+  * 取得 API はアカウントごとの設定 (`AccountSettings.notificationApi`) で切り替え、`NotificationRepository.fetch(api, ...)` に渡す。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
     サーバが favourite / reblog / follow を「同じ種類・同じ対象・近い時間帯」でまとめる)。`Ungrouped` は v1 で、
     各通知を 1 件のグループ (`Notification.asGroup()`) にする。切り替えたら通知を読み直す。サーバのバージョン確認は未実装。
     グルーピングの仕様はサーバ任せとし、クライアント側で独自にまとめることはしない。
@@ -1117,9 +1129,12 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   AccountPosts・PinnedPosts (プロフィールの投稿一覧の最初のページ・ピン留めの並び。ID はアカウント。`PostListEntry` =
   外側の ID・中身の ID・ブーストした人で、`EntityCache.postList` がブーストの外側を組み立て直す)。
   スキーマが変わったら移行せず作り直す (`fallbackToDestructiveMigration`)。スキーマの JSON は `app/schemas/`。
-  * 置き場所は `cacheDir/api-cache/api-cache.db` (`CacheDatabase.create`)。設定画面では「キャッシュ」に数えられ、「キャッシュを削除」・
+  * **アカウントごとに別の DB**: `cacheDir/api-cache/<AccountKey>/api-cache.db` (`CacheDatabase.create(context, key)`)。`AccountContext`
+    が持ち、開いたら `trim()`、`close()` で閉じる。ログアウトでディレクトリごと消す (`CacheDatabase.delete`)。起動時に一覧に無い
+    アカウントのものと、分ける前の `api-cache/api-cache.db` を消す (`deleteOthers`。キャッシュなので移さない)。
+    設定画面では「キャッシュ」に数えられ、「キャッシュを削除」・
     容量不足のときの OS の削除の対象 (バックアップ・端末間の移行の対象外)。本体・`-wal`・`-shm` がばらけて消されないよう、
-    ディレクトリに `StorageManager.setCacheBehaviorGroup` を付けている。起動中に消されても落ちず (開いたままのファイルを使い続ける)、
+    アカウントのディレクトリに `StorageManager.setCacheBehaviorGroup` を付けている。起動中に消されても落ちず (開いたままのファイルを使い続ける)、
     次の起動で作り直すことをエミュレーターで確認済み (`adb shell pm trim-caches 999G`)。
   * 耐久性は要らないので WAL + `synchronous = OFF` (コールバック `onOpen` で設定。fsync しない)。`synchronous` は接続ごとの設定で、
     書き込みに使う主接続だけが OFF になる (WAL の読み取り用の接続は端末の既定のまま。書かないので関係ない)。確かめるときは
@@ -1157,8 +1172,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
     * familiar followers は後から届いて見出しが伸びる。`CollapsingHeaderState` は畳み切っている間に見出しの高さが変わったら
       畳んだままにする (一覧ごと下へずれないように)。
   * まとめの中身: 通知を取ったときにポストが入っているので、期限切れ・無いものだけを取る。
-* 上限: 起動時に種類ごとに古い分を消す (`CachePolicy.MaxEntries`)。ログアウト・別のセッションへの切り替えで全部消す
-  (`AppContainer`。中身はログイン中のユーザーから見た状態なので)。
+* 上限: DB を開いたとき (`AccountContext` を作ったとき) に種類ごとに古い分を消す (`CachePolicy.MaxEntries`)。中身はログイン中の
+  ユーザーから見た状態なので、アカウントをまたいで使わない (DB がアカウントごと)。
 * テスト: 純粋関数は `CacheMergeTest` / `VersionClockTest`、SQL は計装テストの `CacheDaoTest` (下記「開発メモ」)。
 * 未対応: 一覧 (タイムライン・通知。プロフィールの投稿一覧は最初のページだけ) は Room を見ない (画面をまたいだ操作の反映は揃わない)、起動時に前回の一覧を出すこと。
   削除は消すだけで印を残さないので、削除の前に出した取得の応答が後から届くと書き戻されうる (次に開いたときの 404 で消える)。
@@ -1210,21 +1225,32 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 
 ## 設定
 
-* 設定全体は `AppSettings` (`domain/model/settings/`): ポストのメニューに出さない項目 (`hiddenPostMenuItems`)・翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
-  設定画面に出る)・表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
-  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
-  アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
-  log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
-* 保存は `SettingsStore` (`data/settings/`、Preferences DataStore、`AppContainer.settingsStore`)。項目ごとに 1 キーで、
-  対応表は `SettingsPreferences.kt` の `SettingFields` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはここに 1 行足す**。
+* 設定は**端末共通** (`DeviceSettings`) と**アカウントごと** (`AccountSettings`) に分かれる (`domain/model/settings/`。分け方は
+  [docs/multi-account.md](docs/multi-account.md) の「設定の分け方」)。新しく足したアカウントは既定値から始まる (コピーしない)。
+  * 端末共通: ポストのメニューに出さない項目 (`hiddenPostMenuItems`)・翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
+    設定画面に出る)・表示 (`DisplaySettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・
+    予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
+    log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
+  * アカウントごと: 通知の取得 API・カラムごとの自動更新 (`StreamingSettings`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
+    アカウントの既定 `source.privacy`。ダイレクトは選べない)・大きな画像の圧縮・画像のメタデータの削除。
+* 保存は `SettingsStore<S>` (`data/settings/`、Preferences DataStore)。端末共通は `AppContainer.deviceSettings` (`settings` のファイル)、
+  アカウントごとは `AccountContext.settings` (`settings_<AccountKey>` のファイル。DataStore は 1 つのファイルにプロセスで 1 つしか
+  作れないので、`AppContainer` がキーごとに 1 つ持つ。ログアウトで止めてファイルを消す)。項目ごとに 1 キーで、
+  対応表は `SettingsPreferences.kt` の `DeviceSettingsSchema` / `AccountSettingsSchema` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはどちらかに 1 行足す**。
+  キーの名前は分ける前 (1 つのファイル) のまま。
+  * 移行: 分ける前の `settings` のファイルはそのまま端末共通のファイルとして読む。アカウントごとの項目は、ログインしているアカウントの
+    設定を最初に開いたときに DataStore の移行 (`LegacyAccountSettingsMigration`) でそのアカウントのファイルへ写し、写せたら端末共通の
+    ファイルから消す。写した項目は上書きしないので、途中で終わってもやり直せる。ログアウト中に更新したなら、次にログインした
+    アカウントに移る。
   * 確認する操作は 1 つのキー (`confirm_targets`) にまとめるが、既定でオンのもの (`DefaultConfirmations`) だけは個別の
     boolean のキー (`confirm_edit_post` / `confirm_delete_post`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
-  * キーが無ければ既定値。書き込みは変わった項目だけ (`writeSettingsChanges`)。`null` を値に持つ項目は番兵値
+  * キーが無ければ既定値。書き込みは変わった項目だけ (`SettingsSchema.writeChanges`)。`null` を値に持つ項目は番兵値
     (折りたたみ・fps は 0、公開範囲は `"account"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
     `null` 自体が値なので、decode は「読めない」と区別するため `Decoded` で包んで返す。
-  * 読み込みは非同期: `settings: StateFlow<AppSettings?>` は読み込み前 `null` (起動時から読み始める)。`QuasarAppContent` は
-    読み込みまで中身を描かない (既定値で描いてから切り替わらない)。UI 以外は `loaded` (Flow) / `current()` で待つ
-    (`TimelineViewModel` の自動更新・通知 API、`ComposerSession` の公開範囲)。
+  * 読み込みは非同期: `settings: StateFlow<S?>` は読み込み前 `null` (作ったときから読み始める)。`QuasarAppContent` は
+    端末共通の設定の読み込みまで中身を描かない (既定値で描いてから切り替わらない。アカウントごとの設定は待たないので、ログアウト中も
+    同じに動く)。UI 以外は `loaded` (Flow) / `current()` で待つ (アカウントの設定: `TimelineViewModel` の自動更新・通知 API、
+    `ComposerSession` の公開範囲、`AppContainer` の投稿欄の画像の扱い。端末共通: `PostTranslationStore`)。
 * `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`)・`LocalUriHandler` (外部リンク、`NewTaskUriHandler`) と
   `ActionConfirmationHost` を提供する。Activity の setContent は `QuasarAppContent(container)` で包む (MainActivity とデバッグ用ギャラリー)。
   表示設定の項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
@@ -1245,7 +1271,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
   投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン。編集なら `EditPost`)、削除はポスト画面から使う。
-  設定画面の Confirmations の「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
+  設定画面の Confirmations の「Posting」で投稿、「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
 * **ライセンス** (`Route.SettingsLicenses` / `SettingsLicense(id)`、`LicensesPage.kt`): 設定のトップから。翻訳のモデル (PLaMo。
   規約の第 4 条で規約の写しと「Built with PLaMo」が要る) / 同梱のソフトウェア / 依存のライブラリ。依存の一覧は
   `com.mikepenz.aboutlibraries.plugin.android` がビルド時に POM から `res/raw/aboutlibraries.json` を作る (ランタイムのライブラリは
@@ -1256,6 +1282,9 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` / `SettingsPostMenu` /
   `SettingsPosting` / `SettingsConfirmations` / `SettingsExperimental` (実験的機能。今は翻訳の入口だけで、翻訳の無いビルドでは出さない)) は他の画面と同じバックスタックに積む。
+  トップは「アカウントの設定 (@acct@host)」(Timelines = 自動更新・通知 API / Posting = 公開範囲・画像の扱い。使っているアカウントの設定を
+  読み書きする。ログアウト中は出さない) と「アプリの設定」(Display / Post menu / Confirmations / 実験的機能。端末共通) に分け、
+  その下にライセンス・ログアウト。ページの中身はエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`)。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
     (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
@@ -1363,8 +1392,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定の Timelines のページと、そこから開く Post menu のページ。本物の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる) /
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
   translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
@@ -1479,12 +1508,13 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
 * gap の動作確認は流量のあるグローバルで行う: 設定 (Timelines → Auto-update) でグローバルをオンにして、別画面を
   開いて (= 切断) 8 分ほど待ってから戻る。確認後はオフに戻す。
-* 設定を既定に戻すには (debug): `adb shell am force-stop <pkg>` → `adb shell run-as <pkg> rm files/datastore/settings.preferences_pb`。
+* 設定を既定に戻すには (debug): `adb shell am force-stop <pkg>` → `adb shell run-as <pkg> rm files/datastore/settings.preferences_pb`
+  (端末共通。アカウントごとのものは `settings_<AccountKey>.preferences_pb`)。
 * ストリームの接続状況は logcat の `StreamingClient` (接続・切断・受信イベントの種類と文字数のみ。トークンや本文は出さない)。
 
 ## 未対応・今後の課題
 
-* **認証**: 複数アカウント無し (ログインは 1 つ)。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
+* **認証**: 複数アカウント無し (ログインは 1 つ。保存は一覧の形 `AccountStore` で、切り替え・追加は docs/multi-account.md の段階 5・6)。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
   OAuth のログインの往復 (ブラウザでの認可 → 戻り) はエミュレータ + testbed (3.5.19) で確認済み (実機は未確認)。
   * **将来: 戻り先を App Links (検証済みの https URL) にする**。今のカスタムスキーム (`es.aria-on-the-planet.quasar://oauth`) は
     他のアプリが同じスキームを登録すると戻りを横取りされうる (PKCE があるので盗まれたコードはトークンにできないが、
@@ -1495,7 +1525,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   操作失敗時の UI 通知、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
-* **設定**: アカウントごとの設定 (今はアプリ全体で 1 つ)、サーバ側の既定の公開範囲 (`update_credentials`) との同期は無い。
+* **設定**: サーバ側の既定の公開範囲 (`update_credentials`) との同期は無い。
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
 * **自動更新**: 通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。

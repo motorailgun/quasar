@@ -21,12 +21,15 @@ import javax.crypto.spec.GCMParameterSpec
  * 鍵は端末から持ち出せないため、このファイルはバックアップ対象から外している (`backup_rules.xml` /
  * `data_extraction_rules.xml`。復元しても読めない)。読めない値 (鍵が消えた等) は消して `null` を返す。
  * (`EncryptedSharedPreferences` は非推奨になったので使わない。)
+ *
+ * 書き込みは同期 (`commit`)。アカウントの一覧の移行・追加の直後にプロセスが終わっても失わないように (値は小さく、書くのは
+ * ログイン・ログアウト等のときだけ)。
  */
-class SecureStorage(context: Context) {
+class SecureStorage(context: Context) : KeyValueStore {
     private val prefs = context.getSharedPreferences(PrefsName, Context.MODE_PRIVATE)
     private val keyStore = KeyStore.getInstance(KeyStoreType).apply { load(null) }
 
-    fun get(name: String): String? {
+    override fun get(name: String): String? {
         val stored = prefs.getString(name, null) ?: return null
         return try {
             decrypt(name, stored)
@@ -41,12 +44,12 @@ class SecureStorage(context: Context) {
         }
     }
 
-    fun put(name: String, value: String) {
-        prefs.edit { putString(name, encrypt(name, value)) }
+    override fun put(name: String, value: String) {
+        prefs.edit(commit = true) { putString(name, encrypt(name, value)) }
     }
 
-    fun remove(name: String) {
-        prefs.edit { remove(name) }
+    override fun remove(name: String) {
+        prefs.edit(commit = true) { remove(name) }
     }
 
     private fun encrypt(name: String, value: String): String {

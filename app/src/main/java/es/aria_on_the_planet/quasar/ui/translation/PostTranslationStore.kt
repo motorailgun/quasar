@@ -15,7 +15,7 @@ import es.aria_on_the_planet.quasar.data.translation.detectPostLanguage
 import es.aria_on_the_planet.quasar.data.translation.translationOfferFor
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostTranslation
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.DeviceSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.TranslationSettings
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
@@ -90,7 +90,7 @@ class PostTranslationEntry internal constructor(
 class PostTranslationStore(
     private val translator: PostTranslator,
     private val model: TranslationModelFiles,
-    settings: StateFlow<AppSettings?>,
+    settings: StateFlow<DeviceSettings?>,
     private val scope: CoroutineScope,
     private val languageDetector: LanguageDetector?,
 ) {

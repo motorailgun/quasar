@@ -349,23 +349,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
         return
     }
     if (scenario == GalleryScenario.TimelineSettings) {
-        // 本物の設定を読み書きする (アプリの設定画面と同じ)
-        val store = (context.applicationContext as QuasarApplication).container.settingsStore
-        val settings by store.settings.collectAsStateWithLifecycle()
-        // 「ポストのメニュー」はこの中で切り替える (ギャラリーの画面遷移には積まない)
-        var postMenuOpen by rememberSaveable { mutableStateOf(false) }
-        settings?.let {
-            if (postMenuOpen) {
-                PostMenuSettingsPage(it.hiddenPostMenuItems, store::launchUpdate, onBack = { postMenuOpen = false })
-            } else {
-                TimelineSettingsPage(
-                    it,
-                    store::launchUpdate,
-                    onNavigate = { route -> if (route == Route.SettingsPostMenu) postMenuOpen = true },
-                    onBack = onBack,
-                )
-            }
-        }
+        TimelineSettingsGallery(onBack)
         return
     }
     if (scenario == GalleryScenario.QuickPostBar) {

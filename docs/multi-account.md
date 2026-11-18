@@ -1,6 +1,6 @@
 # マルチアカウント
 
-複数のアカウントでログインしておき、ドロワーから切り替える。計画の段階 (「進め方」の 2 まで済み。切り替えはまだ無い)。
+複数のアカウントでログインしておき、ドロワーから切り替える。計画の段階 (「進め方」の 4 まで済み。保存は一覧の形になったが、切り替え・追加はまだ無い)。
 
 ## 要求と決めたこと
 
@@ -244,8 +244,8 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
    復元されることを小さく試した (上記「切り替え」の「確かめた結果」)。
 2. **リファクタ (動きは変えない)** (済み): `AccountContext` を入れ、Repository に session を持たせ、ViewModel・NavHost の配線を替える。
    アカウントは 1 つのまま。計画との違いは下記「段階 2 で決めたこと」。
-3. **設定の分割**: `DeviceSettings` / `AccountSettings`、2 つのストア、移行、設定画面のトップの分割。
-4. **アカウントごとの保存**: `AccountStore` (移行込み)、アカウントごとのキャッシュ DB。
+3. **設定の分割** (済み): `DeviceSettings` / `AccountSettings`、2 つのストア、移行、設定画面のトップの分割。
+4. **アカウントごとの保存** (済み): `AccountStore` (移行込み)、アカウントごとのキャッシュ DB。計画との違いは下記「段階 3・4 で決めたこと」。
 5. **切り替え・追加・ログアウト**: `AccountManager`、作り直し、追加のログイン、ログアウト。
 6. **UI**: ドロワーの切り替え、文字列。
 7. **仕上げ**: テスト、エミュレーター + testbed (サーバの違う 2 アカウント、3.5 と最新の安定版) で確かめる、`AGENTS.md`。
@@ -269,6 +269,85 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   `PostEditStore` の `closeUnlessOwnedBy` も無くなり、ログアウトでは `AccountUiContext.close()` が下書き・編集を止める
   (今までは次にログインするまで下書きのアップロードが続いていた。新しいトークンのセッションでは下書きを捨てていたので、見た目は同じ)。
 * `relationshipChanges` / `postChanges` は Repository に付いたままなので、アカウントごとになった。
+
+## 段階 3・4 で決めたこと (計画との違い)
+
+まだ 1 アカウントずつ使う (ログインで足して使う・ログアウトで使っているものを除く)。`AccountManager`・切り替え・追加のログイン・
+`key(active)` は段階 5・6。
+
+### アカウントの保存 (`data/account/`)
+
+* **`AccountKey` は String の value class** (`@JvmInline`、`hashCode` は中身の String のもの)。値は `UUID.randomUUID()`。
+* **`AccountStore`** (`SessionStore` を置き換え): SecureStorage の 1 項目 `accounts` に `StoredAccounts` (`accounts: List<StoredAccount>` +
+  `activeKey`) の JSON。一覧と使っているアカウントを一緒に書き換えるため 1 項目にした。`StoredAccount` = `key` / `serverUrl` /
+  `accessToken` / `client` / `accountId?` / `profile: StoredProfile?` (acct・表示名・アイコンの URL (static も)・絵文字)。`toString` は
+  トークン・クライアントを出さない (`Session` も)。
+  * 公開するのは `state` (全体) と `active` (使っているアカウント)。`addLogin` / `remove` / `updateProfile`。変更は `StoredAccounts` の
+    純粋関数 (`withLogin` / `without` / `withProfile`)。保存先は `KeyValueStore` (interface。実体は `SecureStorage`、テストは Map) なので
+    JVM でテストできる (`AccountStoreTest`)。
+  * `SecureStorage` の書き込みは `commit` (同期) にした。移行・ログインの直後にプロセスが終わって一覧を失うと、キーが振り直されて
+    アカウントごとのファイルと結びつかなくなるため (値は小さく、書くのはログイン・ログアウト・表示用の情報が変わったときだけ)。
+  * 表示用の情報と `accountId` は、`AppContainer` がアカウントの `myAccount()` (`fetchMe` の結果・プロフィールの編集) を見て埋める
+    (変わっていなければ書かない)。設定画面のトップの見出し・ログアウトの補足 (`@acct@host`) がこれを使う。
+* **同じアカウントの判定**: サーバ (末尾の `/`・大文字小文字は無視) と `accountId` が同じもの。どちらかの `accountId` が無ければ
+  別のものとして足す (移したアカウントは最初の `fetchMe` まで ID が無いので、その間に同じアカウントでログインすると 2 つになる。
+  今はログアウト中にしかログインできないので起きない)。同じなら足さずにトークン・クライアント (・表示用の情報) を差し替え、キーは
+  そのまま。古いトークンは無効化する。
+* **ログインで `verify_credentials` を呼ぶ** (`OAuthLogin.exchange`)。ID・表示用の情報を確かめてから `addLogin`。失敗してもログインは
+  する (ID 無しで足し、`fetchMe` で埋まる)。ログには失敗の種類だけ。
+* **ログアウト**: `OAuthLogin.logout` は `AccountStore.remove(active)` と無効化だけ。ファイルの削除は `AppContainer`: `active` が変わったら
+  前の `AccountUiContext` を `close()` し (DB を閉じる)、一覧から消えたキーなら `deleteAccountData` (設定のコルーチンを止め、
+  `cacheDir/api-cache/<key>/` と `settings_<key>.preferences_pb` を消す)。途中でプロセスが終わった分は、**起動時に一覧に無いキーの
+  ファイルを消す**ことで片付く (分ける前のキャッシュの削除も同じ所)。
+* **移行**: `accounts` が無ければ `session` (以前の SecureStorage の 1 つのセッション)、それも無ければ平文の SharedPreferences
+  `session` を 1 つ目のアカウントにして使うアカウントにする。新しい形を書いてから古いものを消す (途中で終わっても次の起動で
+  新しい形を読むか、やり直す)。トークンの無い保存はログアウト状態。
+* `AppContainer.currentAccount` はそのまま (`AccountStore.active` から作る。段階 5 で `AccountManager.active` に置き換える)。作り直しは
+  **前のものを閉じてから**作る (トークンの差し替えでは同じキーの DB を開くため)。
+
+### 設定 (`data/settings/`)
+
+* `SettingsStore<S>` (型の別名 `DeviceSettingsStore` / `AccountSettingsStore`) + 項目の表 `SettingsSchema<S>` (`DeviceSettingsSchema` /
+  `AccountSettingsSchema`)。`SettingFields` を 2 つの表に分け、キーの名前は変えていない。`AppSettings` は無くなった。
+* **アカウントの設定のストアは `AppContainer` がキーごとに持つ** (`AccountContext` は受け取って `settings` で出すだけ)。DataStore は
+  1 つのファイルにプロセスで 1 つしか作れず、トークンの差し替えで `AccountContext` を作り直すと同じファイルのものを作ってしまうため。
+  ログアウト (`deleteAccountData`) でコルーチンを止めて外す。
+* **移行は DataStore の `DataMigration`** (`LegacyAccountSettingsMigration`): アカウントの設定を最初に読むときに、端末共通のファイル
+  (= 分ける前のファイル) に残っているアカウントごとの項目を写し (こちらに既にある項目は上書きしない)、写せたら端末共通のファイル
+  から消す。途中で終わっても次に開いたときにやり直す。純粋関数 (`hasAccountSettings` / `withLegacyAccountSettings` /
+  `withoutAccountSettings`) は `SettingsPreferencesTest`。
+  * 移行を付けるのは保存しているアカウント (ログインしたアカウント) の設定だけ。ギャラリーのアカウントには付けない。
+  * 移し終えると何もしないので、後から足したアカウントは既定値から始まる。**ログアウト中に更新した場合は、次にログインした
+    アカウントに移る** (その人の設定なので捨てなかった)。
+* 端末共通のファイルに残ったアカウントごとのキー (移す前) は、端末共通の設定としては読まないので害は無い。
+
+### 設定画面
+
+* トップ: 「アカウントの設定 (@acct@host)」= Timelines (自動更新・通知 API) / Posting (公開範囲・大きな画像の圧縮・メタデータの削除)、
+  「アプリの設定」= Display / Post menu / Confirmations / 実験的機能。その下にライセンス・ログアウト (補足に `@acct@host`)。
+  ログアウト中は「アカウントの設定」とログアウトを出さない (今は設定画面にはログイン中しか来ない)。
+* 両方が混ざっていたページは最小限に振り分けた: Timelines にあった「ポストのメニュー」への入口はトップ (アプリの設定) へ。
+  Posting にあった「投稿前に確認」は Confirmations の先頭 (Posting の見出しで「Post」) へ。
+* ページの中身は今までどおりエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`。後者は `currentAccount` の設定)。
+* ギャラリーの timeline-settings は設定のトップ + Timelines (ギャラリーのアカウントの設定) + Post menu (本物の端末共通の設定)。
+  ギャラリーのアカウントは `rememberGalleryAccount` (`AccountKey("gallery")`・`.invalid`。quick-post-bar と共通)。一覧に無いので、
+  ファイルは次の起動で消える。
+
+### キャッシュ
+
+* `CacheDatabase.create(context, key)` → `cacheDir/api-cache/<key>/api-cache.db`、`setCacheBehaviorGroup` はアカウントのディレクトリに
+  付け、親 (`api-cache`) からは外す。`AccountContext` が DB を持ち、作ったときに `trim()`、`close()` で閉じる (`scope` も止める)。
+  `AccountUiContext.close()` が呼ぶ。
+* `EntityCache.clear()` / `CacheDao.clear()` は使わなくなったので消した。
+
+### エミュレーター + testbed で確かめたこと
+
+* 前のコミットのビルド (user2@stable でログイン、長文の折りたたみ 4 行・アイコンの形・投稿前の確認・通知 API = Individual・
+  公開範囲 = 未収載・グローバルの自動更新・メタデータの削除を変えた状態) の上に `adb install -r`: ログインしたまま、端末共通の
+  ファイルには表示・確認・ポストのメニューのキーだけが残り、アカウントのファイル (`settings_<key>`) に 5 つのキーが移った。
+  分ける前の `api-cache/api-cache.db` は消え、`api-cache/<key>/` ができた。ストリーミングは public を含み、通知は v1 で取った。
+* 設定画面で両方を変えて再起動しても残る。ログアウトでアカウントの設定・キャッシュのディレクトリが消え (端末共通は残る。
+  `/oauth/revoke` 200)、user1 でログインし直すと既定値から始まった。プロセスの再生成・コールドスタートも問題なし。
 
 ## 未決
 

@@ -16,7 +16,7 @@
     <string name="gallery_follow_request">Follow request on profile</string>
     <string name="gallery_my_profile">Own profile (tabs)</string>
     <string name="gallery_other_profile">Other profile (tabs)</string>
-    <string name="gallery_timeline_settings">Timeline settings (post menu)</string>
+    <string name="gallery_timeline_settings">Settings (timelines, post menu)</string>
     <string name="gallery_post_detail">Post detail (reactions)</string>
     <string name="gallery_translation">On-device translation</string>
     <string name="gallery_translation_languages">Translation languages</string>

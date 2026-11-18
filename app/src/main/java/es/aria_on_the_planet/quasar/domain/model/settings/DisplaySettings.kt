@@ -1,7 +1,7 @@
 package es.aria_on_the_planet.quasar.domain.model.settings
 
 /**
- * 表示に関するユーザー設定。設定画面で変え、`SettingsStore` が保存する。画面からは `LocalDisplaySettings` で読む。
+ * 表示に関するユーザー設定 (端末共通の [DeviceSettings] の一部)。設定画面で変え、`DeviceSettingsStore` が保存する。画面からは `LocalDisplaySettings` で読む。
  */
 data class DisplaySettings(
     /** タイムライン等でポスト本文を折りたたむ行数。これを超える分はフェードして「Show more」。`null` なら折りたたまない。 */

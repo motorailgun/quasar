@@ -5,9 +5,14 @@ import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
 import es.aria_on_the_planet.quasar.data.account.AccountContext
+import es.aria_on_the_planet.quasar.data.account.AccountKey
+import es.aria_on_the_planet.quasar.data.account.AccountStore
+import es.aria_on_the_planet.quasar.data.account.LegacyPlaintextSession
+import es.aria_on_the_planet.quasar.data.account.LegacyPlaintextSessionSource
+import es.aria_on_the_planet.quasar.data.account.StoredAccount
+import es.aria_on_the_planet.quasar.data.account.StoredProfile
 import es.aria_on_the_planet.quasar.data.auth.OAuthLogin
 import es.aria_on_the_planet.quasar.data.cache.CacheDatabase
-import es.aria_on_the_planet.quasar.data.cache.EntityCache
 import es.aria_on_the_planet.quasar.data.licenses.LicenseRepository
 import es.aria_on_the_planet.quasar.data.media.ContentUriUploadSource
 import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
@@ -20,7 +25,8 @@ import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
 import es.aria_on_the_planet.quasar.data.session.SecureStorage
-import es.aria_on_the_planet.quasar.data.session.SessionStore
+import es.aria_on_the_planet.quasar.data.settings.AccountSettingsStore
+import es.aria_on_the_planet.quasar.data.settings.DeviceSettingsStore
 import es.aria_on_the_planet.quasar.data.settings.SettingsStore
 import es.aria_on_the_planet.quasar.data.translation.PostTranslator
 import es.aria_on_the_planet.quasar.data.translation.TextClassifierLanguageDetector
@@ -38,21 +44,23 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 
 /**
- * 手動 DI コンテナ。アプリ全体で共有するもの (通信・サーバ単位の Repository・設定・翻訳等) を持ち、ログイン中の
+ * 手動 DI コンテナ。アプリ全体で共有するもの (通信・サーバ単位の Repository・端末共通の設定・翻訳等) を持ち、ログイン中の
  * アカウントの分は [currentAccount] ([AccountUiContext] / [AccountContext]) が持つ。
  */
 class AppContainer(context: Context) {
+    private val appContext = context.applicationContext
+
     val okHttpClient: OkHttpClient = OkHttpClient()
 
     private val json = Json {
@@ -60,35 +68,29 @@ class AppContainer(context: Context) {
         coerceInputValues = true
     }
 
-    /** API の結果のキャッシュ (Room)。今はアプリ全体で 1 つで、各 [AccountContext] に渡す。 */
-    private val cache = EntityCache(CacheDatabase.create(context).cacheDao(), json)
-
     private val api = MastodonApi(okHttpClient, json)
 
     private val secureStorage = SecureStorage(context)
 
-    val sessionStore = SessionStore(context, secureStorage)
+    /** ログインしているアカウントの一覧と使っているアカウント。最初の起動で以前の保存 (1 つのセッション) を移す。 */
+    val accountStore = AccountStore(secureStorage, LegacyPlaintextSessionPrefs(appContext))
 
     /** アプリ全体のコルーチン (プロセスと同じ寿命)。 */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** OAuth でのログイン・ログアウト。 */
-    val oauthLogin = OAuthLogin(api, secureStorage, sessionStore, appScope)
+    val oauthLogin = OAuthLogin(api, secureStorage, accountStore, appScope)
 
-    /** 設定。ここで作った時点 (起動時) から読み込み始める。 */
-    val settingsStore = SettingsStore(context, appScope)
+    /** 端末共通の設定。ここで作った時点 (起動時) から読み込み始める。アカウントごとの設定は [AccountContext.settings]。 */
+    val deviceSettings: DeviceSettingsStore = SettingsStore.device(context, appScope)
 
     init {
-        appScope.launch {
-            // 起動時に上限を超えた古い分を消す
-            cache.trim()
-            // ログアウト・別のアカウントでのログインで消す (起動時の今のセッションでは消さない)。キャッシュの中身は
-            // ログイン中のユーザーから見た状態 (お気に入りしたか・関係・非公開のポスト) なので、別のユーザーに見せない
-            sessionStore.session
-                .drop(1)
-                .collect { cache.clear() }
-        }
+        // 一覧に無いアカウントのファイル (ログアウトの途中で終わった分) と、アカウントごとに分ける前のキャッシュを消す
+        val keys = accountStore.state.value.accounts.mapTo(HashSet()) { it.key.value }
+        CacheDatabase.deleteOthers(context, keep = keys)
+        SettingsStore.accountNames(context).filter { it !in keys }.forEach { SettingsStore.accountFile(context, it).delete() }
     }
+
     val instanceRepository = InstanceRepository(api)
     val emojiRepository = EmojiRepository(api)
 
@@ -109,38 +111,86 @@ class AppContainer(context: Context) {
     /** メディアの保存 (システムの DownloadManager に任せる)。 */
     val mediaDownloader: MediaDownloader = SystemMediaDownloader(context)
 
+    /** アカウントごとの設定 (キーごとに 1 つ。DataStore は同じファイルに 1 つしか作れない)。値はそのコルーチンと組。 */
+    private val accountSettings = HashMap<AccountKey, Pair<AccountSettingsStore, CoroutineScope>>()
+
     /**
-     * [session] のアカウント 1 つ分の依存を作る。[currentAccount] が使うほか、ギャラリーが `.invalid` のサーバの
-     * 投稿欄を作るのにも使う (使い終わったら [AccountUiContext.close])。
+     * アカウント [key] の設定。無ければ作る。
+     *
+     * @param migrateLegacy 分ける前の設定のアカウントごとの項目を移すか (ログインしているアカウント。移し終えた後は何もしない)。
      */
-    fun createAccount(session: Session): AccountUiContext = AccountUiContext(
-        AccountContext(
-            session = session,
-            cache = cache,
-            api = api,
-            okHttpClient = okHttpClient,
-            json = json,
-            instanceRepository = instanceRepository,
-        ),
-        createComposer = ::composerSession,
-    )
-
-    private val _currentAccount = MutableStateFlow(sessionStore.session.value?.let(::createAccount))
+    private fun accountSettingsStore(key: AccountKey, migrateLegacy: Boolean): AccountSettingsStore = synchronized(accountSettings) {
+        accountSettings.getOrPut(key) {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            SettingsStore.account(appContext, key.value, scope, legacy = deviceSettings.takeIf { migrateLegacy }) to scope
+        }.first
+    }
 
     /**
-     * ログイン中のアカウント ([SessionStore.session] から作る。ログアウト中は `null`)。セッションが変わったら作り直し、
-     * 前のものは閉じる (下書きのアップロード等を止める)。
+     * アカウント [key] ([session]) 1 つ分の依存を作る。[currentAccount] が使うほか、ギャラリーが `.invalid` のサーバの
+     * 投稿欄・設定を作るのにも使う (使い終わったら [AccountUiContext.close])。キャッシュの DB を開くので、同じキーのものを
+     * 同時に 2 つ作らない。
+     *
+     * @param migrateLegacySettings 分ける前の設定のアカウントごとの項目を移すか ([accountSettingsStore])。
+     */
+    fun createAccount(key: AccountKey, session: Session, migrateLegacySettings: Boolean = false): AccountUiContext =
+        AccountUiContext(
+            AccountContext(
+                key = key,
+                session = session,
+                database = CacheDatabase.create(appContext, key.value),
+                settings = accountSettingsStore(key, migrateLegacySettings),
+                api = api,
+                okHttpClient = okHttpClient,
+                json = json,
+                instanceRepository = instanceRepository,
+            ),
+            createComposer = ::composerSession,
+        )
+
+    /**
+     * アカウント [key] のファイル (キャッシュの DB・設定) を消す。ログアウトで、そのアカウントの [AccountContext] を閉じた後に呼ぶ。
+     */
+    fun deleteAccountData(key: AccountKey) {
+        val settings = synchronized(accountSettings) { accountSettings.remove(key) }
+        // 書き込みを止めてから消す
+        settings?.second?.cancel()
+        appScope.launch(Dispatchers.IO) {
+            CacheDatabase.delete(appContext, key.value)
+            SettingsStore.accountFile(appContext, key.value).delete()
+        }
+    }
+
+    /** 保存しているアカウント [stored] の依存。`fetchMe` の結果で一覧の表示用の情報 (と移したアカウントの ID) を埋める。 */
+    private fun openStoredAccount(stored: StoredAccount): AccountUiContext =
+        createAccount(stored.key, stored.session, migrateLegacySettings = true).also { ui ->
+            val account = ui.account
+            account.scope.launch {
+                account.accountRepository.myAccount().collect { me ->
+                    accountStore.updateProfile(stored.key, me.user.inServerId, StoredProfile(me.user))
+                }
+            }
+        }
+
+    private val _currentAccount = MutableStateFlow(accountStore.active.value?.let(::openStoredAccount))
+
+    /**
+     * ログイン中のアカウント ([AccountStore.active] から作る。ログアウト中は `null`)。使うアカウント・トークンが変わったら
+     * 前のものを閉じてから作り直す (同じアカウントのトークンの差し替えでは同じキャッシュの DB を開くため)。一覧から
+     * 除かれた (ログアウトした) アカウントなら、閉じた後にファイルを消す。
      */
     val currentAccount: StateFlow<AccountUiContext?> = _currentAccount.asStateFlow()
 
     init {
         // 書きかけの投稿等は Main で動くので、作り直しも Main で行う
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
-            sessionStore.session.collect { session ->
+            accountStore.active.collect { stored ->
                 val previous = _currentAccount.value
-                if (previous?.account?.session == session) return@collect
-                _currentAccount.value = session?.let(::createAccount)
+                if (previous?.account?.key == stored?.key && previous?.account?.session == stored?.session) return@collect
                 previous?.close()
+                _currentAccount.value = stored?.let(::openStoredAccount)
+                val previousKey = previous?.account?.key
+                if (previousKey != null && accountStore.state.value.find(previousKey) == null) deleteAccountData(previousKey)
             }
         }
     }
@@ -156,11 +206,11 @@ class AppContainer(context: Context) {
         scope = scope,
         instanceRepository = instanceRepository,
         emojiRepository = emojiRepository,
-        defaultVisibilitySetting = settingsStore.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
+        defaultVisibilitySetting = account.settings.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
         openUploadSource = ::uploadSource,
         editing = editing,
         prepareUpload = { source, limits ->
-            val settings = settingsStore.current()
+            val settings = account.settings.current()
             imageReencoder.prepare(
                 source,
                 limits.toImageUploadLimits(),
@@ -184,7 +234,7 @@ class AppContainer(context: Context) {
             PostTranslationStore(
                 translator = PostTranslator(it),
                 model = modelFiles,
-                settings = settingsStore.settings,
+                settings = deviceSettings.settings,
                 scope = translationScope,
                 languageDetector = TextClassifierLanguageDetector(context),
             ).also { store -> observeAppState(context, store) }
@@ -216,5 +266,22 @@ class AppContainer(context: Context) {
             override fun onLowMemory() = translations.onMemoryPressure()
             override fun onConfigurationChanged(newConfig: Configuration) = translations.onConfigurationChanged()
         })
+    }
+}
+
+/** 以前の平文の保存 (SharedPreferences `session`)。[AccountStore] が最初の起動で移して消す。 */
+private class LegacyPlaintextSessionPrefs(private val context: Context) : LegacyPlaintextSessionSource {
+    override fun read(): LegacyPlaintextSession? {
+        val prefs = context.getSharedPreferences(PrefsName, Context.MODE_PRIVATE)
+        val serverUrl = prefs.getString("server_url", null) ?: return null
+        return LegacyPlaintextSession(serverUrl, prefs.getString("access_token", null))
+    }
+
+    override fun delete() {
+        context.deleteSharedPreferences(PrefsName)
+    }
+
+    private companion object {
+        const val PrefsName = "session"
     }
 }

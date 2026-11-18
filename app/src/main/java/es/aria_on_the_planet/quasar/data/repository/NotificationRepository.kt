@@ -11,7 +11,7 @@ import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 
 /**
  * 通知の取得。どちらの API でも [NotificationGroup] の一覧として返すので、UI は API の違いを意識しない。
- * どちらを使うかは設定 (`AppSettings.notificationApi`) で、呼び出し側が渡す。
+ * どちらを使うかは設定 (アカウントごとの `AccountSettings.notificationApi`) で、呼び出し側が渡す。
  * 通知の一覧はキャッシュしないが、中のポスト・アカウントはキャッシュ ([cache]) に書く (まとめの中身・ポスト画面・
  * プロフィールですぐ出すため)。
  */

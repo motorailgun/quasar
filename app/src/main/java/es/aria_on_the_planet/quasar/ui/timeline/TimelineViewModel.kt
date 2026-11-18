@@ -22,7 +22,7 @@ import es.aria_on_the_planet.quasar.ui.notification.NotificationEntry
 import es.aria_on_the_planet.quasar.ui.notification.appendNotificationPage
 import es.aria_on_the_planet.quasar.ui.notification.mapGroups
 import es.aria_on_the_planet.quasar.ui.notification.nextNotificationMaxId
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import kotlinx.coroutines.flow.Flow
@@ -62,8 +62,8 @@ data class TimelineScreenState(
 
 class TimelineViewModel(
     account: AccountContext,
-    /** 設定 (読み込み後の値の流れ)。自動更新するカラムと通知の取得 API を決める。 */
-    private val settings: Flow<AppSettings>,
+    /** このアカウントの設定 (読み込み後の値の流れ)。自動更新するカラムと通知の取得 API を決める。 */
+    private val settings: Flow<AccountSettings>,
 ) : ViewModel() {
     private val repository = account.timelineRepository
     private val statusRepository = account.statusRepository

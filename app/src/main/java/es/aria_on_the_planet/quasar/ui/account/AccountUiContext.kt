@@ -45,10 +45,14 @@ class AccountUiContext(
     fun composerSession(scope: CoroutineScope, editing: EditTarget?, onPublished: (Post) -> Unit): ComposerSession =
         createComposer(account, scope, editing, onPublished)
 
-    /** ログアウト等でこのアカウントを使わなくなった: 下書きのアップロード・編集を止める。以後は使わない。 */
+    /**
+     * ログアウト等でこのアカウントを使わなくなった: 下書きのアップロード・編集を止め、データ層 ([AccountContext.close]) も
+     * 閉じる。以後は使わない。
+     */
     fun close() {
         draftStore.close()
         panelDraftStore.close()
         postEditStore.dispose()
+        account.close()
     }
 }

@@ -21,6 +21,11 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     PostVariety("post-variety", R.string.gallery_post_variety, "post-variety.json"),
     /** 返信先の表示 (バーの縮小版 / フル画面の X 風)。データは post-variety を使い回す。 */
     Reply("reply", R.string.gallery_reply, "post-variety.json"),
+    /**
+     * クイック投稿バー (一覧の上に浮かべる)。下書きは本物の [es.aria_on_the_planet.quasar.ui.composer.ComposerSession] だが、
+     * セッションは `.invalid` のサーバなのでアカウント・上限は取れない (アイコンは取得前のプレースホルダ)。一覧は post-variety。
+     */
+    QuickPostBar("quick-post-bar", R.string.gallery_quick_post_bar, "post-variety.json"),
     /** 通知のユーザー単位のまとめの中身。データは profile (アカウント + ポスト) を使い回す。 */
     AccountReactions("account-reactions", R.string.gallery_account_reactions, "profile.json"),
     /** 相手からのフォローリクエストが来ているプロフィールのヘッダ。データは profile を使い回す。 */

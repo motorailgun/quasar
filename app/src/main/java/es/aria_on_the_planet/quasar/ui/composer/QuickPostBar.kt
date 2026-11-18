@@ -233,8 +233,9 @@ fun QuickPostBar(
             modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            // バーのアイコンは設定のアイコンの形に関わらず円
-            ComposerAccountIcon(state.account, size = 32.dp, shape = CircleShape, modifier = Modifier.align(Alignment.Top).padding(top = 4.dp))
+            // バーのアイコンは設定のアイコンの形に関わらず円。送信ボタン (48dp の枠に 40dp の円) と同じ大きさ・高さにする
+            // (1 行のときに上下が揃う。複数行になったらアイコンは上、送信ボタンは下に残る)
+            ComposerAccountIcon(state.account, size = 40.dp, shape = CircleShape, modifier = Modifier.align(Alignment.Top).padding(top = 4.dp))
             Spacer(Modifier.width(10.dp))
             ComposerTextField(
                 state = composer.text,

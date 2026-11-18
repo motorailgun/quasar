@@ -17,9 +17,13 @@
 * Docker (compose v2)。ホストの `127.0.0.1:443` (proxy) と `127.0.0.1:53` (端末用の DNS) を使うので、空いていること。
   ポートを変えるなら `.env` の `TESTBED_BIND` / `TESTBED_HTTPS_PORT`。DNS の 53 は変えられない
   (エミュレーターの `-dns-server` はポートを指定できない)。
-* エミュレーター (今は AVD `Pixel_10a`)。PlayStore のイメージは root を取れず `/etc/hosts` を書けないので、
-  名前解決は testbed の DNS を使う。
-* 初回の `up` はイメージの取得 + DB の初期化で 10 分を超えることがある。エージェントから走らせるときはバックグラウンドで。
+* エミュレーター (macOS の開発機は AVD `Pixel_10a`、Linux (Proxmox の LXC) の開発機は `small_phone`)。PlayStore のイメージは
+  root を取れず `/etc/hosts` を書けないので、名前解決は testbed の DNS を使う。
+* 初回の `up` はイメージの取得 + DB の初期化で 10 分を超えることがある (イメージの一部が手元にあった LXC では約 6 分)。
+  エージェントから走らせるときはバックグラウンドで。
+* メモリ: 全サービス + エミュレーター (3GB の AVD) で使用 約 9GB。足りなければ `up` の後で使わないサーバを止める
+  (下記「メモリを抑える」)。
+* ホストの 53 番: systemd-resolved は `127.0.0.53` / `127.0.0.54` で待ち受けるので、testbed の DNS (`127.0.0.1:53`) とはぶつからない。
 
 ## 設定 (`testbed/.env`)
 
@@ -45,6 +49,20 @@ cd testbed
   `user10` は鍵アカウント、`user9` は bot。カスタム絵文字 `:quasar:` `:testbed:` `:blobok:`。
 * ホストから API を叩くときは名前を proxy に向ける (ホストの DNS は `*.quasar.test` を知らない。CA も自前):
   `curl -sk --resolve legacy.quasar.test:443:127.0.0.1 https://legacy.quasar.test/api/v1/timelines/public?local=true`
+  * 投稿等はトークン (`./testbed.sh accounts`) を付ける:
+    `curl -sk --resolve stable.quasar.test:443:127.0.0.1 -H "Authorization: Bearer $TOKEN" --data-urlencode "status=..." https://stable.quasar.test/api/v1/statuses`
+
+### メモリを抑える
+
+`up` は全サーバを立てる。確かめに使わないサーバは、`up` が終わった後で止めてよい (次の `up` でまた立つ):
+
+```sh
+cd testbed
+docker compose stop alpha-web alpha-sidekiq alpha-streaming alpha-redis \
+    legacy-web legacy-sidekiq legacy-streaming legacy-redis misskey misskey-redis
+```
+
+stable だけ + エミュレーターなら空きは 9〜10GB 程度残った (16GB の LXC)。
 
 ## エミュレーターから繋ぐ
 
@@ -52,48 +70,28 @@ cd testbed
    `~/Android/Sdk/emulator/emulator -avd Pixel_10a -dns-server 127.0.0.1 -no-snapshot-save -no-audio -no-boot-anim`
    (`-no-window` も可)。`adb shell ping -c1 legacy.quasar.test` が `10.0.2.2` を返せば OK。
    `-dns-server` 無しで起動したエミュレーターは起動し直す必要がある。
-2. **CA を入れる** (初回と `reset` の後。AVD に残る):
+   * LXC (画面・GPU なし) では `android emulator start` は `-dns-server` を渡せないので、直に起動する (バックグラウンドで):
+     `~/Android/Sdk/emulator/emulator -avd small_phone -no-window -no-audio -no-boot-anim -no-snapshot-save -gpu swiftshader_indirect -dns-server 127.0.0.1`
+2. **CA を入れる** (初回と `reset` の後。AVD に残る。`small_phone` は入れてあり、PIN は `1234`):
    * CA のインストールには画面ロックが要る: `adb shell locksettings set-pin 1234` (testbed 用の AVD は PIN `1234`)。
    * `adb push testbed/state/certs/ca.der /sdcard/Download/`
    * 設定 > セキュリティとプライバシー > その他のセキュリティ設定 > 暗号化と認証情報 > 証明書のインストール > CA 証明書
      → 警告を進めて `ca.der` を選ぶ。元の画面に戻れば入っている。
-3. **アプリにユーザーの CA を信頼させる** (下記「アプリ側の設定」。コミットしない)。
-4. debug ビルドを入れ、サーバに `legacy.quasar.test` 等を入れてログイン。認可は Chrome の Custom Tab で開く。
+     * 設定の検索で「CA certificate」と入れても辿り着ける (→ Install anyway → PIN → `ca.der`)。
+     * 警告の画面 (`InstallCaCertificateWarning`) は exported でないので、`am start` で直に開くことはできない。
+3. debug ビルドを入れ、サーバに `legacy.quasar.test` 等を入れてログイン。認可は Chrome の Custom Tab で開く。
+   * debug ビルドはユーザーが入れた CA を信頼する (下記「アプリ側の設定」)。手元で何かを足す必要は無い。
    * Chrome もユーザーの CA を信頼するので、証明書の警告は出ない。
    * 初回は Chrome の初回起動の画面と、「ローカル ネットワークへのアクセス」の許可 (`ERR_LOCAL_NETWORK_PERMISSION_MISSING`。
-     `10.0.2.2` がプライベートアドレスのため) が出る。許可して読み込み直す。
+     `10.0.2.2` がプライベートアドレスのため) が出る。許可して読み込み直す (`small_phone` では許可は求められなかった)。
    * ログイン → 戻り (OAuth の往復) はこの手順で確認済み。
 
-## アプリ側の設定 (ローカルのみ・コミットしない)
+## アプリ側の設定
 
-Android 7 以降、アプリは既定でユーザーが入れた CA を信頼しないので、testbed の自前の CA で TLS が通らない。
-testbed を使う間だけ、手元で次を足す。**release ビルドにはどうせ効かないが、ブランチ (master / experimental 等) には
-入れない** (常にそのまま release を出せる状態に保つため)。
-
-`app/src/main/res/xml/network_security_config.xml`:
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<!-- debuggable なビルド (debug) だけ、ユーザーが入れた CA も信頼する。testbed の自前の CA のため。 -->
-<network-security-config>
-    <debug-overrides>
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-        </trust-anchors>
-    </debug-overrides>
-</network-security-config>
-```
-
-`app/src/main/AndroidManifest.xml` の `<application>` に:
-
-```xml
-android:networkSecurityConfig="@xml/network_security_config"
-```
-
-`debug-overrides` なので効くのは debuggable なビルド (debug) だけで、benchmark (debuggable ではない) からは testbed に
-繋げない。使い終わったら `git checkout app/src/main/AndroidManifest.xml` と xml の削除で戻す。コミット前に `git status` で
-残っていないことを確かめる。
+Android 7 以降、アプリは既定でユーザーが入れた CA を信頼しないので、そのままでは testbed の自前の CA で TLS が通らない。
+`app/src/main/res/xml/network_security_config.xml` (manifest の `android:networkSecurityConfig`) の `debug-overrides` で、
+**debuggable なビルド (debug) だけ**ユーザーの CA も信頼させている (コミット済み)。release・benchmark (debuggable ではない) は
+システムの CA だけなので、benchmark からは testbed に繋げない。
 
 ## 確かめ方の例
 
@@ -105,6 +103,10 @@ android:networkSecurityConfig="@xml/network_security_config"
       -n es.aria_on_the_planet.quasar.debug/es.aria_on_the_planet.quasar.OpenLink"
   ```
 * **通知**: bots が動いていればお気に入り・ブースト・返信・フォローの通知が溜まる。足りなければ `./testbed.sh bots burst 50`。
+* **Local のページング**: bots はローカルのポストをあまり作らない (`bots burst 200` でも stable のローカルは 17 件) ので、
+  1 ページ (40 件) を超えるには API で投稿を足す (上記「環境を立てる」の `curl`。user2〜5 のトークンで数十件)。
+* **ストリーミング**: 自分のブーストは、元のポストがホームの最近の部分にあると Mastodon がストリームで流さないので、
+  Home の先頭に新しい項目として出ないことがある (サーバの仕様)。
 * **gap・自動更新**: bots の流量 (12 秒ごと) で足りる。速くしたいなら `BOT_INTERVAL` を下げる。
 
 ## 版ごとの違い (分かっていること)

@@ -1305,8 +1305,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   → `app/build/compose_compiler/`。
 * **動作確認用の連合環境** (`testbed/`。使い方・設定・セットアップは [docs/testbed.md](docs/testbed.md)、環境の構成は
   [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) と Misskey 1 台を立てて連合させ、bots が
-  投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れ、手元だけで
-  アプリにユーザーの CA を信頼させれば (`network_security_config`。**コミットしない**) debug ビルドからログインできる。
+  投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れれば
+  debug ビルドからログインできる (debug ビルドはユーザーが入れた CA も信頼する。`network_security_config` の `debug-overrides`)。
   版ごとの API の違い (3.5 には v2 通知が無い等) はここで確かめる。
 * **debug / benchmark は release と別のアプリ** (`applicationIdSuffix = ".debug"` → `es.aria_on_the_planet.quasar.debug`、
   ランチャーでは「Quasar Debug」)。release を普段使いしている端末にも横に並べて入れられる (ログインは別)。

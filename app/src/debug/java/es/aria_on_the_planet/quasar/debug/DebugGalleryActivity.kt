@@ -348,6 +348,10 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
         TranslationLanguagesGallery(onBack)
         return
     }
+    if (scenario == GalleryScenario.AccountSwitcher) {
+        AccountSwitcherGallery(remember(text) { GalleryFixtures.storedAccounts(text) }, onBack)
+        return
+    }
     if (scenario == GalleryScenario.TimelineSettings) {
         TimelineSettingsGallery(onBack)
         return
@@ -457,6 +461,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             GalleryScenario.AccountReactions,
             GalleryScenario.QuickPostBar,
             GalleryScenario.TimelineSettings,
+            GalleryScenario.AccountSwitcher,
             GalleryScenario.PostDetail,
             GalleryScenario.Translation,
             GalleryScenario.TranslationLanguages,

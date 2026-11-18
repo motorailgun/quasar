@@ -111,7 +111,7 @@ es.aria_on_the_planet.quasar
     ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
     │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド / PredictiveBackDamping = 予測型「戻る」の動きを抑える)
     ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
-    ├── timeline/                   タイムライン画面 + ViewModel
+    ├── timeline/                   タイムライン画面 + ViewModel + ドロワー (TimelineDrawer / DrawerAccounts = アカウントの切り替え)
     ├── profile/                    プロフィール (Screen / Header / ActionButton / ViewModel) + 編集 (ProfileEditScreen / ProfileEditor / ProfileEditFields)
     ├── follows/                    フォロー / フォロワー一覧 (Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
@@ -896,7 +896,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   * ヘッダ: 左にメニューのボタン (≡。タップで左から `ModalNavigationDrawer` のドロワー `TimelineDrawerSheet` (X のアプリの形):
     ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) /
-    他のアカウントの一覧 (タップで切り替え) +「アカウントを追加」(仮の UI。`DrawerAccounts`) / 設定 /
+    右に他のアカウントの小さなアイコン 1 つ (大きなアイコンと下揃え) (タップで切り替え)、[v] で全アカウントの一覧 +「アカウントを追加」(`DrawerAccounts.kt`。
+    保存している表示用の情報で描く。ドロワーの幅は変えない) / 設定 /
     検索 (`Route.Search`。トップバーが検索欄で、キーボードの検索で確定。結果は `ConnectedTabRow` (Accounts / Posts / Hashtags) +
     `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
     投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
@@ -1425,7 +1426,9 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
   translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
-  translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ)。
+  translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ) /
+  account-switcher (ドロワーのアカウントの切り替え。`account-switcher.json` の保存しているアカウントで本物の `TimelineDrawerSheet`。
+  チップで 1 / 2 / 全部のアカウント、切り替えは手元だけ。長い名前・絵文字・表示用の情報の無いアカウントを含む)。
   表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率、`--ei long_post_max_lines 3` で長文の折りたたみの行数、`--es avatar_shape RoundedSquare` でアイコンの形)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
@@ -1542,8 +1545,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 
 ## 未対応・今後の課題
 
-* **認証**: 複数アカウントの切り替え・追加はあるが、ドロワーの UI は確かめるための仮のもの (他のアカウントの一覧 +「アカウントを追加」。
-  docs/multi-account.md の段階 6 で作り直す)。アカウントをまたいだ操作は無い。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
+* **認証**: 複数アカウントの切り替え・追加はある (ドロワー)。アカウントをまたいだ操作は無い。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
   OAuth のログインの往復 (ブラウザでの認可 → 戻り) はエミュレータ + testbed (3.5.19) で確認済み (実機は未確認)。
   * **将来: 戻り先を App Links (検証済みの https URL) にする**。今のカスタムスキーム (`es.aria-on-the-planet.quasar://oauth`) は
     他のアプリが同じスキームを登録すると戻りを横取りされうる (PKCE があるので盗まれたコードはトークンにできないが、

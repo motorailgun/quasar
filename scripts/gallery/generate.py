@@ -369,7 +369,23 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(dave, p("오늘 저녁에 같이 밥 먹을래요? 새로 생긴 식당이 있어요")),
     ]
 
+    # --- account-switcher: ドロワーのアカウントの切り替え。保存しているアカウントの一覧 (サーバ + 表示用の情報の元の Account)。
+    # account が null のものは表示用の情報がまだ無いアカウント (以前の保存から移した直後)。先頭が使っているアカウント
+    switcher_accounts = [
+        {"server": "https://one.invalid", "account": account("11", "alice", "Alice", avatars["static"], [])},
+        {"server": "https://two.invalid",
+         "account": account("12", "bob", "Bob :blink_gif: :spin_fast:", avatars["gif"], ems("blink_gif", "spin_fast"))},
+        {"server": "https://a-very-long-server-name-for-the-drawer.invalid",
+         "account": account("13", "longname_with_a_long_acct",
+                            "とても長い表示名のアカウント :wide_wave: Very Long Display Name That Overflows",
+                            avatars["apng"], ems("wide_wave"), bot=True)},
+        {"server": "https://four.invalid", "account": None},
+        {"server": "https://one.invalid",
+         "account": account("15", "carol", "Carol :wobble_webp:", avatars["webp"], ems("wobble_webp"))},
+    ]
+
     return {
+        "account-switcher.json": switcher_accounts,
         "animated-emoji.json": animated_emoji,
         "animated-avatars.json": animated_avatars,
         "emoji-stress.json": emoji_stress,

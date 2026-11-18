@@ -6,6 +6,10 @@
     <string name="logout_confirm_title">ログアウトしますか？</string>
     <string name="logout_confirm_message">このアカウントを使うには、ブラウザからもう一度ログインする必要があります。</string>
     <string name="add_account">アカウントを追加</string>
+    <string name="drawer_switch_to">%1$s に切り替え</string>
+    <string name="drawer_accounts_expand">アカウントを表示</string>
+    <string name="drawer_accounts_collapse">アカウントを隠す</string>
+    <string name="drawer_account_current">使用中のアカウント</string>
     <string name="login_description">Mastodon のアカウントでログインします。サーバーのログインページがブラウザで開きます。</string>
     <string name="login_server">サーバー</string>
     <string name="login_submit">ログイン</string>

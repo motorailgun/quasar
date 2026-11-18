@@ -32,8 +32,6 @@ import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.account.AccountKey
-import es.aria_on_the_planet.quasar.data.account.StoredAccount
-import es.aria_on_the_planet.quasar.data.account.customEmoji
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -91,8 +89,7 @@ import es.aria_on_the_planet.quasar.ui.component.post.LocalPostTranslations
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.UpdateAccountSettings
 import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
-import es.aria_on_the_planet.quasar.ui.timeline.DrawerAccount
-import es.aria_on_the_planet.quasar.ui.timeline.DrawerAccounts
+import es.aria_on_the_planet.quasar.ui.timeline.toDrawerAccounts
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.flow.Flow
@@ -345,12 +342,12 @@ private fun TimelineEntry(container: AppContainer, account: AccountUiContext, on
             }
         },
     )
-    // ドロワーの他のアカウント (仮の UI。段階 6 で作り直す)
+    // ドロワーのアカウントの切り替え (保存している表示用の情報で描く)
     val stored by container.accountStore.state.collectAsStateWithLifecycle()
     val accountManager = container.accountManager
     val switcher = remember(stored, account) {
-        DrawerAccounts(
-            others = stored.accounts.filter { it.key != account.account.key }.map { it.toDrawerAccount() },
+        stored.toDrawerAccounts(
+            currentKey = account.account.key.value,
             onSwitch = { key -> accountManager.switchTo(AccountKey(key)) },
             onAdd = onAddAccount,
         )
@@ -361,24 +358,6 @@ private fun TimelineEntry(container: AppContainer, account: AccountUiContext, on
         accounts = switcher,
     )
 }
-
-/** ドロワーの切り替えの一覧の 1 行 (表示用の情報がまだ無ければサーバだけ)。 */
-private fun StoredAccount.toDrawerAccount(): DrawerAccount = DrawerAccount(
-    key = key.value,
-    user = profile?.let { profile ->
-        User(
-            inServerId = accountId.orEmpty(),
-            screenName = profile.acct,
-            displayName = profile.displayName,
-            serverUrl = serverUrl,
-            iconUrl = profile.avatarUrl,
-            note = "",
-            emojis = profile.emojis.map { it.customEmoji },
-            iconStaticUrl = profile.avatarStaticUrl,
-        )
-    },
-    label = label,
-)
 
 /** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアカウントのもの。 */
 @Composable

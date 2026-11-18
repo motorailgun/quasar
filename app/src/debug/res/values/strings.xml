@@ -20,4 +20,5 @@
     <string name="gallery_post_detail">Post detail (reactions)</string>
     <string name="gallery_translation">On-device translation</string>
     <string name="gallery_translation_languages">Translation languages</string>
+    <string name="gallery_account_switcher">Account switcher</string>
 </resources>

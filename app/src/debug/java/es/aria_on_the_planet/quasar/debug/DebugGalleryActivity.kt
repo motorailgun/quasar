@@ -204,6 +204,7 @@ private class GalleryNavigator(
     override fun openPersonalPosts(list: PersonalPostList) = Unit
     override fun openFollowRequests() = Unit
     override fun openSearch() = Unit
+    override fun openRelogin() = Unit
     override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
     override fun openMediaViewer(args: MediaViewerArgs) {
         backStack.add(Route.MediaViewer(args))

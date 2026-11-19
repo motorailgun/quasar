@@ -15,11 +15,11 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 一覧が空のときに、一覧の中 (header 等) に出す状態: 読み込み中 / 失敗 ([error]、表示する文言) / 空 ([empty])。
- * 一覧の中に置くので、引っ張って更新はそのまま使える。
+ * 一覧の中に置くので、引っ張って更新はそのまま使える。[needsLogin] なら失敗の下に「ログインし直す」([LoadErrorMessage])。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ListStatus(loading: Boolean, error: String?, empty: String, modifier: Modifier = Modifier) {
+fun ListStatus(loading: Boolean, error: String?, empty: String, modifier: Modifier = Modifier, needsLogin: Boolean = false) {
     Box(
         modifier
             .fillMaxWidth()
@@ -28,7 +28,7 @@ fun ListStatus(loading: Boolean, error: String?, empty: String, modifier: Modifi
     ) {
         when {
             loading -> LoadingIndicator()
-            error != null -> Text(error)
+            error != null -> LoadErrorMessage(error, needsLogin)
             else -> Text(empty, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

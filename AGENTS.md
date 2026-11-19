@@ -94,7 +94,7 @@ es.aria_on_the_planet.quasar
     │   ├── menu/ActionMenu.kt      ︙のメニュー (画面下からのシート。項目の上に header を置ける) + MenuItemText (項目の文字、Regular)
     │   ├── account/AccountActions.kt アカウントへの操作 (ブロック・ミュート・ブーストの非表示) の口 (LocalAccountActions) とメニューの項目
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
-    │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く)
+    │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く) + LoadErrorMessage.kt (失敗の文言 + 401 / 403 なら「ログインし直す」)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
     │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
@@ -842,6 +842,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     トークンは無効化)。別のアカウント (サーバ・ID が違う) でログインしたら失敗にして保存しているものは触らない。ID の無い (移した)
     アカウントなら ID を埋める (他に同じ ID が保存されていたら失敗)。純粋関数 `StoredAccounts.withRelogin` (`AccountStoreTest`)。
     使うアカウントが変わると画面が作り直される (`AccountScope`)。
+  * **読み込みの失敗が 401 / 403 なら「ログインし直す」のボタン** (`Navigator.openRelogin` → `Route.Relogin`): 失敗は文字列ではなく
+    `LoadError` (`ui/feed/LoadError.kt`。`toLoadError()` で `MastodonApiException` の 401 / 403 を `needsLogin` にする、`LoadErrorTest`)
+    で持ち、一覧が空のときの表示 (`ListStatus(needsLogin)`・タイムラインのカラム) と詳細画面の全面の表示 (`DetailMessage(needsLogin)`)
+    が文言の下にボタンを出す (`LoadErrorMessage`)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
+    今までどおり再接続を続ける (ボタンは出さない)。
   * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻ると進行中の
     認可待ちもやめる)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
     そのアカウントに切り替わる。

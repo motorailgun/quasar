@@ -43,6 +43,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import es.aria_on_the_planet.quasar.ui.feed.LoadError
+import es.aria_on_the_planet.quasar.ui.feed.toLoadError
 
 data class ProfileState(
     val profile: Profile? = null,
@@ -50,7 +52,7 @@ data class ProfileState(
     val isLoading: Boolean = false,
     /** 引っ張って更新した取得の最中 (インジケータを出す)。 */
     val isRefreshing: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
 )
 
 /** プロフィールの補助情報。取得に失敗しても画面全体はエラーにせず、空として扱う。 */
@@ -433,7 +435,7 @@ class ProfileViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                profile.update { it.copy(isLoading = false, isRefreshing = false, error = e.message ?: e.toString()) }
+                profile.update { it.copy(isLoading = false, isRefreshing = false, error = e.toLoadError()) }
             }
         }
     }

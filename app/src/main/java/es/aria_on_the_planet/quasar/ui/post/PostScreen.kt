@@ -148,7 +148,9 @@ fun PostScreen(
                 },
             ) {
                 when {
-                    thread == null && state.error != null -> DetailMessage(stringResource(R.string.post_error, state.error!!))
+                    thread == null && state.error != null -> state.error!!.let { error ->
+                        DetailMessage(stringResource(R.string.post_error, error.message), needsLogin = error.needsLogin)
+                    }
                     thread == null -> DetailLoading()
                     else -> {
                         val lineColor = MaterialTheme.colorScheme.outlineVariant

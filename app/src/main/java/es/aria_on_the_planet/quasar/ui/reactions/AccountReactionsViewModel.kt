@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import es.aria_on_the_planet.quasar.ui.feed.LoadError
+import es.aria_on_the_planet.quasar.ui.feed.toLoadError
 
 data class AccountReactionsState(
     /** リアクションしたユーザー (プロフィール文込み)。取得前・失敗時は `null`。 */
@@ -28,7 +30,7 @@ data class AccountReactionsState(
     val posts: List<Post> = emptyList(),
     val loaded: Boolean = false,
     val isRefreshing: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
 )
 
 /**
@@ -88,7 +90,7 @@ class AccountReactionsViewModel(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load posts", e)
-                _state.update { it.copy(account = account.await() ?: it.account, error = e.message ?: e.javaClass.simpleName) }
+                _state.update { it.copy(account = account.await() ?: it.account, error = e.toLoadError()) }
             } finally {
                 _state.update { it.copy(loaded = true, isRefreshing = false) }
             }

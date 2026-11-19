@@ -323,6 +323,10 @@ private class BackStackNavigator(
         backStack.add(Route.Search)
     }
 
+    override fun openRelogin() {
+        backStack.add(Route.Relogin)
+    }
+
     override fun back() {
         // 詳細のパネルの画面はパネルが閉じるアニメーションをしてから外す
         if (backStack.lastOrNull()?.opensInPanel() == true && panel.requestBack()) return

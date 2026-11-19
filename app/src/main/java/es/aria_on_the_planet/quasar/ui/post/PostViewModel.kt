@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import es.aria_on_the_planet.quasar.ui.feed.LoadError
+import es.aria_on_the_planet.quasar.ui.feed.toLoadError
 
 data class PostScreenState(
     val thread: PostThread? = null,
@@ -31,7 +33,7 @@ data class PostScreenState(
     val isLoading: Boolean = false,
     /** 引っ張って更新した取得の最中 (インジケータを出す)。 */
     val isRefreshing: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
 )
 
 /** 画面に一度だけ伝える出来事。 */
@@ -159,7 +161,7 @@ class PostViewModel(
                         replies = if (gone) emptyList() else it.replies,
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message ?: e.toString(),
+                        error = e.toLoadError(),
                     )
                 }
             }

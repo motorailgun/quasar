@@ -2,15 +2,12 @@ package es.aria_on_the_planet.quasar.ui.composer
 
 import android.net.Uri
 import android.util.Log
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.media.UploadSource
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.remote.userMessage
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.data.repository.EmojiRepository
 import es.aria_on_the_planet.quasar.data.repository.InstanceRepository
-import es.aria_on_the_planet.quasar.data.repository.MediaRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -63,13 +60,11 @@ data class EditTarget(val post: Post, val source: StatusSource)
  * 内容で始まり、送信は編集 API。公開範囲・返信先は変えられず、設定・アカウントの既定値も入れない。
  */
 class ComposerSession(
-    private val session: Session,
+    /** 投稿するアカウント。 */
+    private val account: AccountContext,
     private val scope: CoroutineScope,
-    private val accountRepository: AccountRepository,
     private val instanceRepository: InstanceRepository,
     private val emojiRepository: EmojiRepository,
-    private val statusRepository: StatusRepository,
-    private val mediaRepository: MediaRepository,
     /** 設定の「新しい投稿の公開範囲」(`null` ならアカウントの既定)。読み込みを待ってから流れる。 */
     private val defaultVisibilitySetting: Flow<PostVisibility?>,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
@@ -81,6 +76,11 @@ class ComposerSession(
     /** 投稿 (編集なら保存) できた。[DraftStore] がこの下書きを終えて空のものに替える。 */
     private val onPublished: (Post) -> Unit,
 ) {
+    private val serverUrl = account.session.serverUrl
+    private val accountRepository = account.accountRepository
+    private val statusRepository = account.statusRepository
+    private val mediaRepository = account.mediaRepository
+
     /** 入力内容。 */
     val composer = ComposerState()
 
@@ -98,12 +98,12 @@ class ComposerSession(
         setAttachments = { composer.attachments = it },
         limits = { _state.value.limits },
         upload = { source, description, onProgress, onProcessing ->
-            mediaRepository.upload(session, source, description, onProgress, onProcessing)
+            mediaRepository.upload(source, description, onProgress, onProcessing)
         },
         // 編集では代替テキストを編集の送信 (`media_attributes`) でまとめて送る。投稿済みのメディアは
         // `PUT /api/v1/media/:id` で変えられない
         updateDescription = { mediaId, description ->
-            if (editing == null) mediaRepository.updateDescription(session, mediaId, description)
+            if (editing == null) mediaRepository.updateDescription(mediaId, description)
         },
         onError = { Log.w(TAG, "Media upload failed", it) },
         prepare = prepareUpload,
@@ -136,12 +136,12 @@ class ComposerSession(
     init {
         scope.launch {
             // 取得できなければ既定値のまま (最終的な判定はサーバが行う)
-            runCatchingLogged("instance") { instanceRepository.instance(session.serverUrl) }
+            runCatchingLogged("instance") { instanceRepository.instance(serverUrl) }
                 ?.let { info -> _state.update { it.copy(limits = info.composeLimits) } }
             limitsLoaded.complete(Unit)
         }
         scope.launch {
-            runCatchingLogged("emojis") { emojiRepository.pickerEmojis(session.serverUrl) }
+            runCatchingLogged("emojis") { emojiRepository.pickerEmojis(serverUrl) }
                 ?.let { emojis -> _state.update { it.copy(emojis = emojis) } }
         }
         if (editing == null) {
@@ -154,7 +154,7 @@ class ComposerSession(
         }
         scope.launch {
             val sensitiveBefore = composer.sensitive
-            runCatchingLogged("account") { accountRepository.fetchMe(session) }?.let { me ->
+            runCatchingLogged("account") { accountRepository.fetchMe() }?.let { me ->
                 // 編集では既定値を入れない (公開範囲は変えられず、閲覧注意はポストのまま)
                 if (editing != null) return@let
                 accountDefaultVisibility = me.defaultVisibility
@@ -165,7 +165,7 @@ class ComposerSession(
         }
         scope.launch {
             // プロフィールの編集でアイコン・名前が変わったら追従する
-            accountRepository.myAccount(session).collect { me -> _state.update { it.copy(account = me.user) } }
+            accountRepository.myAccount().collect { me -> _state.update { it.copy(account = me.user) } }
         }
     }
 
@@ -198,12 +198,12 @@ class ComposerSession(
         if (draft.problems(_state.value.limits).isNotEmpty()) return
         val editing = editing
         if (editing != null) {
-            send { statusRepository.edit(session, editing.post.statusId, draft) }
+            send { statusRepository.edit(editing.post.statusId, draft) }
             return
         }
         val key = lastAttempt?.takeIf { it.first == draft }?.second ?: UUID.randomUUID().toString()
         lastAttempt = draft to key
-        send { statusRepository.publish(session, draft, key) }
+        send { statusRepository.publish(draft, key) }
     }
 
     private fun send(request: suspend () -> Post) {

@@ -279,7 +279,7 @@ private fun <T : Any> DetailPanel(entries: List<NavEntry<T>>, state: DetailPanel
     }
 }
 
-/** 詳細のパネルの中の画面か。パネルの中のクイック投稿バー・返信はパネルの下書き (`AppContainer.panelDraftStore`) を使う。 */
+/** 詳細のパネルの中の画面か。パネルの中のクイック投稿バー・返信はパネルの下書き (`AccountUiContext.panelDraftStore`) を使う。 */
 val LocalInDetailPanel = compositionLocalOf { false }
 
 @Composable

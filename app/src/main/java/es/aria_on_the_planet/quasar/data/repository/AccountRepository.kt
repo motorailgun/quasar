@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
@@ -56,6 +56,7 @@ data class CacheHit<T>(val value: T, val isFresh: Boolean)
  * プロフィールと関係はキャッシュから先に読める ([cachedProfile] / [cachedRelationship])。
  */
 class AccountRepository(
+    private val session: Session,
     private val api: MastodonApi,
     private val cache: EntityCache,
 ) {
@@ -68,42 +69,42 @@ class AccountRepository(
     val relationshipChanges: SharedFlow<RelationshipChange> = changes.asSharedFlow()
 
     private val meMutex = Mutex()
-    private val me = MutableStateFlow<Pair<Session, CurrentAccount>?>(null)
+    private val me = MutableStateFlow<CurrentAccount?>(null)
 
     /** 取得済みならログイン中のアカウント ([fetchMe] のキャッシュ)。待たずに返す。 */
-    fun cachedMe(session: Session): CurrentAccount? = me.value?.takeIf { it.first == session }?.second
+    fun cachedMe(): CurrentAccount? = me.value
 
-    /** ログイン中のアカウント。セッションごとにメモリへキャッシュする。 */
-    suspend fun fetchMe(session: Session): CurrentAccount =
+    /** ログイン中のアカウント。メモリへキャッシュする (この Repository は 1 つのセッションに結びついている)。 */
+    suspend fun fetchMe(): CurrentAccount =
         meMutex.withLock {
-            cachedMe(session) ?: cache.issue().let { version ->
+            cachedMe() ?: cache.issue().let { version ->
                 api.verifyCredentials(session.serverUrl, session.accessToken).also { cache.putAccounts(listOf(it), version) }
-            }.let { dto -> rememberMe(session, dto) }
+            }.let { dto -> rememberMe(dto) }
         }
 
     /**
      * ログイン中のアカウントの取得済みの値と、その後の変化 (プロフィールの編集)。投稿欄・タイムラインのヘッダの
      * アイコン等が追従するのに使う。取得前は何も流れない。
      */
-    fun myAccount(session: Session): Flow<CurrentAccount> =
-        me.mapNotNull { it?.takeIf { (s, _) -> s == session }?.second }.distinctUntilChanged()
+    fun myAccount(): Flow<CurrentAccount> =
+        me.filterNotNull().distinctUntilChanged()
 
-    private fun rememberMe(session: Session, dto: AccountDto): CurrentAccount =
+    private fun rememberMe(dto: AccountDto): CurrentAccount =
         CurrentAccount(
             user = dto.toDomain(),
             defaultVisibility = dto.source?.privacy?.let(::postVisibility) ?: PostVisibility.Public,
             defaultSensitive = dto.source?.sensitive == true,
-        ).also { me.value = session to it }
+        ).also { me.value = it }
 
     /**
      * 自分のプロフィールの編集用の原文。表示中のプロフィールは HTML なので、`verify_credentials` の `source` を
      * 取り直す (編集の直前に読むので、ほかの端末で変えた分も入る)。`source` を返さないサーバでは例外。
      */
-    suspend fun fetchProfileSource(session: Session): ProfileSource {
+    suspend fun fetchProfileSource(): ProfileSource {
         val version = cache.issue()
         val dto = api.verifyCredentials(session.serverUrl, session.accessToken)
         cache.putAccounts(listOf(dto), version)
-        rememberMe(session, dto)
+        rememberMe(dto)
         return dto.toProfileSource() ?: throw IOException("The server did not return the profile source")
     }
 
@@ -112,7 +113,6 @@ class AccountRepository(
      * 応答のプロフィールを返し、キャッシュと [myAccount] にも反映する。
      */
     suspend fun updateProfile(
-        session: Session,
         source: ProfileSource,
         avatar: UploadSource?,
         header: UploadSource?,
@@ -124,12 +124,12 @@ class AccountRepository(
         val version = cache.issue()
         val dto = api.updateCredentials(session.serverUrl, session.accessToken, source.toUpdateCredentialsParams(), images)
         cache.putAccounts(listOf(dto), version)
-        rememberMe(session, dto)
+        rememberMe(dto)
         return dto.toProfile()
     }
 
-    /** [accountId] は [session] のサーバ内 ID (`User.inServerId`)。 */
-    suspend fun fetchProfile(session: Session, accountId: String): Profile {
+    /** [accountId] は接続中サーバ内の ID (`User.inServerId`)。 */
+    suspend fun fetchProfile(accountId: String): Profile {
         val version = cache.issue()
         val account = api.account(session.serverUrl, session.accessToken, accountId)
         cache.putAccounts(listOf(account), version)
@@ -142,7 +142,6 @@ class AccountRepository(
 
     /** @param onlyMedia `true` ならメディア付きのポストのみ (プロフィールのメディア一覧)。 */
     suspend fun fetchPosts(
-        session: Session,
         accountId: String,
         maxId: String? = null,
         limit: Int,
@@ -172,11 +171,11 @@ class AccountRepository(
     }
 
     /** ログイン中のユーザーがお気に入りにしたポスト。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchFavourites(session: Session, maxId: String? = null, limit: Int): Page<Post> =
+    suspend fun fetchFavourites(maxId: String? = null, limit: Int): Page<Post> =
         fetchOwnStatuses { api.favourites(session.serverUrl, session.accessToken, maxId, limit) }
 
     /** ログイン中のユーザーがブックマークしたポスト。`max_id` はブックマークの ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchBookmarks(session: Session, maxId: String? = null, limit: Int): Page<Post> =
+    suspend fun fetchBookmarks(maxId: String? = null, limit: Int): Page<Post> =
         fetchOwnStatuses { api.bookmarks(session.serverUrl, session.accessToken, maxId, limit) }
 
     private suspend fun fetchOwnStatuses(fetch: suspend () -> LinkedPage<StatusDto>): Page<Post> {
@@ -187,7 +186,7 @@ class AccountRepository(
     }
 
     /** 自分へのフォローリクエストを送ってきたアカウント。`max_id` はリクエストの ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchFollowRequests(session: Session, maxId: String? = null): Page<User> {
+    suspend fun fetchFollowRequests(maxId: String? = null): Page<User> {
         val version = cache.issue()
         val page = api.followRequests(session.serverUrl, session.accessToken, maxId)
         cache.putAccounts(page.items, version)
@@ -195,14 +194,14 @@ class AccountRepository(
     }
 
     /** [accountId] がフォローしているアカウント。`max_id` はフォロー関係の ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchFollowing(session: Session, accountId: String, maxId: String? = null): Page<User> =
-        fetchRelations(session, accountId, "following", maxId)
+    suspend fun fetchFollowing(accountId: String, maxId: String? = null): Page<User> =
+        fetchRelations(accountId, "following", maxId)
 
     /** [accountId] のフォロワー。`max_id` はフォロー関係の ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchFollowers(session: Session, accountId: String, maxId: String? = null): Page<User> =
-        fetchRelations(session, accountId, "followers", maxId)
+    suspend fun fetchFollowers(accountId: String, maxId: String? = null): Page<User> =
+        fetchRelations(accountId, "followers", maxId)
 
-    private suspend fun fetchRelations(session: Session, accountId: String, relation: String, maxId: String?): Page<User> {
+    private suspend fun fetchRelations(accountId: String, relation: String, maxId: String?): Page<User> {
         val version = cache.issue()
         val page = api.accountRelations(session.serverUrl, session.accessToken, accountId, relation, maxId)
         cache.putAccounts(page.items, version)
@@ -210,7 +209,7 @@ class AccountRepository(
     }
 
     /** ログイン中ユーザーと [accountId] との関係。 */
-    suspend fun fetchRelationship(session: Session, accountId: String): Relationship? {
+    suspend fun fetchRelationship(accountId: String): Relationship? {
         val version = cache.issue()
         val relationship = api.relationships(session.serverUrl, session.accessToken, listOf(accountId)).firstOrNull { it.id == accountId }
         relationship?.let { cache.putRelationships(listOf(it), version) }
@@ -222,23 +221,23 @@ class AccountRepository(
         cache.relationship(accountId)?.let { CacheHit(it.value.toDomain(), it.isFresh(CachePolicy.RelationshipTtlMillis)) }
 
     /** [accountId] をフォローする (`follow = false` ならフォロー / リクエストをやめる)。更新後の関係を返す。 */
-    suspend fun setFollowing(session: Session, accountId: String, follow: Boolean): Relationship =
+    suspend fun setFollowing(accountId: String, follow: Boolean): Relationship =
         changeRelationship(accountId) { api.follow(session.serverUrl, session.accessToken, accountId, follow) }
 
     /** [accountId] から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。更新後の関係を返す。 */
-    suspend fun answerFollowRequest(session: Session, accountId: String, accept: Boolean): Relationship =
+    suspend fun answerFollowRequest(accountId: String, accept: Boolean): Relationship =
         changeRelationship(accountId) { api.answerFollowRequest(session.serverUrl, session.accessToken, accountId, accept) }
 
     /** [accountId] をブロックする (`block = false` なら解除)。ブロックするとフォロー・フォローされている関係も切れる。 */
-    suspend fun setBlocking(session: Session, accountId: String, block: Boolean): Relationship =
+    suspend fun setBlocking(accountId: String, block: Boolean): Relationship =
         changeRelationship(accountId) { api.block(session.serverUrl, session.accessToken, accountId, block) }
 
     /** [accountId] をミュートする (`mute = false` なら解除)。期限なし・通知もミュート。 */
-    suspend fun setMuting(session: Session, accountId: String, mute: Boolean): Relationship =
+    suspend fun setMuting(accountId: String, mute: Boolean): Relationship =
         changeRelationship(accountId) { api.mute(session.serverUrl, session.accessToken, accountId, mute) }
 
     /** フォロー中の [accountId] のブーストを出すか。フォローしていないときは呼ばない (フォローになってしまう)。 */
-    suspend fun setShowingReblogs(session: Session, accountId: String, show: Boolean): Relationship =
+    suspend fun setShowingReblogs(accountId: String, show: Boolean): Relationship =
         changeRelationship(accountId) { api.setShowingReblogs(session.serverUrl, session.accessToken, accountId, show) }
 
     private suspend fun changeRelationship(accountId: String, request: suspend () -> RelationshipDto): Relationship {
@@ -256,7 +255,7 @@ class AccountRepository(
     }
 
     /** ピン留めされたポスト。サーバによっては多いため [MaxPinnedPosts] 件で打ち切る。 */
-    suspend fun fetchPinnedPosts(session: Session, accountId: String): List<Post> {
+    suspend fun fetchPinnedPosts(accountId: String): List<Post> {
         val version = cache.issue()
         val statuses = api.accountStatuses(session.serverUrl, session.accessToken, accountId, limit = MaxPinnedPosts, pinned = true)
             .take(MaxPinnedPosts)
@@ -265,7 +264,7 @@ class AccountRepository(
     }
 
     /** ログイン中ユーザーがフォローしている人のうち、[accountId] をフォローしている人。 */
-    suspend fun fetchFamiliarFollowers(session: Session, accountId: String): List<User> {
+    suspend fun fetchFamiliarFollowers(accountId: String): List<User> {
         val version = cache.issue()
         val accounts = api.familiarFollowers(session.serverUrl, session.accessToken, listOf(accountId))
             .firstOrNull { it.id == accountId }

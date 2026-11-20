@@ -1,5 +1,8 @@
 package es.aria_on_the_planet.quasar.debug
 
+import es.aria_on_the_planet.quasar.data.account.AccountKey
+import es.aria_on_the_planet.quasar.data.account.StoredAccount
+import es.aria_on_the_planet.quasar.data.account.StoredProfile
 import es.aria_on_the_planet.quasar.data.mapper.toDomain
 import es.aria_on_the_planet.quasar.data.mapper.toProfile
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
@@ -32,7 +35,25 @@ internal object GalleryFixtures {
 
     /** `CustomEmoji` の配列 (`GET /api/v1/custom_emojis` と同じ形)。 */
     fun emojis(text: String): List<CustomEmoji> = json.decodeFromString<List<CustomEmojiDto>>(text).map { it.toDomain() }
+
+    /**
+     * 保存しているアカウントの一覧 (`[{"server": URL, "account": Account | null}]`)。表示用の情報・ID は Account から作る
+     * (本番の `fetchMe` の後と同じ)。`account` が null なら表示用の情報がまだ無いアカウント。キーは `gallery-<順番>`。
+     */
+    fun storedAccounts(text: String): List<StoredAccount> =
+        json.decodeFromString<List<StoredAccountFixtureDto>>(text).mapIndexed { i, dto ->
+            StoredAccount(
+                key = AccountKey("gallery-$i"),
+                serverUrl = dto.server,
+                accessToken = "gallery",
+                accountId = dto.account?.id,
+                profile = dto.account?.let { StoredProfile(it.toDomain()) },
+            )
+        }
 }
+
+@Serializable
+private data class StoredAccountFixtureDto(val server: String, val account: AccountDto? = null)
 
 internal data class ProfileFixture(val profile: Profile, val posts: List<Post>)
 

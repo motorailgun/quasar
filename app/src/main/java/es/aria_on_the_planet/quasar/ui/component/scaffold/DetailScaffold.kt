@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.component.list.LoadErrorMessage
 
 /**
  * 詳細画面 (プロフィール・ポスト等) 共通の骨組み。
@@ -305,15 +306,15 @@ fun DetailLoading() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
 }
 
-/** 読み込み失敗などの全面メッセージ。 */
+/** 読み込み失敗などの全面メッセージ。[needsLogin] なら下に「ログインし直す」([LoadErrorMessage])。 */
 @Composable
-fun DetailMessage(message: String) {
+fun DetailMessage(message: String, needsLogin: Boolean = false) {
     Box(
         Modifier
             .fillMaxSize()
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(message, style = MaterialTheme.typography.bodyMedium)
+        LoadErrorMessage(message, needsLogin)
     }
 }

@@ -48,8 +48,9 @@ fun PostFeedList(
                 item(key = "feed_status", contentType = "status") {
                     ListStatus(
                         loading = !feed.loaded || feed.isRefreshing,
-                        error = feed.error?.let { stringResource(errorFormat, it) },
+                        error = feed.error?.let { stringResource(errorFormat, it.message) },
                         empty = empty,
+                        needsLogin = feed.error?.needsLogin == true,
                     )
                 }
             }

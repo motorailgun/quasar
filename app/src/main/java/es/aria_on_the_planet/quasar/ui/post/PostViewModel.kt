@@ -3,12 +3,11 @@ package es.aria_on_the_planet.quasar.ui.post
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.remote.MastodonApiException
 import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.repository.PostThread
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
@@ -23,6 +22,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import es.aria_on_the_planet.quasar.ui.feed.LoadError
+import es.aria_on_the_planet.quasar.ui.feed.toLoadError
 
 data class PostScreenState(
     val thread: PostThread? = null,
@@ -32,7 +33,7 @@ data class PostScreenState(
     val isLoading: Boolean = false,
     /** 引っ張って更新した取得の最中 (インジケータを出す)。 */
     val isRefreshing: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
 )
 
 /** 画面に一度だけ伝える出来事。 */
@@ -42,10 +43,10 @@ sealed interface PostScreenEvent {
 }
 
 class PostViewModel(
-    private val session: Session,
+    account: AccountContext,
     private val statusId: String,
-    private val repository: StatusRepository,
 ) : ViewModel() {
+    private val repository = account.statusRepository
 
     private val _state = MutableStateFlow(PostScreenState())
     val state: StateFlow<PostScreenState> = _state.asStateFlow()
@@ -68,13 +69,13 @@ class PostViewModel(
     }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(repository, session, post, choices) { poll ->
+        viewModelScope.submitVote(repository, post, choices) { poll ->
             updatePosts { it.withPoll(poll) }
         }
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { id, action -> repository.perform(session, id, action) },
+        send = { id, action -> repository.perform(id, action) },
         update = ::updatePosts,
         onError = { message, error -> Log.w(TAG, message, error) },
     )
@@ -143,7 +144,7 @@ class PostViewModel(
                     _state.update { it.copy(thread = cached.thread, replies = linearReplies(cached.thread.descendants)) }
                 }
                 val reuse = cached?.takeIf { it.isPostFresh && !force }?.thread?.post
-                val fetched = repository.fetchThread(session, statusId, post = reuse)
+                val fetched = repository.fetchThread(statusId, post = reuse)
                 _state.update { s ->
                     // 本体を取らなかったときは、取得中に行った操作 (お気に入り等) の反映を残す
                     val thread = if (reuse != null) fetched.copy(post = s.thread?.post ?: reuse) else fetched
@@ -160,7 +161,7 @@ class PostViewModel(
                         replies = if (gone) emptyList() else it.replies,
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message ?: e.toString(),
+                        error = e.toLoadError(),
                     )
                 }
             }

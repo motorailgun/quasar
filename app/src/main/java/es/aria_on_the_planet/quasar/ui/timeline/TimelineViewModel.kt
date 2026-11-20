@@ -3,14 +3,10 @@ package es.aria_on_the_planet.quasar.ui.timeline
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
-import es.aria_on_the_planet.quasar.data.repository.NotificationRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
 import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.repository.withPoll
-import es.aria_on_the_planet.quasar.data.session.Session
-import es.aria_on_the_planet.quasar.data.streaming.StreamingClient
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
@@ -18,7 +14,6 @@ import es.aria_on_the_planet.quasar.ui.feed.PostActionController
 import es.aria_on_the_planet.quasar.domain.model.TimelineType
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
 import es.aria_on_the_planet.quasar.ui.feed.PostFeed
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
@@ -27,7 +22,7 @@ import es.aria_on_the_planet.quasar.ui.notification.NotificationEntry
 import es.aria_on_the_planet.quasar.ui.notification.appendNotificationPage
 import es.aria_on_the_planet.quasar.ui.notification.mapGroups
 import es.aria_on_the_planet.quasar.ui.notification.nextNotificationMaxId
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
 import kotlinx.coroutines.flow.Flow
@@ -66,18 +61,18 @@ data class TimelineScreenState(
 }
 
 class TimelineViewModel(
-    private val session: Session,
-    private val repository: TimelineRepository,
-    private val statusRepository: StatusRepository,
-    private val notificationRepository: NotificationRepository,
-    private val accountRepository: AccountRepository,
-    private val streamingClient: StreamingClient,
-    /** 設定 (読み込み後の値の流れ)。自動更新するカラムと通知の取得 API を決める。 */
-    private val settings: Flow<AppSettings>,
+    account: AccountContext,
+    /** このアカウントの設定 (読み込み後の値の流れ)。自動更新するカラムと通知の取得 API を決める。 */
+    private val settings: Flow<AccountSettings>,
 ) : ViewModel() {
+    private val repository = account.timelineRepository
+    private val statusRepository = account.statusRepository
+    private val notificationRepository = account.notificationRepository
+    private val accountRepository = account.accountRepository
+    private val streamingClient = account.streamingClient
 
     private val feeds: Map<TimelineType, PostFeed> = ColumnType.entries.mapNotNull { it.timeline }.associateWith { type ->
-        PostFeed(viewModelScope) { maxId -> repository.fetch(session, type, maxId) }
+        PostFeed(viewModelScope) { maxId -> repository.fetch(type, maxId) }
     }
 
     // ページ境界で分かれたサーバ側グループの統合と、ユーザー単位のグルーピングは appendNotificationPage が行う
@@ -88,7 +83,7 @@ class TimelineViewModel(
         // ストリーム・補完で伸びたら古い側を捨てる (gap は作らない)
         trim = { it.take(MaxNotificationEntries) },
         nextMaxIdOfItems = { entries -> nextNotificationMaxId(entries.flatMap { it.groups }) },
-    ) { maxId -> notificationRepository.fetch(session, notificationApi(), maxId) }
+    ) { maxId -> notificationRepository.fetch(notificationApi(), maxId) }
 
     private suspend fun notificationApi(): NotificationApi = settings.first().notificationApi
 
@@ -157,8 +152,8 @@ class TimelineViewModel(
         timelines = feeds,
         streamedTimelines = streamedTimelinesFor(streaming),
         notifications = notifications.takeIf { streaming.isEnabled(ColumnType.Notifications) },
-        fetchPosts = { type, maxId, sinceId -> repository.fetch(session, type, maxId = maxId, sinceId = sinceId) },
-        fetchNewerNotifications = { sinceId -> notificationRepository.fetch(session, notificationApi, sinceId = sinceId) },
+        fetchPosts = { type, maxId, sinceId -> repository.fetch(type, maxId = maxId, sinceId = sinceId) },
+        fetchNewerNotifications = { sinceId -> notificationRepository.fetch(notificationApi, sinceId = sinceId) },
         toGroup = { notificationRepository.toGroup(it, notificationApi) },
         pageLimit = MastodonApi.DEFAULT_LIMIT,
         onError = { message, error -> Log.w(TAG, message, error) },
@@ -177,7 +172,7 @@ class TimelineViewModel(
             val channels = streamChannelsFor(streaming)
             if (channels.isEmpty()) return@collectLatest
             val sync = syncFor(streaming, api)
-            streamingClient.events(session, channels).collect(sync::handle)
+            streamingClient.events(channels).collect(sync::handle)
         }
     }
 
@@ -188,7 +183,7 @@ class TimelineViewModel(
     }
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+        viewModelScope.submitVote(statusRepository, post, choices) { poll ->
             // 同じポストが複数のカラムに載っていることがあるので全てに反映する
             feeds.values.forEach { feed -> feed.updatePosts { it.withPoll(poll) } }
             notifications.updateItems { entry -> entry.mapGroups { it.copy(post = it.post?.withPoll(poll)) } }
@@ -196,7 +191,7 @@ class TimelineViewModel(
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        send = { statusId, action -> statusRepository.perform(statusId, action) },
         // 同じポストが複数のカラム・通知に載っていることがあるので全てに反映する
         update = { transform ->
             feeds.values.forEach { feed -> feed.updatePosts(transform) }

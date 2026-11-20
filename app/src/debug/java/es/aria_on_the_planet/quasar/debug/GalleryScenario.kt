@@ -39,8 +39,8 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
      * リアクションしたユーザーの一覧 (ユーザーは post-variety の投稿者)。
      */
     /**
-     * 設定の「タイムライン」のページと、そこから開く「ポストのメニュー」(本物の設定に書く。項目を変えて post-variety の︙で確かめる)。
-     * 固定データは使わない (post-variety を指しているだけ)。
+     * 設定のトップと、そこから開く「タイムライン」(ギャラリーのアカウントの設定) と「ポストのメニュー」(本物の端末共通の設定に書く。
+     * 項目を変えて post-variety の︙で確かめる)。[TimelineSettingsGallery]。固定データは使わない (post-variety を指しているだけ)。
      */
     TimelineSettings("timeline-settings", R.string.gallery_timeline_settings, "post-variety.json"),
     PostDetail("post-detail", R.string.gallery_post_detail, "post-variety.json"),
@@ -48,6 +48,11 @@ internal enum class GalleryScenario(val id: String, @StringRes val title: Int, v
     Translation("translation", R.string.gallery_translation, "translation.json"),
     /** 翻訳の設定の言語ごとの扱い。設定は手元だけ。固定データは使わない (translation を指しているだけ)。[TranslationLanguagesGallery]。 */
     TranslationLanguages("translation-languages", R.string.gallery_translation_languages, "translation.json"),
+    /**
+     * ドロワーのアカウントの切り替え ([AccountSwitcherGallery])。アカウントの数 (1 / 2 / 全部) を切り替えられ、切り替えは手元だけ。
+     * 長い名前・名前の絵文字・表示用の情報の無いアカウントを含む。
+     */
+    AccountSwitcher("account-switcher", R.string.gallery_account_switcher, "account-switcher.json"),
     ;
 
     companion object {

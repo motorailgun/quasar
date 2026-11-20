@@ -1,6 +1,7 @@
 package es.aria_on_the_planet.quasar.data.auth
 
 import es.aria_on_the_planet.quasar.BuildConfig
+import es.aria_on_the_planet.quasar.data.account.AccountKey
 import kotlinx.serialization.Serializable
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.net.URI
@@ -39,6 +40,8 @@ data class PendingAuthorization(
     val client: OAuthClient,
     val codeVerifier: String,
     val state: String,
+    /** 保存しているアカウントにログインし直すなら、そのキー (`null` なら新しく足す)。 */
+    val reloginKey: AccountKey? = null,
 )
 
 private val random = SecureRandom()
@@ -51,8 +54,13 @@ fun randomUrlSafeString(bytes: Int = 32): String = base64Url.encodeToString(Byte
 fun codeChallengeOf(verifier: String): String =
     base64Url.encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII)))
 
-/** ブラウザで開く認可画面の URL。 */
-fun authorizeUrl(pending: PendingAuthorization): String =
+/**
+ * ブラウザで開く認可画面の URL。
+ *
+ * @param forceLogin ブラウザがサーバにログインしていても、ログインの画面を出させる (`force_login=true`。Mastodon 2.6.0 から。
+ *   同じサーバの複数のアカウントで認可するのに要る)。アカウントの追加・ログインし直しで付け、最初のログインでは付けない。
+ */
+fun authorizeUrl(pending: PendingAuthorization, forceLogin: Boolean = false): String =
     pending.serverUrl.toHttpUrl().newBuilder()
         .addPathSegments("oauth/authorize")
         .addQueryParameter("response_type", "code")
@@ -62,6 +70,7 @@ fun authorizeUrl(pending: PendingAuthorization): String =
         .addQueryParameter("state", pending.state)
         .addQueryParameter("code_challenge", codeChallengeOf(pending.codeVerifier))
         .addQueryParameter("code_challenge_method", "S256")
+        .apply { if (forceLogin) addQueryParameter("force_login", "true") }
         .build()
         .toString()
 
@@ -98,3 +107,16 @@ fun parseAuthorizationRedirect(uri: String, expectedState: String): Authorizatio
 }
 
 private fun decode(value: String): String = URLDecoder.decode(value, Charsets.UTF_8)
+
+/**
+ * 保存しているアカウントのトークンで `verify_credentials` を呼んだときの HTTP の状態コード [code] を、ログインの失敗として
+ * どう伝えるか (Mastodon の `Api::BaseController#require_user!` 等):
+ * * 401: トークンが無効 (無効化された)。422: トークンにユーザーが無い。→ そのアカウントはログインし直す必要がある。
+ * * 403: トークンは有効だが、アカウントが無効・凍結・メール未確認・承認待ち。→ 今はサーバで使えない。
+ * * それ以外 (5xx 等): 一時的な失敗としてサーバが断った扱い。
+ */
+fun storedTokenError(code: Int): LoginError = when (code) {
+    401, 422 -> LoginError.ExistingAccountNeedsLogin
+    403 -> LoginError.ExistingAccountUnavailable
+    else -> LoginError.Rejected
+}

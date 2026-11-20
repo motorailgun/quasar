@@ -58,7 +58,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import es.aria_on_the_planet.quasar.ui.component.menu.MenuItemText
 
-/** ポストのメニューに出さない項目 (設定 `AppSettings.hiddenPostMenuItems`)。`QuasarAppContent` が提供する。 */
+/** ポストのメニューに出さない項目 (設定 `DeviceSettings.hiddenPostMenuItems`)。`QuasarAppContent` が提供する。 */
 val LocalHiddenPostMenuItems = staticCompositionLocalOf { emptySet<PostMenuItem>() }
 
 /** メニューを開いたときに読む相手の状態。 */

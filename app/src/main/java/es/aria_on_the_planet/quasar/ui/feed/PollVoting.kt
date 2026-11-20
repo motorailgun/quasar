@@ -2,7 +2,6 @@ package es.aria_on_the_planet.quasar.ui.feed
 
 import android.util.Log
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.Post
 import kotlinx.coroutines.CancellationException
@@ -15,7 +14,6 @@ import kotlinx.coroutines.async
  */
 internal suspend fun CoroutineScope.submitVote(
     repository: StatusRepository,
-    session: Session,
     post: Post,
     choices: List<Int>,
     apply: (Poll) -> Unit,
@@ -23,7 +21,7 @@ internal suspend fun CoroutineScope.submitVote(
     val pollId = post.poll?.id ?: return false
     return async {
         try {
-            apply(repository.vote(session, post.statusId, pollId, choices))
+            apply(repository.vote(post.statusId, pollId, choices))
             true
         } catch (e: CancellationException) {
             throw e

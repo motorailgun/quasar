@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  *
  * 作られたときに共有の中身を入れる。プロセスが終わって作り直されたときも intent から入れ直す (書き足した分は消える)。
  *
- * @param createDraft 下書きを作る (`AppContainer.composerSession`)。2 つ目の引数は投稿できたとき。
+ * @param createDraft 下書きを作る (`AccountUiContext.composerSession`)。2 つ目の引数は投稿できたとき。
  */
 class ShareViewModel(
     createDraft: (CoroutineScope, (Post) -> Unit) -> ComposerSession,

@@ -44,6 +44,9 @@ interface Navigator {
     fun openFollowRequests()
     fun openSearch()
 
+    /** 使っているアカウントのログインし直し (トークンが使えなくなったとき)。 */
+    fun openRelogin()
+
     /** 今の画面を閉じる (一番下の画面ならアプリを閉じる)。 */
     fun back()
 }

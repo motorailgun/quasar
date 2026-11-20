@@ -46,6 +46,10 @@ class OAuthTest {
         assertEquals("S256", url.queryParameter("code_challenge_method"))
         // client_secret はブラウザに渡さない
         assertFalse("secret" in url.toString())
+        // 最初のログインではブラウザのログインをそのまま使う
+        assertEquals(null, url.queryParameter("force_login"))
+        // アカウントの追加・ログインし直しではログインの画面を出させる
+        assertEquals("true", authorizeUrl(pending, forceLogin = true).toHttpUrl().queryParameter("force_login"))
     }
 
     @Test
@@ -80,5 +84,14 @@ class OAuthTest {
             AuthorizationResult.Error("access_denied"),
             parseAuthorizationRedirect("${OAuthConfig.RedirectUri}?error=access_denied&error_description=x&state=s1", "s1"),
         )
+    }
+
+    @Test
+    fun storedTokenFailuresAreToldApart() {
+        // トークンが無効 (401)・ユーザーが無い (422) はログインし直し、403 (無効・凍結・承認待ち等) は今は使えない
+        assertEquals(LoginError.ExistingAccountNeedsLogin, storedTokenError(401))
+        assertEquals(LoginError.ExistingAccountNeedsLogin, storedTokenError(422))
+        assertEquals(LoginError.ExistingAccountUnavailable, storedTokenError(403))
+        listOf(404, 429, 500, 502, 503).forEach { assertEquals(LoginError.Rejected, storedTokenError(it)) }
     }
 }

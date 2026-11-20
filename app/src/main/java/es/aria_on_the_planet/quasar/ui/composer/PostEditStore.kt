@@ -2,12 +2,12 @@ package es.aria_on_the_planet.quasar.ui.composer
 
 import android.util.Log
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -25,20 +25,19 @@ sealed interface PostEditFailure {
 }
 
 /**
- * 自分のポストの編集・削除をアプリ全体で 1 つ持つ。どの画面のポストのメニューからでも同じ流れになるよう、
+ * 自分のポストの編集・削除をアカウントごとに 1 つ持つ (`AccountUiContext.postEditStore`)。どの画面のポストのメニューからでも同じ流れになるよう、
  * 編集の投稿欄 ([editor]) は画面ではなくここが持ち、`QuasarNavHost` が全画面の上に重ねて出す ([PostEditorHost])。
  * 書きかけの投稿 ([DraftStore]) とは別。プロセスが終わると消える。
  *
  * 保存・削除の結果は `StatusRepository.postChanges` に流れ、各画面の一覧はそれで差し替える・除く。
  *
- * @param create 編集用の投稿欄を作る (`AppContainer.composerSession`)。4 つ目の引数は保存できたときに呼ぶ。
+ * @param create 編集用の投稿欄を作る (`AccountUiContext.composerSession`)。3 つ目の引数は保存できたときに呼ぶ。
  */
 class PostEditStore(
     private val statusRepository: StatusRepository,
-    private val create: (Session, CoroutineScope, EditTarget, (Post) -> Unit) -> ComposerSession,
+    private val create: (CoroutineScope, EditTarget, (Post) -> Unit) -> ComposerSession,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var owner: Session? = null
 
     private val _editor = MutableStateFlow<ComposerSession?>(null)
 
@@ -54,19 +53,18 @@ class PostEditStore(
     val failures: SharedFlow<PostEditFailure> = _failures.asSharedFlow()
 
     /** [post] (自分のポスト) の編集を始める。原文 (HTML ではない本文) を取ってから投稿欄を開く。 */
-    fun startEdit(session: Session, post: Post) {
+    fun startEdit(post: Post) {
         if (_busyStatusId.value != null || _editor.value != null) return
         _busyStatusId.value = post.statusId
         scope.launch {
             try {
-                val source = statusRepository.fetchSource(session, post.statusId)
+                val source = statusRepository.fetchSource(post.statusId)
                 lateinit var editor: ComposerSession
                 // ブーストとして載っていたものでも、編集するのは中身
                 val target = EditTarget(post.copy(id = post.statusId, boostedBy = null), source)
-                editor = create(session, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), target) {
+                editor = create(CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), target) {
                     if (_editor.value === editor) close()
                 }
-                owner = session
                 _editor.value = editor
             } catch (e: CancellationException) {
                 throw e
@@ -83,21 +81,21 @@ class PostEditStore(
     fun close() {
         _editor.value?.close()
         _editor.value = null
-        owner = null
     }
 
-    /** [session] 以外のアカウントの編集が開いていれば閉じる (ログアウト・アカウントの切り替え)。 */
-    fun closeUnlessOwnedBy(session: Session?) {
-        if (_editor.value != null && owner != session) close()
+    /** 編集・削除の最中のものも含めて止める (ログアウト)。以後は使わない。 */
+    fun dispose() {
+        scope.cancel()
+        close()
     }
 
     /** [post] (自分のポスト) を削除する。確認は呼び出し側で済ませてから呼ぶ。 */
-    fun delete(session: Session, post: Post) {
+    fun delete(post: Post) {
         if (_busyStatusId.value != null) return
         _busyStatusId.value = post.statusId
         scope.launch {
             try {
-                statusRepository.delete(session, post.statusId)
+                statusRepository.delete(post.statusId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

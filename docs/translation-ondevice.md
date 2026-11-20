@@ -286,7 +286,7 @@ SDK の場所を変えたら `llama/.cxx` を消す (CMake のキャッシュが
     読み込みの途中で取り消しても読み終えてから解放する。モデルを消している間は次を訳さない。
   * CPU か NPU かは `LlamaParams` の既定 (NPU が使えれば NPU)。
 * **設定** (設定 →「実験的機能」→「翻訳」、`TranslationSettingsPage`): 「端末内で翻訳」のスイッチ (既定オフ)、モデルの状態、
-  翻訳先の言語 (端末の言語 / 53 言語)、言語ごとの扱い。保存は `AppSettings.translation`。言語名は ICU の方言名
+  翻訳先の言語 (端末の言語 / 53 言語)、言語ごとの扱い。保存は `DeviceSettings.translation` (端末共通)。言語名は ICU の方言名
   (`languageDisplayName`。「簡体中国語」)。
 * **フレーバーの入れ替え**: applicationId が同じなので full と lite は互いに上書きして入れられる。lite は起動時に full の残した
   モデル・ダウンロードを消す。翻訳の設定の値は残るが lite では読まない (full に戻すとオンのままモデルが無い状態)。

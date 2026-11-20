@@ -14,7 +14,7 @@ data class FeedState<T>(
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
     val endReached: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
     val loaded: Boolean = false,
     /** 次ページ取得に使う `max_id`。取得した生のページから決め、表示上の並び (再グルーピング等) には依存しない。 */
     val nextMaxId: String? = null,
@@ -93,7 +93,7 @@ open class PagedFeed<R, T>(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(isRefreshing = false, loaded = true, error = e.message ?: e.toString()) }
+                _state.update { it.copy(isRefreshing = false, loaded = true, error = e.toLoadError()) }
             }
         }
     }
@@ -163,7 +163,7 @@ open class PagedFeed<R, T>(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(isLoadingMore = false, error = e.message ?: e.toString()) }
+                _state.update { it.copy(isLoadingMore = false, error = e.toLoadError()) }
             }
         }
     }

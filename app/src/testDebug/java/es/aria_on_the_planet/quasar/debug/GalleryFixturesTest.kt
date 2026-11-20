@@ -21,7 +21,7 @@ class GalleryFixturesTest {
     @Test
     fun postFixturesParseAndUseKnownEmojis() {
         val lists = GalleryScenario.entries
-            .filter { it.fixture != GalleryScenario.EmojiPicker.fixture && it.fixture != GalleryScenario.Profile.fixture }
+            .filter { it.fixture !in NonPostFixtures }
             .associate { it.fixture to GalleryFixtures.posts(read(it.fixture)) }
         lists.forEach { (name, posts) ->
             assertTrue(name, posts.isNotEmpty())
@@ -40,6 +40,21 @@ class GalleryFixturesTest {
         val texts = listOf(user.displayName, user.note) + fixture.profile.fields.flatMap { listOf(it.name, it.value) }
         texts.forEach { assertResolved("profile", it, user.emojis) }
         fixture.posts.forEach { assertEmojisResolved("profile", it) }
+    }
+
+    @Test
+    fun accountSwitcherFixtureParses() {
+        val accounts = GalleryFixtures.storedAccounts(read(GalleryScenario.AccountSwitcher.fixture))
+        assertTrue("1 / 2 / 全部を切り替えるので 3 つ以上", accounts.size >= 3)
+        assertEquals(accounts.size, accounts.map { it.key }.toSet().size)
+        assertTrue("表示用の情報の無いアカウントがある", accounts.any { it.profile == null })
+        accounts.forEach { account ->
+            assertTrue(account.serverUrl, account.serverUrl.endsWith(".invalid"))
+            account.profile?.let { profile ->
+                assertTrue("ID と表示用の情報は一緒に入る", account.accountId != null)
+                assertResolved("account-switcher", profile.displayName, profile.emojis.map { CustomEmoji(it.shortcode, it.url, it.staticUrl) })
+            }
+        }
     }
 
     @Test
@@ -71,6 +86,13 @@ class GalleryFixturesTest {
     }
 
     private companion object {
+        /** ポストの配列ではない固定データ。 */
+        val NonPostFixtures = setOf(
+            GalleryScenario.EmojiPicker.fixture,
+            GalleryScenario.Profile.fixture,
+            GalleryScenario.AccountSwitcher.fixture,
+        )
+
         val Shortcode = Regex(":([A-Za-z0-9_]+):")
         val AssetUrl = Regex("file:///android_asset/([^\"]+)")
     }

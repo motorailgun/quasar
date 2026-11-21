@@ -164,7 +164,8 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
   の結果で埋める (開いたら必ず `fetchMe` を呼ぶ)。**同じアカウント (サーバ + ID) を 2 つ保存しない** (下記「Login」。ID の無い
   アカウントは以前の保存から移したものだけ)。
 * **`AccountManager`** (`ui/account/`、`AppContainer.accountManager`) が `AccountKey → AccountUiContext` を持つ: 使うアカウントになったときに
-  作り、**切り替えても閉じずにログアウトまで持つ** (下書きが切り替えて戻っても残る。使っていないアカウントは画面が無いので通信しない)。
+  作り、**切り替えても閉じずにログアウトまで持つ** (下書きが切り替えて戻っても残る。使っていないアカウントは画面が無いので通信しない。
+  ログインし直しでトークンが変わったら作り直すので、下書きはそこで消える)。
   `active` (`StateFlow<ActiveAccount?>`: `context` と、そのキーの依存を作り直した回数 `generation`)・`switchTo(key)`・`logoutActive()`。
   `AccountStore.state` を見て、一覧から消えた・トークンが変わったキーの依存を `close()` し (新しいものを開く前に閉じる = 同じキーの DB
   を 2 つ開かない)、消えたキーはファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時には一覧に無い
@@ -838,14 +839,16 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     違い、サーバ (3.5 / 4.x) はログインの画面を出さず、同じクライアントのトークンがあるときの自動承認を止めるだけ (Quasar は毎回
     クライアントを登録するので今は効いていない)。別のユーザーで認可するには、認可画面のブラウザ側のログアウトを使ってもらう。
   * **ログインし直す** (`Route.Relogin`、設定のトップのログアウトの上): 使っているアカウントのサーバで OAuth をやり直し
-    (`PendingAuthorization.reloginKey`)、同じキーのままトークン・クライアントを差し替える (設定・キャッシュ・下書きが残る。古い
-    トークンは無効化)。別のアカウント (サーバ・ID が違う) でログインしたら失敗にして保存しているものは触らない。ID の無い (移した)
+    (`PendingAuthorization.reloginKey`)、同じキーのままトークン・クライアントを差し替える (設定・キャッシュは残る。古い
+    トークンは無効化)。依存 (`AccountUiContext`) は作り直すので、**書きかけの投稿・編集中の投稿・アップロード中の添付は消える**
+    (下書きの永続化は TODO。下記「投稿」の「未実装」)。別のアカウント (サーバ・ID が違う) でログインしたら失敗にして保存しているものは触らない。ID の無い (移した)
     アカウントなら ID を埋める (他に同じ ID が保存されていたら失敗)。純粋関数 `StoredAccounts.withRelogin` (`AccountStoreTest`)。
     使うアカウントが変わると画面が作り直される (`AccountScope`)。
   * **読み込みの失敗が 401 / 403 なら「ログインし直す」のボタン** (`Navigator.openRelogin` → `Route.Relogin`): 失敗は文字列ではなく
-    `LoadError` (`ui/feed/LoadError.kt`。`toLoadError()` で `MastodonApiException` の 401 / 403 を `needsLogin` にする、`LoadErrorTest`)
-    で持ち、一覧が空のときの表示 (`ListStatus(needsLogin)`・タイムラインのカラム) と詳細画面の全面の表示 (`DetailMessage(needsLogin)`)
-    が文言の下にボタンを出す (`LoadErrorMessage`)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
+    `LoadError` (`ui/feed/LoadError.kt`。`toLoadError()` で `MastodonApiException` の 401 / 403 を `needsLogin` にし、文言はサーバの
+    `error` の文 (`userMessage`)、`LoadErrorTest`) で持ち、一覧が空のときの表示 (`ListStatus(needsLogin)`・タイムラインのカラム) と
+    詳細画面の全面の表示 (`DetailMessage(needsLogin)`)・共有された URL を開く画面 (`OpenLinkState.Failed`) が文言の下にボタンを出す
+    (`LoadErrorMessage`)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
     今までどおり再接続を続ける (ボタンは出さない)。
   * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻ると進行中の
     認可待ちもやめる)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
@@ -874,7 +877,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `DetailScaffold` (タイトルは表示名 +「Favourited N of your posts」) + `PostList` でまとめたポストを通知と同じ新しい順に並べ、
     末尾 (`PostList(footer = ...)`) にそのユーザーの要約 (`UserSummary`: タイムラインと同じ大きさのアイコン / 太字の表示名 /
     控えめな色・小さめのプロフィール文。タップでプロフィール)。ポストは通知の一覧から受け取らず ID で取り直す (プロセスの
-    再生成でも開き直せるように)。消された・見られないポスト (4xx) は飛ばす。開いた後に届いた分は反映しない。
+    再生成でも開き直せるように)。消された・見られないポスト (404) は飛ばし、それ以外の失敗 (401 / 403 等) は画面の失敗にする。開いた後に届いた分は反映しない。
   * 一覧の組み立ては純粋関数 `appendNotificationPage(current, page)` (`ui/notification/NotificationGrouping.kt`) が行い、
     `PagedFeed(append = ...)` から呼ぶ。refresh は空の一覧に足す。手順:
     1. ページ境界で分かれたサーバ側グループの続き (同じ `group_key`) は既存行の中で `NotificationGroup.mergeOlder` で統合
@@ -941,7 +944,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   例外として、詳細のパネル (タブレット表示) の中の画面は別の `AccountUiContext.panelDraftStore` を使う (`LocalInDetailPanel` で
   決める。パネルから開いた単独の投稿画面は `Route.Composer(panelDraft = true)`)。パネルを閉じても下書きは残る。
   session は自分のコルーチンの範囲 (`SupervisorJob` + Main) で動くので、画面を切り替えてもアップロードは止まらない。
-  投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。ログアウトで `AccountUiContext.close()` が止める。プロセスが終わると消える (保存しない)。
+  投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。ログアウトで `AccountUiContext.close()` が止める。ログインし直し
+  (トークンが変わって依存を作り直す)・プロセスの終了でも消える (保存しない。**TODO: 下書きの永続化**)。
   * 投稿できたら `DraftStore` 自身が `finish()` し、`DraftStore.published` (SharedFlow) に投稿を流す。同じ下書きを複数の画面
     (メイン画面とポスト画面) が表示しているので、後始末は画面ではなくここで 1 回だけ行う。画面はそれを受けてフル画面を閉じる・
     スレッドに足す (`PostViewModel.addPublishedReply`) だけ。
@@ -1114,10 +1118,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 開く対象は純粋関数 `linkQueryOf` (`OpenLinkTest`): `EXTRA_TEXT` → `EXTRA_SUBJECT` の順で最初の http(s) の URL、無ければ
     `@user@domain`。タグのページ (`/tags/名前`・`/tag/名前`) は検索で引けないので `hashtagOfUrl` で直接 `Route.Hashtag`。
   * それ以外は `Route.OpenLink(query)` を積み、`/api/v2/search` (`resolve=true`) で引けたら自分を `Route.Post` / `Route.Profile` /
-    `Route.Hashtag` に置き換える (すぐ下が同じ画面なら外すだけ)。見つからない・失敗はその画面で理由 + ブラウザで開く (+ 再試行)。
+    `Route.Hashtag` に置き換える (すぐ下が同じ画面なら外すだけ)。見つからない・失敗はその画面で理由 + ブラウザで開く (+ 再試行。401 / 403 なら「ログインし直す」も)。
   * MainActivity → `QuasarNavHost(externalLinks)` は Channel (画面ができる前に受けた分も溜まる)。未ログインなら Toast。
   * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
-* **未実装**: 下書き保存、
+* **未実装**: 下書き保存 (TODO: 永続化して、ログインし直し・プロセスの終了をまたいで残す。今はどちらでも消える)、
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 

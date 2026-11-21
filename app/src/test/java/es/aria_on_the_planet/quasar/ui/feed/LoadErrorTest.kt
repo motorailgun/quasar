@@ -23,8 +23,14 @@ class LoadErrorTest {
     }
 
     @Test
-    fun `keeps the message`() {
-        assertEquals("HTTP 401: revoked", MastodonApiException(401, "HTTP 401: revoked").toLoadError().message)
+    fun `uses the server's error text`() {
+        val e = MastodonApiException(401, """HTTP 401: {"error":"The access token was revoked"}""")
+        assertEquals("The access token was revoked", e.toLoadError().message)
+    }
+
+    @Test
+    fun `falls back to the exception message`() {
+        assertEquals("HTTP 502: <html>", MastodonApiException(502, "HTTP 502: <html>").toLoadError().message)
         assertEquals("timeout", IOException("timeout").toLoadError().message)
     }
 }

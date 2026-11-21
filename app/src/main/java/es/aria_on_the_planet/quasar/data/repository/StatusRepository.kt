@@ -101,7 +101,8 @@ class StatusRepository(
 
     /**
      * [statusIds] のポストを 1 件ずつ取得し、同じ順で返す (同時に [MaxParallelFetches] 件まで)。
-     * 消された・見られなくなったポスト (404 等、429 以外の 4xx) は飛ばす。通信エラー・5xx は投げる。
+     * 消された・見られなくなったポスト (404) は飛ばす。それ以外の失敗 (401 / 403 = ログインし直しが要る、通信エラー・5xx 等)
+     * は投げる。
      */
     suspend fun fetchPosts(statusIds: List<String>): List<Post> = coroutineScope {
         val permits = Semaphore(MaxParallelFetches)
@@ -112,7 +113,7 @@ class StatusRepository(
                     try {
                         api.status(session.serverUrl, session.accessToken, id)
                     } catch (e: MastodonApiException) {
-                        if (e.code in 400..499 && e.code != 429) null else throw e
+                        if (e.code == 404) null else throw e
                     }
                 }
             }

@@ -97,6 +97,18 @@ class AccountStoreTest {
         storage.values["session"] = """{"serverUrl":"https://b.example","accessToken":"old"}"""
         val active = store(storage).active.value!!
         assertEquals("new", active.accessToken)
+        // 残っていた古いものはこの起動で消す
+        assertFalse("session" in storage.values)
+    }
+
+    @Test
+    fun leftoverPlaintextSessionIsDeletedOnTheNextLaunch() {
+        // 平文から移して新しい形を書いた後、平文を消す前に終わった
+        val storage = MemoryStore()
+        store(storage).addLogin("https://a.example", "new", client, "1", profile)
+        val plaintext = Plaintext(LegacyPlaintextSession("https://a.example", "old"))
+        assertEquals("new", store(storage, plaintext).active.value!!.accessToken)
+        assertNull(plaintext.session)
     }
 
     @Test

@@ -20,7 +20,7 @@
     <string name="login_error_invalid_response">ログインの応答が正しくありません。もう一度お試しください。</string>
     <string name="login_error_no_browser">ログインページを開けるブラウザがありません。</string>
     <string name="relogin">ログインし直す</string>
-    <string name="relogin_summary">このアカウントの設定・下書きはそのまま</string>
+    <string name="relogin_summary">このアカウントの設定はそのまま。書きかけの投稿は消えます</string>
     <string name="relogin_description">%1$s でログインし直します。このアカウントの設定・下書きはそのままです。</string>
     <string name="login_error_existing_needs_login">追加済みの %1$s はログインし直す必要があります (同じサーバーのアカウントを追加する前に確かめるため)。そのアカウントに切り替えて設定の「ログインし直す」を選ぶか、ログアウトしてください。</string>
     <string name="login_error_existing_unavailable">追加済みの %1$s は今サーバーで使えません (無効・承認待ち・メールアドレス未確認の可能性があります)。そのアカウントに切り替えて設定の「ログインし直す」を選ぶか、ログアウトしてください。</string>

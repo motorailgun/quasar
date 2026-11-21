@@ -26,12 +26,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.component.list.LoadErrorMessage
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.navigation.Route
 
 /**
  * 他のアプリから共有された URL を開く途中の画面。サーバで引けたら [onResolved] で行き先の画面に置き換わる。
- * 見つからない・失敗したら理由と、ブラウザで開く (URL のとき) ボタン。
+ * 見つからない・失敗したら理由と、ブラウザで開く (URL のとき) ボタン。401 / 403 なら「ログインし直す」も出す。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -64,7 +65,8 @@ fun OpenLinkScreen(
             when (val s = state) {
                 OpenLinkState.Loading, is OpenLinkState.Resolved -> LoadingIndicator()
                 OpenLinkState.NotFound -> Message(stringResource(R.string.open_link_not_found))
-                is OpenLinkState.Failed -> Message(stringResource(R.string.open_link_failed, s.message))
+                is OpenLinkState.Failed ->
+                    LoadErrorMessage(stringResource(R.string.open_link_failed, s.error.message), needsLogin = s.error.needsLogin)
             }
             Text(
                 viewModel.query,

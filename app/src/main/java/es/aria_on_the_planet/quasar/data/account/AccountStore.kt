@@ -102,19 +102,19 @@ class AccountStore(
 
     /**
      * 保存を読む。無ければ以前の保存から移す: SecureStorage の `session` (1 つのセッション) → さらに前の平文の保存。
-     * 移したら新しい形で書いてから古いものを消す (途中で終わっても次の起動でやり直せる。書けていれば新しい形を読む)。
+     * 移したら新しい形で書いてから古いものを消す。古いものは毎回の起動で消すので、新しい形を書いた後に終わっていても
+     * 次の起動で (新しい形を読んだうえで) 消える。
      */
     private fun load(legacyPlaintext: LegacyPlaintextSessionSource?): StoredAccounts {
-        storage.get(AccountsKey)?.let { stored ->
-            decodeAccounts(stored)?.let { return it }
-        }
         val legacySession = storage.get(LegacySessionKey)
         val plaintext = legacyPlaintext?.read()
-        val migrated = migrateLegacySession(legacySession, plaintext, newKey)
-        if (migrated != null) storage.put(AccountsKey, json.encodeToString(StoredAccounts.serializer(), migrated))
+        val accounts = storage.get(AccountsKey)?.let(::decodeAccounts)
+            ?: migrateLegacySession(legacySession, plaintext, newKey)?.also {
+                storage.put(AccountsKey, json.encodeToString(StoredAccounts.serializer(), it))
+            }
         if (legacySession != null) storage.remove(LegacySessionKey)
         if (plaintext != null) legacyPlaintext.delete()
-        return migrated ?: StoredAccounts()
+        return accounts ?: StoredAccounts()
     }
 
     companion object {

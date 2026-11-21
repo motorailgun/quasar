@@ -118,7 +118,7 @@ fun SettingsTopPage(
         }
         if (account != null) {
             SettingsGroup(title = null) {
-                // 設定・キャッシュ・下書きはそのままでトークンだけ取り直す (無効になったとき等)。除くのはログアウトだけ
+                // 設定・キャッシュはそのままでトークンだけ取り直す (無効になったとき等。下書きは依存の作り直しで消える)。除くのはログアウトだけ
                 SettingsActionItem(
                     title = stringResource(R.string.relogin),
                     summary = stringResource(R.string.relogin_summary),

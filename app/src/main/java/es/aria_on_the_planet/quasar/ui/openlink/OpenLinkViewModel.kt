@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.repository.ResolvedLink
+import es.aria_on_the_planet.quasar.ui.feed.LoadError
+import es.aria_on_the_planet.quasar.ui.feed.toLoadError
 import es.aria_on_the_planet.quasar.ui.navigation.Route
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +21,7 @@ sealed interface OpenLinkState {
 
     /** サーバで見つからなかった (見られない・取れない)。 */
     data object NotFound : OpenLinkState
-    data class Failed(val message: String) : OpenLinkState
+    data class Failed(val error: LoadError) : OpenLinkState
 }
 
 /** 他のアプリから共有された [query] (URL・`@user@domain`) を接続中サーバで引き、開く画面を決める。 */
@@ -48,7 +50,7 @@ class OpenLinkViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                OpenLinkState.Failed(e.message ?: e.toString())
+                OpenLinkState.Failed(e.toLoadError())
             }
         }
     }

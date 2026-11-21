@@ -89,7 +89,7 @@ class AppContainer(context: Context) {
         // 一覧に無いアカウントのファイル (ログアウトの途中で終わった分) と、アカウントごとに分ける前のキャッシュを消す
         val keys = accountStore.state.value.accounts.mapTo(HashSet()) { it.key.value }
         CacheDatabase.deleteOthers(context, keep = keys)
-        SettingsStore.accountNames(context).filter { it !in keys }.forEach { SettingsStore.accountFile(context, it).delete() }
+        SettingsStore.accountNames(context).filter { it !in keys }.forEach { SettingsStore.deleteAccountFiles(context, it) }
     }
 
     val instanceRepository = InstanceRepository(api)
@@ -154,11 +154,12 @@ class AppContainer(context: Context) {
      */
     fun deleteAccountData(key: AccountKey) {
         val settings = synchronized(accountSettings) { accountSettings.remove(key) }
-        // 書き込みを止めてから消す
+        // 書き込みを止めてから消す (止めるのは待たない。書きかけで残った書き込みの途中のファイルも消す。それでも後から書かれて
+        // 残った分は次の起動で消える。キーは使い回さないので、残っていても他のアカウントが読むことはない)
         settings?.second?.cancel()
         appScope.launch(Dispatchers.IO) {
             CacheDatabase.delete(appContext, key.value)
-            SettingsStore.accountFile(appContext, key.value).delete()
+            SettingsStore.deleteAccountFiles(appContext, key.value)
         }
     }
 
@@ -171,7 +172,12 @@ class AppContainer(context: Context) {
             val account = ui.account
             account.scope.launch {
                 account.accountRepository.myAccount().collect { me ->
-                    accountStore.updateProfile(stored.key, me.user.inServerId, StoredProfile(me.user))
+                    // 書けなくても (Keystore の失敗等) 落とさず、購読も続ける。次の fetchMe でまた書く
+                    try {
+                        accountStore.updateProfile(stored.key, me.user.inServerId, StoredProfile(me.user))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Saving the account profile failed: ${e.javaClass.simpleName}")
+                    }
                 }
             }
             account.scope.launch {

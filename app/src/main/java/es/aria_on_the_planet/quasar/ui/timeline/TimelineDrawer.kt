@@ -16,6 +16,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,7 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
  * 上のアカウントの部分 ([DrawerAccountHeader]): 名前の部分のタップで自分のプロフィール、右上の他のアカウントの小さな
  * アイコンのタップで切り替え、[v] で全アカウントの一覧 ([DrawerAccountList]。+「アカウントを追加」) を開閉する。
  * [account] は投稿欄が取得した使っているアカウント (無ければ [accounts] の保存している情報)。
+ * ドロワーは閉じていてもコンポジションに残るので、閉じ切ったら ([closed]) 一覧も閉じる (開き直すと閉じている)。
  *
  * 幅は項目に合わせる (M3 の既定は項目が幅いっぱいに広がるので最大の 360dp になる。下限の 240dp は M3 のまま)。
  * アカウントの部分は幅を決めるのに数えず、長い名前は省略する。
@@ -66,6 +68,7 @@ fun TimelineDrawerSheet(
     onOpenPersonalPosts: (PersonalPostList) -> Unit,
     onOpenFollowRequests: () -> Unit,
     onOpenSearch: () -> Unit,
+    closed: Boolean,
     modifier: Modifier = Modifier,
 ) {
     ModalDrawerSheet(modifier.width(IntrinsicSize.Max)) {
@@ -73,6 +76,7 @@ fun TimelineDrawerSheet(
             if (account != null || accounts != null) {
                 // アカウントの部分は幅を決めるのに数えない (長い名前・アカウントの数でドロワーが広がらない)
                 var expanded by remember { mutableStateOf(false) }
+                LaunchedEffect(closed) { if (closed) expanded = false }
                 Column(Modifier.then(IgnoreIntrinsicWidth).fillMaxWidth()) {
                     DrawerAccountHeader(
                         me = account ?: accounts?.current?.user,

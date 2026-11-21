@@ -299,7 +299,7 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   する (段階 5 で、失敗したらログインを失敗にするよう変えた) (ID 無しで足し、`fetchMe` で埋まる)。ログには失敗の種類だけ。
 * **ログアウト**: `OAuthLogin.logout` は `AccountStore.remove(active)` と無効化だけ。ファイルの削除は `AppContainer`: `active` が変わったら
   前の `AccountUiContext` を `close()` し (DB を閉じる)、一覧から消えたキーなら `deleteAccountData` (設定のコルーチンを止め、
-  `cacheDir/api-cache/<key>/` と `settings_<key>.preferences_pb` を消す)。途中でプロセスが終わった分は、**起動時に一覧に無いキーの
+  `cacheDir/api-cache/<key>/` と `settings_<key>.preferences_pb` (+ 書き込みの途中のファイル `.preferences_pb.tmp`) を消す)。途中でプロセスが終わった分は、**起動時に一覧に無いキーの
   ファイルを消す**ことで片付く (分ける前のキャッシュの削除も同じ所)。
 * **移行**: `accounts` が無ければ `session` (以前の SecureStorage の 1 つのセッション)、それも無ければ平文の SharedPreferences
   `session` を 1 つ目のアカウントにして使うアカウントにする。新しい形を書いてから古いものを消す (途中で終わっても次の起動で
@@ -361,8 +361,9 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   アカウントにしか要らない)。切り替えても閉じない (下書きが残る)。閉じるのは一覧から消えたとき・トークンが変わったときだけ
   (トークンが変わったとき = ログインし直しでも下書きは消える)。
   使っていないアカウントの依存は画面が無いので通信しない (ストリーミングは画面が collect している間だけ)。
-* 出すのは `active: StateFlow<ActiveAccount?>` (`context` + `generation`)・`switchTo(key)`・`logoutActive()`。`context(key)` (使って
-  いないアカウントの依存を取る) は使う所が無いので作っていない (アカウントをまたいだ操作のときに足す)。
+* 出すのは `active: StateFlow<ActiveAccount?>` (`context` + `generation`)・`switchTo(key)`・`logoutActive()`・`context(key)` (キーの
+  依存。開いていなければ作り、使っているアカウントは変えない。共有の画面が使う)。`context(key)` で受けた画面は
+  `AccountUiContext.closed` (ログアウト・ログインし直しで閉じられた) を見る。
 * 状態は `AccountStore.state` を Main で collect して合わせる (切り替え・ログイン・ログアウトはどれも `AccountStore` を
   書き換えるだけ)。合わせ方: 一覧から消えた・セッションが変わったキーの依存を閉じる → 一覧から消えたキーのファイルを消す
   (このプロセスで開いていないものも) → `activeKey` の依存を (無ければ作って) `active` にする。段階 3・4 の不変条件 (閉じてから開く・
@@ -390,8 +391,12 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
 * `QuasarNavHost` はアカウントを引数で受ける (作り直されるまで変わらない)。「ログインしたら Login を外す / ログアウトしたら
   `[Login]` に戻す」作り直しは無くなり、ログアウト中に復元したバックスタックが `[Login]` でなければ直すだけ。
   `TimelineEntry` の ViewModel のキー (トークンのハッシュ) も要らなくなった。
-* `ShareActivity` は `AccountManager.active` の `context` で投稿する。ViewModel のキーは `<アカウントのキー>#<generation>`
-  (開いている間に切り替わったら作り直す)。外から開くリンク (`OpenLink`) は `QuasarNavHost` の中なので、使っているアカウントで引く。
+* `ShareActivity` は開いたときに使っていたアカウントで投稿し、開いている間に MainActivity で切り替えても追わない (キーを
+  `rememberSaveable` で持ち、依存は `AccountManager.context(key)`。ViewModel のキーは `share#<アカウントのキー>`)。追うと入力が消え、
+  前のアカウントの下書きがアップロードを続けていた。そのアカウントの依存が閉じられたら (`closed`。ログアウト・ログインし直し)
+  Toast を出して閉じる。未ログインで開いたときだけ、ログインされるのを待って使っているアカウントにする。将来この画面でアカウントを
+  選べるようにするときは、選んだキーに替える (下書きの中身の引き継ぎは別に要る)。外から開くリンク (`OpenLink`) は
+  `QuasarNavHost` の中なので、使っているアカウントで引く。
 
 ### 追加・ログアウト
 
@@ -439,6 +444,8 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
     作り直され (`generation` が変わる)、画面はタイムラインから。**下書き・編集中の投稿・アップロード中の添付は消える**
     (`ComposerSession` は古いトークンの依存を持つので、そのままは引き継げない)。下書きの永続化は TODO (永続化すれば
     ログインし直しの後に新しい依存で開き直せる)。
+  * システムの「戻る」で離れても認可待ちは残る (追加と同じ)。その間に別のアカウントへ切り替えていても、後から認可を終えたら
+    対象のアカウントに切り替わる (認可を終えたアカウントを出すのが自然で、追加とも揃う)。
 * アカウントの追加・ログインし直しでは、認可の URL に `force_login=true` を付ける (`authorizeUrl(forceLogin = true)`、`OAuthTest`。
   ドキュメントでは Mastodon 2.6.0 から「同じサーバの複数のアカウントで認可するのに要る」)。保存しているアカウントが無いとき
   (最初のログイン) は付けない。

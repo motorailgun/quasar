@@ -96,17 +96,40 @@ class SettingsStore<S> private constructor(
             return SettingsStore(open(context, AccountFilePrefix + name, migrations, scope), AccountSettingsSchema, scope)
         }
 
-        /** アカウント [name] の設定のファイル (ログアウトで消す)。 */
-        fun accountFile(context: Context, name: String): File =
+        /**
+         * DataStore が書き込みの途中に使うファイルの名前の末尾 (`<ファイル>.tmp` に書いてから置き換える。DataStore 1.2.1 の
+         * `FileStorageConnection`)。書き込みの途中で止めると残る。
+         */
+        private const val ScratchSuffix = ".tmp"
+
+        /** アカウント [name] の設定のファイル。 */
+        private fun accountFile(context: Context, name: String): File =
             context.applicationContext.preferencesDataStoreFile(AccountFilePrefix + name)
 
-        /** 保存してあるアカウントごとの設定の名前 (`AccountKey`)。残ったもの (ログアウトの途中で終わった等) を消すのに使う。 */
+        /** アカウント [name] の設定のファイルと、書き込みの途中のファイルを消す (ログアウト・起動時の後始末)。 */
+        fun deleteAccountFiles(context: Context, name: String) {
+            val file = accountFile(context, name)
+            file.delete()
+            File(file.path + ScratchSuffix).delete()
+        }
+
+        /**
+         * 保存してあるアカウントごとの設定の名前 (`AccountKey`)。書き込みの途中のファイルだけが残っているものも含む。
+         * 残ったもの (ログアウトの途中で終わった等) を消すのに使う。
+         */
         fun accountNames(context: Context): List<String> {
             val directory = accountFile(context, "x").parentFile ?: return emptyList()
             val suffix = ".preferences_pb"
             return directory.listFiles().orEmpty().map { it.name }
-                .filter { it.startsWith(AccountFilePrefix) && it.endsWith(suffix) }
-                .map { it.removePrefix(AccountFilePrefix).removeSuffix(suffix) }
+                .filter { it.startsWith(AccountFilePrefix) }
+                .mapNotNull { name ->
+                    when {
+                        name.endsWith(suffix) -> name.removeSuffix(suffix)
+                        name.endsWith(suffix + ScratchSuffix) -> name.removeSuffix(suffix + ScratchSuffix)
+                        else -> null
+                    }?.removePrefix(AccountFilePrefix)
+                }
+                .distinct()
         }
 
         private fun open(

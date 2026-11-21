@@ -275,6 +275,17 @@ class AccountStoreTest {
     }
 
     @Test
+    fun danglingActiveKeyFallsBackToTheFirstAccount() {
+        val stored = """{"accounts":[""" +
+            """{"key":"a","serverUrl":"https://a.example","accessToken":"t1"},""" +
+            """{"key":"b","serverUrl":"https://b.example","accessToken":"t2"}""" +
+            """],"activeKey":"x"}"""
+        val store = store(MemoryStore(mapOf("accounts" to stored)))
+        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(2, store.state.value.accounts.size)
+    }
+
+    @Test
     fun tokensAreNotInToString() {
         val account = StoredAccount(AccountKey("a"), "https://a.example", "secret-token", client)
         assertFalse("secret-token" in account.toString())

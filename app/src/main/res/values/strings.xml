@@ -451,6 +451,7 @@
     <string name="settings_confirm_reject_follow_request">Reject</string>
     <string name="share_not_logged_in">Log in to share to Mastodon.</string>
     <string name="share_posted">Posted</string>
+    <string name="share_account_closed">Closed because the account was logged out or logged in again</string>
     <plurals name="share_media_skipped">
         <item quantity="one">%1$d file couldn\'t be attached</item>
         <item quantity="other">%1$d files couldn\'t be attached</item>

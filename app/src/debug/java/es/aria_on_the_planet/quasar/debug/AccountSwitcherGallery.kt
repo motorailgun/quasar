@@ -66,6 +66,7 @@ internal fun AccountSwitcherGallery(accounts: List<StoredAccount>, onBack: () ->
                     onOpenPersonalPosts = { toast(it.name) },
                     onOpenFollowRequests = { toast("Follow requests") },
                     onOpenSearch = { toast("Search") },
+                    closed = false,
                 )
             }
         }

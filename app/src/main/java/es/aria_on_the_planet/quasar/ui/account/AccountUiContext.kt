@@ -9,6 +9,9 @@ import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.EditTarget
 import es.aria_on_the_planet.quasar.ui.composer.PostEditStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * アカウント 1 つ分の UI 側の依存 (書きかけの投稿・自分のポストの編集・メニューの操作)。データ層の依存は [account]。
@@ -46,11 +49,20 @@ class AccountUiContext(
     fun composerSession(scope: CoroutineScope, editing: EditTarget?, onPublished: (Post) -> Unit): ComposerSession =
         createComposer(account, scope, editing, onPublished)
 
+    private val _closed = MutableStateFlow(false)
+
+    /**
+     * [close] された (ログアウト・ログインし直しでトークンが変わった)。`AccountScope` の外でこの依存を持つ画面 (共有) が、
+     * 使えなくなったことを知るため。
+     */
+    val closed: StateFlow<Boolean> = _closed.asStateFlow()
+
     /**
      * ログアウト等でこのアカウントを使わなくなった: 下書きのアップロード・編集を止め、データ層 ([AccountContext.close]) も
      * 閉じる。以後は使わない。
      */
     fun close() {
+        _closed.value = true
         draftStore.close()
         panelDraftStore.close()
         postEditStore.dispose()

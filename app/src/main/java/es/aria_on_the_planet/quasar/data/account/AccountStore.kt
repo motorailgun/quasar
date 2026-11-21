@@ -126,8 +126,8 @@ class AccountStore(
         /** 読めない (形の変わった) 保存は無かったことにする。 */
         internal fun decodeAccounts(stored: String): StoredAccounts? =
             runCatching { json.decodeFromString(StoredAccounts.serializer(), stored) }.getOrNull()
-                // 使っているアカウントが一覧に無ければ使わない
-                ?.let { if (it.activeKey != null && it.active == null) it.copy(activeKey = null) else it }
+                // 使っているアカウントが一覧に無ければ、一覧の先頭を使う (無ければログアウト状態。StoredAccounts.without と同じ)
+                ?.let { if (it.activeKey != null && it.active == null) it.copy(activeKey = it.accounts.firstOrNull()?.key) else it }
 
         /**
          * 以前の保存 ([legacySession] = SecureStorage の `session` の JSON、無ければ [legacyPlaintext]) を、使っている

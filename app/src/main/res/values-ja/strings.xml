@@ -424,6 +424,7 @@
     <string name="settings_confirm_reject_follow_request">拒否</string>
     <string name="share_not_logged_in">Mastodon に共有するにはログインしてください。</string>
     <string name="share_posted">投稿しました</string>
+    <string name="share_account_closed">アカウントがログアウトされたか、ログインし直されたため閉じました</string>
     <plurals name="share_media_skipped">
         <item quantity="other">%1$d 件のファイルを添付できませんでした</item>
     </plurals>

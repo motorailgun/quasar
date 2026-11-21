@@ -155,7 +155,7 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
   `close()` = DB を閉じる)。`InstanceRepository` / `EmojiRepository` (サーバ単位・トークン無し) と `MastodonApi` はアプリ全体で共有。
 * UI 側の 1 アカウント分は `ui/account/AccountUiContext`: `account` (上の `AccountContext`)・`draftStore` / `panelDraftStore` /
   `postEditStore`・`accountActions` / `ownPostActions` (`SessionAccountActions` / `SessionOwnPostActions`)・`composerSession(...)`
-  (投稿欄を作る)・`close()` (下書き・編集を止め、`AccountContext` も閉じる)。`AccountContext` は data 層なので UI のものはこちらに分けている。
+  (投稿欄を作る)・`close()` (下書き・編集を止め、`AccountContext` も閉じる)・`closed` (閉じられたか。`AccountScope` の外で持つ共有の画面が見る)。`AccountContext` は data 層なので UI のものはこちらに分けている。
 * アカウントの保存は `AccountStore` (`data/account/`): SecureStorage の 1 項目 (`accounts`) に `StoredAccount` の一覧 (キー・サーバ・
   トークン・クライアント・`accountId`・表示用の情報 `StoredProfile`) と使っているアカウントのキー。`AccountKey` は端末で振る UUID
   (String の value class。`hashCode` がプロセスをまたいで変わらない) で、アカウントごとのファイルの名前にも使う。変更は純粋関数
@@ -174,7 +174,8 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
   `ViewModelStoreOwner` (Activity の ViewModel `AccountViewModelStores` に置き、切り替えのときだけ `clear`) + 外側の
   `SaveableStateHolder` で保存した状態をアカウントごとに分け、使っていないアカウントの分は捨てる。切り替えた先は `[Timeline]` から。
   `QuasarNavHost` は `account` を引数で受け (作り直されるまで変わらない)、`WithSession` で各画面に渡す。`ShareActivity` は
-  `AccountManager.active` を読む。ViewModel には `account` を渡し、寿命の間ずっと同じものを使う (「今のアカウント」をその都度読まない)。
+  開いたときの `AccountManager.active` のキーに固定し、`AccountManager.context(key)` の依存を使う (切り替えても追わない。依存が
+  閉じられた = `AccountUiContext.closed` なら閉じる)。ViewModel には `account` を渡し、寿命の間ずっと同じものを使う (「今のアカウント」をその都度読まない)。
   複数アカウントの計画・決めたことは [docs/multi-account.md](docs/multi-account.md)。
 
 ## ドメインモデル
@@ -844,6 +845,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (下書きの永続化は TODO。下記「投稿」の「未実装」)。別のアカウント (サーバ・ID が違う) でログインしたら失敗にして保存しているものは触らない。ID の無い (移した)
     アカウントなら ID を埋める (他に同じ ID が保存されていたら失敗)。純粋関数 `StoredAccounts.withRelogin` (`AccountStoreTest`)。
     使うアカウントが変わると画面が作り直される (`AccountScope`)。
+    ログインし直しの認可を待つ間に別のアカウントへ切り替えていても、認可を終えたら対象のアカウントに切り替わる (`withRelogin` が
+    使うアカウントにする。アカウントの追加と同じく、認可を終えたアカウントを出す)。
   * **読み込みの失敗が 401 / 403 なら「ログインし直す」のボタン** (`Navigator.openRelogin` → `Route.Relogin`): 失敗は文字列ではなく
     `LoadError` (`ui/feed/LoadError.kt`。`toLoadError()` で `MastodonApiException` の 401 / 403 を `needsLogin` にし、文言はサーバの
     `error` の文 (`userMessage`)、`LoadErrorTest`) で持ち、一覧が空のときの表示 (`ListStatus(needsLogin)`・タイムラインのカラム) と
@@ -1096,7 +1099,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * **MainActivity とは別の Activity**: 標準の launchMode なので共有元のタスクに積まれ、投稿・破棄で `finish()` すると共有元に
     戻る (MainActivity は singleTask で、受けると Quasar のタスクに移ってしまう)。`taskAffinity=""` は共有元が `NEW_TASK` を
     付けてきたときに MainActivity のタスクに積まれないため。投稿できたら Toast「Posted」。
-  * **下書きは `DraftStore` と別** (`ShareViewModel` が今のアカウントの `AccountUiContext.composerSession` で作る)。書きかけの投稿・返信先と混ざらない。
+  * **下書きは `DraftStore` と別** (`ShareViewModel` が開いたときのアカウントの `AccountUiContext.composerSession` で作る。開いている間に
+    MainActivity で切り替えても追わず、そのアカウントがログアウト・ログインし直されたら閉じる。この画面でのアカウントの選択は未実装)。書きかけの投稿・返信先と混ざらない。
     閉じるときは変更があれば破棄の確認 (`keepDraftOnClose = false`)。プロセスの再生成では intent から入れ直す。
   * 中身の解釈は純粋関数 (`SharedContent.kt`、`SharedContentTest`): 本文は `EXTRA_SUBJECT` (ページのタイトル) + 改行 +
     `EXTRA_TEXT` (含まれていれば本文だけ)。メディアは `EXTRA_STREAM` (無ければ ClipData)、重複を除いて順を保つ。
@@ -1109,7 +1113,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 未ログインはログインを促し、MainActivity を開く (共有の中身は引き継がない)。
   * 確認: `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "hello" -n <pkg>/es.aria_on_the_planet.quasar.ui.share.ShareActivity`。
     adb から渡した `content://` は shell の権限なので読めない (メディアの経路は実際のアプリから共有して確かめる)。
-  * 未実装: Direct Share (共有シートのおすすめ)、音声の共有、共有した下書きを `DraftStore` に移して後で続ける。
+  * 未実装: Direct Share (共有シートのおすすめ)、音声の共有、共有した下書きを `DraftStore` に移して後で続ける、この画面で投稿するアカウントを選ぶ。
 * **共有された URL を開く** (`ui/openlink/`): 共有シートに「Quasar で開く」(manifest の `<activity-alias android:name=".OpenLink">`、
   MainActivity の別名) を「Quasar で投稿」(`ShareActivity`) と別の項目として出す (Instagram の「ストーリーズ / フィード」と同じ仕組み)。
   * 受けるのは MainActivity (singleTask) なので Quasar のタスクで開き、「戻る」は元の画面 (タイムライン等) に戻る。別名で

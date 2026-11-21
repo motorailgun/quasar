@@ -192,6 +192,8 @@ fun TimelineScreen(
                     navigator.openSearch()
                     scope.launch { drawerState.close() }
                 },
+                // 閉じ切ってから (閉じる動きの間に一覧が縮まないように)
+                closed = drawerState.isClosed,
             )
         },
     ) {

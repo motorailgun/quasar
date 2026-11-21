@@ -22,6 +22,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -35,6 +39,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import es.aria_on_the_planet.quasar.MainActivity
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.data.account.AccountKey
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.ui.QuasarAppContent
 import es.aria_on_the_planet.quasar.ui.component.icon.Symbols
@@ -49,6 +54,9 @@ import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
  * タスクに積まれないようにするため。
  *
  * 共有された URI を読める (一時的な許可) のはこの Activity が生きている間なので、開いたらすぐアップロードする。
+ *
+ * 投稿するのは開いたときに使っていたアカウントで、開いている間に MainActivity で切り替えても追わない。そのアカウントが
+ * ログアウトされた・ログインし直された (依存が閉じられた) ら閉じる。
  */
 class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +76,10 @@ class ShareActivity : ComponentActivity() {
                     onClose = ::finish,
                     onPublished = {
                         Toast.makeText(this, R.string.share_posted, Toast.LENGTH_SHORT).show()
+                        finish()
+                    },
+                    onAccountClosed = {
+                        Toast.makeText(this, R.string.share_account_closed, Toast.LENGTH_LONG).show()
                         finish()
                     },
                     onOpenApp = {
@@ -90,21 +102,34 @@ private fun ShareScreen(
     content: SharedContent,
     onClose: () -> Unit,
     onPublished: () -> Unit,
+    onAccountClosed: () -> Unit,
     onOpenApp: () -> Unit,
 ) {
-    // 使っているアカウントで投稿する (開いている間に切り替わったら、そのアカウントの下書きを作り直す)
-    val active by container.accountManager.active.collectAsStateWithLifecycle()
-    val current = active?.context
-    if (current == null) {
+    val accountManager = container.accountManager
+    val active by accountManager.active.collectAsStateWithLifecycle()
+    // 投稿するアカウント。最初に決まった (開いたときに使っていた) アカウントに固定し、MainActivity で切り替えても追わない
+    // (追うと入力が消え、前のアカウントの下書きがアップロードを続ける)。未ログインの間だけ使っているアカウントを待つ。
+    // 将来この画面でアカウントを選べるようにするときは、選んだキーを pinnedKey に入れる (下書きの中身の引き継ぎは別に要る)。
+    var pinnedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val key = pinnedKey?.let(::AccountKey) ?: active?.key
+    if (key == null) {
         NotLoggedIn(onClose = onClose, onOpenApp = onOpenApp)
         return
     }
+    LaunchedEffect(key) { pinnedKey = key.value }
+    // プロセスの作り直しの後は、使っているアカウントでなくなっていても開く (無ければログアウトされた)
+    val account = remember(key) { accountManager.context(key) }
+    val closed = account?.closed?.collectAsStateWithLifecycle()?.value ?: true
+    if (account == null || closed) {
+        LaunchedEffect(Unit) { onAccountClosed() }
+        return
+    }
     val viewModel: ShareViewModel = viewModel(
-        key = "${active?.key}#${active?.generation}",
+        key = "share#${key.value}",
         factory = viewModelFactory {
             initializer {
                 ShareViewModel(
-                    createDraft = { scope, published -> current.composerSession(scope, null, published) },
+                    createDraft = { scope, published -> account.composerSession(scope, null, published) },
                     content = content,
                 )
             }

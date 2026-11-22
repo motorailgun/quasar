@@ -301,6 +301,8 @@ SDK の場所を変えたら `llama/.cxx` を消す (CMake のキャッシュが
   `models/<名前>.download` へ落とす → sha256 を確かめて本来の名前にする。
   * アプリが終わっても続き、切れたら再開し、通知に進み具合が出る。ローミング中は落とさない。HF の 302 は DownloadManager がたどる。
   * 進み具合はダウンロード中だけ 1 秒ごとに問い合わせる。ID は保存せず、DownloadManager の一覧から URL で探す。
+  * 設定のモデルの項目は、補足の下に Expressive の波打つバー (`LinearWavyProgressIndicator`) を出す。1 秒ごとの値の間は
+    `animateFloatAsState` で補って動かす。順番待ち (まだ 0 バイト)・確かめている間は割合が無いので流れるバー。
   * 空きがモデル + 200MB 無ければ始めない。失敗 (空き・通信・壊れている) は設定に出し、タップでやり直す。
 * オフにするときは「ダウンロードしたモデルも削除する」(既定でチェック) を選べる。ダウンロード中のモデルの項目を押すと中止できる。
 * 置き場所は `Android/data/<pkg>/files/models/` (`getExternalFilesDir`。DownloadManager が書けるのはここか共有の場所だけ)。

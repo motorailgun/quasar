@@ -159,7 +159,10 @@ fun SettingsNavigationItem(
     )
 }
 
-/** 押すとその場で操作する項目 (ログアウト等)。[destructive] なら題名とアイコンを error 色にする。 */
+/**
+ * 押すとその場で操作する項目 (ログアウト等)。[destructive] なら題名とアイコンを error 色にする。
+ * [below] は補足の下に置くもの (進み具合のバー等)。
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsActionItem(
@@ -169,6 +172,7 @@ fun SettingsActionItem(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     destructive: Boolean = false,
+    below: (@Composable () -> Unit)? = null,
 ) {
     SegmentedListItem(
         onClick = onClick,
@@ -176,7 +180,16 @@ fun SettingsActionItem(
         colors = itemColors(contentColor = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified),
         modifier = modifier,
         leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
-        supportingContent = Summary(summary),
+        supportingContent = if (below == null) {
+            Summary(summary)
+        } else {
+            {
+                Column {
+                    summary?.let { Text(it) }
+                    below()
+                }
+            }
+        },
         content = { Text(title) },
     )
 }

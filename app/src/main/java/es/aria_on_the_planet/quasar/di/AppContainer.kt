@@ -118,7 +118,7 @@ class AppContainer(context: Context) {
     /**
      * アカウント [key] の設定。無ければ作る。
      *
-     * @param migrateLegacy 分ける前の設定のアカウントごとの項目を移すか (ログインしているアカウント。移し終えた後は何もしない)。
+     * @param migrateLegacy 分ける前の設定のアカウントごとの項目を移すか (保存しているアカウントなら常に。最初に開いたものに移り、移し終えた後は何もしない)。
      */
     private fun accountSettingsStore(key: AccountKey, migrateLegacy: Boolean): AccountSettingsStore = synchronized(accountSettings) {
         accountSettings.getOrPut(key) {

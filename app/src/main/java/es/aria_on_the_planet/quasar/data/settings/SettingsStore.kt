@@ -88,8 +88,8 @@ class SettingsStore<S> private constructor(
         /**
          * アカウント [name] (`AccountKey`) の設定。[scope] はこのアカウントのもの (ログアウトで止める)。
          *
-         * @param legacy 分ける前の設定 (= [device]) からアカウントごとの項目を移すか (以前の保存から移したアカウント・
-         *   ログインした最初のアカウント)。移したら端末共通のファイルからは消す。
+         * @param legacy 分ける前の設定 (= [device]) からアカウントごとの項目を移すか (保存しているアカウントを開くときは
+         *   いつも渡し、最初に開いたアカウントに移る)。移したら端末共通のファイルからは消すので、後から開いたものは何もしない。
          */
         fun account(context: Context, name: String, scope: CoroutineScope, legacy: DeviceSettingsStore?): AccountSettingsStore {
             val migrations = listOfNotNull(legacy?.let { LegacyAccountSettingsMigration(it.dataStore) })

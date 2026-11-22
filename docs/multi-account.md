@@ -1,6 +1,7 @@
 # マルチアカウント
 
-複数のアカウントでログインしておき、ドロワーから切り替える。計画の段階 (「進め方」の 6 まで済み。残りは仕上げ)。
+複数のアカウントでログインしておき、ドロワーから切り替える。「進め方」の段階はすべて済んだ。「進め方」までは最初の計画で、
+その後の段階で名前・形が変わったものがある (違いは各「段階 N で決めたこと」。今の形は `AGENTS.md` の「アカウントの依存」)。
 
 ## 要求と決めたこと
 
@@ -123,6 +124,9 @@ AccountContext (アカウントごと)
 
 ## 切り替え (画面の作り直し)
 
+(計画。実装では `AccountStoresViewModel` → `AccountViewModelStores`、`accountManager.activeKey` → `AccountManager.active`
+(`ActiveAccount`)、`key(activeKey)` → `key(アカウントのキー, generation)` (`AccountScope`) になった。下記「段階 5 で決めたこと」。)
+
 * `AccountManager.switchTo(key)` で `active` が変わる → `MainActivity` の中身を `key(activeKey) { ... }` で包み直し、
   **アカウントごとの `ViewModelStoreOwner`** を `LocalViewModelStoreOwner` で渡す。`recreate()` / `finish()` は要らない。
 * Nav3 1.2.0 / lifecycle 2.11.0 で動くことを確かめた (下記「確かめた結果」)。形は次のとおり:
@@ -186,6 +190,8 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   包み、他のアカウントの分を `removeState` すれば起きなくなった (作り直し・再生成での復元はそのまま)。
 
 ## ログイン・追加・ログアウト
+
+(計画。実装では `AccountStore.addLogin` が使うアカウントにし、ログアウトは `AccountManager.logout(key)`。下記「段階 5 で決めたこと」。)
 
 * 追加: ドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。今の「ログインしていたら Login を外す」作り直しは、
   `activeKey` が変わったときの作り直しに置き換える)。`OAuthLogin.exchange` でトークンを得たら `verify_credentials` で
@@ -331,7 +337,7 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   ログアウト中は「アカウントの設定」とログアウトを出さない (今は設定画面にはログイン中しか来ない)。
 * 両方が混ざっていたページは最小限に振り分けた: Timelines にあった「ポストのメニュー」への入口はトップ (アプリの設定) へ。
   Posting にあった「投稿前に確認」は Confirmations の先頭 (Posting の見出しで「Post」) へ。
-* ページの中身は今までどおりエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`。後者は `currentAccount` の設定)。
+* ページの中身は今までどおりエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`。後者は `currentAccount` の設定。段階 5 からは画面の `AccountUiContext` の設定)。
 * ギャラリーの timeline-settings は設定のトップ + Timelines (ギャラリーのアカウントの設定) + Post menu (本物の端末共通の設定)。
   ギャラリーのアカウントは `rememberGalleryAccount` (`AccountKey("gallery")`・`.invalid`。quick-post-bar と共通)。一覧に無いので、
   ファイルは次の起動で消える。
@@ -379,7 +385,7 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
 
 ### 画面の作り直し (`ui/account/AccountScope.kt`)
 
-* 計画のコードのとおり (`key()` + アカウントごとの owner + 外側の `rememberSaveableStateHolder()` + 使っていないキーの
+* 上の「切り替え」の計画の形のとおり (名前は計画と違う。`key()` + アカウントごとの owner (`AccountViewModelStores`) + 外側の `rememberSaveableStateHolder()` + 使っていないキーの
   `removeState` + `onDispose` で lifecycle が CREATED 以上なら owner を clear)。`AccountScope(active, accountKeys, stores) { account -> ... }`
   に包み、MainActivity は `QuasarNavHost(container, account, ...)` を中に置く。
   * 保存のキーは `AccountKey` の値 (String)。value class を `Any` で渡すと箱 (`AccountKey`) になり、Bundle に入らない。

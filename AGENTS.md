@@ -168,8 +168,8 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
   ログインし直しでトークンが変わったら作り直すので、下書きはそこで消える)。
   `active` (`StateFlow<ActiveAccount?>`: `context` と、そのキーの依存を作り直した回数 `generation`)・`switchTo(key)`・`logout(key)`。
   `AccountStore.state` を見て、一覧から消えた・トークンが変わったキーの依存を `close()` し (新しいものを開く前に閉じる = 同じキーの DB
-  を 2 つ開かない)、消えたキーはファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時には一覧に無い
-  アカウントのファイルを消す。
+  を 2 つ開かない)、消えたキーはファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時に一覧に無い
+  アカウントのファイルを消すのは `AppContainer` (の初期化)。
 * **切り替えは画面ごと作り直す** (`AccountScope`、MainActivity): `key(アカウントのキー, generation)` + アカウントごとの
   `ViewModelStoreOwner` (Activity の ViewModel `AccountViewModelStores` に置き、切り替えのときだけ `clear`) + 外側の
   `SaveableStateHolder` で保存した状態をアカウントごとに分け、使っていないアカウントの分は捨てる。切り替えた先は `[Timeline]` から。
@@ -853,10 +853,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     詳細画面の全面の表示 (`DetailMessage`)・共有された URL を開く画面 (`OpenLinkState.Failed`) が文言の下にボタンを出す
     (`LoadErrorMessage`。どれも `LoadError` と文言の書式を受け、文言の組み立て・ボタンを出すかはその中で決める)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
     今までどおり再接続を続ける (ボタンは出さない)。
-  * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻ると進行中の
-    認可待ちもやめる)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
+  * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻るボタンでは進行中の
+    認可待ちもやめる。システムの「戻る」では画面を閉じるだけで認可待ちは残り、ブラウザで認可を終えればそのアカウントが足される)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
     そのアカウントに切り替わる。
-  * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser / Exchanging / Failed(`LoginError`))。
+  * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser(`serverUrl`) / Exchanging / Failed(`LoginError`, `account` = 文言に入れる
+    `@acct@host` かサーバのホスト。要らなければ `null`))。
   * 保存: `AccountStore` (上記「アカウントの依存」) は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。書き込みは同期 (`commit`)。
     項目名を AAD にする。`EncryptedSharedPreferences` は非推奨なので使わない)。鍵は端末外に出ないので `secure.xml` は
     バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消す。
@@ -1073,7 +1074,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
 * **返信**:
-  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アプリ全体で 1 つ。パネルは別)。
+  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アカウントごとに 1 つ。パネルは別)。
     **返信先が付くのは返信ボタンを押したときだけ** (ポスト画面を開いただけでは付けない。以前の X 風の「自動の返信」は外した)。
     返信ボタン (`onReply`) は `session.startReply(post)` + `QuickPostBarState.requestInput()` (バーにフォーカス)。
     返信中に別のポストの返信ボタンを押すと返信先を上書きし、本文は残す。プロフィール (バーが無い) は `startReply` → `Navigator.openComposer()`。
@@ -1280,12 +1281,12 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   作れないので、`AppContainer` がキーごとに 1 つ持つ。ログアウトで止めてファイルを消す)。項目ごとに 1 キーで、
   対応表は `SettingsPreferences.kt` の `DeviceSettingsSchema` / `AccountSettingsSchema` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはどちらかに 1 行足す**。
   キーの名前は分ける前 (1 つのファイル) のまま。
-  * 移行: 分ける前の `settings` のファイルはそのまま端末共通のファイルとして読む。アカウントごとの項目は、ログインしているアカウントの
-    設定を最初に開いたときに DataStore の移行 (`LegacyAccountSettingsMigration`) でそのアカウントのファイルへ写し、写せたら端末共通の
-    ファイルから消す。写した項目は上書きしないので、途中で終わってもやり直せる。ログアウト中に更新したなら、次にログインした
-    アカウントに移る。
+  * 移行: 分ける前の `settings` のファイルはそのまま端末共通のファイルとして読む。アカウントごとの項目は、保存しているアカウントのうち
+    最初に設定を開いたアカウント (ふつうは起動時に使っているアカウント。ログアウト中だったなら次にログインしたアカウント) のファイルへ
+    DataStore の移行 (`LegacyAccountSettingsMigration`) で写し、写せたら端末共通のファイルから消す。写した項目は上書きしないので、
+    途中で終わってもやり直せる。移し終えた後に開いたアカウントは既定値から始まる。
   * 確認する操作は 1 つのキー (`confirm_targets`) にまとめるが、既定でオンのもの (`DefaultConfirmations`) だけは個別の
-    boolean のキー (`confirm_edit_post` / `confirm_delete_post`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
+    boolean のキー (`confirm_edit_post` / `confirm_delete_post` / `confirm_reject_follow_request`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
   * キーが無ければ既定値。書き込みは変わった項目だけ (`SettingsSchema.writeChanges`)。`null` を値に持つ項目は番兵値
     (折りたたみ・fps は 0、公開範囲は `"account"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
     `null` 自体が値なので、decode は「読めない」と区別するため `Decoded` で包んで返す。

@@ -1,17 +1,9 @@
 package es.aria_on_the_planet.quasar.ui.component.settings
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,12 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.component.dialog.ChoiceDialog
 
 /**
  * 選択肢から 1 つ選ぶ項目 (AOSP の「Screen timeout」の形)。説明文に今の値を出し、押すとラジオボタンのダイアログ。
@@ -56,9 +46,9 @@ fun <T> SettingsChoiceItem(
         showChevron = false,
     )
     if (open) {
-        SettingsChoiceDialog(
+        ChoiceDialog(
             title = title,
-            options = options,
+            groups = listOf(options),
             selected = selected,
             label = label,
             description = description,
@@ -68,65 +58,6 @@ fun <T> SettingsChoiceItem(
             },
             onDismiss = { open = false },
         )
-    }
-}
-
-/** [SettingsChoiceItem] のダイアログ。選んだ時点で [onSelect] (閉じるのは呼び出し側)。 */
-@Composable
-private fun <T> SettingsChoiceDialog(
-    title: String,
-    options: List<T>,
-    selected: T,
-    label: @Composable (T) -> String,
-    onSelect: (T) -> Unit,
-    onDismiss: () -> Unit,
-    description: (@Composable (T) -> String?)?,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(
-                Modifier
-                    .selectableGroup()
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                options.forEach { option ->
-                    ChoiceRow(
-                        label = label(option),
-                        description = description?.invoke(option),
-                        selected = option == selected,
-                        onClick = { onSelect(option) },
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
-}
-
-@Composable
-private fun ChoiceRow(label: String, description: String?, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Column(Modifier.padding(start = 16.dp)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            if (description != null) {
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
     }
 }
 

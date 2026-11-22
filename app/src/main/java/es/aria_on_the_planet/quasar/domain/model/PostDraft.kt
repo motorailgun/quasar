@@ -18,6 +18,11 @@ data class PostDraft(
     val inReplyToId: String? = null,
     /** 引用するポストの ID (Mastodon 4.5+)。引用でなければ `null`。 */
     val quotedStatusId: String? = null,
+    /**
+     * ポストの言語 (ISO 639。`ja` 等)。`null` (Auto) なら送らず、サーバが決める (4.x はアカウントの設定の
+     * 投稿の言語 → 無ければ UI の言語、3.5 は本文から推定)。
+     */
+    val language: String? = null,
 )
 
 /** 作成中の投票。 */

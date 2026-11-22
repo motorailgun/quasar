@@ -43,6 +43,8 @@ data class CurrentAccount(
     val defaultVisibility: PostVisibility,
     /** メディアを既定で閲覧注意にするか (`source.sensitive`)。 */
     val defaultSensitive: Boolean,
+    /** 投稿の言語の設定 (`source.language`)。設定していなければ `null` (サーバは UI の言語を使う)。 */
+    val defaultLanguage: String? = null,
 )
 
 /** 自分の操作で [accountId] との関係が [relationship] に変わった。 */
@@ -94,6 +96,7 @@ class AccountRepository(
             user = dto.toDomain(),
             defaultVisibility = dto.source?.privacy?.let(::postVisibility) ?: PostVisibility.Public,
             defaultSensitive = dto.source?.sensitive == true,
+            defaultLanguage = dto.source?.language?.takeIf { it.isNotBlank() },
         ).also { me.value = it }
 
     /**

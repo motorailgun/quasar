@@ -41,6 +41,17 @@ class DraftMappersTest {
     }
 
     @Test
+    fun languageIsSentOnlyWhenChosen() {
+        assertEquals(
+            listOf("status" to "hi", "visibility" to "public", "language" to "ja"),
+            PostDraft("hi", language = "ja").toFormParams(),
+        )
+        assertEquals(null, PostDraft("hi").toFormParams().toMap()["language"])
+        assertEquals("en", PostDraft("hi", language = "en").toEditFormParams().toMap()["language"])
+        assertEquals(null, PostDraft("hi").toEditFormParams().toMap()["language"])
+    }
+
+    @Test
     fun blankContentWarningIsOmitted() {
         assertEquals(2, PostDraft("hi", contentWarning = " ").toFormParams().size)
     }

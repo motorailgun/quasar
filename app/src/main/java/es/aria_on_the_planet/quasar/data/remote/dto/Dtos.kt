@@ -51,6 +51,8 @@ data class AccountSourceDto(
     val note: String? = null,
     /** フィールドの原文 (値は HTML ではない)。 */
     val fields: List<FieldDto> = emptyList(),
+    /** 投稿の言語の設定 (ISO 639)。設定していなければ `null` か空。 */
+    val language: String? = null,
 )
 
 /** https://docs.joinmastodon.org/entities/Status/#Mention */

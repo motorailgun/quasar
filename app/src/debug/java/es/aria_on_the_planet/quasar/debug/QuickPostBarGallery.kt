@@ -14,7 +14,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -27,6 +30,7 @@ import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostList
 import es.aria_on_the_planet.quasar.ui.component.scaffold.DetailScaffold
 import es.aria_on_the_planet.quasar.ui.feed.TimelineItem
+import es.aria_on_the_planet.quasar.ui.composer.ComposerScreen
 import es.aria_on_the_planet.quasar.ui.composer.QuickPostBar
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +41,7 @@ import kotlinx.coroutines.cancel
 /**
  * クイック投稿バーを一覧の上に浮かべる (見た目・位置の確認用)。下書きは本物の ComposerSession だが、サーバは
  * `.invalid` なのでアカウント・上限・絵文字は取れず (アイコンは取得前のプレースホルダ)、送信も失敗する。
+ * ピルを引き上げるとフルの投稿画面 ([ComposerScreen]) を重ねる。
  */
 @Composable
 internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
@@ -49,6 +54,7 @@ internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
     DisposableEffect(session) {
         onDispose { session.first.cancel() }
     }
+    var expanded by remember { mutableStateOf(false) }
     val hazeState = rememberHazeState()
     val listState = rememberLazyListState()
     DetailScaffold(
@@ -69,7 +75,7 @@ internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
             QuickPostBar(
                 session = session.second,
                 hazeState = hazeState,
-                onExpand = {},
+                onExpand = { expanded = true },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
@@ -77,5 +83,14 @@ internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
                     .padding(12.dp),
             )
         }
+    }
+    if (expanded) {
+        ComposerScreen(
+            session = session.second,
+            onClose = { expanded = false },
+            onFinish = { expanded = false },
+            keepDraftOnClose = true,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }

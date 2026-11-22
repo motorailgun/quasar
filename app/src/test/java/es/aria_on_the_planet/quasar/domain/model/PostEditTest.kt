@@ -16,10 +16,11 @@ class PostEditTest {
         media: List<MediaAttachment> = emptyList(),
         poll: Poll? = null,
         sensitive: Boolean = false,
+        language: String? = null,
     ) = Post(
         "1", User("me", "me", "", "https://e.invalid", "", "", emptyList()), "<p>html</p>", Instant.EPOCH, 0, 0, 0,
         emptyList(), mediaAttachments = media, poll = poll, sensitive = sensitive, visibility = PostVisibility.Unlisted,
-        contentWarning = "html cw",
+        contentWarning = "html cw", language = language,
     )
 
     private fun poll(expiresAt: Instant?) = Poll(
@@ -37,6 +38,12 @@ class PostEditTest {
         assertEquals("cw", draft.contentWarning)
         assertEquals(PostVisibility.Unlisted, draft.visibility)
         assertNull(draft.inReplyToId)
+    }
+
+    @Test
+    fun languageIsKept() {
+        assertEquals("ja", editDraftOf(post(language = "ja"), StatusSource("x", ""), durations, now).language)
+        assertNull(editDraftOf(post(), StatusSource("x", ""), durations, now).language)
     }
 
     @Test

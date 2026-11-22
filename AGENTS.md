@@ -54,7 +54,7 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag,
+│                                   PostDraft, PostLanguage, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag,
 │                                   ProfileEdit = ProfileSource / ProfileLimits)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
@@ -82,7 +82,8 @@ es.aria_on_the_planet.quasar
     │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに。
     │                               各タブは `ConnectedTab(label, icon, selectedIcon)`。幅は `layoutTabs`: 等幅で収まれば
     │                               ラベル、収まらなければ選択中だけラベル + 他はアイコン、それでもはみ出せば横スクロール + 端のフェード)
-    │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
+    │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除) / ChoiceDialog.kt ラジオボタンで 1 つ選ぶダイアログ
+│   │                           (中身は LazyColumn。設定の `SettingsChoiceItem`・投稿の言語)
     │   ├── dialog/ActionConfirmation.kt 設定に従う操作前の確認 (ActionConfirmationHost / LocalActionConfirmer)
     │   ├── settings/               AOSP 風の設定の部品 (SettingsScaffold / SettingsGroup / Switch・Choice・Slider 等の項目)
     │   ├── blur/SurfaceBlur.kt     浮かぶ UI の背景のぼかし (rememberSurfaceBlurStyle。半径・濃さは DisplaySettings)
@@ -96,7 +97,7 @@ es.aria_on_the_planet.quasar
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く) + LoadErrorMessage.kt (失敗の文言 + 401 / 403 なら「ログインし直す」)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
-    │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
+    │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / LanguageButton / ComposerToolbar /
     │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
     │   │                           ReplyTarget = 返信先の表示: ReplyTargetPreview / ReplyContext / ReplyingToLabel)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle) /
@@ -1070,6 +1071,16 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * `UploadSource` でデータ層を `ContentResolver` から切り離している (`AppContainer.uploadSource(uri)` が作る。IO スレッドで呼ぶ)。
   * アクセストークンに `write:media` が無いとアップロードは 403 になる (以前の手入力のトークンで起きうる。OAuth では `write` に含まれる)。
   * 未実装: 画像の縮小 (圧縮は上記)、焦点 (focus) の指定、カメラ撮影、プロセス再生成後の添付の復元。
+* **言語** (`PostDraft.language` / `ComposerState.language`): フルの投稿画面のトップバーの Post / Save の左の `LanguageButton`
+  (言語のアイコン + `JA` 等のコード、未指定なら「Auto」。色はツールバーと同じ `ComposerIconColors` で、選んでいれば on、Auto は off。
+  クイック投稿バーには出さない)。押すと翻訳先の設定と同じラジオボタンの
+  ダイアログ (`ChoiceDialog`) で一覧: Auto / アカウントの投稿の言語の設定 (`verify_credentials` の `source.language`、
+  `CurrentAccount.defaultLanguage`)・端末の言語・選んでいる言語 (`preferredPostLanguages`) / 区切り / 残りの ISO 639-1
+  (`postLanguageCodes`、表示名の順) (`PostLanguageTest`)。
+  * Auto (`null`) は `language` を送らない。サーバは 4.x ならアカウントの投稿の言語の設定 → 無ければ UI の言語 (`valid_locale_cascade`)、
+    3.5 は本文から推定する。空文字も同じ扱いだが送らない。
+  * 編集はポストの言語 (`Post.language`) で始まり、変えれば `PUT` で送る。`null` のままなら送らず、サーバはポストの言語を保つ。
+  * 下書きごと (`ComposerSession`) なので、投稿したら次の下書きは Auto から。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
@@ -1128,7 +1139,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
 * **未実装**: 下書き保存 (TODO: 永続化して、ログインし直し・プロセスの終了をまたいで残す。今はどちらでも消える)、
   メンション・ハッシュタグの補完、
-  言語の指定、予約投稿。
+  最後に選んだ言語を覚えること (今は下書きごとに Auto から)、予約投稿。
 
 ## オンデバイス翻訳 (実験的機能。`:llama` + `data/translation/`)
 
@@ -1332,7 +1343,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
     (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
     `SettingsSwitchItem` / `SettingsSplitSwitchItem` (左は詳細ページ、縦線の右はスイッチ) / `SettingsNavigationItem` /
-    `SettingsChoiceItem` (ラジオのダイアログ) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。 `SettingsFooter` はページ末尾の注意書き (AOSP の FooterPreference: 丸い面の情報アイコン + 控えめな文)。
+    `SettingsChoiceItem` (ラジオのダイアログ、`ChoiceDialog`) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。 `SettingsFooter` はページ末尾の注意書き (AOSP の FooterPreference: 丸い面の情報アイコン + 控えめな文)。
   * 面の色は surfaceBright (背景は surfaceContainer)。`SegmentedListItem` の checked 版は選択中の色・形に変わるので、
     selected 系の色と `selectedShape` を通常と同じにしている (AOSP は面の色でオン / オフを示さない)。
 * **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取り、`Modifier.surfaceBlur` で
@@ -1435,7 +1446,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /

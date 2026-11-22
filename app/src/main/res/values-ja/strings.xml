@@ -247,6 +247,9 @@
     <string name="composer_remove_poll">アンケートを削除</string>
     <string name="composer_content_warning">閲覧注意</string>
     <string name="composer_visibility">公開範囲</string>
+    <string name="composer_language">言語</string>
+    <string name="composer_language_auto_account">投稿の言語の設定 (%1$s)</string>
+    <string name="composer_language_auto_server">サーバーに任せる</string>
     <string name="composer_remaining_characters">残り %1$d 文字</string>
     <string name="composer_discard_title">下書きを破棄しますか？</string>
     <string name="composer_discard_message">現在作成中の投稿が破棄されます。</string>

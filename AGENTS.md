@@ -966,6 +966,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     ボタン優先、押せないもの (空の送信ボタン等)・アイコン・ピルのタップはバー全体に回る。ピルはドラッグのみ。
   * 一覧はバーの後ろまで描き (ぼかしの元)、下端の余白は `contentPadding` (ナビゲーションバー + バーの高さ + 余白) で取る。
     バーはキーボードの上に乗る (`WindowInsets.ime ∪ navigationBars`)。スナックバーはバーの上。
+  * バーの下 (余白・ナビゲーションバー) と左右の余白は一覧が透けて見えるが、タップ・スクロールを受けて捨てる
+    (`QuickComposerHost` の `blockPointerInput`。指が少しずれただけで後ろのポストが開くのを防ぐ)。バーより上は覆わない。
   * 「戻る」でキーボードだけ閉じられたらフォーカスも外して縮める (`WindowInsets.isImeVisible` が出ていた → 消えたとき)。
     公開範囲のメニュー・絵文字 / メディアのピッカー・OS 標準のピッカーは別ウィンドウ (別画面) に移ってキーボードが閉じるので、
     閉じてから少し待って、まだこの画面のウィンドウにフォーカスがある (`LocalWindowInfo.isWindowFocused`) ときだけ縮める。キーボードが出ていないときの「戻る」もフォーカスを外すだけ。バーからの投稿の結果・エラーはタイムラインのスナックバー。
@@ -1446,7 +1448,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。本物と同じ `QuickComposerHost` で組む。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /

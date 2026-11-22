@@ -32,6 +32,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
+import es.aria_on_the_planet.quasar.domain.model.findHashtags
 import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
 import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 
@@ -126,28 +127,46 @@ private class LastNonNull<T : Any> {
 }
 
 /**
- * 絵文字になる `:shortcode:` を、本文はそのままに少し太く + 色付きで表示する (Discord の入力欄のように)。
- * 判定は [findEmojiShortcodes] (サーバと同じ前後の条件 + 実在するショートコードのみ)。
+ * 絵文字になる `:shortcode:` と、[hashtags] ならハッシュタグになる `#名前` を、本文はそのままに少し太く + 色付きで表示する
+ * (Discord の入力欄のように)。判定は [findEmojiShortcodes] (サーバと同じ前後の条件 + 実在するショートコードのみ) と
+ * [findHashtags] (サーバと同じ規則)。
  */
-class EmojiShortcodeHighlight(
+class ComposerHighlight(
     emojis: List<CustomEmoji>,
+    private val hashtags: Boolean,
     private val style: SpanStyle,
 ) : OutputTransformation {
     private val known = emojis.mapTo(HashSet()) { it.shortcode }
 
     override fun TextFieldBuffer.transformOutput() {
-        findEmojiShortcodes(asCharSequence(), known).forEach { range ->
+        val text = asCharSequence()
+        findEmojiShortcodes(text, known).forEach { range ->
             addStyle(style, range.first, range.last + 1)
+        }
+        if (hashtags) {
+            findHashtags(text).forEach { range ->
+                addStyle(style, range.first, range.last + 1)
+            }
         }
     }
 }
 
-/** [EmojiShortcodeHighlight] を [emojis] が変わったときだけ作り直す。 */
+/** 絵文字だけの [ComposerHighlight] (CW・プロフィール等、サーバがハッシュタグにしない欄)。絵文字が無ければ `null`。 */
 @Composable
 fun rememberEmojiShortcodeHighlight(emojis: List<CustomEmoji>): OutputTransformation? {
+    val highlight = rememberComposerHighlight(emojis, hashtags = false)
+    return if (emojis.isEmpty()) null else highlight
+}
+
+/** 投稿の本文用の [ComposerHighlight] (絵文字 + ハッシュタグ)。 */
+@Composable
+fun rememberPostTextHighlight(emojis: List<CustomEmoji>): OutputTransformation = rememberComposerHighlight(emojis, hashtags = true)
+
+/** [emojis] や色が変わったときだけ作り直す。 */
+@Composable
+private fun rememberComposerHighlight(emojis: List<CustomEmoji>, hashtags: Boolean): ComposerHighlight {
     val color = MaterialTheme.colorScheme.primary
-    return remember(emojis, color) {
-        if (emojis.isEmpty()) null
-        else EmojiShortcodeHighlight(emojis, SpanStyle(color = color, fontWeight = FontWeight.SemiBold))
+    return remember(emojis, hashtags, color) {
+        ComposerHighlight(emojis, hashtags, SpanStyle(color = color, fontWeight = FontWeight.SemiBold))
     }
 }

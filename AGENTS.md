@@ -1032,6 +1032,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     primary 色 + SemiBold にする (本文は変えない)。判定はサーバ (`CustomEmoji::SCAN_RE`) と同じ前後条件で、Ruby の
     `[[:alnum:]]` に合わせ、かな・漢字の直後も絵文字にならない。
   * `BasicTextField(TextFieldState)` は `InlineTextContent` 非対応のため、入力欄内で画像にはしない。
+* **ハッシュタグの強調**: 本文の中でサーバがハッシュタグにする `#名前` も、絵文字と同じ primary 色 + SemiBold にする
+  (`ComposerHighlight`。本文用は `rememberPostTextHighlight`、CW・プロフィールは絵文字だけの `rememberEmojiShortcodeHighlight`。
+  サーバは CW からタグを拾わない)。判定は純粋関数 `findHashtags` (`domain/model/Hashtag.kt`、`FindHashtagsTest`) で、Mastodon 4.x の
+  `Tag::HASHTAG_RE` + `Extractor` に合わせる: `#` / `＃` は先頭か空白の直後のみ、名前は文字を 1 つ以上含む単語の文字の並び
+  (`·` `・` ZWNJ を挟める、末尾の区切りは含めない)、直後が `://` なら末尾の `http(s)` を除く。Ruby の `[[:word:]]` 等は JVM / Android の
+  正規表現と意味が違うのでコードポイントごとに判定している。テストの期待値は Mastodon のイメージの Ruby で正規表現を走らせて出したもの。
+  3.5 は `(` 等の後もタグにする (4.x に揃えているので 3.5 では強調されないタグがありうる)。
 * **絵文字ピッカー** (`EmojiPicker.kt`): ツールバーの絵文字ボタンで `ModalBottomSheet` を開く (開くときにキーボードは閉じる)。
   `EmojiPicker` (検索欄 + `LazyVerticalGrid`) は入れ物に依存しない部品で、`EmojiPickerSheet` がシートに載せる。
   * 並びは `groupEmojisByCategory` (分類なし「Custom」が先頭、残りはカテゴリ名順、カテゴリ内はサーバの順)。検索中は

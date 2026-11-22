@@ -31,7 +31,7 @@ import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
  * 枠の無い本文欄 (X の投稿欄と同じ見た目)。プレースホルダは空のときだけ出す。
  *
  * @param minHeight 空でもこの高さを確保し、余白のタップでも入力を始められるようにする。
- * @param outputTransformation 表示だけの装飾 (本文は変えない)。絵文字の強調 ([rememberEmojiShortcodeHighlight]) 等。
+ * @param outputTransformation 表示だけの装飾 (本文は変えない)。絵文字・ハッシュタグの強調 ([rememberPostTextHighlight] / [rememberEmojiShortcodeHighlight]) 等。
  */
 @Composable
 fun ComposerTextField(

@@ -87,7 +87,7 @@ import es.aria_on_the_planet.quasar.ui.component.composer.ReplyTargetPreview
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 import es.aria_on_the_planet.quasar.ui.component.composer.VisibilityButton
 import es.aria_on_the_planet.quasar.ui.component.composer.insertEmoji
-import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiShortcodeHighlight
+import es.aria_on_the_planet.quasar.ui.component.composer.rememberPostTextHighlight
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiSuggestions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -131,7 +131,7 @@ fun QuickPostBar(
     val isEmpty by remember(composer) { derivedStateOf { composer.toDraft().isEmpty || composer.isUntouched() } }
     val characterCount by remember(composer, limits) { derivedStateOf { composer.toDraft().characterCount(limits) } }
     val suggestions by rememberEmojiSuggestions(composer.text, state.emojis)
-    val highlight = rememberEmojiShortcodeHighlight(state.emojis)
+    val highlight = rememberPostTextHighlight(state.emojis)
     val openMediaPicker = rememberMediaPicker(session)
 
     var focused by remember { mutableStateOf(false) }

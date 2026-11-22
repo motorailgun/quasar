@@ -33,13 +33,13 @@ class ActiveAccount(val context: AccountUiContext, val generation: Int) {
  * * Main で動かす ([scope] は Main)。
  *
  * @param open 保存しているアカウントの依存を作る (`AppContainer`)。
- * @param logout アカウントのログアウト (`OAuthLogin.logout`: 一覧から除いてトークンを無効化)。
+ * @param logoutAccount アカウントのログアウト (`OAuthLogin.logout`: 一覧から除いてトークンを無効化)。
  */
 class AccountManager(
     private val store: AccountStore,
     private val open: (StoredAccount) -> AccountUiContext,
     private val deleteData: (AccountKey) -> Unit,
-    private val logout: (AccountKey) -> Unit,
+    private val logoutAccount: (AccountKey) -> Unit,
     scope: CoroutineScope,
 ) {
     private val contexts = HashMap<AccountKey, AccountUiContext>()
@@ -67,10 +67,8 @@ class AccountManager(
      */
     fun context(key: AccountKey): AccountUiContext? = store.state.value.find(key)?.let(::openIfNeeded)
 
-    /** 使っているアカウントからログアウトする (残りがあればその先頭に切り替わる)。 */
-    fun logoutActive() {
-        active.value?.key?.let(logout)
-    }
+    /** [key] からログアウトする (使っていたアカウントなら、残りがあればその先頭に切り替わる)。 */
+    fun logout(key: AccountKey) = logoutAccount(key)
 
     private fun sync(state: StoredAccounts) {
         // 消えたもの・トークンが変わったものを閉じる。新しいものを開く前に閉じる (同じキーの DB を 2 つ開かない)

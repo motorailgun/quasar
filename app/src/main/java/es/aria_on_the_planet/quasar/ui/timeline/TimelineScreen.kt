@@ -328,11 +328,10 @@ private fun ColumnPage(
             feed.items.isEmpty() && (feed.isRefreshing || !feed.loaded) ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
 
-            feed.items.isEmpty() && feed.error != null -> feed.error.let { error ->
+            feed.items.isEmpty() && feed.error != null ->
                 Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                    LoadErrorMessage(stringResource(R.string.timeline_error, error.message), needsLogin = error.needsLogin)
+                    LoadErrorMessage(feed.error, R.string.timeline_error)
                 }
-            }
 
             feed.items.isEmpty() ->
                 CenteredMessage(stringResource(R.string.column_empty))

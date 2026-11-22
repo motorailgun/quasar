@@ -256,11 +256,12 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
 
 * **`AccountContext` を 2 つに分けた**: data 層の `data/account/AccountContext` (session・cache・Repository 6 つ・
   `StreamingClient`) と、UI 側の `ui/account/AccountUiContext` (`account` = 前者・`draftStore` / `panelDraftStore` /
-  `postEditStore`・`accountActions` / `ownPostActions`・`composerSession(...)`・`close()`)。`DraftStore` 等は `ui/composer` の
+  `postEditStore` (`OwnPostActions` も兼ねる)・`accountActions`・`composerSession(...)`・`close()`)。`DraftStore` 等は `ui/composer` の
   クラスなので、data 層に置くと `ui → domain ← data` の向きが崩れるため。上の図の `AccountContext` の中身は 2 つを合わせたもの。
   * ViewModel は data 層の `AccountContext` を受ける (中で `account.statusRepository` 等を取り出す)。投稿欄 (`ComposerSession`) も
     `AccountContext` を受ける。`QuasarNavHost` の画面・`ShareActivity`・ギャラリーは `AccountUiContext` を扱う。
-  * `SessionAccountActions` / `SessionOwnPostActions` は名前のまま `ui/navigation/` から `ui/account/` に移した。
+  * `SessionAccountActions` / `SessionOwnPostActions` は名前のまま `ui/navigation/` から `ui/account/` に移した (後に
+    `SessionOwnPostActions` は無くし、`PostEditStore` が `OwnPostActions` を実装する)。
   * data 層の `AccountContext` にはまだ `close()` が無い (閉じるものが無い。DB を分ける段階 4 で足す)。
 * **「今の」アカウントは `AppContainer.currentAccount`** (`StateFlow<AccountUiContext?>`): `SessionStore.session` から作り、セッションが
   変わったら作り直して前のものを `close()` する (Main で行う。作り直しのたびに Repository も新しくなる)。段階 5 の
@@ -282,9 +283,9 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
 * **`AccountKey` は String の value class** (`@JvmInline`、`hashCode` は中身の String のもの)。値は `UUID.randomUUID()`。
 * **`AccountStore`** (`SessionStore` を置き換え): SecureStorage の 1 項目 `accounts` に `StoredAccounts` (`accounts: List<StoredAccount>` +
   `activeKey`) の JSON。一覧と使っているアカウントを一緒に書き換えるため 1 項目にした。`StoredAccount` = `key` / `serverUrl` /
-  `accessToken` / `client` / `accountId?` / `profile: StoredProfile?` (acct・表示名・アイコンの URL (static も)・絵文字)。`toString` は
+  `accessToken` / `client` / `accountId?` / `profile: StoredProfile?` (acct・表示名・アイコンの URL (static も)・絵文字・bot)。`toString` は
   トークン・クライアントを出さない (`Session` も)。
-  * 公開するのは `state` (全体) と `active` (使っているアカウント)。`addLogin` / `remove` / `updateProfile`。変更は `StoredAccounts` の
+  * 公開するのは `state` (全体。使っているアカウントは `state.active`)。`addLogin` / `remove` / `updateProfile`。変更は `StoredAccounts` の
     純粋関数 (`withLogin` / `without` / `withProfile`)。保存先は `KeyValueStore` (interface。実体は `SecureStorage`、テストは Map) なので
     JVM でテストできる (`AccountStoreTest`)。
   * `SecureStorage` の書き込みは `commit` (同期) にした。移行・ログインの直後にプロセスが終わって一覧を失うと、キーが振り直されて
@@ -361,7 +362,7 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   アカウントにしか要らない)。切り替えても閉じない (下書きが残る)。閉じるのは一覧から消えたとき・トークンが変わったときだけ
   (トークンが変わったとき = ログインし直しでも下書きは消える)。
   使っていないアカウントの依存は画面が無いので通信しない (ストリーミングは画面が collect している間だけ)。
-* 出すのは `active: StateFlow<ActiveAccount?>` (`context` + `generation`)・`switchTo(key)`・`logoutActive()`・`context(key)` (キーの
+* 出すのは `active: StateFlow<ActiveAccount?>` (`context` + `generation`)・`switchTo(key)`・`logout(key)`・`context(key)` (キーの
   依存。開いていなければ作り、使っているアカウントは変えない。共有の画面が使う)。`context(key)` で受けた画面は
   `AccountUiContext.closed` (ログアウト・ログインし直しで閉じられた) を見る。
 * 状態は `AccountStore.state` を Main で collect して合わせる (切り替え・ログイン・ログアウトはどれも `AccountStore` を
@@ -404,7 +405,7 @@ debug ビルドだけの実験の画面 (ブランチ `spike/nav3-account-switch
   (タイトル「アカウントを追加」) を出し、押したら進行中のログインもやめる (トークンに換えている途中なら止めない。できたら切り替わる)。
   システムの「戻る」では止めない (後からブラウザで認可を終えたら、そのアカウントが足されて切り替わる)。
   ログインの流れ・`PendingAuthorization` は今のまま 1 つ。`addLogin` が使うアカウントにするので、`AccountManager` が切り替える。
-* ログアウト: 設定画面のトップから `AccountManager.logoutActive()` → `OAuthLogin.logout(key)` (`AccountStore.remove` + 無効化)。残りの
+* ログアウト: 設定画面のトップから `AccountManager.logout(key)` (その画面のアカウント) → `OAuthLogin.logout(key)` (`AccountStore.remove` + 無効化)。残りの
   先頭に切り替わる (`StoredAccounts.without`)。依存を閉じてファイルを消すのは `AccountManager`。
 
 ### 同じアカウントを 2 つ持たない・自動では除かない

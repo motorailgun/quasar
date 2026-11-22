@@ -50,7 +50,7 @@ class AccountStoreTest {
             mapOf("session" to """{"serverUrl":"https://a.example","accessToken":"token","client":{"clientId":"id","clientSecret":"secret"}}"""),
         )
         val store = store(storage)
-        val active = store.active.value!!
+        val active = store.state.value.active!!
         assertEquals(AccountKey("a"), active.key)
         assertEquals(Session("https://a.example", "token"), active.session)
         assertEquals(client, active.client)
@@ -67,7 +67,7 @@ class AccountStoreTest {
     fun migratesThePlaintextSessionWhenThereIsNoEncryptedOne() {
         val plaintext = Plaintext(LegacyPlaintextSession("https://a.example", "token"))
         val storage = MemoryStore()
-        val active = store(storage, plaintext).active.value!!
+        val active = store(storage, plaintext).state.value.active!!
         assertEquals(Session("https://a.example", "token"), active.session)
         assertNull(active.client)
         assertNull(plaintext.session)
@@ -77,7 +77,7 @@ class AccountStoreTest {
     fun legacySessionWithoutTokenIsLoggedOut() {
         val storage = MemoryStore(mapOf("session" to """{"serverUrl":"https://a.example","accessToken":null}"""))
         val store = store(storage)
-        assertNull(store.active.value)
+        assertNull(store.state.value.active)
         assertTrue(store.state.value.accounts.isEmpty())
         assertFalse("session" in storage.values)
     }
@@ -85,7 +85,7 @@ class AccountStoreTest {
     @Test
     fun nothingToMigrateIsLoggedOut() {
         val storage = MemoryStore()
-        assertNull(store(storage).active.value)
+        assertNull(store(storage).state.value.active)
         assertTrue(storage.values.isEmpty())
     }
 
@@ -95,7 +95,7 @@ class AccountStoreTest {
         val storage = MemoryStore()
         store(storage).addLogin("https://a.example", "new", client, "1", profile)
         storage.values["session"] = """{"serverUrl":"https://b.example","accessToken":"old"}"""
-        val active = store(storage).active.value!!
+        val active = store(storage).state.value.active!!
         assertEquals("new", active.accessToken)
         // 残っていた古いものはこの起動で消す
         assertFalse("session" in storage.values)
@@ -107,7 +107,7 @@ class AccountStoreTest {
         val storage = MemoryStore()
         store(storage).addLogin("https://a.example", "new", client, "1", profile)
         val plaintext = Plaintext(LegacyPlaintextSession("https://a.example", "old"))
-        assertEquals("new", store(storage, plaintext).active.value!!.accessToken)
+        assertEquals("new", store(storage, plaintext).state.value.active!!.accessToken)
         assertNull(plaintext.session)
     }
 
@@ -116,11 +116,11 @@ class AccountStoreTest {
         val store = store()
         val first = store.addLogin("https://a.example", "t1", client, "1", profile)
         assertNull(first.replaced)
-        assertEquals(first.account, store.active.value)
+        assertEquals(first.account, store.state.value.active)
         val second = store.addLogin("https://b.example", "t2", client, "1", null)
         assertNull(second.replaced)
         assertEquals(listOf(AccountKey("a"), AccountKey("b")), store.state.value.accounts.map { it.key })
-        assertEquals(AccountKey("b"), store.active.value?.key)
+        assertEquals(AccountKey("b"), store.state.value.active?.key)
     }
 
     @Test
@@ -133,7 +133,7 @@ class AccountStoreTest {
         // 足さずに差し替え、キー・表示用の情報は残す
         assertEquals(2, store.state.value.accounts.size)
         assertEquals("t1", result.replaced?.accessToken)
-        val active = store.active.value!!
+        val active = store.state.value.active!!
         assertEquals(AccountKey("a"), active.key)
         assertEquals("t3", active.accessToken)
         assertEquals(newClient, active.client)
@@ -181,7 +181,7 @@ class AccountStoreTest {
         assertEquals("t1", result.replaced.accessToken)
         // キーはそのまま (設定・キャッシュが残る)、使うアカウントになる。表示用の情報は残す
         assertEquals(listOf(AccountKey("a"), AccountKey("b")), store.state.value.accounts.map { it.key })
-        val active = store.active.value!!
+        val active = store.state.value.active!!
         assertEquals(AccountKey("a"), active.key)
         assertEquals("t3", active.accessToken)
         assertEquals(newClient, active.client)
@@ -206,8 +206,8 @@ class AccountStoreTest {
         val store = store(storage)
         val result = store.relogin(AccountKey("a"), "https://a.example", "t2", client, "1", profile)
         assertTrue(result is ReloginResult.Replaced)
-        assertEquals("1", store.active.value?.accountId)
-        assertEquals("t2", store.active.value?.accessToken)
+        assertEquals("1", store.state.value.active?.accountId)
+        assertEquals("t2", store.state.value.active?.accessToken)
     }
 
     @Test
@@ -229,13 +229,13 @@ class AccountStoreTest {
         store.addLogin("https://b.example", "t2", client, "2", null)
         val accounts = store.state.value.accounts
         store.setActive(AccountKey("a"))
-        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(AccountKey("a"), store.state.value.active?.key)
         assertEquals(accounts, store.state.value.accounts)
         // 保存される (次の起動はこのアカウントから)
-        assertEquals(AccountKey("a"), store(storage).active.value?.key)
+        assertEquals(AccountKey("a"), store(storage).state.value.active?.key)
         // 一覧に無いキーには切り替えない
         store.setActive(AccountKey("x"))
-        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(AccountKey("a"), store.state.value.active?.key)
     }
 
     @Test
@@ -245,12 +245,12 @@ class AccountStoreTest {
         store.addLogin("https://b.example", "t2", client, "2", null)
         store.addLogin("https://c.example", "t3", client, "3", null)
         assertEquals("t3", store.remove(AccountKey("c"))?.accessToken)
-        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(AccountKey("a"), store.state.value.active?.key)
         // 使っていないものを除いても使っているものは変わらない
         store.remove(AccountKey("b"))
-        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(AccountKey("a"), store.state.value.active?.key)
         store.remove(AccountKey("a"))
-        assertNull(store.active.value)
+        assertNull(store.state.value.active)
         assertTrue(store.state.value.accounts.isEmpty())
         assertNull(store.remove(AccountKey("a")))
     }
@@ -261,17 +261,17 @@ class AccountStoreTest {
         val store = store(storage)
         store.addLogin("https://a.example", "t1", client, "1", null)
         store.updateProfile(AccountKey("a"), "1", profile)
-        assertEquals("1", store.active.value?.accountId)
-        assertEquals(profile, store.active.value?.profile)
-        assertEquals("alice@a.example", store.active.value?.fullAcct)
+        assertEquals("1", store.state.value.active?.accountId)
+        assertEquals(profile, store.state.value.active?.profile)
+        assertEquals("alice@a.example", store.state.value.active?.fullAcct)
         assertEquals(store.state.value, store(storage).state.value)
     }
 
     @Test
     fun unreadableOrInconsistentStorageIsLoggedOut() {
-        assertNull(store(MemoryStore(mapOf("accounts" to "{broken"))).active.value)
+        assertNull(store(MemoryStore(mapOf("accounts" to "{broken"))).state.value.active)
         val dangling = """{"accounts":[],"activeKey":"x"}"""
-        assertNull(store(MemoryStore(mapOf("accounts" to dangling))).active.value)
+        assertNull(store(MemoryStore(mapOf("accounts" to dangling))).state.value.active)
     }
 
     @Test
@@ -281,7 +281,7 @@ class AccountStoreTest {
             """{"key":"b","serverUrl":"https://b.example","accessToken":"t2"}""" +
             """],"activeKey":"x"}"""
         val store = store(MemoryStore(mapOf("accounts" to stored)))
-        assertEquals(AccountKey("a"), store.active.value?.key)
+        assertEquals(AccountKey("a"), store.state.value.active?.key)
         assertEquals(2, store.state.value.accounts.size)
     }
 

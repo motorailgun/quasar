@@ -106,7 +106,7 @@ es.aria_on_the_planet.quasar
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      ログイン画面 (サーバを入力 → ブラウザで OAuth)
     ├── account/                    アカウントの UI 側の依存 (AccountUiContext = 下書き・編集・メニューの操作 + AccountContext /
-    │                               SessionAccountActions / SessionOwnPostActions) / AccountManager (アカウントごとの AccountUiContext と
+    │                               SessionAccountActions) / AccountManager (アカウントごとの AccountUiContext と
     │                               使っているアカウント) / AccountScope (切り替えで画面を作り直す + アカウントごとの ViewModelStore)
     ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
     │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド / PredictiveBackDamping = 予測型「戻る」の動きを抑える)
@@ -154,7 +154,7 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
   持つのが `data/account/AccountContext` (`key`・`session`・専用のキャッシュの DB・アカウントごとの設定 `settings`・`scope`・
   `close()` = DB を閉じる)。`InstanceRepository` / `EmojiRepository` (サーバ単位・トークン無し) と `MastodonApi` はアプリ全体で共有。
 * UI 側の 1 アカウント分は `ui/account/AccountUiContext`: `account` (上の `AccountContext`)・`draftStore` / `panelDraftStore` /
-  `postEditStore`・`accountActions` / `ownPostActions` (`SessionAccountActions` / `SessionOwnPostActions`)・`composerSession(...)`
+  `postEditStore` (ポストのメニューの編集・削除の口 `OwnPostActions` も兼ねる)・`accountActions` (`SessionAccountActions`)・`composerSession(...)`
   (投稿欄を作る)・`close()` (下書き・編集を止め、`AccountContext` も閉じる)・`closed` (閉じられたか。`AccountScope` の外で持つ共有の画面が見る)。`AccountContext` は data 層なので UI のものはこちらに分けている。
 * アカウントの保存は `AccountStore` (`data/account/`): SecureStorage の 1 項目 (`accounts`) に `StoredAccount` の一覧 (キー・サーバ・
   トークン・クライアント・`accountId`・表示用の情報 `StoredProfile`) と使っているアカウントのキー。`AccountKey` は端末で振る UUID
@@ -166,7 +166,7 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
 * **`AccountManager`** (`ui/account/`、`AppContainer.accountManager`) が `AccountKey → AccountUiContext` を持つ: 使うアカウントになったときに
   作り、**切り替えても閉じずにログアウトまで持つ** (下書きが切り替えて戻っても残る。使っていないアカウントは画面が無いので通信しない。
   ログインし直しでトークンが変わったら作り直すので、下書きはそこで消える)。
-  `active` (`StateFlow<ActiveAccount?>`: `context` と、そのキーの依存を作り直した回数 `generation`)・`switchTo(key)`・`logoutActive()`。
+  `active` (`StateFlow<ActiveAccount?>`: `context` と、そのキーの依存を作り直した回数 `generation`)・`switchTo(key)`・`logout(key)`。
   `AccountStore.state` を見て、一覧から消えた・トークンが変わったキーの依存を `close()` し (新しいものを開く前に閉じる = 同じキーの DB
   を 2 つ開かない)、消えたキーはファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時には一覧に無い
   アカウントのファイルを消す。
@@ -792,9 +792,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * **自分のポストの編集・削除**: ポストのメニュー (`PostMenu`) は、自分のポスト (`AccountActions.myAccountId` = `fetchMe` の ID、
     まだなら関係の読み込みの `AccountMenuTarget.Me`) なら、**どの画面 (タイムライン・プロフィール・ハッシュタグ・通知・詳細) でも**
     編集 / error 色の削除 + ブラウザで開く・本文をコピーを出す。口は `LocalOwnPostActions` (`ui/component/post/OwnPostActions.kt`、
-    `QuasarNavHost` が `AccountUiContext.ownPostActions` = `SessionOwnPostActions` を提供。無い所では出さない。ギャラリーは押すと Toast を出すだけの `GalleryOwnPostActions`)。中身はアカウントごとに 1 つの
+    `QuasarNavHost` が `AccountUiContext.postEditStore` (`PostEditStore` が実装) を提供。無い所では出さない。ギャラリーは押すと Toast を出すだけの `GalleryOwnPostActions`)。中身はアカウントごとに 1 つの
     `PostEditStore` (`AccountUiContext.postEditStore`、`ui/composer/`)。準備・削除の最中は︙が読み込み中になる。
-    * 編集: `PostEditStore.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AccountUiContext.composerSession`)
+    * 編集: `PostEditStore.edit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AccountUiContext.composerSession`)
       を作る。**`DraftStore` の下書きとは別**で、`QuasarNavHost` が全画面の上に `PostEditorHost` で `ComposerScreen` を下から重ねる。中身は純粋関数 `editDraftOf`
       (`PostEditTest`): 添付は投稿済みのメディアを Uploaded 扱い、投票の期間は残り時間に最も近い選択肢 (編集で数え直しになる)。
       公開範囲は変えられない (`Composer(visibilityEditable = false)`)。送信は Save (`toEditFormParams`、`DraftMappersTest`)、
@@ -849,9 +849,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     使うアカウントにする。アカウントの追加と同じく、認可を終えたアカウントを出す)。
   * **読み込みの失敗が 401 / 403 なら「ログインし直す」のボタン** (`Navigator.openRelogin` → `Route.Relogin`): 失敗は文字列ではなく
     `LoadError` (`ui/feed/LoadError.kt`。`toLoadError()` で `MastodonApiException` の 401 / 403 を `needsLogin` にし、文言はサーバの
-    `error` の文 (`userMessage`)、`LoadErrorTest`) で持ち、一覧が空のときの表示 (`ListStatus(needsLogin)`・タイムラインのカラム) と
-    詳細画面の全面の表示 (`DetailMessage(needsLogin)`)・共有された URL を開く画面 (`OpenLinkState.Failed`) が文言の下にボタンを出す
-    (`LoadErrorMessage`)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
+    `error` の文 (`userMessage`)、`LoadErrorTest`) で持ち、一覧が空のときの表示 (`ListStatus`・タイムラインのカラム) と
+    詳細画面の全面の表示 (`DetailMessage`)・共有された URL を開く画面 (`OpenLinkState.Failed`) が文言の下にボタンを出す
+    (`LoadErrorMessage`。どれも `LoadError` と文言の書式を受け、文言の組み立て・ボタンを出すかはその中で決める)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
     今までどおり再接続を続ける (ボタンは出さない)。
   * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻ると進行中の
     認可待ちもやめる)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
@@ -863,8 +863,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     以前の 1 つのセッションの保存 (`secure` の `session`、さらに前の平文の SharedPreferences `session`) は、最初の起動で使っている
     1 つ目のアカウントに移して消す (`AccountStore.load`。トークンの無い保存 = 最初期の未ログインでの利用の名残はログアウト状態。
     平文の頃のトークンはクライアント情報が無いのでログアウト時に無効化できない)。
-  * ログアウト: 設定画面のトップの末尾 (error 色、補足に `@acct@host`)。対象は使っているアカウント。**設定に関わらず必ず**
-    `ConfirmDialog` で確認してから `AccountManager.logoutActive` → `OAuthLogin.logout(key)` (一覧から除いてから `POST /oauth/revoke`。
+  * ログアウト: 設定画面のトップの末尾 (error 色、補足に `@acct@host`)。対象はその画面のアカウント (= 使っているアカウント)。**設定に関わらず必ず**
+    `ConfirmDialog` で確認してから `AccountManager.logout(key)` → `OAuthLogin.logout(key)` (一覧から除いてから `POST /oauth/revoke`。
     失敗はログのみ)。残りのアカウントがあればその先頭に切り替わり、無ければログインの画面。そのアカウントのキャッシュ・
     アカウントごとの設定のファイルは `AccountManager` が閉じてから消す。端末共通の設定は残る。
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global (常に 4 つ)。

@@ -3,6 +3,7 @@ package es.aria_on_the_planet.quasar.ui.composer
 import android.util.Log
 import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.ui.component.post.OwnPostActions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +28,8 @@ sealed interface PostEditFailure {
 /**
  * 自分のポストの編集・削除をアカウントごとに 1 つ持つ (`AccountUiContext.postEditStore`)。どの画面のポストのメニューからでも同じ流れになるよう、
  * 編集の投稿欄 ([editor]) は画面ではなくここが持ち、`QuasarNavHost` が全画面の上に重ねて出す ([PostEditorHost])。
- * 書きかけの投稿 ([DraftStore]) とは別。プロセスが終わると消える。
+ * 書きかけの投稿 ([DraftStore]) とは別。プロセスが終わると消える。ポストのメニューの口 ([OwnPostActions]) もこれで、
+ * `QuasarNavHost` が提供する。
  *
  * 保存・削除の結果は `StatusRepository.postChanges` に流れ、各画面の一覧はそれで差し替える・除く。
  *
@@ -36,7 +38,7 @@ sealed interface PostEditFailure {
 class PostEditStore(
     private val statusRepository: StatusRepository,
     private val create: (CoroutineScope, EditTarget, (Post) -> Unit) -> ComposerSession,
-) {
+) : OwnPostActions {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val _editor = MutableStateFlow<ComposerSession?>(null)
@@ -47,13 +49,13 @@ class PostEditStore(
     private val _busyStatusId = MutableStateFlow<String?>(null)
 
     /** 編集の準備 (原文の取得)・削除の最中のポスト。その間は次の操作を受けない。 */
-    val busyStatusId: StateFlow<String?> = _busyStatusId.asStateFlow()
+    override val busyStatusId: StateFlow<String?> = _busyStatusId.asStateFlow()
 
     private val _failures = MutableSharedFlow<PostEditFailure>(extraBufferCapacity = 8)
     val failures: SharedFlow<PostEditFailure> = _failures.asSharedFlow()
 
     /** [post] (自分のポスト) の編集を始める。原文 (HTML ではない本文) を取ってから投稿欄を開く。 */
-    fun startEdit(post: Post) {
+    override fun edit(post: Post) {
         if (_busyStatusId.value != null || _editor.value != null) return
         _busyStatusId.value = post.statusId
         scope.launch {
@@ -90,7 +92,7 @@ class PostEditStore(
     }
 
     /** [post] (自分のポスト) を削除する。確認は呼び出し側で済ませてから呼ぶ。 */
-    fun delete(post: Post) {
+    override fun delete(post: Post) {
         if (_busyStatusId.value != null) return
         _busyStatusId.value = post.statusId
         scope.launch {

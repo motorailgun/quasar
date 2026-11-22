@@ -31,7 +31,6 @@ import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
 import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
 import es.aria_on_the_planet.quasar.data.account.AccountContext
-import es.aria_on_the_planet.quasar.data.account.AccountKey
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
@@ -119,24 +118,23 @@ fun QuasarNavHost(
     externalLinks: Flow<String> = emptyFlow(),
     onExit: () -> Unit,
 ) {
-    val current = account
-    val backStack = rememberNavBackStack(if (current == null) Route.Login else Route.Timeline)
+    val backStack = rememberNavBackStack(if (account == null) Route.Login else Route.Timeline)
 
     // ログアウト中はログインの画面だけ (復元した状態が別の形でも直す)
-    LaunchedEffect(current) {
-        if (current == null && backStack.toList() != listOf(Route.Login)) backStack.resetTo(Route.Login)
+    LaunchedEffect(account) {
+        if (account == null && backStack.toList() != listOf(Route.Login)) backStack.resetTo(Route.Login)
     }
-    LaunchedEffect(current) {
-        if (current != null) {
-            current.draftStore.open()
-            current.panelDraftStore.open()
+    LaunchedEffect(account) {
+        if (account != null) {
+            account.draftStore.open()
+            account.panelDraftStore.open()
         }
     }
 
     val context = LocalContext.current
     LaunchedEffect(externalLinks) {
         externalLinks.collect { query ->
-            if (current == null) {
+            if (account == null) {
                 Toast.makeText(context, R.string.open_link_not_logged_in, Toast.LENGTH_SHORT).show()
             } else {
                 // タグのページは検索では引けないので URL から直接開く。同じものを続けて共有されたら積まない
@@ -165,9 +163,9 @@ fun QuasarNavHost(
     CompositionLocalProvider(
         LocalNavigator provides navigator,
         // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
-        LocalAccountActions provides current?.accountActions,
+        LocalAccountActions provides account?.accountActions,
         // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
-        LocalOwnPostActions provides current?.ownPostActions,
+        LocalOwnPostActions provides account?.postEditStore,
         LocalPostTranslations provides container.postTranslations,
         LocalFloatingPanelInset provides panel.coveredWidth,
     ) {
@@ -190,12 +188,12 @@ fun QuasarNavHost(
                 entryProvider = entryProvider {
                     entry<Route.Login> {
                         // ログイン中なら追加のログイン (戻るボタンで今のアカウントに戻る)
-                        LoginScreen(container.oauthLogin, onBack = if (current != null) navigator::back else null)
+                        LoginScreen(container.oauthLogin, onBack = if (account != null) navigator::back else null)
                     }
                     entry<Route.Relogin> {
-                        WithSession(current) { account ->
+                        WithSession(account) { ui ->
                             val stored by container.accountStore.state.collectAsStateWithLifecycle()
-                            val target = stored.find(account.account.key)
+                            val target = stored.find(ui.account.key)
                             LoginScreen(
                                 container.oauthLogin,
                                 onBack = navigator::back,
@@ -204,38 +202,38 @@ fun QuasarNavHost(
                         }
                     }
                     entry<Route.Timeline> {
-                        WithSession(current) { TimelineEntry(container, it, onAddAccount = { backStack.add(Route.Login) }) }
+                        WithSession(account) { TimelineEntry(container, it, onAddAccount = { backStack.add(Route.Login) }) }
                     }
-                    entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
-                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(it, key, navigator) } }
-                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(it, key, navigator) } }
+                    entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { ProfileEntry(container, it, key, navigator) } }
+                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { FollowListEntry(it, key, navigator) } }
+                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { HashtagEntry(it, key, navigator) } }
                     entry<Route.PersonalPosts>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { PersonalPostsEntry(it, key, navigator) }
+                        WithSession(account) { PersonalPostsEntry(it, key, navigator) }
                     }
                     entry<Route.Search>(metadata = DetailPanelSceneStrategy.panel()) {
-                        WithSession(current) { SearchEntry(it, navigator) }
+                        WithSession(account) { SearchEntry(it, navigator) }
                     }
                     entry<Route.FollowRequests>(metadata = DetailPanelSceneStrategy.panel()) {
-                        WithSession(current) { FollowRequestsEntry(it, navigator) }
+                        WithSession(account) { FollowRequestsEntry(it, navigator) }
                     }
                     entry<Route.AccountReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { AccountReactionsEntry(it, key, navigator) }
+                        WithSession(account) { AccountReactionsEntry(it, key, navigator) }
                     }
                     entry<Route.PostReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { PostReactionsEntry(it, key, navigator) }
+                        WithSession(account) { PostReactionsEntry(it, key, navigator) }
                     }
-                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { PostEntry(it, key, navigator) } }
+                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { PostEntry(it, key, navigator) } }
                     entry<Route.OpenLink>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { account ->
-                            OpenLinkEntry(account, key, navigator) { backStack.replace(key, it) }
+                        WithSession(account) { ui ->
+                            OpenLinkEntry(ui, key, navigator) { backStack.replace(key, it) }
                         }
                     }
-                    entry<Route.Composer> { key -> WithSession(current) { ComposerEntry(it, key, navigator) } }
+                    entry<Route.Composer> { key -> WithSession(account) { ComposerEntry(it, key, navigator) } }
                     mediaViewerEntry(container, onBack = navigator::back)
-                    settingsEntries(container, navigator) { backStack.add(it) }
+                    settingsEntries(container, account, navigator) { backStack.add(it) }
                 },
             )
-            current?.let { PostEditorHost(it.postEditStore) }
+            account?.let { PostEditorHost(it.postEditStore) }
         }
     }
 }
@@ -351,8 +349,8 @@ private fun TimelineEntry(container: AppContainer, account: AccountUiContext, on
     val accountManager = container.accountManager
     val switcher = remember(stored, account) {
         stored.toDrawerAccounts(
-            currentKey = account.account.key.value,
-            onSwitch = { key -> accountManager.switchTo(AccountKey(key)) },
+            currentKey = account.account.key,
+            onSwitch = accountManager::switchTo,
             onAdd = onAddAccount,
         )
     }
@@ -618,20 +616,25 @@ private fun ComposerEntry(account: AccountUiContext, key: Route.Composer, naviga
     }
 }
 
-/** 設定のページ。「アカウントの設定」のページは使っているアカウントの設定を、それ以外は端末共通の設定を読み書きする。 */
+/**
+ * 設定のページ。「アカウントの設定」のページは [account] (この NavHost のアカウント) の設定を、それ以外は端末共通の設定を
+ * 読み書きする。
+ */
 private fun EntryProviderScope<NavKey>.settingsEntries(
     container: AppContainer,
+    account: AccountUiContext?,
     navigator: Navigator,
     navigate: (Route) -> Unit,
 ) {
     val update = container.deviceSettings::launchUpdate
     entry<Route.Settings> {
-        val stored by container.accountStore.active.collectAsStateWithLifecycle()
+        // 表示用の情報は fetchMe で変わるので一覧から引く
+        val stored by container.accountStore.state.collectAsStateWithLifecycle()
         SettingsTopPage(
-            account = stored?.label,
+            account = account?.let { stored.find(it.account.key)?.label },
             translationAvailable = container.postTranslations != null,
             onNavigate = navigate,
-            onLogout = container.accountManager::logoutActive,
+            onLogout = { account?.let { container.accountManager.logout(it.account.key) } },
             onRelogin = { navigate(Route.Relogin) },
             onBack = navigator::back,
         )
@@ -643,7 +646,7 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         WithDeviceSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
     }
     entry<Route.SettingsTimelines> {
-        WithAccountSettings(container) { settings, updateAccount ->
+        WithAccountSettings(account) { settings, updateAccount ->
             TimelineSettingsPage(settings, updateAccount, onBack = navigator::back)
         }
     }
@@ -651,7 +654,7 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         WithDeviceSettings(container) { PostMenuSettingsPage(it.hiddenPostMenuItems, update, onBack = navigator::back) }
     }
     entry<Route.SettingsPosting> {
-        WithAccountSettings(container) { settings, updateAccount ->
+        WithAccountSettings(account) { settings, updateAccount ->
             PostingSettingsPage(settings, updateAccount, onBack = navigator::back)
         }
     }
@@ -686,16 +689,15 @@ private fun WithDeviceSettings(container: AppContainer, content: @Composable (De
 }
 
 /**
- * 使っているアカウントの設定と、それを変える関数で [content] を描く ([WithDeviceSettings] と同じくエントリの中で読む)。
+ * [account] の設定と、それを変える関数で [content] を描く ([WithDeviceSettings] と同じくエントリの中で読む)。
  * ログアウト中・読み込み前は何も出さない。
  */
 @Composable
 private fun WithAccountSettings(
-    container: AppContainer,
+    account: AccountUiContext?,
     content: @Composable (AccountSettings, UpdateAccountSettings) -> Unit,
 ) {
-    val active by container.accountManager.active.collectAsStateWithLifecycle()
-    val store = active?.context?.account?.settings ?: return
+    val store = account?.account?.settings ?: return
     val settings by store.settings.collectAsStateWithLifecycle()
     settings?.let { content(it, store::launchUpdate) }
 }

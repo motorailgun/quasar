@@ -264,9 +264,9 @@ private fun HashtagResults(
 private fun SearchStatus(feed: FeedState<*>) {
     ListStatus(
         loading = !feed.loaded || feed.isRefreshing,
-        error = feed.error?.let { stringResource(R.string.search_error, it.message) },
+        error = feed.error,
+        errorFormat = R.string.search_error,
         empty = stringResource(R.string.search_empty),
-        needsLogin = feed.error?.needsLogin == true,
     )
 }
 

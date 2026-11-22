@@ -65,8 +65,7 @@ fun OpenLinkScreen(
             when (val s = state) {
                 OpenLinkState.Loading, is OpenLinkState.Resolved -> LoadingIndicator()
                 OpenLinkState.NotFound -> Message(stringResource(R.string.open_link_not_found))
-                is OpenLinkState.Failed ->
-                    LoadErrorMessage(stringResource(R.string.open_link_failed, s.error.message), needsLogin = s.error.needsLogin)
+                is OpenLinkState.Failed -> LoadErrorMessage(s.error, R.string.open_link_failed)
             }
             Text(
                 viewModel.query,

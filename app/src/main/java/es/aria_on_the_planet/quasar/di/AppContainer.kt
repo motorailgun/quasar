@@ -134,20 +134,19 @@ class AppContainer(context: Context) {
      *
      * @param migrateLegacySettings 分ける前の設定のアカウントごとの項目を移すか ([accountSettingsStore])。
      */
-    fun createAccount(key: AccountKey, session: Session, migrateLegacySettings: Boolean = false): AccountUiContext =
-        AccountUiContext(
-            AccountContext(
-                key = key,
-                session = session,
-                database = CacheDatabase.create(appContext, key.value),
-                settings = accountSettingsStore(key, migrateLegacySettings),
-                api = api,
-                okHttpClient = okHttpClient,
-                json = json,
-                instanceRepository = instanceRepository,
-            ),
-            createComposer = ::composerSession,
+    fun createAccount(key: AccountKey, session: Session, migrateLegacySettings: Boolean = false): AccountUiContext {
+        val account = AccountContext(
+            key = key,
+            session = session,
+            database = CacheDatabase.create(appContext, key.value),
+            settings = accountSettingsStore(key, migrateLegacySettings),
+            api = api,
+            okHttpClient = okHttpClient,
+            json = json,
+            instanceRepository = instanceRepository,
         )
+        return AccountUiContext(account) { scope, editing, onPublished -> composerSession(account, scope, editing, onPublished) }
+    }
 
     /**
      * アカウント [key] のファイル (キャッシュの DB・設定) を消す。ログアウトで、そのアカウントの [AccountContext] を閉じた後に呼ぶ。
@@ -200,7 +199,7 @@ class AppContainer(context: Context) {
         store = accountStore,
         open = ::openStoredAccount,
         deleteData = ::deleteAccountData,
-        logout = oauthLogin::logout,
+        logoutAccount = oauthLogin::logout,
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
     )
 

@@ -38,11 +38,6 @@ class AccountStore(
     /** 全体 (一覧 + 使っているアカウント)。 */
     val state: StateFlow<StoredAccounts> = _state.asStateFlow()
 
-    private val _active = MutableStateFlow(_state.value.active)
-
-    /** 使っているアカウント (ログアウト中は `null`)。表示用の情報が変わったときも流れる。 */
-    val active: StateFlow<StoredAccount?> = _active.asStateFlow()
-
     /** ログインできたアカウントを足して (同じアカウントならトークンを差し替えて) 使うアカウントにする。 */
     fun addLogin(
         serverUrl: String,
@@ -97,7 +92,6 @@ class AccountStore(
     private fun save(accounts: StoredAccounts) {
         storage.put(AccountsKey, json.encodeToString(StoredAccounts.serializer(), accounts))
         _state.value = accounts
-        _active.value = accounts.active
     }
 
     /**

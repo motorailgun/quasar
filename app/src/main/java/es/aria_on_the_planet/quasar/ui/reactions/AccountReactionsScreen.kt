@@ -105,9 +105,9 @@ fun AccountReactionsContent(
                     item(key = "status", contentType = "status") {
                         ListStatus(
                             loading = !state.loaded || state.isRefreshing,
-                            error = state.error?.let { stringResource(R.string.hashtag_error, it.message) },
+                            error = state.error,
+                            errorFormat = R.string.hashtag_error,
                             empty = stringResource(R.string.account_reactions_empty),
-                            needsLogin = state.error?.needsLogin == true,
                         )
                     }
                 }

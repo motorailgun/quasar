@@ -36,8 +36,8 @@ internal fun AccountSwitcherGallery(accounts: List<StoredAccount>, onBack: () ->
     val context = LocalContext.current
     var count by remember { mutableIntStateOf(AccountCounts.last()) }
     val shown = accounts.take(count)
-    var currentKey by remember { mutableStateOf(accounts.first().key.value) }
-    val current = currentKey.takeIf { key -> shown.any { it.key.value == key } } ?: shown.first().key.value
+    var currentKey by remember { mutableStateOf(accounts.first().key) }
+    val current = currentKey.takeIf { key -> shown.any { it.key == key } } ?: shown.first().key
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     val drawerAccounts = StoredAccounts(shown).toDrawerAccounts(
         currentKey = current,

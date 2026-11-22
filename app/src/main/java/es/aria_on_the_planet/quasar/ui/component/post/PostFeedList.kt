@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import es.aria_on_the_planet.quasar.ui.component.list.ListStatus
 import es.aria_on_the_planet.quasar.ui.feed.PostFeedState
 
@@ -48,9 +47,9 @@ fun PostFeedList(
                 item(key = "feed_status", contentType = "status") {
                     ListStatus(
                         loading = !feed.loaded || feed.isRefreshing,
-                        error = feed.error?.let { stringResource(errorFormat, it.message) },
+                        error = feed.error,
+                        errorFormat = errorFormat,
                         empty = empty,
-                        needsLogin = feed.error?.needsLogin == true,
                     )
                 }
             }

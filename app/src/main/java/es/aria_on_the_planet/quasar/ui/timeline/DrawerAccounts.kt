@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.data.account.AccountKey
 import es.aria_on_the_planet.quasar.data.account.StoredAccount
 import es.aria_on_the_planet.quasar.data.account.StoredAccounts
 import es.aria_on_the_planet.quasar.data.account.customEmoji
@@ -49,15 +50,15 @@ import es.aria_on_the_planet.quasar.ui.component.user.UserName
 import es.aria_on_the_planet.quasar.ui.component.user.avatarShape
 
 /**
- * ドロワーのアカウントの切り替え: [current] は使っているアカウント、[others] はそれ以外 (保存している順)。[onSwitch] はキー
- * (`AccountKey` の値) で切り替える、[onAdd] はアカウントの追加 (ログインの画面を開く)。どれも保存している表示用の情報
+ * ドロワーのアカウントの切り替え: [current] は使っているアカウント、[others] はそれ以外 (保存している順)。[onSwitch] はキーで
+ * 切り替える、[onAdd] はアカウントの追加 (ログインの画面を開く)。どれも保存している表示用の情報
  * (`StoredProfile`) で描く (通信しない)。
  */
 @Immutable
 data class DrawerAccounts(
     val current: DrawerAccount,
     val others: List<DrawerAccount>,
-    val onSwitch: (String) -> Unit,
+    val onSwitch: (AccountKey) -> Unit,
     val onAdd: () -> Unit,
 )
 
@@ -66,14 +67,14 @@ data class DrawerAccounts(
  * アイコンとサーバ名で出す)、[label] は `@user@host` (無ければサーバのホスト)。
  */
 @Immutable
-data class DrawerAccount(val key: String, val user: User?, val label: String)
+data class DrawerAccount(val key: AccountKey, val user: User?, val label: String)
 
 /** 保存しているアカウントの一覧から、[currentKey] を使っているアカウントとしたドロワーの切り替え。一覧に無ければ `null`。 */
-fun StoredAccounts.toDrawerAccounts(currentKey: String, onSwitch: (String) -> Unit, onAdd: () -> Unit): DrawerAccounts? {
-    val current = accounts.firstOrNull { it.key.value == currentKey } ?: return null
+fun StoredAccounts.toDrawerAccounts(currentKey: AccountKey, onSwitch: (AccountKey) -> Unit, onAdd: () -> Unit): DrawerAccounts? {
+    val current = find(currentKey) ?: return null
     return DrawerAccounts(
         current = current.toDrawerAccount(),
-        others = accounts.filter { it.key.value != currentKey }.map { it.toDrawerAccount() },
+        others = accounts.filter { it.key != currentKey }.map { it.toDrawerAccount() },
         onSwitch = onSwitch,
         onAdd = onAdd,
     )
@@ -81,7 +82,7 @@ fun StoredAccounts.toDrawerAccounts(currentKey: String, onSwitch: (String) -> Un
 
 /** 表示用の情報 (と ID) が揃っていなければ [DrawerAccount.user] は `null` (以前の保存から移した直後のアカウント)。 */
 fun StoredAccount.toDrawerAccount(): DrawerAccount = DrawerAccount(
-    key = key.value,
+    key = key,
     user = profile?.let { profile ->
         val id = accountId ?: return@let null
         User(
@@ -93,6 +94,7 @@ fun StoredAccount.toDrawerAccount(): DrawerAccount = DrawerAccount(
             note = "",
             emojis = profile.emojis.map { it.customEmoji },
             iconStaticUrl = profile.avatarStaticUrl,
+            bot = profile.bot,
         )
     },
     label = label,

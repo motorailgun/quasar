@@ -48,6 +48,8 @@ data class StoredProfile(
     val avatarUrl: String,
     val avatarStaticUrl: String,
     val emojis: List<StoredEmoji> = emptyList(),
+    /** ボットのアカウントか (名前の横の印。足す前の保存は次の `fetchMe` で埋まる)。 */
+    val bot: Boolean = false,
 )
 
 @Serializable
@@ -60,6 +62,7 @@ fun StoredProfile(user: User): StoredProfile = StoredProfile(
     avatarUrl = user.iconUrl,
     avatarStaticUrl = user.iconStaticUrl,
     emojis = user.emojis.map { StoredEmoji(it.shortcode, it.url, it.staticUrl) },
+    bot = user.bot,
 )
 
 val StoredEmoji.customEmoji: CustomEmoji get() = CustomEmoji(shortcode, url, staticUrl)

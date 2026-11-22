@@ -148,9 +148,7 @@ fun PostScreen(
                 },
             ) {
                 when {
-                    thread == null && state.error != null -> state.error!!.let { error ->
-                        DetailMessage(stringResource(R.string.post_error, error.message), needsLogin = error.needsLogin)
-                    }
+                    thread == null && state.error != null -> DetailMessage(state.error!!, R.string.post_error)
                     thread == null -> DetailLoading()
                     else -> {
                         val lineColor = MaterialTheme.colorScheme.outlineVariant
@@ -198,6 +196,7 @@ fun PostScreen(
                                         // キャッシュの本体を出してスレッドを取っている間
                                         loading = state.isLoading,
                                         error = null,
+                                        errorFormat = R.string.post_error,
                                         empty = stringResource(R.string.post_no_replies),
                                     )
                                 }

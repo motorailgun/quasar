@@ -1,9 +1,9 @@
 [
  {
-  "id": "1049",
-  "url": "https://gallery.invalid/@bob/1049",
-  "uri": "https://gallery.invalid/users/bob/statuses/1049",
-  "created_at": "2025-12-31T23:11:00.000Z",
+  "id": "1051",
+  "url": "https://gallery.invalid/@bob/1051",
+  "uri": "https://gallery.invalid/users/bob/statuses/1051",
+  "created_at": "2025-12-31T23:09:00.000Z",
   "account": {
    "id": "2",
    "username": "bob",
@@ -47,15 +47,15 @@
     "category": null
    }
   ],
-  "replies_count": 1,
-  "reblogs_count": 4,
-  "favourites_count": 0
+  "replies_count": 0,
+  "reblogs_count": 1,
+  "favourites_count": 2
  },
  {
-  "id": "1050",
-  "url": "https://gallery.invalid/@alice/1050",
-  "uri": "https://gallery.invalid/users/alice/statuses/1050",
-  "created_at": "2025-12-31T23:10:00.000Z",
+  "id": "1052",
+  "url": "https://gallery.invalid/@alice/1052",
+  "uri": "https://gallery.invalid/users/alice/statuses/1052",
+  "created_at": "2025-12-31T23:08:00.000Z",
   "account": {
    "id": "1",
    "username": "alice",
@@ -84,15 +84,15 @@
     "category": null
    }
   ],
-  "replies_count": 2,
-  "reblogs_count": 0,
-  "favourites_count": 1
+  "replies_count": 1,
+  "reblogs_count": 2,
+  "favourites_count": 3
  },
  {
-  "id": "1051",
-  "url": "https://gallery.invalid/@carol/1051",
-  "uri": "https://gallery.invalid/users/carol/statuses/1051",
-  "created_at": "2025-12-31T23:09:00.000Z",
+  "id": "1053",
+  "url": "https://gallery.invalid/@carol/1053",
+  "uri": "https://gallery.invalid/users/carol/statuses/1053",
+  "created_at": "2025-12-31T23:07:00.000Z",
   "account": {
    "id": "3",
    "username": "carol",
@@ -121,15 +121,15 @@
   "content": "<p>Read the docs at <a href=\"https://docs.gallery.invalid/methods/statuses/#create\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">docs.gallery.invalid/methods/s</span><span class=\"invisible\">tatuses/#create</span></a> before opening an issue, please.</p>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 0,
-  "reblogs_count": 1,
-  "favourites_count": 2
+  "replies_count": 2,
+  "reblogs_count": 3,
+  "favourites_count": 4
  },
  {
-  "id": "1052",
-  "url": "https://gallery.invalid/@bob/1052",
-  "uri": "https://gallery.invalid/users/bob/statuses/1052",
-  "created_at": "2025-12-31T23:08:00.000Z",
+  "id": "1054",
+  "url": "https://gallery.invalid/@bob/1054",
+  "uri": "https://gallery.invalid/users/bob/statuses/1054",
+  "created_at": "2025-12-31T23:06:00.000Z",
   "account": {
    "id": "2",
    "username": "bob",
@@ -173,15 +173,15 @@
     "category": null
    }
   ],
-  "replies_count": 1,
-  "reblogs_count": 2,
-  "favourites_count": 3
+  "replies_count": 0,
+  "reblogs_count": 4,
+  "favourites_count": 5
  },
  {
-  "id": "1053",
-  "url": "https://gallery.invalid/@alice/1053",
-  "uri": "https://gallery.invalid/users/alice/statuses/1053",
-  "created_at": "2025-12-31T23:07:00.000Z",
+  "id": "1055",
+  "url": "https://gallery.invalid/@alice/1055",
+  "uri": "https://gallery.invalid/users/alice/statuses/1055",
+  "created_at": "2025-12-31T23:05:00.000Z",
   "account": {
    "id": "1",
    "username": "alice",
@@ -210,15 +210,15 @@
     "category": null
    }
   ],
-  "replies_count": 2,
-  "reblogs_count": 3,
-  "favourites_count": 4
+  "replies_count": 1,
+  "reblogs_count": 0,
+  "favourites_count": 6
  },
  {
-  "id": "1054",
-  "url": "https://remote.invalid/@dave/1054",
-  "uri": "https://remote.invalid/users/dave/statuses/1054",
-  "created_at": "2025-12-31T23:06:00.000Z",
+  "id": "1056",
+  "url": "https://remote.invalid/@dave/1056",
+  "uri": "https://remote.invalid/users/dave/statuses/1056",
+  "created_at": "2025-12-31T23:04:00.000Z",
   "account": {
    "id": "4",
    "username": "dave",
@@ -247,15 +247,15 @@
     "category": null
    }
   ],
-  "replies_count": 0,
-  "reblogs_count": 4,
-  "favourites_count": 5
+  "replies_count": 2,
+  "reblogs_count": 1,
+  "favourites_count": 0
  },
  {
-  "id": "1055",
-  "url": "https://gallery.invalid/@carol/1055",
-  "uri": "https://gallery.invalid/users/carol/statuses/1055",
-  "created_at": "2025-12-31T23:05:00.000Z",
+  "id": "1057",
+  "url": "https://gallery.invalid/@carol/1057",
+  "uri": "https://gallery.invalid/users/carol/statuses/1057",
+  "created_at": "2025-12-31T23:03:00.000Z",
   "account": {
    "id": "3",
    "username": "carol",
@@ -284,15 +284,15 @@
   "content": "<blockquote><p>設定は変えなくていい</p></blockquote><p>って書いてあったけど、実際は <code>max_id</code> を指定しないと 2 ページ目が取れなかった…</p><pre><code>GET /api/v1/timelines/home?max_id=123</code></pre>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 1,
-  "reblogs_count": 0,
-  "favourites_count": 6
+  "replies_count": 0,
+  "reblogs_count": 2,
+  "favourites_count": 1
  },
  {
-  "id": "1056",
-  "url": "https://remote.invalid/@dave/1056",
-  "uri": "https://remote.invalid/users/dave/statuses/1056",
-  "created_at": "2025-12-31T23:04:00.000Z",
+  "id": "1058",
+  "url": "https://remote.invalid/@dave/1058",
+  "uri": "https://remote.invalid/users/dave/statuses/1058",
+  "created_at": "2025-12-31T23:02:00.000Z",
   "account": {
    "id": "4",
    "username": "dave",
@@ -313,15 +313,15 @@
   "content": "<p class=\"quote-inline\">RE: <a href=\"https://gallery.invalid/@alice/1001\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"\">gallery.invalid/@alice/1001</span><span class=\"invisible\"></span></a></p><p>Totally agree, see <a href=\"https://remote.invalid/notes/abc\" rel=\"nofollow noopener\">this note</a> too</p>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 2,
-  "reblogs_count": 1,
-  "favourites_count": 0
+  "replies_count": 1,
+  "reblogs_count": 3,
+  "favourites_count": 2
  },
  {
-  "id": "1057",
-  "url": "https://gallery.invalid/@alice/1057",
-  "uri": "https://gallery.invalid/users/alice/statuses/1057",
-  "created_at": "2025-12-31T23:03:00.000Z",
+  "id": "1059",
+  "url": "https://gallery.invalid/@alice/1059",
+  "uri": "https://gallery.invalid/users/alice/statuses/1059",
+  "created_at": "2025-12-31T23:01:00.000Z",
   "account": {
    "id": "1",
    "username": "alice",
@@ -342,15 +342,15 @@
   "content": "<p>lol same</p>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 0,
-  "reblogs_count": 2,
-  "favourites_count": 1
+  "replies_count": 2,
+  "reblogs_count": 4,
+  "favourites_count": 3
  },
  {
-  "id": "1058",
-  "url": "https://gallery.invalid/@carol/1058",
-  "uri": "https://gallery.invalid/users/carol/statuses/1058",
-  "created_at": "2025-12-31T23:02:00.000Z",
+  "id": "1060",
+  "url": "https://gallery.invalid/@carol/1060",
+  "uri": "https://gallery.invalid/users/carol/statuses/1060",
+  "created_at": "2025-12-31T23:00:00.000Z",
   "account": {
    "id": "3",
    "username": "carol",
@@ -379,15 +379,15 @@
   "content": "<p>Bonjour <span class=\"h-card\" translate=\"no\"><a href=\"https://gallery.invalid/@alice\" class=\"u-url mention\">@<span>alice</span></a></span>, je teste la traduction sur l'appareil ce soir <a href=\"https://gallery.invalid/tags/quasar\" class=\"mention hashtag\" rel=\"tag\">#<span>quasar</span></a></p>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 1,
-  "reblogs_count": 3,
-  "favourites_count": 2
+  "replies_count": 0,
+  "reblogs_count": 0,
+  "favourites_count": 4
  },
  {
-  "id": "1059",
-  "url": "https://gallery.invalid/@bob/1059",
-  "uri": "https://gallery.invalid/users/bob/statuses/1059",
-  "created_at": "2025-12-31T23:01:00.000Z",
+  "id": "1061",
+  "url": "https://gallery.invalid/@bob/1061",
+  "uri": "https://gallery.invalid/users/bob/statuses/1061",
+  "created_at": "2025-12-31T22:59:00.000Z",
   "account": {
    "id": "2",
    "username": "bob",
@@ -423,15 +423,15 @@
   "content": "<p>今天的天气很好，我们一起去公园散步吧。</p>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 2,
-  "reblogs_count": 4,
-  "favourites_count": 3
+  "replies_count": 1,
+  "reblogs_count": 1,
+  "favourites_count": 5
  },
  {
-  "id": "1060",
-  "url": "https://remote.invalid/@dave/1060",
-  "uri": "https://remote.invalid/users/dave/statuses/1060",
-  "created_at": "2025-12-31T23:00:00.000Z",
+  "id": "1062",
+  "url": "https://remote.invalid/@dave/1062",
+  "uri": "https://remote.invalid/users/dave/statuses/1062",
+  "created_at": "2025-12-31T22:58:00.000Z",
   "account": {
    "id": "4",
    "username": "dave",
@@ -452,8 +452,8 @@
   "content": "<p>오늘 저녁에 같이 밥 먹을래요? 새로 생긴 식당이 있어요</p>",
   "visibility": "public",
   "emojis": [],
-  "replies_count": 0,
-  "reblogs_count": 0,
-  "favourites_count": 4
+  "replies_count": 2,
+  "reblogs_count": 2,
+  "favourites_count": 6
  }
 ]

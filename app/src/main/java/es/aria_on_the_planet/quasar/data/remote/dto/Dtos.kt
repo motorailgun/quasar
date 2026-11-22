@@ -316,6 +316,8 @@ data class ConversationDto(
 data class StatusDto(
     val id: String,
     @SerialName("created_at") val createdAt: String,
+    /** 最後に編集された日時。編集されていなければ `null`。 */
+    @SerialName("edited_at") val editedAt: String? = null,
     val account: AccountDto,
     /** ActivityPub の ID。 */
     val uri: String? = null,

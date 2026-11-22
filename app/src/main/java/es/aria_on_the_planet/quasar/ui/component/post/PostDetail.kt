@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
@@ -111,9 +113,10 @@ fun PostDetail(
         // ロケールや 12/24 時間設定の変更で再計算されるよう Configuration を読む
         LocalConfiguration.current
         val linkColor = MaterialTheme.colorScheme.primary
+        val edited = stringResource(R.string.post_edited)
         val time = formatDetailedTime(post.createdAt, is24Hour = DateFormat.is24HourFormat(context))
         Text(
-            // 日時 · 投稿に使ったアプリ (website があればリンク)
+            // 日時 · 投稿に使ったアプリ (website があればリンク) · 編集済み
             text = buildAnnotatedString {
                 append(time)
                 post.application?.let { app ->
@@ -125,6 +128,10 @@ fun PostDetail(
                     } else {
                         append(app.name)
                     }
+                }
+                if (post.editedAt != null) {
+                    append(" · ")
+                    append(edited)
                 }
             },
             style = MaterialTheme.typography.bodyMedium,

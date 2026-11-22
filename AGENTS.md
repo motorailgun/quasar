@@ -240,6 +240,7 @@ data class Post(
     val mentions: List<Mention>,   // mentions (id / username / acct / url)。返信の宛先・本文のメンションのタップに使う
     val tags: List<Hashtag>,       // tags (name / url)。本文のハッシュタグのタップに使う
     val language: String?,         // language (ISO 639)。翻訳の元の言語。無いことがある
+    val editedAt: Instant?,        // edited_at (最後に編集された日時)。編集されていなければ null
 )
 
 /** ログイン中ユーザーから見た状態。 */
@@ -783,6 +784,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     詳細日時は `yyyy MM/dd HH:mm:ss` (システム設定が 12 時間なら `yyyy MM/dd h:mm:ss a`)。
     日時の隣に投稿アプリ (`Status.application`) を「日時 · アプリ名」で出し、`website` があればリンクにする。
     application は他サーバからのポストでは返らないため、表示されるのは主にローカルユーザーのポスト。
+    編集されたポスト (`Post.editedAt`) はさらに「 · Edited」(編集済み) を続ける (アプリが無ければ日時の直後)。
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。

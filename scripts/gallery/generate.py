@@ -322,6 +322,10 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(alice, p("閲覧注意の添付 (ぼかし)"), sensitive=True,
                 media_attachments=[mediaj(10, stripes), mediaj(11, tall, 600, 900)]),
         st.make(bob, p("CW 付き"), spoiler_text="ネタバレ注意"),
+        # 編集済み (ポスト詳細の日時の行に「· Edited」)。アプリ付きと無し
+        st.make(alice, p("編集した投稿 (アプリ付き)"), edited_at="2026-01-02T00:00:00.000Z",
+                application={"name": "Quasar", "website": None}),
+        st.make(bob, p("編集した投稿"), edited_at="2026-01-02T00:00:00.000Z"),
         # 長文 (折りたたみ) + 添付。メニューの上の表示 (6 行で切る) の確認にも使う
         st.make(carol, "".join(p(f"長文の {i + 1} 行目") for i in range(10)),
                 media_attachments=[mediaj(20, media[0]), mediaj(21, media[2])]),

@@ -139,6 +139,7 @@ fun StatusDto.toDomain(): Post {
         tags = body.tags.map { Hashtag(it.name, it.url) },
         url = body.url ?: body.uri,
         language = body.language?.takeIf { it.isNotBlank() },
+        editedAt = body.editedAt?.let { parseInstantOrNull(it) },
     )
 }
 

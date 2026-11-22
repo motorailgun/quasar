@@ -45,7 +45,8 @@ fun UserFeedList(
                     item(key = "status", contentType = "status") {
                         ListStatus(
                             loading = !feed.loaded || feed.isRefreshing,
-                            error = feed.error?.let { stringResource(R.string.user_list_error, it) },
+                            error = feed.error,
+                            errorFormat = R.string.user_list_error,
                             // 一覧を隠しているアカウントも空で返る
                             empty = empty ?: stringResource(R.string.user_list_empty),
                         )

@@ -204,6 +204,7 @@ private class GalleryNavigator(
     override fun openPersonalPosts(list: PersonalPostList) = Unit
     override fun openFollowRequests() = Unit
     override fun openSearch() = Unit
+    override fun openRelogin() = Unit
     override fun openMedia(click: MediaClick) = openMedia(context, click, ::openMediaViewer)
     override fun openMediaViewer(args: MediaViewerArgs) {
         backStack.add(Route.MediaViewer(args))
@@ -348,24 +349,12 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
         TranslationLanguagesGallery(onBack)
         return
     }
+    if (scenario == GalleryScenario.AccountSwitcher) {
+        AccountSwitcherGallery(remember(text) { GalleryFixtures.storedAccounts(text) }, onBack)
+        return
+    }
     if (scenario == GalleryScenario.TimelineSettings) {
-        // 本物の設定を読み書きする (アプリの設定画面と同じ)
-        val store = (context.applicationContext as QuasarApplication).container.settingsStore
-        val settings by store.settings.collectAsStateWithLifecycle()
-        // 「ポストのメニュー」はこの中で切り替える (ギャラリーの画面遷移には積まない)
-        var postMenuOpen by rememberSaveable { mutableStateOf(false) }
-        settings?.let {
-            if (postMenuOpen) {
-                PostMenuSettingsPage(it.hiddenPostMenuItems, store::launchUpdate, onBack = { postMenuOpen = false })
-            } else {
-                TimelineSettingsPage(
-                    it,
-                    store::launchUpdate,
-                    onNavigate = { route -> if (route == Route.SettingsPostMenu) postMenuOpen = true },
-                    onBack = onBack,
-                )
-            }
-        }
+        TimelineSettingsGallery(onBack)
         return
     }
     if (scenario == GalleryScenario.QuickPostBar) {
@@ -473,6 +462,7 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
             GalleryScenario.AccountReactions,
             GalleryScenario.QuickPostBar,
             GalleryScenario.TimelineSettings,
+            GalleryScenario.AccountSwitcher,
             GalleryScenario.PostDetail,
             GalleryScenario.Translation,
             GalleryScenario.TranslationLanguages,

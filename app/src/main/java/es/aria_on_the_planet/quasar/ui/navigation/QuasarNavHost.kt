@@ -28,14 +28,16 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.data.media.ImagePrepareOptions
+import es.aria_on_the_planet.quasar.ui.account.AccountUiContext
 import es.aria_on_the_planet.quasar.ui.component.account.LocalAccountActions
-import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.di.AppContainer
 import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.DeviceSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.ui.component.layout.LocalFloatingPanelInset
 import es.aria_on_the_planet.quasar.ui.timeline.visibleColumnCount
@@ -57,6 +59,7 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostsViewModel
 import es.aria_on_the_planet.quasar.ui.search.SearchScreen
 import es.aria_on_the_planet.quasar.ui.search.SearchViewModel
 import es.aria_on_the_planet.quasar.ui.login.LoginScreen
+import es.aria_on_the_planet.quasar.ui.login.ReloginTarget
 import es.aria_on_the_planet.quasar.ui.mediaviewer.mediaViewerEntry
 import es.aria_on_the_planet.quasar.ui.mediaviewer.openMedia
 import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
@@ -83,7 +86,9 @@ import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
 import es.aria_on_the_planet.quasar.ui.settings.TranslationSettingsPage
 import es.aria_on_the_planet.quasar.ui.component.post.LocalPostTranslations
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.UpdateAccountSettings
 import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
+import es.aria_on_the_planet.quasar.ui.timeline.toDrawerAccounts
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineScreen
 import es.aria_on_the_planet.quasar.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.flow.Flow
@@ -93,38 +98,43 @@ import kotlinx.coroutines.flow.emptyFlow
  * アプリの全画面。画面の行き来は Navigation 3 のバックスタック ([Route]) で、Activity は MainActivity 1 つ。
  * 画面 (`ProfileScreen` 等) へのコールバックは [Navigator] から組み立て、画面の中では [LocalNavigator] でも引ける。
  *
- * * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。
+ * * アカウントごとに作り直される (MainActivity の `AccountScope`)。ログイン中は `[Timeline]`、ログアウト中は `[Login]` から始まる。
+ *   アカウントの追加はログイン中に `Login` を積み、ログインできたら使うアカウントが変わって作り直される。
  * * ViewModel・`rememberSaveable` は画面 (エントリ) ごと。下に積まれた画面はコンポジションから外れる
  *   (ストリーミング・インライン再生は今までの「別の Activity を開くと止まる」と同じく止まる)。
- * * 書きかけの投稿 (`DraftStore`) はセッションごとにここで開く (どの画面から復元されても使えるように)。
+ * * ログイン中のアカウントの依存 ([AccountUiContext]) を各画面に渡す。ViewModel にはそのデータ層の分 ([AccountContext]) を渡し、
+ *   ViewModel は寿命の間ずっと同じものを使う。
+ * * 書きかけの投稿 (`DraftStore`) はアカウントごとにここで開く (どの画面から復元されても使えるように)。
  *
+ * @param account 使っているアカウントの依存 (ログアウト中は `null`)。作り直されるまで変わらない。
  * @param externalLinks 他のアプリから「Quasar で開く」に共有された URL・`@user@domain` (`linkQueryOf`)。
  *   今の画面の上に開く (ログアウト中なら Toast)。
  * @param onExit 一番下の画面で「戻る」(Activity を閉じる)。
  */
 @Composable
-fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFlow(), onExit: () -> Unit) {
-    val session by container.sessionStore.session.collectAsStateWithLifecycle()
-    val current = session
-    val backStack = rememberNavBackStack(if (current == null) Route.Login else Route.Timeline)
+fun QuasarNavHost(
+    container: AppContainer,
+    account: AccountUiContext?,
+    externalLinks: Flow<String> = emptyFlow(),
+    onExit: () -> Unit,
+) {
+    val backStack = rememberNavBackStack(if (account == null) Route.Login else Route.Timeline)
 
-    // ログイン・ログアウトでバックスタックを作り直す (状態から決めるので、復元時に余計な作り直しはしない)
-    val loggedIn = current != null
-    LaunchedEffect(loggedIn) {
-        val wrongRoot = if (loggedIn) Route.Login in backStack else backStack.toList() != listOf(Route.Login)
-        if (wrongRoot) backStack.resetTo(if (loggedIn) Route.Timeline else Route.Login)
+    // ログアウト中はログインの画面だけ (復元した状態が別の形でも直す)
+    LaunchedEffect(account) {
+        if (account == null && backStack.toList() != listOf(Route.Login)) backStack.resetTo(Route.Login)
     }
-    LaunchedEffect(current) {
-        if (current != null) {
-            container.draftStore.open(current)
-            container.panelDraftStore.open(current)
+    LaunchedEffect(account) {
+        if (account != null) {
+            account.draftStore.open()
+            account.panelDraftStore.open()
         }
     }
 
     val context = LocalContext.current
     LaunchedEffect(externalLinks) {
         externalLinks.collect { query ->
-            if (container.sessionStore.session.value == null) {
+            if (account == null) {
                 Toast.makeText(context, R.string.open_link_not_logged_in, Toast.LENGTH_SHORT).show()
             } else {
                 // タグのページは検索では引けないので URL から直接開く。同じものを続けて共有されたら積まない
@@ -137,7 +147,7 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     val panel = remember(backStack) { DetailPanelState(pop = { backStack.removeLastOrNull() }) }
     val navigator = remember(backStack, context) { BackStackNavigator(backStack, context, panel, onExit) }
     val backDamping = remember { PredictiveBackDamping() }
-    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
+    val settings by container.deviceSettings.settings.collectAsStateWithLifecycle()
     SideEffect {
         settings?.let {
             backDamping.settings = it.predictiveBack
@@ -150,15 +160,12 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
     val sceneStrategies = remember(panel, panelEnabled) {
         listOf(OverlaySceneStrategy<NavKey>(), DetailPanelSceneStrategy(panel, panelEnabled))
     }
-    // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
-    val accountActions = remember(current) { current?.let { SessionAccountActions(it, container.accountRepository) } }
-    // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
-    val ownPostActions = remember(current) { current?.let { SessionOwnPostActions(it, container.postEditStore) } }
-    LaunchedEffect(current) { container.postEditStore.closeUnlessOwnedBy(current) }
     CompositionLocalProvider(
         LocalNavigator provides navigator,
-        LocalAccountActions provides accountActions,
-        LocalOwnPostActions provides ownPostActions,
+        // ポストのメニューのブロック等・ブラウザで開く。ログアウト中は無い
+        LocalAccountActions provides account?.accountActions,
+        // 自分のポストの編集・削除。編集の投稿欄はどの画面から開いても全画面の上に重ねる (PostEditorHost)
+        LocalOwnPostActions provides account?.postEditStore,
         LocalPostTranslations provides container.postTranslations,
         LocalFloatingPanelInset provides panel.coveredWidth,
     ) {
@@ -179,46 +186,62 @@ fun QuasarNavHost(container: AppContainer, externalLinks: Flow<String> = emptyFl
                 popTransitionSpec = { popTransition() },
                 predictivePopTransitionSpec = { predictivePopTransition(backDamping.settings.transitionMillis) },
                 entryProvider = entryProvider {
-                    entry<Route.Login> { LoginScreen(container.oauthLogin) }
-                    entry<Route.Timeline> { WithSession(current) { TimelineEntry(container, it) } }
-                    entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { ProfileEntry(container, it, key, navigator) } }
-                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { FollowListEntry(container, it, key, navigator) } }
-                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { HashtagEntry(container, it, key, navigator) } }
-                    entry<Route.PersonalPosts>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { PersonalPostsEntry(container, it, key, navigator) }
+                    entry<Route.Login> {
+                        // ログイン中なら追加のログイン (戻るボタンで今のアカウントに戻る)
+                        LoginScreen(container.oauthLogin, onBack = if (account != null) navigator::back else null)
                     }
-                    entry<Route.Search>(metadata = DetailPanelSceneStrategy.panel()) {
-                        WithSession(current) { SearchEntry(container, it, navigator) }
-                    }
-                    entry<Route.FollowRequests>(metadata = DetailPanelSceneStrategy.panel()) {
-                        WithSession(current) { FollowRequestsEntry(container, it, navigator) }
-                    }
-                    entry<Route.AccountReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { AccountReactionsEntry(container, it, key, navigator) }
-                    }
-                    entry<Route.PostReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { PostReactionsEntry(container, it, key, navigator) }
-                    }
-                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(current) { PostEntry(container, it, key, navigator) } }
-                    entry<Route.OpenLink>(metadata = DetailPanelSceneStrategy.panel()) { key ->
-                        WithSession(current) { session ->
-                            OpenLinkEntry(container, session, key, navigator) { backStack.replace(key, it) }
+                    entry<Route.Relogin> {
+                        WithSession(account) { ui ->
+                            val stored by container.accountStore.state.collectAsStateWithLifecycle()
+                            val target = stored.find(ui.account.key)
+                            LoginScreen(
+                                container.oauthLogin,
+                                onBack = navigator::back,
+                                relogin = target?.let { ReloginTarget(it.key, it.serverUrl, it.label) },
+                            )
                         }
                     }
-                    entry<Route.Composer> { key -> ComposerEntry(container, key, navigator) }
+                    entry<Route.Timeline> {
+                        WithSession(account) { TimelineEntry(container, it, onAddAccount = { backStack.add(Route.Login) }) }
+                    }
+                    entry<Route.Profile>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { ProfileEntry(container, it, key, navigator) } }
+                    entry<Route.FollowList>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { FollowListEntry(it, key, navigator) } }
+                    entry<Route.Hashtag>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { HashtagEntry(it, key, navigator) } }
+                    entry<Route.PersonalPosts>(metadata = DetailPanelSceneStrategy.panel()) { key ->
+                        WithSession(account) { PersonalPostsEntry(it, key, navigator) }
+                    }
+                    entry<Route.Search>(metadata = DetailPanelSceneStrategy.panel()) {
+                        WithSession(account) { SearchEntry(it, navigator) }
+                    }
+                    entry<Route.FollowRequests>(metadata = DetailPanelSceneStrategy.panel()) {
+                        WithSession(account) { FollowRequestsEntry(it, navigator) }
+                    }
+                    entry<Route.AccountReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
+                        WithSession(account) { AccountReactionsEntry(it, key, navigator) }
+                    }
+                    entry<Route.PostReactions>(metadata = DetailPanelSceneStrategy.panel()) { key ->
+                        WithSession(account) { PostReactionsEntry(it, key, navigator) }
+                    }
+                    entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { PostEntry(it, key, navigator) } }
+                    entry<Route.OpenLink>(metadata = DetailPanelSceneStrategy.panel()) { key ->
+                        WithSession(account) { ui ->
+                            OpenLinkEntry(ui, key, navigator) { backStack.replace(key, it) }
+                        }
+                    }
+                    entry<Route.Composer> { key -> WithSession(account) { ComposerEntry(it, key, navigator) } }
                     mediaViewerEntry(container, onBack = navigator::back)
-                    settingsEntries(container, navigator) { backStack.add(it) }
+                    settingsEntries(container, account, navigator) { backStack.add(it) }
                 },
             )
-            PostEditorHost(container.postEditStore)
+            account?.let { PostEditorHost(it.postEditStore) }
         }
     }
 }
 
-/** ログイン中だけ中身を出す (ログアウト直後、バックスタックを作り直すまでの間は何も出さない)。 */
+/** ログイン中だけ中身を出す (ログアウト中に復元されたエントリは、バックスタックを作り直すまで何も出さない)。 */
 @Composable
-private fun WithSession(session: Session?, content: @Composable (Session) -> Unit) {
-    if (session != null) content(session)
+private fun WithSession(account: AccountUiContext?, content: @Composable (AccountUiContext) -> Unit) {
+    if (account != null) content(account)
 }
 
 private fun NavBackStack<NavKey>.resetTo(root: Route) {
@@ -298,6 +321,10 @@ private class BackStackNavigator(
         backStack.add(Route.Search)
     }
 
+    override fun openRelogin() {
+        backStack.add(Route.Relogin)
+    }
+
     override fun back() {
         // 詳細のパネルの画面はパネルが閉じるアニメーションをしてから外す
         if (backStack.lastOrNull()?.opensInPanel() == true && panel.requestBack()) return
@@ -306,66 +333,69 @@ private class BackStackNavigator(
 }
 
 @Composable
-private fun TimelineEntry(container: AppContainer, session: Session) {
+private fun TimelineEntry(container: AppContainer, account: AccountUiContext, onAddAccount: () -> Unit) {
     val viewModel: TimelineViewModel = viewModel(
-        key = "${session.serverUrl}|${session.accessToken.hashCode()}",
         factory = viewModelFactory {
             initializer {
                 TimelineViewModel(
-                    session,
-                    container.timelineRepository,
-                    container.statusRepository,
-                    container.notificationRepository,
-                    container.accountRepository,
-                    container.streamingClient,
-                    container.settingsStore.loaded,
+                    account.account,
+                    account.account.settings.loaded,
                 )
             }
         },
     )
+    // ドロワーのアカウントの切り替え (保存している表示用の情報で描く)
+    val stored by container.accountStore.state.collectAsStateWithLifecycle()
+    val accountManager = container.accountManager
+    val switcher = remember(stored, account) {
+        stored.toDrawerAccounts(
+            currentKey = account.account.key,
+            onSwitch = accountManager::switchTo,
+            onAdd = onAddAccount,
+        )
+    }
     TimelineScreen(
         viewModel = viewModel,
-        drafts = container.draftStore,
+        drafts = account.draftStore,
+        accounts = switcher,
     )
 }
 
-/** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアプリ全体のもの。 */
+/** この画面の下書き: 詳細のパネルの中ならパネルのもの、それ以外はアカウントのもの。 */
 @Composable
-private fun draftsHere(container: AppContainer): DraftStore =
-    if (LocalInDetailPanel.current) container.panelDraftStore else container.draftStore
+private fun draftsHere(account: AccountUiContext): DraftStore =
+    if (LocalInDetailPanel.current) account.panelDraftStore else account.draftStore
 
 /** クイック投稿バーの無い画面からの返信: 下書き (この画面のもの) の返信先にして投稿画面で書く。 */
 @Composable
-private fun replyInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit {
+private fun replyInComposer(account: AccountUiContext, navigator: Navigator): (Post) -> Unit {
     val inPanel = LocalInDetailPanel.current
-    val drafts = draftsHere(container)
+    val drafts = draftsHere(account)
     return { post ->
-        drafts.open(session).startReply(post)
+        drafts.open().startReply(post)
         navigator.openComposer(panelDraft = inPanel)
     }
 }
 
 /** クイック投稿バーの無い画面からの引用 (ブーストの長押し): 下書きの引用先にして投稿画面で書く。 */
 @Composable
-private fun quoteInComposer(container: AppContainer, session: Session, navigator: Navigator): (Post) -> Unit {
+private fun quoteInComposer(account: AccountUiContext, navigator: Navigator): (Post) -> Unit {
     val inPanel = LocalInDetailPanel.current
-    val drafts = draftsHere(container)
+    val drafts = draftsHere(account)
     return { post ->
-        drafts.open(session).startQuote(post)
+        drafts.open().startQuote(post)
         navigator.openComposer(panelDraft = inPanel)
     }
 }
 
 @Composable
-private fun ProfileEntry(container: AppContainer, session: Session, key: Route.Profile, navigator: Navigator) {
+private fun ProfileEntry(container: AppContainer, account: AccountUiContext, key: Route.Profile, navigator: Navigator) {
     val viewModel: ProfileViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
                 ProfileViewModel(
-                    session = session,
+                    account = account.account,
                     accountId = key.accountId,
-                    repository = container.accountRepository,
-                    statusRepository = container.statusRepository,
                     instanceRepository = container.instanceRepository,
                     emojiRepository = container.emojiRepository,
                     openUploadSource = container::uploadSource,
@@ -391,16 +421,16 @@ private fun ProfileEntry(container: AppContainer, session: Session, key: Route.P
         onFollowingClick = { navigator.openFollowList(key.accountId, FollowListTab.Following) },
         onFollowersClick = { navigator.openFollowList(key.accountId, FollowListTab.Followers) },
         onOpenImage = navigator::openMediaViewer,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun FollowListEntry(container: AppContainer, session: Session, key: Route.FollowList, navigator: Navigator) {
+private fun FollowListEntry(account: AccountUiContext, key: Route.FollowList, navigator: Navigator) {
     val viewModel: FollowListViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { FollowListViewModel(session, key.accountId, container.accountRepository) }
+            initializer { FollowListViewModel(account.account, key.accountId) }
         },
     )
     FollowListScreen(
@@ -412,18 +442,10 @@ private fun FollowListEntry(container: AppContainer, session: Session, key: Rout
 }
 
 @Composable
-private fun HashtagEntry(container: AppContainer, session: Session, key: Route.Hashtag, navigator: Navigator) {
+private fun HashtagEntry(account: AccountUiContext, key: Route.Hashtag, navigator: Navigator) {
     val viewModel: HashtagViewModel = viewModel(
         factory = viewModelFactory {
-            initializer {
-                HashtagViewModel(
-                    session,
-                    key.name,
-                    container.timelineRepository,
-                    container.statusRepository,
-                    container.accountRepository,
-                )
-            }
+            initializer { HashtagViewModel(account.account, key.name) }
         },
     )
     HashtagScreen(
@@ -434,24 +456,16 @@ private fun HashtagEntry(container: AppContainer, session: Session, key: Route.H
         onMediaClick = navigator::openMedia,
         // 同じハッシュタグからは遷移しない
         onHashtagClick = { tag -> if (!tag.equals(key.name, ignoreCase = true)) navigator.openHashtag(tag) },
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun PersonalPostsEntry(container: AppContainer, session: Session, key: Route.PersonalPosts, navigator: Navigator) {
+private fun PersonalPostsEntry(account: AccountUiContext, key: Route.PersonalPosts, navigator: Navigator) {
     val viewModel: PersonalPostsViewModel = viewModel(
         factory = viewModelFactory {
-            initializer {
-                PersonalPostsViewModel(
-                    session,
-                    key.list,
-                    container.accountRepository,
-                    container.timelineRepository,
-                    container.statusRepository,
-                )
-            }
+            initializer { PersonalPostsViewModel(account.account, key.list) }
         },
     )
     PersonalPostsScreen(
@@ -461,16 +475,16 @@ private fun PersonalPostsEntry(container: AppContainer, session: Session, key: R
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun SearchEntry(container: AppContainer, session: Session, navigator: Navigator) {
+private fun SearchEntry(account: AccountUiContext, navigator: Navigator) {
     val viewModel: SearchViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { SearchViewModel(session, container.searchRepository, container.statusRepository) }
+            initializer { SearchViewModel(account.account) }
         },
     )
     SearchScreen(
@@ -480,23 +494,22 @@ private fun SearchEntry(container: AppContainer, session: Session, navigator: Na
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun FollowRequestsEntry(container: AppContainer, session: Session, navigator: Navigator) {
+private fun FollowRequestsEntry(account: AccountUiContext, navigator: Navigator) {
     val viewModel: FollowRequestsViewModel = viewModel(
-        factory = viewModelFactory { initializer { FollowRequestsViewModel(session, container.accountRepository) } },
+        factory = viewModelFactory { initializer { FollowRequestsViewModel(account.account) } },
     )
     FollowRequestsScreen(viewModel = viewModel, onBack = navigator::back, onUserClick = navigator::openProfile)
 }
 
 @Composable
 private fun AccountReactionsEntry(
-    container: AppContainer,
-    session: Session,
+    account: AccountUiContext,
     key: Route.AccountReactions,
     navigator: Navigator,
 ) {
@@ -504,12 +517,10 @@ private fun AccountReactionsEntry(
         factory = viewModelFactory {
             initializer {
                 AccountReactionsViewModel(
-                    session = session,
+                    account = account.account,
                     accountId = key.accountId,
                     type = key.type,
                     statusIds = key.statusIds,
-                    accountRepository = container.accountRepository,
-                    statusRepository = container.statusRepository,
                 )
             }
         },
@@ -521,27 +532,26 @@ private fun AccountReactionsEntry(
         onPostClick = navigator::openPost,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
-        onReply = replyInComposer(container, session, navigator),
-        onQuote = quoteInComposer(container, session, navigator),
+        onReply = replyInComposer(account, navigator),
+        onQuote = quoteInComposer(account, navigator),
     )
 }
 
 @Composable
-private fun PostEntry(container: AppContainer, session: Session, key: Route.Post, navigator: Navigator) {
+private fun PostEntry(account: AccountUiContext, key: Route.Post, navigator: Navigator) {
     val viewModel: PostViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
                 PostViewModel(
-                    session = session,
+                    account = account.account,
                     statusId = key.statusId,
-                    repository = container.statusRepository,
                 )
             }
         },
     )
     PostScreen(
         viewModel = viewModel,
-        drafts = draftsHere(container),
+        drafts = draftsHere(account),
         onBack = navigator::back,
         onUserClick = navigator::openProfile,
         onPostClick = { id -> if (id != key.statusId) navigator.openPost(id) },
@@ -555,10 +565,10 @@ private fun PostEntry(container: AppContainer, session: Session, key: Route.Post
 }
 
 @Composable
-private fun PostReactionsEntry(container: AppContainer, session: Session, key: Route.PostReactions, navigator: Navigator) {
+private fun PostReactionsEntry(account: AccountUiContext, key: Route.PostReactions, navigator: Navigator) {
     val viewModel: PostReactionsViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { PostReactionsViewModel(session, key.statusId, container.statusRepository) }
+            initializer { PostReactionsViewModel(account.account, key.statusId) }
         },
     )
     PostReactionsScreen(
@@ -572,15 +582,14 @@ private fun PostReactionsEntry(container: AppContainer, session: Session, key: R
 /** 共有された URL を開く途中の画面。引けたら行き先の画面に置き換える ([onResolved])。 */
 @Composable
 private fun OpenLinkEntry(
-    container: AppContainer,
-    session: Session,
+    account: AccountUiContext,
     key: Route.OpenLink,
     navigator: Navigator,
     onResolved: (Route) -> Unit,
 ) {
     val viewModel: OpenLinkViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { OpenLinkViewModel(session, key.query, container.searchRepository) }
+            initializer { OpenLinkViewModel(account.account, key.query) }
         },
     )
     OpenLinkScreen(viewModel = viewModel, onBack = navigator::back, onResolved = onResolved)
@@ -588,8 +597,8 @@ private fun OpenLinkEntry(
 
 /** 投稿画面 (単独)。投稿できたら閉じる。閉じても下書きは残す。 */
 @Composable
-private fun ComposerEntry(container: AppContainer, key: Route.Composer, navigator: Navigator) {
-    val drafts = if (key.panelDraft) container.panelDraftStore else container.draftStore
+private fun ComposerEntry(account: AccountUiContext, key: Route.Composer, navigator: Navigator) {
+    val drafts = if (key.panelDraft) account.panelDraftStore else account.draftStore
     val draft by drafts.current.collectAsStateWithLifecycle()
     LaunchedEffect(drafts) {
         drafts.published.collect { navigator.back() }
@@ -607,38 +616,50 @@ private fun ComposerEntry(container: AppContainer, key: Route.Composer, navigato
     }
 }
 
-/** 設定のページ。 */
+/**
+ * 設定のページ。「アカウントの設定」のページは [account] (この NavHost のアカウント) の設定を、それ以外は端末共通の設定を
+ * 読み書きする。
+ */
 private fun EntryProviderScope<NavKey>.settingsEntries(
     container: AppContainer,
+    account: AccountUiContext?,
     navigator: Navigator,
     navigate: (Route) -> Unit,
 ) {
-    val update = container.settingsStore::launchUpdate
+    val update = container.deviceSettings::launchUpdate
     entry<Route.Settings> {
-        val session by container.sessionStore.session.collectAsStateWithLifecycle()
+        // 表示用の情報は fetchMe で変わるので一覧から引く
+        val stored by container.accountStore.state.collectAsStateWithLifecycle()
         SettingsTopPage(
-            serverUrl = session?.serverUrl,
+            account = account?.let { stored.find(it.account.key)?.label },
             translationAvailable = container.postTranslations != null,
             onNavigate = navigate,
-            onLogout = container.oauthLogin::logout,
+            onLogout = { account?.let { container.accountManager.logout(it.account.key) } },
+            onRelogin = { navigate(Route.Relogin) },
             onBack = navigator::back,
         )
     }
     entry<Route.SettingsDisplay> {
-        WithSettings(container) { DisplaySettingsPage(it.display, update, onNavigate = navigate, onBack = navigator::back) }
+        WithDeviceSettings(container) { DisplaySettingsPage(it.display, update, onNavigate = navigate, onBack = navigator::back) }
     }
     entry<Route.SettingsAnimation> {
-        WithSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
+        WithDeviceSettings(container) { AnimationSettingsPage(it.display, update, onBack = navigator::back) }
     }
     entry<Route.SettingsTimelines> {
-        WithSettings(container) { TimelineSettingsPage(it, update, onNavigate = navigate, onBack = navigator::back) }
+        WithAccountSettings(account) { settings, updateAccount ->
+            TimelineSettingsPage(settings, updateAccount, onBack = navigator::back)
+        }
     }
     entry<Route.SettingsPostMenu> {
-        WithSettings(container) { PostMenuSettingsPage(it.hiddenPostMenuItems, update, onBack = navigator::back) }
+        WithDeviceSettings(container) { PostMenuSettingsPage(it.hiddenPostMenuItems, update, onBack = navigator::back) }
     }
-    entry<Route.SettingsPosting> { WithSettings(container) { PostingSettingsPage(it, update, onBack = navigator::back) } }
+    entry<Route.SettingsPosting> {
+        WithAccountSettings(account) { settings, updateAccount ->
+            PostingSettingsPage(settings, updateAccount, onBack = navigator::back)
+        }
+    }
     entry<Route.SettingsConfirmations> {
-        WithSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
+        WithDeviceSettings(container) { ConfirmationSettingsPage(it.confirmations, update, onBack = navigator::back) }
     }
     entry<Route.SettingsExperimental> { ExperimentalSettingsPage(onNavigate = navigate, onBack = navigator::back) }
     entry<Route.SettingsTranslation> {
@@ -646,7 +667,7 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
         if (translations == null) {
             LaunchedEffect(Unit) { navigator.back() }
         } else {
-            WithSettings(container) { TranslationSettingsPage(it.translation, translations, update, onBack = navigator::back) }
+            WithDeviceSettings(container) { TranslationSettingsPage(it.translation, translations, update, onBack = navigator::back) }
         }
     }
     entry<Route.SettingsLicenses> {
@@ -658,11 +679,25 @@ private fun EntryProviderScope<NavKey>.settingsEntries(
 }
 
 /**
- * 今の設定で [content] を描く。設定はエントリの中で読む: `NavDisplay` は積まれたエントリ (中身のラムダごと) を
+ * 今の端末共通の設定で [content] を描く。設定はエントリの中で読む: `NavDisplay` は積まれたエントリ (中身のラムダごと) を
  * 使い回すので、`entryProvider` の外で読んだ値を渡すと、開いたときの値のまま変わらない。
  */
 @Composable
-private fun WithSettings(container: AppContainer, content: @Composable (AppSettings) -> Unit) {
-    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
-    content(settings ?: AppSettings())
+private fun WithDeviceSettings(container: AppContainer, content: @Composable (DeviceSettings) -> Unit) {
+    val settings by container.deviceSettings.settings.collectAsStateWithLifecycle()
+    content(settings ?: DeviceSettings())
+}
+
+/**
+ * [account] の設定と、それを変える関数で [content] を描く ([WithDeviceSettings] と同じくエントリの中で読む)。
+ * ログアウト中・読み込み前は何も出さない。
+ */
+@Composable
+private fun WithAccountSettings(
+    account: AccountUiContext?,
+    content: @Composable (AccountSettings, UpdateAccountSettings) -> Unit,
+) {
+    val store = account?.account?.settings ?: return
+    val settings by store.settings.collectAsStateWithLifecycle()
+    settings?.let { content(it, store::launchUpdate) }
 }

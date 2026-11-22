@@ -3,8 +3,7 @@ package es.aria_on_the_planet.quasar.ui.personal
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
-import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.ui.feed.PagedFeed
@@ -26,15 +25,15 @@ data class FollowRequestsState(
 
 /** 自分へのフォローリクエストの一覧。返事をしたら一覧から除く。 */
 class FollowRequestsViewModel(
-    private val session: Session,
-    private val repository: AccountRepository,
+    account: AccountContext,
 ) : ViewModel() {
+    private val repository = account.accountRepository
 
     // max_id はリクエストの ID なので、Link ヘッダから得た Page.nextMaxId でページングする
     private val requests = PagedFeed<User, User>(
         scope = viewModelScope,
         append = appendDistinct(idOf = { it.inServerId }),
-        fetchPage = { maxId -> repository.fetchFollowRequests(session, maxId) },
+        fetchPage = { maxId -> repository.fetchFollowRequests(maxId) },
     )
 
     private val answering = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -57,7 +56,7 @@ class FollowRequestsViewModel(
         answering.update { it + (id to accept) }
         viewModelScope.launch {
             try {
-                repository.answerFollowRequest(session, id, accept)
+                repository.answerFollowRequest(id, accept)
                 requests.updateList { list -> list.filterNot { it.inServerId == id } }
             } catch (e: CancellationException) {
                 throw e

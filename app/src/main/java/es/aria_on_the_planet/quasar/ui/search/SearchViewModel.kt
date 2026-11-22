@@ -3,10 +3,9 @@ package es.aria_on_the_planet.quasar.ui.search
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.repository.SearchRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
 import es.aria_on_the_planet.quasar.data.repository.withPoll
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Hashtag
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
@@ -48,10 +47,10 @@ data class SearchState(
  * 検索し直すたびに 3 つの一覧を作り直す (前の検索の読み込みは取りやめる)。
  */
 class SearchViewModel(
-    private val session: Session,
-    private val repository: SearchRepository,
-    private val statusRepository: StatusRepository,
+    account: AccountContext,
 ) : ViewModel() {
+    private val repository = account.searchRepository
+    private val statusRepository = account.statusRepository
 
     private inner class Results(val query: String) {
         val job = SupervisorJob(viewModelScope.coroutineContext[Job])
@@ -61,13 +60,13 @@ class SearchViewModel(
         val accounts = PagedFeed<User, User>(
             scope = scope,
             append = appendDistinct(idOf = { it.inServerId }),
-            fetchPage = { offset -> repository.searchAccounts(session, query, offset) },
+            fetchPage = { offset -> repository.searchAccounts(query, offset) },
         )
-        val posts = PostFeed.linked(scope) { offset -> repository.searchPosts(session, query, offset) }
+        val posts = PostFeed.linked(scope) { offset -> repository.searchPosts(query, offset) }
         val hashtags = PagedFeed<Hashtag, Hashtag>(
             scope = scope,
             append = appendDistinct(idOf = { it.name.lowercase() }),
-            fetchPage = { offset -> repository.searchHashtags(session, query, offset) },
+            fetchPage = { offset -> repository.searchHashtags(query, offset) },
         )
 
         fun feedOf(tab: SearchTab): PagedFeed<*, *> = when (tab) {
@@ -112,13 +111,13 @@ class SearchViewModel(
     fun loadMore(tab: SearchTab) = results.value?.feedOf(tab)?.loadMore()
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+        viewModelScope.submitVote(statusRepository, post, choices) { poll ->
             results.value?.posts?.updatePosts { it.withPoll(poll) }
         }
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        send = { statusId, action -> statusRepository.perform(statusId, action) },
         update = { transform -> results.value?.posts?.updatePosts(transform) },
         onError = { message, error -> Log.w(TAG, message, error) },
     )

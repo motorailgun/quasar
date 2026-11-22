@@ -1,5 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.component.scaffold
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,8 +51,10 @@ import es.aria_on_the_planet.quasar.ui.component.player.MediaOverlayColors
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.feed.LoadError
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.ui.component.text.EmojiText
+import es.aria_on_the_planet.quasar.ui.component.list.LoadErrorMessage
 
 /**
  * 詳細画面 (プロフィール・ポスト等) 共通の骨組み。
@@ -305,15 +308,15 @@ fun DetailLoading() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
 }
 
-/** 読み込み失敗などの全面メッセージ。 */
+/** 読み込みの失敗の全面表示 (文言は [format]、401 / 403 なら「ログインし直す」も。[LoadErrorMessage])。 */
 @Composable
-fun DetailMessage(message: String) {
+fun DetailMessage(error: LoadError, @StringRes format: Int) {
     Box(
         Modifier
             .fillMaxSize()
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(message, style = MaterialTheme.typography.bodyMedium)
+        LoadErrorMessage(error, format)
     }
 }

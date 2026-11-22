@@ -73,7 +73,8 @@ fun FollowRequestsScreen(
                     item(key = "status", contentType = "status") {
                         ListStatus(
                             loading = !feed.loaded || feed.isRefreshing,
-                            error = feed.error?.let { stringResource(R.string.user_list_error, it) },
+                            error = feed.error,
+                            errorFormat = R.string.user_list_error,
                             empty = stringResource(R.string.follow_requests_empty),
                         )
                     }

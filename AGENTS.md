@@ -21,14 +21,15 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
 | オンデバイス翻訳 (実験的機能) | llama.cpp (git submodule `third_party/llama.cpp`、タグ v1.0.0 = b12359) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
 
-DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。
+DI フレームワークは現時点では使わず、`AppContainer` (手動 DI) で依存を組み立てる。ログイン中のアカウント 1 つ分の依存は
+`AccountContext` / `AccountUiContext` にまとめる (下記「アカウントの依存」)。
 
 ## パッケージ構成
 
 ```
 es.aria_on_the_planet.quasar
 ├── QuasarApplication.kt / MainActivity.kt   MainActivity が主の Activity (中身は QuasarNavHost)。共有の受け口は ui/share/ShareActivity
-├── di/AppContainer.kt              手動 DI
+├── di/AppContainer.kt              手動 DI (アプリ全体のもの + アカウントごとの AccountUiContext を作る。AccountManager を持つ)
 ├── data/streaming/                 Streaming API (StreamingClient / StreamEvent)
 ├── data/media/                     アップロード元 (UploadSource / ContentUriUploadSource) と進み具合付きの RequestBody、
 │                                   メディアの保存 (MediaDownloader / SystemMediaDownloader = DownloadManager)
@@ -38,9 +39,11 @@ es.aria_on_the_planet.quasar
 │   │   ├── MastodonApi.kt          REST 呼び出し (OkHttp)
 │   │   └── dto/                    API の JSON そのままの形 (Account, Status, CustomEmoji)
 │   ├── mapper/                     DTO → domain 変換
-│   ├── session/                    SessionStore (サーバ URL / アクセストークン / OAuth クライアント) + SecureStorage (Keystore で暗号化)
+│   ├── account/                    AccountContext (アカウント 1 つ分のセッション・キャッシュ・設定・Repository・StreamingClient) /
+│                                   AccountStore (アカウントの一覧 + 使っているアカウント。StoredAccount / AccountKey)
+│   ├── session/                    Session (サーバ URL / アクセストークン) + SecureStorage (Keystore で暗号化。KeyValueStore)
 │   ├── auth/                       OAuth (OAuth.kt = 純粋関数・定数 / OAuthLogin = ログインの段取り・ログアウト)
-│   ├── settings/                   設定の保存 (SettingsStore = DataStore / SettingsPreferences = 項目とキーの対応)
+│   ├── settings/                   設定の保存 (SettingsStore = DataStore。端末共通 / アカウントごと / SettingsPreferences = 項目とキーの対応)
 │   ├── licenses/                   設定の「ライセンス」(LicenseRepository。依存の一覧 = AboutLibraries のプラグインが作る raw の JSON を
 │   │                               parseLibraryDefinitions で読む + BundledComponent = POM の無いもの。本文は assets/licenses/。
 │   │                               llama.cpp・libc++・PLaMo はフレーバー full の FlavorLicenses)
@@ -91,7 +94,7 @@ es.aria_on_the_planet.quasar
     │   ├── menu/ActionMenu.kt      ︙のメニュー (画面下からのシート。項目の上に header を置ける) + MenuItemText (項目の文字、Regular)
     │   ├── account/AccountActions.kt アカウントへの操作 (ブロック・ミュート・ブーストの非表示) の口 (LocalAccountActions) とメニューの項目
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
-    │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く)
+    │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く) + LoadErrorMessage.kt (失敗の文言 + 401 / 403 なら「ログインし直す」)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
     │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
@@ -102,10 +105,13 @@ es.aria_on_the_planet.quasar
     ├── feed/                       PagedFeed<T> (max_id ページングの状態管理) / PostFeed / PollVoting / PostActions
     ├── notification/               通知一覧 (NotificationList / NotificationItem)
     ├── login/                      ログイン画面 (サーバを入力 → ブラウザで OAuth)
+    ├── account/                    アカウントの UI 側の依存 (AccountUiContext = 下書き・編集・メニューの操作 + AccountContext /
+    │                               SessionAccountActions) / AccountManager (アカウントごとの AccountUiContext と
+    │                               使っているアカウント) / AccountScope (切り替えで画面を作り直す + アカウントごとの ViewModelStore)
     ├── navigation/                 画面遷移 (Route = 画面のキー / Navigator + LocalNavigator = 遷移の口 / QuasarNavHost = NavDisplay と
     │                               各画面の配線 / OverlaySceneStrategy = 重ねて出す画面 / Transitions = 横スライド / PredictiveBackDamping = 予測型「戻る」の動きを抑える)
     ├── settings/                   設定画面 (SettingsScreen = 各ページ) + LocalDisplaySettings
-    ├── timeline/                   タイムライン画面 + ViewModel
+    ├── timeline/                   タイムライン画面 + ViewModel + ドロワー (TimelineDrawer / DrawerAccounts = アカウントの切り替え)
     ├── profile/                    プロフィール (Screen / Header / ActionButton / ViewModel) + 編集 (ProfileEditScreen / ProfileEditor / ProfileEditFields)
     ├── follows/                    フォロー / フォロワー一覧 (Screen / ViewModel)
     ├── mediaviewer/                メディアビューア (Entry / Screen / ViewModel / Args / ページ / DismissibleViewer)
@@ -141,6 +147,36 @@ assets/gallery/                     固定データ (API と同じ形の JSON + 
 `src/liteDebug` の「無い」と出すだけ。benchmark は `src/{full,lite}Debug` を共有)。
 
 `scripts/gallery/generate.py` (ギャラリーの固定データの生成)、`scripts/icons/generate.py` (アイコンの生成)、`scripts/perf/measure.sh` (描画の負荷の測定)。
+
+## アカウントの依存 (`AccountContext` / `AccountUiContext`)
+* Repository (Timeline / Account / Status / Notification / Search / Media) と `StreamingClient` はアカウントごとのインスタンスで、
+  `Session` をコンストラクタで受ける (**メソッドで `session` を受けない**。別のアカウントのセッションを渡せないように)。まとめて
+  持つのが `data/account/AccountContext` (`key`・`session`・専用のキャッシュの DB・アカウントごとの設定 `settings`・`scope`・
+  `close()` = DB を閉じる)。`InstanceRepository` / `EmojiRepository` (サーバ単位・トークン無し) と `MastodonApi` はアプリ全体で共有。
+* UI 側の 1 アカウント分は `ui/account/AccountUiContext`: `account` (上の `AccountContext`)・`draftStore` / `panelDraftStore` /
+  `postEditStore` (ポストのメニューの編集・削除の口 `OwnPostActions` も兼ねる)・`accountActions` (`SessionAccountActions`)・`composerSession(...)`
+  (投稿欄を作る)・`close()` (下書き・編集を止め、`AccountContext` も閉じる)・`closed` (閉じられたか。`AccountScope` の外で持つ共有の画面が見る)。`AccountContext` は data 層なので UI のものはこちらに分けている。
+* アカウントの保存は `AccountStore` (`data/account/`): SecureStorage の 1 項目 (`accounts`) に `StoredAccount` の一覧 (キー・サーバ・
+  トークン・クライアント・`accountId`・表示用の情報 `StoredProfile`) と使っているアカウントのキー。`AccountKey` は端末で振る UUID
+  (String の value class。`hashCode` がプロセスをまたいで変わらない) で、アカウントごとのファイルの名前にも使う。変更は純粋関数
+  (`StoredAccounts.withLogin` / `without` / `withActive` / `withProfile`、`AccountStoreTest`)。ログインで足して使うアカウントにする・
+  切り替え (`setActive`)・ログアウトで除く (使っていたら残りの先頭に切り替わる)。表示用の情報・`accountId` は `fetchMe` (`myAccount`)
+  の結果で埋める (開いたら必ず `fetchMe` を呼ぶ)。**同じアカウント (サーバ + ID) を 2 つ保存しない** (下記「Login」。ID の無い
+  アカウントは以前の保存から移したものだけ)。
+* **`AccountManager`** (`ui/account/`、`AppContainer.accountManager`) が `AccountKey → AccountUiContext` を持つ: 使うアカウントになったときに
+  作り、**切り替えても閉じずにログアウトまで持つ** (下書きが切り替えて戻っても残る。使っていないアカウントは画面が無いので通信しない。
+  ログインし直しでトークンが変わったら作り直すので、下書きはそこで消える)。
+  `active` (`StateFlow<ActiveAccount?>`: `context` と、そのキーの依存を作り直した回数 `generation`)・`switchTo(key)`・`logout(key)`。
+  `AccountStore.state` を見て、一覧から消えた・トークンが変わったキーの依存を `close()` し (新しいものを開く前に閉じる = 同じキーの DB
+  を 2 つ開かない)、消えたキーはファイル (キャッシュのディレクトリ・設定のファイル) を消す (`deleteAccountData`)。起動時に一覧に無い
+  アカウントのファイルを消すのは `AppContainer` (の初期化)。
+* **切り替えは画面ごと作り直す** (`AccountScope`、MainActivity): `key(アカウントのキー, generation)` + アカウントごとの
+  `ViewModelStoreOwner` (Activity の ViewModel `AccountViewModelStores` に置き、切り替えのときだけ `clear`) + 外側の
+  `SaveableStateHolder` で保存した状態をアカウントごとに分け、使っていないアカウントの分は捨てる。切り替えた先は `[Timeline]` から。
+  `QuasarNavHost` は `account` を引数で受け (作り直されるまで変わらない)、`WithSession` で各画面に渡す。`ShareActivity` は
+  開いたときの `AccountManager.active` のキーに固定し、`AccountManager.context(key)` の依存を使う (切り替えても追わない。依存が
+  閉じられた = `AccountUiContext.closed` なら閉じる)。ViewModel には `account` を渡し、寿命の間ずっと同じものを使う (「今のアカウント」をその都度読まない)。
+  複数アカウントの計画・決めたことは [docs/multi-account.md](docs/multi-account.md)。
 
 ## ドメインモデル
 
@@ -481,12 +517,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     無ければ `uri`)、「本文をコピー」(`postPlainText`: 短縮表示の URL も全体を残す。本文が無ければ出さない。コピーの通知は OS が
     出す)、他人のポストなら「ミュート」・「ブロック」/「ブロックを解除」(どちらも error 色)・「@acct さんのブーストを非表示」(フォロー中のみ)。URL は純粋関数
     (`domain/model/WebPage.kt`、`WebPageTest`)。
-  * 項目は設定 (Timelines →「ポストのメニュー」のページ、`Route.SettingsPostMenu`) で 1 つずつ出さないようにできる (`AppSettings.hiddenPostMenuItems`。出さない方を
+  * 項目は設定 (アプリの設定 →「ポストのメニュー」のページ、`Route.SettingsPostMenu`) で 1 つずつ出さないようにできる (`DeviceSettings.hiddenPostMenuItems`。出さない方を
     持つので、後から足した項目は既定で出る)。`QuasarAppContent` が `LocalHiddenPostMenuItems` で渡し、そのポストに出る項目は純粋関数
     `visiblePostMenuItems` (`domain/model/settings/PostMenuItems.kt`、`PostMenuItemsTest`) で決める。1 つも無ければ︙自体を出さない。
     プロフィールのメニューには効かない。項目を足すときは `PostMenuItem` と設定画面 (`PostMenuSettingsPage`) にも足す。
-  * 操作の口は `LocalAccountActions` (`ui/component/account/AccountActions.kt`、`QuasarNavHost` が `SessionAccountActions` を
-    提供)。無い所ではメニュー自体を出さない (ギャラリーは手元だけで関係を持つ `GalleryAccountActions` を提供。固定データの carol (ID `3`) を自分として扱う)。関係はメニューを開くたびに読む (キャッシュが新しければそれ)。
+  * 操作の口は `LocalAccountActions` (`ui/component/account/AccountActions.kt`、`QuasarNavHost` が `AccountUiContext.accountActions`
+    = `SessionAccountActions` を提供)。無い所ではメニュー自体を出さない (ギャラリーは手元だけで関係を持つ `GalleryAccountActions` を提供。固定データの carol (ID `3`) を自分として扱う)。関係はメニューを開くたびに読む (キャッシュが新しければそれ)。
   * 読み込みの前後でメニューの高さを変えない: 項目 (ミュート・ブロック・ブーストの非表示) は常に 3 つ出し、使えないものは
     グレーアウトする (`AccountActionMenuItems`)。読み込むまでは仮の関係 (`ProvisionalRelationship`: ブロック・ミュートしていない)
     でミュート・ブロックを押せるようにしておく (ミュート・ブロックの API は済みでも成功するので先に押されても困らない)。ブーストの
@@ -538,7 +574,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   → `ViewModel.performAction(post, action)` → `PostActionController` (`ui/feed/PostActions.kt`) → `StatusRepository.perform`。
   画面側は `rememberPostActionHandler(viewModel::performAction)`。
 * **確認モーダルの差し込み口**: `PostActionConfirmation.confirm(post, action): PostAction?`。既定は
-  `rememberPostActionConfirmation()` で、設定 (`AppSettings.confirmations`) で確認する操作なら `LocalActionConfirmer` のダイアログで
+  `rememberPostActionConfirmation()` で、設定 (`DeviceSettings.confirmations`) で確認する操作なら `LocalActionConfirmer` のダイアログで
   答えを待ち、`null` で取りやめ (下記「設定」)。操作を変えて返してもよい (将来ブーストの公開範囲を選ばせる等)。
   ViewModel 側は確認の有無を知らない。
 * `PostActionController`: 見込みで反映 (`Post.withAction`) → 送信 → 応答の件数・状態で上書き (`Post.withInteractionsOf`)、
@@ -608,9 +644,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * ViewModel は画面 (エントリ) ごと (`rememberViewModelStoreNavEntryDecorator`)。下に積まれた画面はコンポジションから外れる
     (状態は `rememberSaveable` で残る)。`LaunchedEffect` / `repeatOnLifecycle` で動くもの (ストリーミング・インライン再生) は、
     別の画面を開くと止まり、戻ると再開する。
-  * ログイン状態でバックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`)。`Login` 以外の画面は
-    セッションがあるときだけ描く (`WithSession`)。書きかけの投稿 (`DraftStore`) は
-    `QuasarNavHost` がセッションごとに開く。
+  * 使っているアカウントが変わったら (ログイン・切り替え・ログアウト) `QuasarNavHost` ごと作り直す (上記「アカウントの依存」の
+    `AccountScope`)。ログイン中は `[Timeline]`、ログアウト中は `[Login]` から始まる。`Login` 以外の画面は
+    ログイン中だけ描く (`WithSession`。使っているアカウントの `AccountUiContext` を渡す)。書きかけの投稿 (`DraftStore`) は
+    `QuasarNavHost` がアカウントごとに開く。
   * 遷移は横スライド (`Transitions.kt`、AOSP の設定画面と同じ)。メディアビューアだけは `OverlaySceneStrategy` で
     下の画面に重ね、出入りは自分で描く。
   * **詳細のパネル** (`DetailPanel.kt`、計画・経緯は [docs/tablet-layout.md](docs/tablet-layout.md)): タイムラインが 2 カラムの間は、
@@ -755,9 +792,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * **自分のポストの編集・削除**: ポストのメニュー (`PostMenu`) は、自分のポスト (`AccountActions.myAccountId` = `fetchMe` の ID、
     まだなら関係の読み込みの `AccountMenuTarget.Me`) なら、**どの画面 (タイムライン・プロフィール・ハッシュタグ・通知・詳細) でも**
     編集 / error 色の削除 + ブラウザで開く・本文をコピーを出す。口は `LocalOwnPostActions` (`ui/component/post/OwnPostActions.kt`、
-    `QuasarNavHost` が `SessionOwnPostActions` を提供。無い所では出さない。ギャラリーは押すと Toast を出すだけの `GalleryOwnPostActions`)。中身はアプリ全体で 1 つの
-    `PostEditStore` (`AppContainer.postEditStore`、`ui/composer/`)。準備・削除の最中は︙が読み込み中になる。
-    * 編集: `PostEditStore.startEdit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AppContainer.composerSession`)
+    `QuasarNavHost` が `AccountUiContext.postEditStore` (`PostEditStore` が実装) を提供。無い所では出さない。ギャラリーは押すと Toast を出すだけの `GalleryOwnPostActions`)。中身はアカウントごとに 1 つの
+    `PostEditStore` (`AccountUiContext.postEditStore`、`ui/composer/`)。準備・削除の最中は︙が読み込み中になる。
+    * 編集: `PostEditStore.edit` が原文 (`/source`) を取り、編集用の `ComposerSession` (`EditTarget`、`AccountUiContext.composerSession`)
       を作る。**`DraftStore` の下書きとは別**で、`QuasarNavHost` が全画面の上に `PostEditorHost` で `ComposerScreen` を下から重ねる。中身は純粋関数 `editDraftOf`
       (`PostEditTest`): 添付は投稿済みのメディアを Uploaded 扱い、投票の期間は残り時間に最も近い選択肢 (編集で数え直しになる)。
       公開範囲は変えられない (`Composer(visibilityEditable = false)`)。送信は Save (`toEditFormParams`、`DraftMappersTest`)、
@@ -790,20 +827,51 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 途中の状態 (`PendingAuthorization`: クライアント・code_verifier・state) は `SecureStorage` に保存し、ブラウザにいる間に
     プロセスが終わっても続けられる。戻りを受けた時点で消す (コードは 1 回しか使えない)。進行中のものが無い戻りは無視する。
     state の不一致は `InvalidResponse`。URI の解釈・認可 URL の組み立ては純粋関数 (`OAuth.kt`、`OAuthTest`)。
-  * トークンを得たら `SessionStore.save(session, client)`。ナビゲーションはセッションの有無で切り替わる。
-  * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser / Exchanging / Failed(`LoginError`))。
-  * 保存: `SessionStore` は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。
+  * トークンを得たら `verify_credentials` でアカウント (ID・表示用の情報) を確かめて `AccountStore.addLogin` (使うアカウントになる)。
+    **確かめられなければログインを失敗にする** (得たトークンは無効化を試みる)。ログインで足すアカウントは必ず ID を持つ。
+    同じアカウント (サーバ + `accountId`) が既にあれば足さずにトークン・クライアントを差し替え、古いトークンは無効化する
+    (キーは同じで、依存は作り直す)。
+  * **同じアカウントを 2 つ保存しない・保存しているアカウントを自動では除かない** (除くと設定も消える。除くのはログアウトだけ):
+    `addLogin` の前に、同じサーバの ID の無いアカウント (以前の保存から移したもの。`StoredAccounts.withoutIdOn`) の ID を
+    それぞれのトークンで `verify_credentials` を呼んで埋める (`OAuthLogin.resolveMissingIds`)。埋められなければ足すのを失敗にする:
+    401 / 422 → そのアカウントのログインし直しかログアウトを促す、403 → 今はサーバで使えない (無効・凍結・承認待ち等) と伝える
+    (`storedTokenError`)、通信・5xx → 後でもう一度。ログには失敗の種類だけ。
+  * アカウントの追加・ログインし直しでは認可の URL に `force_login=true` を付ける (最初のログインでは付けない)。ドキュメントの説明と
+    違い、サーバ (3.5 / 4.x) はログインの画面を出さず、同じクライアントのトークンがあるときの自動承認を止めるだけ (Quasar は毎回
+    クライアントを登録するので今は効いていない)。別のユーザーで認可するには、認可画面のブラウザ側のログアウトを使ってもらう。
+  * **ログインし直す** (`Route.Relogin`、設定のトップのログアウトの上): 使っているアカウントのサーバで OAuth をやり直し
+    (`PendingAuthorization.reloginKey`)、同じキーのままトークン・クライアントを差し替える (設定・キャッシュは残る。古い
+    トークンは無効化)。依存 (`AccountUiContext`) は作り直すので、**書きかけの投稿・編集中の投稿・アップロード中の添付は消える**
+    (下書きの永続化は TODO。下記「投稿」の「未実装」)。別のアカウント (サーバ・ID が違う) でログインしたら失敗にして保存しているものは触らない。ID の無い (移した)
+    アカウントなら ID を埋める (他に同じ ID が保存されていたら失敗)。純粋関数 `StoredAccounts.withRelogin` (`AccountStoreTest`)。
+    使うアカウントが変わると画面が作り直される (`AccountScope`)。
+    ログインし直しの認可を待つ間に別のアカウントへ切り替えていても、認可を終えたら対象のアカウントに切り替わる (`withRelogin` が
+    使うアカウントにする。アカウントの追加と同じく、認可を終えたアカウントを出す)。
+  * **読み込みの失敗が 401 / 403 なら「ログインし直す」のボタン** (`Navigator.openRelogin` → `Route.Relogin`): 失敗は文字列ではなく
+    `LoadError` (`ui/feed/LoadError.kt`。`toLoadError()` で `MastodonApiException` の 401 / 403 を `needsLogin` にし、文言はサーバの
+    `error` の文 (`userMessage`)、`LoadErrorTest`) で持ち、一覧が空のときの表示 (`ListStatus`・タイムラインのカラム) と
+    詳細画面の全面の表示 (`DetailMessage`)・共有された URL を開く画面 (`OpenLinkState.Failed`) が文言の下にボタンを出す
+    (`LoadErrorMessage`。どれも `LoadError` と文言の書式を受け、文言の組み立て・ボタンを出すかはその中で決める)。一覧があるときのタイムラインの失敗はスナックバーの操作。ストリーミングの 401 は
+    今までどおり再接続を続ける (ボタンは出さない)。
+  * **アカウントの追加**: ログイン中にドロワーの「アカウントを追加」で `Route.Login` を積む (戻るボタン付き。戻るボタンでは進行中の
+    認可待ちもやめる。システムの「戻る」では画面を閉じるだけで認可待ちは残り、ブラウザで認可を終えればそのアカウントが足される)。流れはログアウト中のログインと同じで、途中の状態 (`PendingAuthorization`) も 1 つだけ。ログインできたら
+    そのアカウントに切り替わる。
+  * 進み具合は `OAuthLogin.status` (`LoginStatus`: Idle / Registering / InBrowser(`serverUrl`) / Exchanging / Failed(`LoginError`, `account` = 文言に入れる
+    `@acct@host` かサーバのホスト。要らなければ `null`))。
+  * 保存: `AccountStore` (上記「アカウントの依存」) は `SecureStorage` (Android Keystore の AES-256-GCM 鍵で暗号化して SharedPreferences `secure` に置く。書き込みは同期 (`commit`)。
     項目名を AAD にする。`EncryptedSharedPreferences` は非推奨なので使わない)。鍵は端末外に出ないので `secure.xml` は
-    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消し、トークンの無い保存
-    (最初期の未ログインでの利用の名残) はログアウト状態として扱う。
-    以前の平文の保存 (SharedPreferences `session`) は起動時に移して消す (そのトークンはクライアント情報が無いので
-    ログアウト時に無効化できない)。
-  * ログアウト: 設定画面のトップの末尾 (error 色、補足にサーバのホスト)。**設定に関わらず必ず** `ConfirmDialog` で確認してから
-    `OAuthLogin.logout` (保存を消してから `POST /oauth/revoke`。失敗はログのみ)。
+    バックアップ・端末間移行から除外 (`backup_rules.xml` / `data_extraction_rules.xml`)。読めない値は消す。
+    以前の 1 つのセッションの保存 (`secure` の `session`、さらに前の平文の SharedPreferences `session`) は、最初の起動で使っている
+    1 つ目のアカウントに移して消す (`AccountStore.load`。トークンの無い保存 = 最初期の未ログインでの利用の名残はログアウト状態。
+    平文の頃のトークンはクライアント情報が無いのでログアウト時に無効化できない)。
+  * ログアウト: 設定画面のトップの末尾 (error 色、補足に `@acct@host`)。対象はその画面のアカウント (= 使っているアカウント)。**設定に関わらず必ず**
+    `ConfirmDialog` で確認してから `AccountManager.logout(key)` → `OAuthLogin.logout(key)` (一覧から除いてから `POST /oauth/revoke`。
+    失敗はログのみ)。残りのアカウントがあればその先頭に切り替わり、無ければログインの画面。そのアカウントのキャッシュ・
+    アカウントごとの設定のファイルは `AccountManager` が閉じてから消す。端末共通の設定は残る。
 * **カラム** (`ColumnType`): Home / Notifications / Local / Global (常に 4 つ)。
   4 つでは等幅にラベルが収まらないため、選択中のボタンだけラベルを出して幅を広げる (他はアイコンのみ)。
 * **通知カラム** (`ui/notification/`): `NotificationGroup` 単位の一覧。
-  * 取得 API は設定 (`AppSettings.notificationApi`) で切り替え、`NotificationRepository.fetch(session, api, ...)` に渡す。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
+  * 取得 API はアカウントごとの設定 (`AccountSettings.notificationApi`) で切り替え、`NotificationRepository.fetch(api, ...)` に渡す。既定は `Grouped` (`GET /api/v2/notifications`、Mastodon 4.3+、
     サーバが favourite / reblog / follow を「同じ種類・同じ対象・近い時間帯」でまとめる)。`Ungrouped` は v1 で、
     各通知を 1 件のグループ (`Notification.asGroup()`) にする。切り替えたら通知を読み直す。サーバのバージョン確認は未実装。
     グルーピングの仕様はサーバ任せとし、クライアント側で独自にまとめることはしない。
@@ -813,7 +881,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `DetailScaffold` (タイトルは表示名 +「Favourited N of your posts」) + `PostList` でまとめたポストを通知と同じ新しい順に並べ、
     末尾 (`PostList(footer = ...)`) にそのユーザーの要約 (`UserSummary`: タイムラインと同じ大きさのアイコン / 太字の表示名 /
     控えめな色・小さめのプロフィール文。タップでプロフィール)。ポストは通知の一覧から受け取らず ID で取り直す (プロセスの
-    再生成でも開き直せるように)。消された・見られないポスト (4xx) は飛ばす。開いた後に届いた分は反映しない。
+    再生成でも開き直せるように)。消された・見られないポスト (404) は飛ばし、それ以外の失敗 (401 / 403 等) は画面の失敗にする。開いた後に届いた分は反映しない。
   * 一覧の組み立ては純粋関数 `appendNotificationPage(current, page)` (`ui/notification/NotificationGrouping.kt`) が行い、
     `PagedFeed(append = ...)` から呼ぶ。refresh は空の一覧に足す。手順:
     1. ページ境界で分かれたサーバ側グループの続き (同じ `group_key`) は既存行の中で `NotificationGroup.mergeOlder` で統合
@@ -839,7 +907,9 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * **Timeline**: トップバーは無く、上端にヘッダ (`TimelineHeader`、Google マップの検索欄・チップ風) を浮かべる。
   中身は `PostList`。各タイムラインの状態は `TimelineViewModel` が `TimelineType` ごとに保持。
   * ヘッダ: 左にメニューのボタン (≡。タップで左から `ModalNavigationDrawer` のドロワー `TimelineDrawerSheet` (X のアプリの形):
-    ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) / 設定 /
+    ログイン中のアカウントのアイコン・名前・@acct (`ComposerSession` が取得したもの。タップで自分のプロフィール) /
+    右に他のアカウントの小さなアイコン 1 つ (大きなアイコンと下揃え) (タップで切り替え)、[v] で全アカウントの一覧 +「アカウントを追加」(`DrawerAccounts.kt`。
+    保存している表示用の情報で描く。ドロワーの幅は変えない) / 設定 /
     検索 (`Route.Search`。トップバーが検索欄で、キーボードの検索で確定。結果は `ConnectedTabRow` (Accounts / Posts / Hashtags) +
     `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
     投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
@@ -874,11 +944,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   (一覧は `hazeSource` を付け、下端の余白に引数の `barSpace` を足す)。
   単独の投稿画面 (`Route.Composer`、`Navigator.openComposer()`) はバーの無い画面 (プロフィール・ハッシュタグからの返信) 用。閉じても下書きは残す。
 * **下書きの共有**: 書きかけの投稿は `ComposerSession` (入力 `ComposerState`・添付のアップロード・送信・上限・アカウント・絵文字)。
-  `DraftStore` (`AppContainer.draftStore`) がアプリ全体で 1 つ持ち、バー・フル画面・単独の投稿画面が同じものを使う。
-  例外として、詳細のパネル (タブレット表示) の中の画面は別の `AppContainer.panelDraftStore` を使う (`LocalInDetailPanel` で
+  `DraftStore` (`AccountUiContext.draftStore`) がアカウントごとに 1 つ持ち、バー・フル画面・単独の投稿画面が同じものを使う。
+  例外として、詳細のパネル (タブレット表示) の中の画面は別の `AccountUiContext.panelDraftStore` を使う (`LocalInDetailPanel` で
   決める。パネルから開いた単独の投稿画面は `Route.Composer(panelDraft = true)`)。パネルを閉じても下書きは残る。
   session は自分のコルーチンの範囲 (`SupervisorJob` + Main) で動くので、画面を切り替えてもアップロードは止まらない。
-  投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。アカウントが変わったら作り直す。プロセスが終わると消える (保存しない)。
+  投稿・破棄で `DraftStore.finish()` → 空の下書きに替わる。ログアウトで `AccountUiContext.close()` が止める。ログインし直し
+  (トークンが変わって依存を作り直す)・プロセスの終了でも消える (保存しない。**TODO: 下書きの永続化**)。
   * 投稿できたら `DraftStore` 自身が `finish()` し、`DraftStore.published` (SharedFlow) に投稿を流す。同じ下書きを複数の画面
     (メイン画面とポスト画面) が表示しているので、後始末は画面ではなくここで 1 回だけ行う。画面はそれを受けてフル画面を閉じる・
     スレッドに足す (`PostViewModel.addPublishedReply`) だけ。
@@ -920,7 +991,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   `characters_reserved_per_url` (23)、`@user@domain` は `@user` 分、書記素単位。URL の判定は twitter-text より簡略化している。
 * 上限 (`ComposeLimits`) は `InstanceRepository` から。取得前・失敗時は Mastodon の既定値 (500 字 / 4 枚 / 4 択)。
   `InstanceRepository` はサーバごとにプロセス内で 1 回だけ取得し (失敗はキャッシュしない)、ストリーミング URL もここから取る。
-* 公開範囲・閲覧注意の初期値は `AccountRepository.fetchMe` (`verify_credentials` の `source`、セッションごとにキャッシュ)。
+* 公開範囲・閲覧注意の初期値は `AccountRepository.fetchMe` (`verify_credentials` の `source`、Repository (= アカウント) ごとにキャッシュ)。
   取得前にユーザーが変えていたら上書きしない。
 * **カスタム絵文字の補完**: カーソル直前の `:sho` (2 文字以上) で、ツールバー直上に候補の帯 (`EmojiSuggestionStrip`) を出す。
   タップで `:shortcode: ` に置き換える。フォーカスのある欄 (本文 / CW) が対象。
@@ -1003,7 +1074,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
 * **返信**:
-  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アプリ全体で 1 つ。パネルは別)。
+  * 返信先は下書きの一部 (`ComposerState.inReplyTo`)。**返信と通常の投稿で下書きを分けない** (アカウントごとに 1 つ。パネルは別)。
     **返信先が付くのは返信ボタンを押したときだけ** (ポスト画面を開いただけでは付けない。以前の X 風の「自動の返信」は外した)。
     返信ボタン (`onReply`) は `session.startReply(post)` + `QuickPostBarState.requestInput()` (バーにフォーカス)。
     返信中に別のポストの返信ボタンを押すと返信先を上書きし、本文は残す。プロフィール (バーが無い) は `startReply` → `Navigator.openComposer()`。
@@ -1029,7 +1100,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * **MainActivity とは別の Activity**: 標準の launchMode なので共有元のタスクに積まれ、投稿・破棄で `finish()` すると共有元に
     戻る (MainActivity は singleTask で、受けると Quasar のタスクに移ってしまう)。`taskAffinity=""` は共有元が `NEW_TASK` を
     付けてきたときに MainActivity のタスクに積まれないため。投稿できたら Toast「Posted」。
-  * **下書きは `DraftStore` と別** (`ShareViewModel` が `container.composerSession` で作る)。書きかけの投稿・返信先と混ざらない。
+  * **下書きは `DraftStore` と別** (`ShareViewModel` が開いたときのアカウントの `AccountUiContext.composerSession` で作る。開いている間に
+    MainActivity で切り替えても追わず、そのアカウントがログアウト・ログインし直されたら閉じる。この画面でのアカウントの選択は未実装)。書きかけの投稿・返信先と混ざらない。
     閉じるときは変更があれば破棄の確認 (`keepDraftOnClose = false`)。プロセスの再生成では intent から入れ直す。
   * 中身の解釈は純粋関数 (`SharedContent.kt`、`SharedContentTest`): 本文は `EXTRA_SUBJECT` (ページのタイトル) + 改行 +
     `EXTRA_TEXT` (含まれていれば本文だけ)。メディアは `EXTRA_STREAM` (無ければ ClipData)、重複を除いて順を保つ。
@@ -1042,7 +1114,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 未ログインはログインを促し、MainActivity を開く (共有の中身は引き継がない)。
   * 確認: `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "hello" -n <pkg>/es.aria_on_the_planet.quasar.ui.share.ShareActivity`。
     adb から渡した `content://` は shell の権限なので読めない (メディアの経路は実際のアプリから共有して確かめる)。
-  * 未実装: Direct Share (共有シートのおすすめ)、音声の共有、共有した下書きを `DraftStore` に移して後で続ける。
+  * 未実装: Direct Share (共有シートのおすすめ)、音声の共有、共有した下書きを `DraftStore` に移して後で続ける、この画面で投稿するアカウントを選ぶ。
 * **共有された URL を開く** (`ui/openlink/`): 共有シートに「Quasar で開く」(manifest の `<activity-alias android:name=".OpenLink">`、
   MainActivity の別名) を「Quasar で投稿」(`ShareActivity`) と別の項目として出す (Instagram の「ストーリーズ / フィード」と同じ仕組み)。
   * 受けるのは MainActivity (singleTask) なので Quasar のタスクで開き、「戻る」は元の画面 (タイムライン等) に戻る。別名で
@@ -1051,10 +1123,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 開く対象は純粋関数 `linkQueryOf` (`OpenLinkTest`): `EXTRA_TEXT` → `EXTRA_SUBJECT` の順で最初の http(s) の URL、無ければ
     `@user@domain`。タグのページ (`/tags/名前`・`/tag/名前`) は検索で引けないので `hashtagOfUrl` で直接 `Route.Hashtag`。
   * それ以外は `Route.OpenLink(query)` を積み、`/api/v2/search` (`resolve=true`) で引けたら自分を `Route.Post` / `Route.Profile` /
-    `Route.Hashtag` に置き換える (すぐ下が同じ画面なら外すだけ)。見つからない・失敗はその画面で理由 + ブラウザで開く (+ 再試行)。
+    `Route.Hashtag` に置き換える (すぐ下が同じ画面なら外すだけ)。見つからない・失敗はその画面で理由 + ブラウザで開く (+ 再試行。401 / 403 なら「ログインし直す」も)。
   * MainActivity → `QuasarNavHost(externalLinks)` は Channel (画面ができる前に受けた分も溜まる)。未ログインなら Toast。
   * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
-* **未実装**: 下書き保存、
+* **未実装**: 下書き保存 (TODO: 永続化して、ログインし直し・プロセスの終了をまたいで残す。今はどちらでも消える)、
   メンション・ハッシュタグの補完、
   言語の指定、予約投稿。
 
@@ -1063,7 +1135,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
 PLaMo 3 Translate 0.8B (GGUF Q4_0) を llama.cpp で端末内で動かす。フレーバー `full` だけ (v1.4 から配布)
 (`lite` は `createTranslationEngine` が null で、翻訳の表示・設定が出ない)。ポストの本文の上に X の形の「PLaMoで〇〇語から翻訳 (規約の第 5 条で、モデルの出力だと示す。省略させず折り返す) ·
 原文を表示 / 翻訳を表示」(`PostTranslationBar`。順番待ち・訳している間は「翻訳中…」を薄くし、その上を濃い帯が流れる = `Modifier.shimmer`)、言語ごとの扱い (自動で翻訳 / ボタンを表示 / 表示しない。「その他の言語」+ 違う扱いの言語の一覧)・翻訳先は設定の「実験的機能」→「翻訳」。状態はアプリ全体で
-1 つの `PostTranslationStore` (`LocalPostTranslations`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
+1 つの `PostTranslationStore` (`LocalPostTranslations`。アカウントを切り替えたら訳・言語の推定の結果を捨てる = `clearResults`)。モデルは最初に訳すときに読み、2 分使われなければ解放する。
 **裏に回ったら (`ProcessLifecycleOwner` の onStop) すぐ解放して前面に戻るまで訳さず、`onTrimMemory` (RUNNING_LOW 以上、
 UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持ったまま裏にいるとアプリごと終わらされやすい)。訳しかけは順番待ちに戻す。
 **設計・実験の結果・確かめ方は [docs/translation-ondevice.md](docs/translation-ondevice.md)**。以前の ML Kit + サーバー側翻訳の
@@ -1100,9 +1172,12 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   AccountPosts・PinnedPosts (プロフィールの投稿一覧の最初のページ・ピン留めの並び。ID はアカウント。`PostListEntry` =
   外側の ID・中身の ID・ブーストした人で、`EntityCache.postList` がブーストの外側を組み立て直す)。
   スキーマが変わったら移行せず作り直す (`fallbackToDestructiveMigration`)。スキーマの JSON は `app/schemas/`。
-  * 置き場所は `cacheDir/api-cache/api-cache.db` (`CacheDatabase.create`)。設定画面では「キャッシュ」に数えられ、「キャッシュを削除」・
+  * **アカウントごとに別の DB**: `cacheDir/api-cache/<AccountKey>/api-cache.db` (`CacheDatabase.create(context, key)`)。`AccountContext`
+    が持ち、開いたら `trim()`、`close()` で閉じる。ログアウトでディレクトリごと消す (`CacheDatabase.delete`)。起動時に一覧に無い
+    アカウントのものと、分ける前の `api-cache/api-cache.db` を消す (`deleteOthers`。キャッシュなので移さない)。
+    設定画面では「キャッシュ」に数えられ、「キャッシュを削除」・
     容量不足のときの OS の削除の対象 (バックアップ・端末間の移行の対象外)。本体・`-wal`・`-shm` がばらけて消されないよう、
-    ディレクトリに `StorageManager.setCacheBehaviorGroup` を付けている。起動中に消されても落ちず (開いたままのファイルを使い続ける)、
+    アカウントのディレクトリに `StorageManager.setCacheBehaviorGroup` を付けている。起動中に消されても落ちず (開いたままのファイルを使い続ける)、
     次の起動で作り直すことをエミュレーターで確認済み (`adb shell pm trim-caches 999G`)。
   * 耐久性は要らないので WAL + `synchronous = OFF` (コールバック `onOpen` で設定。fsync しない)。`synchronous` は接続ごとの設定で、
     書き込みに使う主接続だけが OFF になる (WAL の読み取り用の接続は端末の既定のまま。書かないので関係ない)。確かめるときは
@@ -1140,8 +1215,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
     * familiar followers は後から届いて見出しが伸びる。`CollapsingHeaderState` は畳み切っている間に見出しの高さが変わったら
       畳んだままにする (一覧ごと下へずれないように)。
   * まとめの中身: 通知を取ったときにポストが入っているので、期限切れ・無いものだけを取る。
-* 上限: 起動時に種類ごとに古い分を消す (`CachePolicy.MaxEntries`)。ログアウト・別のセッションへの切り替えで全部消す
-  (`AppContainer`。中身はログイン中のユーザーから見た状態なので)。
+* 上限: DB を開いたとき (`AccountContext` を作ったとき) に種類ごとに古い分を消す (`CachePolicy.MaxEntries`)。中身はログイン中の
+  ユーザーから見た状態なので、アカウントをまたいで使わない (DB がアカウントごと)。
 * テスト: 純粋関数は `CacheMergeTest` / `VersionClockTest`、SQL は計装テストの `CacheDaoTest` (下記「開発メモ」)。
 * 未対応: 一覧 (タイムライン・通知。プロフィールの投稿一覧は最初のページだけ) は Room を見ない (画面をまたいだ操作の反映は揃わない)、起動時に前回の一覧を出すこと。
   削除は消すだけで印を残さないので、削除の前に出した取得の応答が後から届くと書き戻されうる (次に開いたときの 404 で消える)。
@@ -1193,21 +1268,32 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 
 ## 設定
 
-* 設定全体は `AppSettings` (`domain/model/settings/`): ポストのメニューに出さない項目 (`hiddenPostMenuItems`)・翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
-  設定画面に出る)・表示 (`DisplaySettings`)・通知の取得 API・カラムごとの自動更新
-  (`StreamingSettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
-  アカウントの既定 `source.privacy`。ダイレクトは選べない)・予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
-  log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
-* 保存は `SettingsStore` (`data/settings/`、Preferences DataStore、`AppContainer.settingsStore`)。項目ごとに 1 キーで、
-  対応表は `SettingsPreferences.kt` の `SettingFields` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはここに 1 行足す**。
+* 設定は**端末共通** (`DeviceSettings`) と**アカウントごと** (`AccountSettings`) に分かれる (`domain/model/settings/`。分け方は
+  [docs/multi-account.md](docs/multi-account.md) の「設定の分け方」)。新しく足したアカウントは既定値から始まる (コピーしない)。
+  * 端末共通: ポストのメニューに出さない項目 (`hiddenPostMenuItems`)・翻訳 (`TranslationSettings`: オン / オフ・言語ごとの扱い (`defaultMode` + `languageModes`)・訳す先。翻訳のあるビルドだけ
+    設定画面に出る)・表示 (`DisplaySettings`)・確認する操作 (`Set<ConfirmTarget>`、既定は自分のポストの編集の保存・削除・フォローリクエストの拒否 = `DefaultConfirmations`)・
+    予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
+    log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
+  * アカウントごと: 通知の取得 API・カラムごとの自動更新 (`StreamingSettings`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
+    アカウントの既定 `source.privacy`。ダイレクトは選べない)・大きな画像の圧縮・画像のメタデータの削除。
+* 保存は `SettingsStore<S>` (`data/settings/`、Preferences DataStore)。端末共通は `AppContainer.deviceSettings` (`settings` のファイル)、
+  アカウントごとは `AccountContext.settings` (`settings_<AccountKey>` のファイル。DataStore は 1 つのファイルにプロセスで 1 つしか
+  作れないので、`AppContainer` がキーごとに 1 つ持つ。ログアウトで止めてファイルを消す)。項目ごとに 1 キーで、
+  対応表は `SettingsPreferences.kt` の `DeviceSettingsSchema` / `AccountSettingsSchema` (純粋関数、`SettingsPreferencesTest`)。**項目を足すときはどちらかに 1 行足す**。
+  キーの名前は分ける前 (1 つのファイル) のまま。
+  * 移行: 分ける前の `settings` のファイルはそのまま端末共通のファイルとして読む。アカウントごとの項目は、保存しているアカウントのうち
+    最初に設定を開いたアカウント (ふつうは起動時に使っているアカウント。ログアウト中だったなら次にログインしたアカウント) のファイルへ
+    DataStore の移行 (`LegacyAccountSettingsMigration`) で写し、写せたら端末共通のファイルから消す。写した項目は上書きしないので、
+    途中で終わってもやり直せる。移し終えた後に開いたアカウントは既定値から始まる。
   * 確認する操作は 1 つのキー (`confirm_targets`) にまとめるが、既定でオンのもの (`DefaultConfirmations`) だけは個別の
-    boolean のキー (`confirm_edit_post` / `confirm_delete_post`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
-  * キーが無ければ既定値。書き込みは変わった項目だけ (`writeSettingsChanges`)。`null` を値に持つ項目は番兵値
+    boolean のキー (`confirm_edit_post` / `confirm_delete_post` / `confirm_reject_follow_request`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
+  * キーが無ければ既定値。書き込みは変わった項目だけ (`SettingsSchema.writeChanges`)。`null` を値に持つ項目は番兵値
     (折りたたみ・fps は 0、公開範囲は `"account"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
     `null` 自体が値なので、decode は「読めない」と区別するため `Decoded` で包んで返す。
-  * 読み込みは非同期: `settings: StateFlow<AppSettings?>` は読み込み前 `null` (起動時から読み始める)。`QuasarAppContent` は
-    読み込みまで中身を描かない (既定値で描いてから切り替わらない)。UI 以外は `loaded` (Flow) / `current()` で待つ
-    (`TimelineViewModel` の自動更新・通知 API、`ComposerSession` の公開範囲)。
+  * 読み込みは非同期: `settings: StateFlow<S?>` は読み込み前 `null` (作ったときから読み始める)。`QuasarAppContent` は
+    端末共通の設定の読み込みまで中身を描かない (既定値で描いてから切り替わらない。アカウントごとの設定は待たないので、ログアウト中も
+    同じに動く)。UI 以外は `loaded` (Flow) / `current()` で待つ (アカウントの設定: `TimelineViewModel` の自動更新・通知 API、
+    `ComposerSession` の公開範囲、`AppContainer` の投稿欄の画像の扱い。端末共通: `PostTranslationStore`)。
 * `QuasarAppContent` が `LocalDisplaySettings` (`ui/settings/`)・`LocalUriHandler` (外部リンク、`NewTaskUriHandler`) と
   `ActionConfirmationHost` を提供する。Activity の setContent は `QuasarAppContent(container)` で包む (MainActivity とデバッグ用ギャラリー)。
   表示設定の項目: `longPostMaxLines` (長文の折りたたみ行数、null で無効)、
@@ -1228,7 +1314,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   (`ActionConfirmationHost` が描く `ConfirmDialog`) を出して答えを待ち、そうでなければすぐ `true`。新しい確認が来たら前のは
   取りやめ、呼び出し側のコルーチンがキャンセルされたらダイアログも消える。ブースト等は `rememberPostActionConfirmation`、
   投稿は `rememberConfirmedSubmit(session)` (クイック投稿バー・投稿画面の送信ボタン。編集なら `EditPost`)、削除はポスト画面から使う。
-  設定画面の Confirmations の「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
+  設定画面の Confirmations の「Posting」で投稿、「My posts」で編集・削除、「Follow requests」で拒否の確認を切り替える。
 * **ライセンス** (`Route.SettingsLicenses` / `SettingsLicense(id)`、`LicensesPage.kt`): 設定のトップから。翻訳のモデル (PLaMo。
   規約の第 4 条で規約の写しと「Built with PLaMo」が要る) / 同梱のソフトウェア / 依存のライブラリ。依存の一覧は
   `com.mikepenz.aboutlibraries.plugin.android` がビルド時に POM から `res/raw/aboutlibraries.json` を作る (ランタイムのライブラリは
@@ -1239,6 +1325,9 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` / `SettingsPostMenu` /
   `SettingsPosting` / `SettingsConfirmations` / `SettingsExperimental` (実験的機能。今は翻訳の入口だけで、翻訳の無いビルドでは出さない)) は他の画面と同じバックスタックに積む。
+  トップは「アカウントの設定 (@acct@host)」(Timelines = 自動更新・通知 API / Posting = 公開範囲・画像の扱い。使っているアカウントの設定を
+  読み書きする。ログアウト中は出さない) と「アプリの設定」(Display / Post menu / Confirmations / 実験的機能。端末共通) に分け、
+  その下にライセンス・ログアウト。ページの中身はエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`)。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
     (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
@@ -1305,8 +1394,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   → `app/build/compose_compiler/`。
 * **動作確認用の連合環境** (`testbed/`。使い方・設定・セットアップは [docs/testbed.md](docs/testbed.md)、環境の構成は
   [testbed/README.md](testbed/README.md)): Docker の中に Mastodon 3 台 (nightly / 最新安定版 / 3.5.19) と Misskey 1 台を立てて連合させ、bots が
-  投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れ、手元だけで
-  アプリにユーザーの CA を信頼させれば (`network_security_config`。**コミットしない**) debug ビルドからログインできる。
+  投稿・リアクションし合う。`testbed/testbed.sh up`。エミュレーターは `-dns-server 127.0.0.1` で起動して CA を入れれば
+  debug ビルドからログインできる (debug ビルドはユーザーが入れた CA も信頼する。`network_security_config` の `debug-overrides`)。
   版ごとの API の違い (3.5 には v2 通知が無い等) はここで確かめる。
 * **debug / benchmark は release と別のアプリ** (`applicationIdSuffix = ".debug"` → `es.aria_on_the_planet.quasar.debug`、
   ランチャーでは「Quasar Debug」)。release を普段使いしている端末にも横に並べて入れられる (ログインは別)。
@@ -1346,12 +1435,14 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定の Timelines のページと、そこから開く Post menu のページ。本物の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる) /
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
   translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
-  translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ)。
+  translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ) /
+  account-switcher (ドロワーのアカウントの切り替え。`account-switcher.json` の保存しているアカウントで本物の `TimelineDrawerSheet`。
+  チップで 1 / 2 / 全部のアカウント、切り替えは手元だけ。長い名前・絵文字・表示用の情報の無いアカウントを含む)。
   表示設定の extra (`GalleryExtras`、`QuasarAppContent(display = ...)` に渡す) は指定した項目だけを上書きし (`--ei max_fps 0` で上限なし、`--ef ui_scale 1.2` / `--ef font_scale 1.1` で倍率、`--ei long_post_max_lines 3` で長文の折りたたみの行数、`--es avatar_shape RoundedSquare` でアイコンの形)、ビルドし直さずに比べられる。
 * 固定データ: `assets/gallery/*.json` は API と同じ形 (Status / Account / CustomEmoji) で、本番と同じ DTO と mapper で読む
   (`GalleryFixtures`)。画像の URL は `file:///android_asset/gallery/images/...` (Coil が assets から読む。`RemoteImage` と
@@ -1462,13 +1553,14 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * 起動直後の `uiautomator dump` はまだ描画前のことがある。目的のノードが出るまで数回リトライする。
 * gap の動作確認は流量のあるグローバルで行う: 設定 (Timelines → Auto-update) でグローバルをオンにして、別画面を
   開いて (= 切断) 8 分ほど待ってから戻る。確認後はオフに戻す。
-* 設定を既定に戻すには (debug): `adb shell am force-stop <pkg>` → `adb shell run-as <pkg> rm files/datastore/settings.preferences_pb`。
+* 設定を既定に戻すには (debug): `adb shell am force-stop <pkg>` → `adb shell run-as <pkg> rm files/datastore/settings.preferences_pb`
+  (端末共通。アカウントごとのものは `settings_<AccountKey>.preferences_pb`)。
 * ストリームの接続状況は logcat の `StreamingClient` (接続・切断・受信イベントの種類と文字数のみ。トークンや本文は出さない)。
 
 ## 未対応・今後の課題
 
-* **認証**: 複数アカウント無し (ログインは 1 つ)。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
-  OAuth のログインの往復 (ブラウザでの認可 → 戻り) はエミュレータ + testbed (3.5.19) で確認済み (実機は未確認)。
+* **認証**: 複数アカウントの切り替え・追加はある (ドロワー)。アカウントをまたいだ操作は無い。OAuth のクライアントはログインのたびに登録し直している (サーバごとの再利用は無い)。
+  OAuth のログインの往復 (ブラウザでの認可 → 戻り) はエミュレータ + testbed (3.5.19 / 4.x) で確認済み (実機は未確認)。
   * **将来: 戻り先を App Links (検証済みの https URL) にする**。今のカスタムスキーム (`es.aria-on-the-planet.quasar://oauth`) は
     他のアプリが同じスキームを登録すると戻りを横取りされうる (PKCE があるので盗まれたコードはトークンにできないが、
     横取り自体は防げない。RFC 8252 7.2)。管理するドメインに `/.well-known/assetlinks.json` (パッケージ名 + 署名の
@@ -1478,7 +1570,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   操作失敗時の UI 通知、ブーストの公開範囲の選択、自分のフォロワー限定ポストのブーストは未対応。
 * **メディアビューア**: PiP、代替テキストの表示は未実装
   ([docs/media-viewer.md](docs/media-viewer.md) の「未実装」)。audio はまだ実機で確認していない。
-* **設定**: アカウントごとの設定 (今はアプリ全体で 1 つ)、サーバ側の既定の公開範囲 (`update_credentials`) との同期は無い。
+* **設定**: サーバ側の既定の公開範囲 (`update_credentials`) との同期は無い。
   v2 通知は Mastodon 4.3+ 前提で、互換サーバ (Pleroma / GoToSocial 等) やバージョン判定はまだ無い。
 * **自動更新**: 通知の gap は無い (1 ページ埋まったら読み直し)、背面での受信 (Web Push) 無し、
   通知の削除イベント未対応。一覧の上限 (400) で捨てる際、下端を読んでいる最中でも古い側が消えうる。

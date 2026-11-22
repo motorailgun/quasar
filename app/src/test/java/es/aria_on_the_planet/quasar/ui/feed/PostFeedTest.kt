@@ -50,7 +50,7 @@ class PostFeedTest {
         feed.loadMore()
         val state = feed.state.value
         assertEquals(listOf("1"), state.items.posts.map { it.id })
-        assertEquals("boom", state.error)
+        assertEquals("boom", state.error?.message)
         assertFalse(state.isLoadingMore)
     }
 

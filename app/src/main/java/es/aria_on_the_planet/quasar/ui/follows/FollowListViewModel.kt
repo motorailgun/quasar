@@ -3,8 +3,7 @@ package es.aria_on_the_planet.quasar.ui.follows
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
-import es.aria_on_the_planet.quasar.data.session.Session
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.domain.model.Page
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.User
@@ -35,16 +34,16 @@ data class FollowListState(
 }
 
 class FollowListViewModel(
-    private val session: Session,
+    account: AccountContext,
     private val accountId: String,
-    private val repository: AccountRepository,
 ) : ViewModel() {
+    private val repository = account.accountRepository
 
     private val profile = MutableStateFlow<Profile?>(null)
 
     // max_id はフォロー関係の ID なので、Link ヘッダから得た Page.nextMaxId でページングする
-    private val following = userFeed { maxId -> repository.fetchFollowing(session, accountId, maxId) }
-    private val followers = userFeed { maxId -> repository.fetchFollowers(session, accountId, maxId) }
+    private val following = userFeed { maxId -> repository.fetchFollowing(accountId, maxId) }
+    private val followers = userFeed { maxId -> repository.fetchFollowers(accountId, maxId) }
 
     val state: StateFlow<FollowListState> = combine(profile, following.state, followers.state, ::FollowListState)
         .stateIn(viewModelScope, SharingStarted.Eagerly, FollowListState())
@@ -52,7 +51,7 @@ class FollowListViewModel(
     init {
         viewModelScope.launch {
             try {
-                profile.value = repository.fetchProfile(session, accountId)
+                profile.value = repository.fetchProfile(accountId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -3,11 +3,8 @@ package es.aria_on_the_planet.quasar.ui.hashtag
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import es.aria_on_the_planet.quasar.data.repository.AccountRepository
-import es.aria_on_the_planet.quasar.data.repository.StatusRepository
-import es.aria_on_the_planet.quasar.data.repository.TimelineRepository
+import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.repository.withPoll
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
@@ -19,14 +16,14 @@ import kotlinx.coroutines.launch
 
 /** ハッシュタグ [hashtag] (`#` 無し) のタイムライン。ストリーミングは受けず、PTR と追加読み込みのみ。 */
 class HashtagViewModel(
-    private val session: Session,
+    account: AccountContext,
     val hashtag: String,
-    repository: TimelineRepository,
-    private val statusRepository: StatusRepository,
-    accountRepository: AccountRepository,
 ) : ViewModel() {
+    private val repository = account.timelineRepository
+    private val statusRepository = account.statusRepository
+    private val accountRepository = account.accountRepository
 
-    private val posts = PostFeed(viewModelScope) { maxId -> repository.fetchHashtag(session, hashtag, maxId) }
+    private val posts = PostFeed(viewModelScope) { maxId -> repository.fetchHashtag(hashtag, maxId) }
 
     val state: StateFlow<PostFeedState> = posts.state
 
@@ -47,13 +44,13 @@ class HashtagViewModel(
     fun loadMore() = posts.loadMore()
 
     suspend fun vote(post: Post, choices: List<Int>): Boolean =
-        viewModelScope.submitVote(statusRepository, session, post, choices) { poll ->
+        viewModelScope.submitVote(statusRepository, post, choices) { poll ->
             posts.updatePosts { it.withPoll(poll) }
         }
 
     private val postActions = PostActionController(
         scope = viewModelScope,
-        send = { statusId, action -> statusRepository.perform(session, statusId, action) },
+        send = { statusId, action -> statusRepository.perform(statusId, action) },
         update = posts::updatePosts,
         onError = { message, error -> Log.w(TAG, message, error) },
     )

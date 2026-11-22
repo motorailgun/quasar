@@ -17,12 +17,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.rememberHazeState
-import es.aria_on_the_planet.quasar.QuasarApplication
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.ui.component.blur.LocalSurfaceBlurEnabled
 import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurSource
@@ -43,19 +40,15 @@ import kotlinx.coroutines.cancel
  */
 @Composable
 internal fun QuickPostBarGallery(posts: List<Post>, onBack: () -> Unit) {
-    val context = LocalContext.current
     val navigator = LocalNavigator.current
-    val session = remember {
-        val container = (context.applicationContext as QuasarApplication).container
+    val account = rememberGalleryAccount()
+    val session = remember(account) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        scope to container.composerSession(
-            session = Session(serverUrl = "https://gallery.invalid", accessToken = "gallery"),
-            scope = scope,
-            editing = null,
-            onPublished = {},
-        )
+        scope to account.composerSession(scope = scope, editing = null, onPublished = {})
     }
-    DisposableEffect(Unit) { onDispose { session.first.cancel() } }
+    DisposableEffect(session) {
+        onDispose { session.first.cancel() }
+    }
     val hazeState = rememberHazeState()
     val listState = rememberLazyListState()
     DetailScaffold(

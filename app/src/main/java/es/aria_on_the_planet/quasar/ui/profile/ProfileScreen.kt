@@ -269,7 +269,7 @@ private fun ProfileBody(
         when {
             profile == null && state.profile.error != null ->
                 Box(Modifier.padding(top = scaffoldBarHeight)) {
-                    DetailMessage(stringResource(R.string.profile_error, state.profile.error))
+                    DetailMessage(state.profile.error, R.string.profile_error)
                 }
 
             profile == null -> Box(Modifier.padding(top = scaffoldBarHeight)) { DetailLoading() }

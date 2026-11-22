@@ -58,9 +58,6 @@ abstract class CacheDao {
     )
     abstract suspend fun trim(kind: String, keep: Int)
 
-    @Query("DELETE FROM cache_entries")
-    abstract suspend fun clear()
-
     companion object {
         const val MaxIdsPerQuery = 500
     }

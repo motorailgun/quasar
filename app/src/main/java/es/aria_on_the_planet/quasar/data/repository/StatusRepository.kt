@@ -52,6 +52,7 @@ data class CachedThread(val thread: PostThread, val isPostFresh: Boolean)
  * ポストの取得・操作。取得・操作の結果はキャッシュ ([cache]) にも書く。操作 (お気に入り等) は成功した応答だけを書く。
  */
 class StatusRepository(
+    private val session: Session,
     private val api: MastodonApi,
     private val cache: EntityCache,
 ) {
@@ -64,7 +65,7 @@ class StatusRepository(
      * [statusId] のスレッドを取得する。[post] (キャッシュの本体) を渡すと本体は取らず、スレッド (`/context`) だけを取る。
      * 消された・見られなくなったポスト (404 / 410) はキャッシュからも消して投げ直す。
      */
-    suspend fun fetchThread(session: Session, statusId: String, post: Post? = null): PostThread = coroutineScope {
+    suspend fun fetchThread(statusId: String, post: Post? = null): PostThread = coroutineScope {
         val version = cache.issue()
         try {
             val status = if (post == null) async { api.status(session.serverUrl, session.accessToken, statusId) } else null
@@ -100,9 +101,10 @@ class StatusRepository(
 
     /**
      * [statusIds] のポストを 1 件ずつ取得し、同じ順で返す (同時に [MaxParallelFetches] 件まで)。
-     * 消された・見られなくなったポスト (404 等、429 以外の 4xx) は飛ばす。通信エラー・5xx は投げる。
+     * 消された・見られなくなったポスト (404) は飛ばす。それ以外の失敗 (401 / 403 = ログインし直しが要る、通信エラー・5xx 等)
+     * は投げる。
      */
-    suspend fun fetchPosts(session: Session, statusIds: List<String>): List<Post> = coroutineScope {
+    suspend fun fetchPosts(statusIds: List<String>): List<Post> = coroutineScope {
         val permits = Semaphore(MaxParallelFetches)
         val version = cache.issue()
         val statuses = statusIds.map { id ->
@@ -111,7 +113,7 @@ class StatusRepository(
                     try {
                         api.status(session.serverUrl, session.accessToken, id)
                     } catch (e: MastodonApiException) {
-                        if (e.code in 400..499 && e.code != 429) null else throw e
+                        if (e.code == 404) null else throw e
                     }
                 }
             }
@@ -121,14 +123,14 @@ class StatusRepository(
     }
 
     /** [statusId] をブーストしたアカウント。`max_id` はブーストの ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchRebloggedBy(session: Session, statusId: String, maxId: String? = null): Page<User> =
-        fetchReactors(session, statusId, "reblogged_by", maxId)
+    suspend fun fetchRebloggedBy(statusId: String, maxId: String? = null): Page<User> =
+        fetchReactors(statusId, "reblogged_by", maxId)
 
     /** [statusId] をお気に入りにしたアカウント。`max_id` はお気に入りの ID なので [Page.nextMaxId] を使う。 */
-    suspend fun fetchFavouritedBy(session: Session, statusId: String, maxId: String? = null): Page<User> =
-        fetchReactors(session, statusId, "favourited_by", maxId)
+    suspend fun fetchFavouritedBy(statusId: String, maxId: String? = null): Page<User> =
+        fetchReactors(statusId, "favourited_by", maxId)
 
-    private suspend fun fetchReactors(session: Session, statusId: String, reaction: String, maxId: String?): Page<User> {
+    private suspend fun fetchReactors(statusId: String, reaction: String, maxId: String?): Page<User> {
         val version = cache.issue()
         val page = api.statusReactors(session.serverUrl, session.accessToken, statusId, reaction, maxId)
         cache.putAccounts(page.items, version)
@@ -143,7 +145,7 @@ class StatusRepository(
     }
 
     /** [statusId] の投票 [pollId] に投票して更新後の [Poll] を返す。 */
-    suspend fun vote(session: Session, statusId: String, pollId: String, choices: List<Int>): Poll {
+    suspend fun vote(statusId: String, pollId: String, choices: List<Int>): Poll {
         val version = cache.issue()
         val poll = api.votePoll(session.serverUrl, session.accessToken, pollId, choices)
         cache.updatePoll(statusId, poll, version)
@@ -154,7 +156,7 @@ class StatusRepository(
      * [statusId] のポストに [action] を行い、更新後のポストを返す。
      * ブーストの応答はブースト自体の Status だが、[toDomain] で中身の件数・状態が取り出される。
      */
-    suspend fun perform(session: Session, statusId: String, action: PostAction): Post {
+    suspend fun perform(statusId: String, action: PostAction): Post {
         val version = cache.issue()
         return api.statusAction(session.serverUrl, session.accessToken, statusId, action.endpoint)
             .also { cache.putStatuses(listOf(it), version) }
@@ -165,7 +167,7 @@ class StatusRepository(
      * [draft] を投稿し、作成されたポストを返す。
      * 同じ [idempotencyKey] での再送は二重に投稿されない (通信エラー後の再試行用)。
      */
-    suspend fun publish(session: Session, draft: PostDraft, idempotencyKey: String): Post {
+    suspend fun publish(draft: PostDraft, idempotencyKey: String): Post {
         val version = cache.issue()
         return api.postStatus(session.serverUrl, session.accessToken, draft.toFormParams(), idempotencyKey)
             .also { cache.putStatuses(listOf(it), version) }
@@ -173,13 +175,13 @@ class StatusRepository(
     }
 
     /** 自分のポストの編集前の原文 (本文・CW)。 */
-    suspend fun fetchSource(session: Session, statusId: String): StatusSource {
+    suspend fun fetchSource(statusId: String): StatusSource {
         val dto = api.statusSource(session.serverUrl, session.accessToken, statusId)
         return StatusSource(text = dto.text, contentWarning = dto.spoilerText)
     }
 
     /** 自分のポスト [statusId] を [draft] の内容に書き換え、更新後のポストを返す (公開範囲・返信先は変わらない)。 */
-    suspend fun edit(session: Session, statusId: String, draft: PostDraft): Post {
+    suspend fun edit(statusId: String, draft: PostDraft): Post {
         val version = cache.issue()
         return api.editStatus(session.serverUrl, session.accessToken, statusId, draft.toEditFormParams())
             .also { cache.putStatuses(listOf(it), version) }
@@ -188,7 +190,7 @@ class StatusRepository(
     }
 
     /** 自分のポスト [statusId] を削除する。 */
-    suspend fun delete(session: Session, statusId: String) {
+    suspend fun delete(statusId: String) {
         api.deleteStatus(session.serverUrl, session.accessToken, statusId)
         cache.deleteStatus(statusId)
         changes.tryEmit(PostChange.Deleted(statusId))

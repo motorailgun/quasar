@@ -24,9 +24,10 @@ import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
 import es.aria_on_the_planet.quasar.ui.theme.SyncWindowBackground
 
 /**
- * Activity の setContent の最上位 (アプリ本体の MainActivity とデバッグ用ギャラリー)。テーマとアプリ全体の設定 (表示・ポストのメニューの項目)・表示用の現在時刻 ([LocalNow])・外部リンクの開き方 ([LocalUriHandler]) を提供し、
+ * Activity の setContent の最上位 (アプリ本体の MainActivity とデバッグ用ギャラリー)。テーマと端末共通の設定 (表示・ポストのメニューの項目・確認)・表示用の現在時刻 ([LocalNow])・外部リンクの開き方 ([LocalUriHandler]) を提供し、
  * 操作の前の確認のダイアログ ([ActionConfirmationHost]) を出す。メニューの背景のぼかしの元 ([BackdropBlurHost]) も置く。ウィンドウの背景もテーマに合わせる ([SyncWindowBackground])。
- * 設定の読み込み前は中身を描かない (既定値で描いてから切り替わらないように。普通は最初のフレームまでに読み終わる)。
+ * 端末共通の設定の読み込み前は中身を描かない (既定値で描いてから切り替わらないように。普通は最初のフレームまでに読み終わる)。
+ * アカウントごとの設定は待たない (ログアウト中も同じに動く)。
  * 表示設定の UI・文字の倍率は [LocalDensity] を差し替えて効かせる ([scaledBy])。
  *
  * @param display 表示設定を上書きする (デバッグ用ギャラリーが adb の extra で上書きする)。
@@ -37,7 +38,7 @@ fun QuasarAppContent(
     display: (DisplaySettings) -> DisplaySettings = { it },
     content: @Composable () -> Unit,
 ) {
-    val settings by container.settingsStore.settings.collectAsStateWithLifecycle()
+    val settings by container.deviceSettings.settings.collectAsStateWithLifecycle()
     val playback = rememberInlinePlayback(container.okHttpClient)
     val now by rememberTickingNow()
     QuasarTheme {

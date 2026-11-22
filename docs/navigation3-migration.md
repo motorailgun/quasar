@@ -105,7 +105,7 @@ val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No Navigator")
 
 * MainActivity の中身を `QuasarNavHost` にし、Timeline をルートに。各画面をエントリにして、対応する Activity と manifest の
   宣言を消す。メディアビューアはこの段階では**今の Activity のまま** (`Navigator.openMedia` が `startActivity` する)。
-* **ログイン**: 今は MainActivity が `session == null` で LoginScreen と Timeline を出し分けている。セッションの有無で
+* **ログイン** (移行の当時の話。今はマルチアカウントで `AccountScope` が作り直す。[multi-account.md](multi-account.md)): 今は MainActivity が `session == null` で LoginScreen と Timeline を出し分けている。セッションの有無で
   バックスタックを作り直す (ログイン → `[Timeline]`、ログアウト → `[Login]`) 形にする (Navigation 3 の「条件付きの遷移」)。
   非ログインの経路は今後なくす方針なので、ここでは最低限 (Login 画面を 1 つのルートにするだけ)。
 * **ViewModel**: 各エントリで今と同じ `viewModel(factory = ...)`。エントリごとに別の ViewModel になる (同じプロフィールを

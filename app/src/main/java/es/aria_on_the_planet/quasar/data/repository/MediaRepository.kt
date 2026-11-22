@@ -9,6 +9,7 @@ import java.io.IOException
 
 /** 投稿に添付するメディアのアップロード。 */
 class MediaRepository(
+    private val session: Session,
     private val api: MastodonApi,
 ) {
     /**
@@ -18,7 +19,6 @@ class MediaRepository(
      * @param onProgress 送った割合 (0〜1、サイズ不明なら `null`)。通信のスレッドから呼ばれる。
      */
     suspend fun upload(
-        session: Session,
         source: UploadSource,
         description: String?,
         onProgress: (Float?) -> Unit,
@@ -41,7 +41,7 @@ class MediaRepository(
     }
 
     /** アップロード済み (未投稿) のメディアの代替テキストを変える。 */
-    suspend fun updateDescription(session: Session, mediaId: String, description: String) {
+    suspend fun updateDescription(mediaId: String, description: String) {
         api.updateMediaDescription(session.serverUrl, session.accessToken, mediaId, description)
     }
 

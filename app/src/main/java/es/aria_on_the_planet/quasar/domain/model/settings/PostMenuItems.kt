@@ -1,7 +1,7 @@
 package es.aria_on_the_planet.quasar.domain.model.settings
 
 /**
- * ポストのメニュー (︙) の項目。設定 ([AppSettings.hiddenPostMenuItems]) で 1 つずつ出さないようにできる。
+ * ポストのメニュー (︙) の項目。設定 ([DeviceSettings.hiddenPostMenuItems]) で 1 つずつ出さないようにできる。
  * 並びはメニューの並び (自分のポストの項目 → 共通 → 他人のポストの項目)。
  */
 enum class PostMenuItem {

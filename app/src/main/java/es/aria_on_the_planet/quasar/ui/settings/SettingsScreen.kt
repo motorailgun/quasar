@@ -11,11 +11,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
+import es.aria_on_the_planet.quasar.domain.model.settings.DeviceSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
@@ -33,30 +34,52 @@ import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSliderItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSplitSwitchItem
 import es.aria_on_the_planet.quasar.ui.component.settings.SettingsSwitchItem
 import es.aria_on_the_planet.quasar.ui.navigation.Route
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** 設定を変える (`SettingsStore.launchUpdate`)。 */
-typealias UpdateSettings = ((AppSettings) -> AppSettings) -> Unit
+/** 端末共通の設定を変える (`DeviceSettingsStore.launchUpdate`)。 */
+typealias UpdateDeviceSettings = ((DeviceSettings) -> DeviceSettings) -> Unit
+
+/** 使っているアカウントの設定を変える (`AccountContext.settings` の `launchUpdate`)。 */
+typealias UpdateAccountSettings = ((AccountSettings) -> AccountSettings) -> Unit
 
 /**
- * トップ: 各ページへの入口 + ログアウト。ログアウトは設定に関わらず必ず確認する。
+ * トップ: 「アカウントの設定」(使っているアカウントのもの) と「アプリの設定」(端末共通) の各ページへの入口 + ログインし直す・
+ * ログアウト。
+ * ログアウトは設定に関わらず必ず確認する。
  *
- * @param serverUrl ログイン中のサーバ (ログアウトの項目の補足に出す)。
+ * @param account 使っているアカウント (`@acct@host`、まだ分からなければサーバのホスト)。見出しとログアウトの補足に出す。
+ *   `null` (ログアウト中) なら「アカウントの設定」とログアウトを出さない。
  * @param translationAvailable 翻訳の入ったビルドか (翻訳のページを出す)。
  */
 @Composable
 fun SettingsTopPage(
-    serverUrl: String?,
+    account: String?,
     translationAvailable: Boolean,
     onNavigate: (Route) -> Unit,
     onLogout: () -> Unit,
     onBack: () -> Unit,
+    onRelogin: () -> Unit = {},
 ) {
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
     SettingsScaffold(title = stringResource(R.string.settings), onBack = onBack) {
-        SettingsGroup(title = null) {
+        if (account != null) {
+            SettingsGroup(title = stringResource(R.string.settings_account_section, account)) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_timelines),
+                    summary = stringResource(R.string.settings_timelines_summary),
+                    icon = Symbols.Outlined.Sync,
+                    onClick = { onNavigate(Route.SettingsTimelines) },
+                )
+                SettingsNavigationItem(
+                    title = stringResource(R.string.settings_posting),
+                    summary = stringResource(R.string.settings_posting_summary),
+                    icon = Symbols.Outlined.Edit,
+                    onClick = { onNavigate(Route.SettingsPosting) },
+                )
+            }
+        }
+        SettingsGroup(title = stringResource(R.string.settings_app_section)) {
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_display),
                 summary = stringResource(R.string.settings_display_summary),
@@ -64,16 +87,10 @@ fun SettingsTopPage(
                 onClick = { onNavigate(Route.SettingsDisplay) },
             )
             SettingsNavigationItem(
-                title = stringResource(R.string.settings_timelines),
-                summary = stringResource(R.string.settings_timelines_summary),
-                icon = Symbols.Outlined.Sync,
-                onClick = { onNavigate(Route.SettingsTimelines) },
-            )
-            SettingsNavigationItem(
-                title = stringResource(R.string.settings_posting),
-                summary = stringResource(R.string.settings_posting_summary),
-                icon = Symbols.Outlined.Edit,
-                onClick = { onNavigate(Route.SettingsPosting) },
+                title = stringResource(R.string.settings_post_menu),
+                summary = stringResource(R.string.settings_post_menu_summary),
+                icon = Symbols.Outlined.MoreVert,
+                onClick = { onNavigate(Route.SettingsPostMenu) },
             )
             SettingsNavigationItem(
                 title = stringResource(R.string.settings_confirmations),
@@ -99,14 +116,23 @@ fun SettingsTopPage(
                 onClick = { onNavigate(Route.SettingsLicenses) },
             )
         }
-        SettingsGroup(title = null) {
-            SettingsActionItem(
-                title = stringResource(R.string.logout),
-                summary = serverUrl?.toHttpUrlOrNull()?.host,
-                icon = Symbols.Outlined.Logout,
-                destructive = true,
-                onClick = { confirmLogout = true },
-            )
+        if (account != null) {
+            SettingsGroup(title = null) {
+                // 設定・キャッシュはそのままでトークンだけ取り直す (無効になったとき等。下書きは依存の作り直しで消える)。除くのはログアウトだけ
+                SettingsActionItem(
+                    title = stringResource(R.string.relogin),
+                    summary = stringResource(R.string.relogin_summary),
+                    icon = Symbols.Outlined.Refresh,
+                    onClick = onRelogin,
+                )
+                SettingsActionItem(
+                    title = stringResource(R.string.logout),
+                    summary = account,
+                    icon = Symbols.Outlined.Logout,
+                    destructive = true,
+                    onClick = { confirmLogout = true },
+                )
+            }
         }
     }
     if (confirmLogout) {
@@ -134,7 +160,7 @@ private val ColumnLayoutChoices = ColumnLayout.entries
 @Composable
 fun DisplaySettingsPage(
     display: DisplaySettings,
-    update: UpdateSettings,
+    update: UpdateDeviceSettings,
     onNavigate: (Route) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -277,7 +303,7 @@ private fun formatScale(scale: Float): String =
 
 /** アニメーション: 画像のアニメーション全体と、種類ごとのオン / オフ。 */
 @Composable
-fun AnimationSettingsPage(display: DisplaySettings, update: UpdateSettings, onBack: () -> Unit) {
+fun AnimationSettingsPage(display: DisplaySettings, update: UpdateDeviceSettings, onBack: () -> Unit) {
     fun updateDisplay(transform: DisplaySettings.() -> DisplaySettings) = update { it.copy(display = it.display.transform()) }
     SettingsScaffold(title = stringResource(R.string.settings_animation), onBack = onBack) {
         SettingsGroup(title = null) {
@@ -315,21 +341,14 @@ fun AnimationSettingsPage(display: DisplaySettings, update: UpdateSettings, onBa
     }
 }
 
-/** タイムライン: ポストのメニュー (別のページ) への入口・カラムごとの自動更新・通知の取得方法。 */
+/** タイムライン (アカウントごと): カラムごとの自動更新・通知の取得方法。 */
 @Composable
-fun TimelineSettingsPage(settings: AppSettings, update: UpdateSettings, onNavigate: (Route) -> Unit, onBack: () -> Unit) {
+fun TimelineSettingsPage(settings: AccountSettings, update: UpdateAccountSettings, onBack: () -> Unit) {
     val streaming = settings.streaming
     fun updateStreaming(transform: StreamingSettings.() -> StreamingSettings) =
         update { it.copy(streaming = it.streaming.transform()) }
     val streamSummary = stringResource(R.string.settings_stream_summary)
     SettingsScaffold(title = stringResource(R.string.settings_timelines), onBack = onBack) {
-        SettingsGroup(title = null) {
-            SettingsNavigationItem(
-                title = stringResource(R.string.settings_post_menu),
-                summary = stringResource(R.string.settings_post_menu_summary),
-                onClick = { onNavigate(Route.SettingsPostMenu) },
-            )
-        }
         SettingsGroup(title = stringResource(R.string.settings_auto_update)) {
             SettingsSwitchItem(
                 title = stringResource(R.string.timeline_home),
@@ -387,7 +406,7 @@ fun TimelineSettingsPage(settings: AppSettings, update: UpdateSettings, onNaviga
  * ポストのメニュー (︙) に出す項目。共通 (見出しなし。ページの題名で分かる) / 自分のポスト / 他人のポストに分けて、項目ごとにオン / オフ。
  */
 @Composable
-fun PostMenuSettingsPage(hidden: Set<PostMenuItem>, update: UpdateSettings, onBack: () -> Unit) {
+fun PostMenuSettingsPage(hidden: Set<PostMenuItem>, update: UpdateDeviceSettings, onBack: () -> Unit) {
     @Composable
     fun Item(item: PostMenuItem, title: String, icon: ImageVector) = SettingsSwitchItem(
         title = title,
@@ -416,9 +435,9 @@ fun PostMenuSettingsPage(hidden: Set<PostMenuItem>, update: UpdateSettings, onBa
     }
 }
 
-/** 投稿: 新しい投稿の公開範囲・投稿前の確認。 */
+/** 投稿 (アカウントごと): 新しい投稿の公開範囲・添付の画像の扱い。 */
 @Composable
-fun PostingSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: () -> Unit) {
+fun PostingSettingsPage(settings: AccountSettings, update: UpdateAccountSettings, onBack: () -> Unit) {
     SettingsScaffold(title = stringResource(R.string.settings_posting), onBack = onBack) {
         SettingsGroup(title = null) {
             SettingsChoiceItem<PostVisibility?>(
@@ -432,13 +451,6 @@ fun PostingSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: (
                     stringResource(visibility?.descriptionRes ?: R.string.settings_visibility_account_default_description)
                 },
                 onSelect = { visibility -> update { it.copy(defaultVisibility = visibility) } },
-            )
-            ConfirmSwitch(
-                title = stringResource(R.string.settings_confirm_post),
-                summary = null,
-                target = ConfirmTarget.Post,
-                confirmations = settings.confirmations,
-                update = update,
             )
             SettingsSwitchItem(
                 title = stringResource(R.string.settings_compress_oversized_images),
@@ -456,14 +468,20 @@ fun PostingSettingsPage(settings: AppSettings, update: UpdateSettings, onBack: (
     }
 }
 
-/** 確認: ブースト・お気に入り・ブックマーク (とそれぞれの取り消し)・自分のポストの編集・削除・フォローリクエストの拒否の前に確認するか。 */
+/**
+ * 確認: 投稿・ブースト・お気に入り・ブックマーク (とそれぞれの取り消し)・自分のポストの編集・削除・フォローリクエストの拒否の
+ * 前に確認するか。
+ */
 @Composable
-fun ConfirmationSettingsPage(confirmations: Set<ConfirmTarget>, update: UpdateSettings, onBack: () -> Unit) {
+fun ConfirmationSettingsPage(confirmations: Set<ConfirmTarget>, update: UpdateDeviceSettings, onBack: () -> Unit) {
     val summary = stringResource(R.string.settings_confirm_summary)
     @Composable
     fun Item(title: Int, target: ConfirmTarget) =
         ConfirmSwitch(stringResource(title), summary, target, confirmations, update)
     SettingsScaffold(title = stringResource(R.string.settings_confirmations), onBack = onBack) {
+        SettingsGroup(title = stringResource(R.string.settings_posting)) {
+            Item(R.string.settings_confirm_post, ConfirmTarget.Post)
+        }
         SettingsGroup(title = stringResource(R.string.settings_boost)) {
             Item(R.string.settings_confirm_boost, ConfirmTarget.Boost)
             Item(R.string.settings_confirm_unboost, ConfirmTarget.Unboost)
@@ -508,7 +526,7 @@ private fun ConfirmSwitch(
     summary: String?,
     target: ConfirmTarget,
     confirmations: Set<ConfirmTarget>,
-    update: UpdateSettings,
+    update: UpdateDeviceSettings,
 ) {
     SettingsSwitchItem(
         title = title,

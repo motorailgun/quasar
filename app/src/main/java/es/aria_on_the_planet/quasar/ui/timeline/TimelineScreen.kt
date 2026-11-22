@@ -72,12 +72,16 @@ import es.aria_on_the_planet.quasar.ui.composer.rememberQuickPostBarState
 import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.rememberPostActionHandler
 import kotlinx.coroutines.launch
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import es.aria_on_the_planet.quasar.ui.component.list.LoadErrorMessage
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel,
     drafts: DraftStore,
+    accounts: DrawerAccounts? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -108,12 +112,20 @@ fun TimelineScreen(
         snapshotFlow { startOf(pagerState.settledPage) }.collect { viewModel.select(ColumnType.entries[it]) }
     }
 
-    // 見えているカラムのどれかの取得に失敗したら (一覧が空ならその場に出るので除く) スナックバーで知らせる
+    // 見えているカラムのどれかの取得に失敗したら (一覧が空ならその場に出るので除く) スナックバーで知らせる。
+    // ログインし直しで直りうる失敗 (401 / 403) なら「ログインし直す」を付ける
     val error = (startOf(pagerState.settledPage) until startOf(pagerState.settledPage) + visibleColumns)
         .map { state.feedOf(ColumnType.entries[it]) }
         .firstNotNullOfOrNull { feed -> feed.error?.takeIf { feed.items.isNotEmpty() } }
+    val reloginLabel = stringResource(R.string.relogin)
     LaunchedEffect(error) {
-        if (error != null) snackbarHostState.showSnackbar(error)
+        if (error == null) return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            error.message,
+            actionLabel = reloginLabel.takeIf { error.needsLogin },
+            duration = if (error.needsLogin) SnackbarDuration.Long else SnackbarDuration.Short,
+        )
+        if (result == SnackbarResult.ActionPerformed) navigator.openRelogin()
     }
 
     // クイック投稿バー: 下に浮かべ、後ろの一覧をぼかす。ピルを引き上げると同じ画面内でフルの投稿画面に広がる
@@ -153,6 +165,13 @@ fun TimelineScreen(
         drawerContent = {
             TimelineDrawerSheet(
                 account = account,
+                accounts = accounts?.let { accounts ->
+                    // 切り替え・追加はドロワーを閉じてから (切り替えは画面ごと作り直すので閉じるのを待たない)
+                    accounts.copy(onAdd = {
+                        accounts.onAdd()
+                        scope.launch { drawerState.close() }
+                    })
+                },
                 onOpenProfile = { user ->
                     navigator.openProfile(user)
                     scope.launch { drawerState.close() }
@@ -173,6 +192,8 @@ fun TimelineScreen(
                     navigator.openSearch()
                     scope.launch { drawerState.close() }
                 },
+                // 閉じ切ってから (閉じる動きの間に一覧が縮まないように)
+                closed = drawerState.isClosed,
             )
         },
     ) {
@@ -308,7 +329,9 @@ private fun ColumnPage(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
 
             feed.items.isEmpty() && feed.error != null ->
-                CenteredMessage(stringResource(R.string.timeline_error, feed.error))
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    LoadErrorMessage(feed.error, R.string.timeline_error)
+                }
 
             feed.items.isEmpty() ->
                 CenteredMessage(stringResource(R.string.column_empty))

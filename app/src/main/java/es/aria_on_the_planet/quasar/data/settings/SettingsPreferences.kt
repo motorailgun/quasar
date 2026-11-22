@@ -8,65 +8,105 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
-import es.aria_on_the_planet.quasar.domain.model.settings.AppSettings
+import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
 import es.aria_on_the_planet.quasar.domain.model.settings.ConfirmTarget
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultConfirmations
-import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
 import es.aria_on_the_planet.quasar.domain.model.settings.DefaultVisibilityChoices
+import es.aria_on_the_planet.quasar.domain.model.settings.DeviceSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.DisplaySettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
+import es.aria_on_the_planet.quasar.domain.model.settings.PostMenuItem
 import es.aria_on_the_planet.quasar.domain.model.settings.PredictiveBackSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.TranslationMode
 
 /**
- * [AppSettings] と DataStore (Preferences) の対応。項目ごとに 1 つのキーを持つ。
+ * 設定 ([DeviceSettings] / [AccountSettings]) と DataStore (Preferences) の対応 ([DeviceSettingsSchema] /
+ * [AccountSettingsSchema])。項目ごとに 1 つのキーを持つ。
  *
  * * キーが無ければ既定値 (コードの既定値を変えれば、変えていないユーザーにはそれが効く)。
- * * 書き込みは変わった項目だけ ([writeSettingsChanges])。ユーザーが選んだ値だけが保存される。
+ * * 書き込みは変わった項目だけ ([SettingsSchema.writeChanges])。ユーザーが選んだ値だけが保存される。
  * * `null` を値として持つ項目は、キーの削除 (= 既定値) と区別するために番兵値で保存する。
  * * 読めない値 (知らない列挙値・範囲外) はその項目だけ既定値にする。
+ * * 端末共通とアカウントごとはファイルが別で、キーの名前は分ける前 (1 つのファイルだった頃) のまま。分ける前のファイルは
+ *   端末共通のファイルとして読み、アカウントごとの項目は移す ([withLegacyAccountSettings] / [withoutAccountSettings])。
  */
-fun Preferences.toAppSettings(): AppSettings =
-    SettingFields.fold(AppSettings()) { settings, field -> field.read(this, settings) }
+class SettingsSchema<S> internal constructor(
+    private val defaults: S,
+    private val fields: List<SettingField<S, *, *>>,
+) {
+    /** 保存した値。無い・読めない項目は既定値。 */
+    fun read(prefs: Preferences): S = fields.fold(defaults) { settings, field -> field.read(prefs, settings) }
 
-/** [before] から [after] で変わった項目を [prefs] に書き込む。 */
-fun writeSettingsChanges(prefs: MutablePreferences, before: AppSettings, after: AppSettings) {
-    SettingFields.forEach { it.writeIfChanged(prefs, before, after) }
+    /** [before] から [after] で変わった項目を [prefs] に書き込む。 */
+    fun writeChanges(prefs: MutablePreferences, before: S, after: S) {
+        fields.forEach { it.writeIfChanged(prefs, before, after) }
+    }
+
+    /** この設定のキー。 */
+    internal val keys: List<Preferences.Key<*>> get() = fields.map { it.key }
+}
+
+/** 端末共通の設定。今の `settings` のファイル。 */
+val DeviceSettingsSchema = SettingsSchema(DeviceSettings(), DeviceSettingFields())
+
+/** アカウントごとの設定。アカウントごとのファイル (`settings_<AccountKey>`)。 */
+val AccountSettingsSchema = SettingsSchema(AccountSettings(), AccountSettingFields())
+
+/** アカウントごとの項目があるか (分ける前のファイル = 今の端末共通のファイルに残っているか)。 */
+fun Preferences.hasAccountSettings(): Boolean = AccountSettingsSchema.keys.any { contains(it) }
+
+/**
+ * アカウントごとの設定 (このファイル) に、分ける前のファイル ([device]) に残っているアカウントごとの項目を写したもの。
+ * 既にこちらにある項目は上書きしない (移す途中で終わって、やり直したときに後から変えた値を戻さない)。
+ */
+fun Preferences.withLegacyAccountSettings(device: Preferences): Preferences {
+    val result = toMutablePreferences()
+    AccountSettingsSchema.keys.forEach { key -> copyIfMissing(key, device, result) }
+    return result.toPreferences()
+}
+
+/** アカウントごとの項目を除いたもの (移し終えた端末共通のファイル)。 */
+fun Preferences.withoutAccountSettings(): Preferences =
+    toMutablePreferences().apply { AccountSettingsSchema.keys.forEach { remove(it) } }.toPreferences()
+
+private fun <T> copyIfMissing(key: Preferences.Key<T>, from: Preferences, to: MutablePreferences) {
+    if (key in to) return
+    from[key]?.let { to[key] = it }
 }
 
 /** 読み取った値。`null` 自体も値になりうる項目があるので、「読めない」(= `null` の [Decoded]) と区別するために包む。 */
-private class Decoded<T>(val value: T)
+internal class Decoded<T>(val value: T)
 
-/** 設定の 1 項目。[decode] が `null` を返したら (読めない値) 既定値のまま。 */
-private class SettingField<T, P : Any>(
+/** 設定 ([S]) の 1 項目。[decode] が `null` を返したら (読めない値) 既定値のまま。 */
+internal class SettingField<S, T, P : Any>(
     val key: Preferences.Key<P>,
-    val get: (AppSettings) -> T,
-    val set: (AppSettings, T) -> AppSettings,
+    val get: (S) -> T,
+    val set: (S, T) -> S,
     val encode: (T) -> P,
     val decode: (P) -> Decoded<T>?,
 ) {
-    fun read(prefs: Preferences, settings: AppSettings): AppSettings {
+    fun read(prefs: Preferences, settings: S): S {
         val stored = prefs[key] ?: return settings
         val decoded = decode(stored) ?: return settings
         return set(settings, decoded.value)
     }
 
-    fun writeIfChanged(prefs: MutablePreferences, before: AppSettings, after: AppSettings) {
+    fun writeIfChanged(prefs: MutablePreferences, before: S, after: S) {
         val value = get(after)
         if (value != get(before)) prefs[key] = encode(value)
     }
 }
 
-private fun boolean(name: String, get: (AppSettings) -> Boolean, set: (AppSettings, Boolean) -> AppSettings) =
+private fun <S> boolean(name: String, get: (S) -> Boolean, set: (S, Boolean) -> S) =
     SettingField(booleanPreferencesKey(name), get, set, encode = { it }, decode = { Decoded(it) })
 
 private fun display(name: String, get: (DisplaySettings) -> Boolean, set: DisplaySettings.(Boolean) -> DisplaySettings) =
-    boolean(name, { get(it.display) }, { s, v -> s.copy(display = s.display.set(v)) })
+    boolean<DeviceSettings>(name, { get(it.display) }, { s, v -> s.copy(display = s.display.set(v)) })
 
 /** `null` = 無効 / 上限なし を 0 で保存する正の整数。 */
-private fun optionalPositiveInt(name: String, get: (AppSettings) -> Int?, set: (AppSettings, Int?) -> AppSettings) =
+private fun <S> optionalPositiveInt(name: String, get: (S) -> Int?, set: (S, Int?) -> S) =
     SettingField(
         intPreferencesKey(name), get, set,
         encode = { it ?: 0 },
@@ -75,16 +115,16 @@ private fun optionalPositiveInt(name: String, get: (AppSettings) -> Int?, set: (
 
 /** 確認する操作のうち 1 つ ([target]) を、するか (`true`) で保存する。 */
 private fun confirm(name: String, target: ConfirmTarget) =
-    boolean(name, { target in it.confirmations }) { s, v ->
+    boolean<DeviceSettings>(name, { target in it.confirmations }) { s, v ->
         s.copy(confirmations = if (v) s.confirmations + target else s.confirmations - target)
     }
 
 /** [range] の中だけ読める小数。 */
-private fun float(
+private fun <S> float(
     name: String,
     range: ClosedFloatingPointRange<Float>,
-    get: (AppSettings) -> Float,
-    set: (AppSettings, Float) -> AppSettings,
+    get: (S) -> Float,
+    set: (S, Float) -> S,
 ) = SettingField(
     floatPreferencesKey(name), get, set,
     encode = { it },
@@ -101,7 +141,8 @@ private const val DeviceTranslationTarget = "device"
 /** 翻訳の言語ごとの扱いの「まだ変えていない」(`null`。端末の言語を出さない一覧)。空の一覧とは別。 */
 private const val DeviceLanguageModes = "device"
 
-private val SettingFields: List<SettingField<*, *>> = listOf(
+/** 端末共通の項目。 */
+private fun DeviceSettingFields(): List<SettingField<DeviceSettings, *, *>> = listOf(
     optionalPositiveInt(
         "long_post_max_lines",
         { it.display.longPostMaxLines },
@@ -158,19 +199,6 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         encode = { it.name },
         decode = { stored -> enumOrNull<ColumnLayout>(stored)?.let(::Decoded) },
     ),
-    SettingField(
-        stringPreferencesKey("notification_api"),
-        { it.notificationApi },
-        { s, v -> s.copy(notificationApi = v) },
-        encode = { it.name },
-        decode = { stored -> enumOrNull<NotificationApi>(stored)?.let(::Decoded) },
-    ),
-    boolean("stream_home", { it.streaming.home }) { s, v -> s.copy(streaming = s.streaming.copy(home = v)) },
-    boolean("stream_notifications", { it.streaming.notifications }) { s, v ->
-        s.copy(streaming = s.streaming.copy(notifications = v))
-    },
-    boolean("stream_local", { it.streaming.local }) { s, v -> s.copy(streaming = s.streaming.copy(local = v)) },
-    boolean("stream_global", { it.streaming.global }) { s, v -> s.copy(streaming = s.streaming.copy(global = v)) },
     // 確認する操作のうち、既定でオンのもの ([DefaultConfirmations]) は 1 つずつのキー、残りはまとめて 1 つのキー。
     // まとめたキーに入れると、追加より前に保存したユーザーにはオフで読めてしまうため
     SettingField(
@@ -187,20 +215,6 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
     confirm("confirm_delete_post", ConfirmTarget.DeletePost),
     confirm("confirm_reject_follow_request", ConfirmTarget.RejectFollowRequest),
     SettingField(
-        stringPreferencesKey("default_visibility"),
-        { it.defaultVisibility },
-        { s, v -> s.copy(defaultVisibility = v) },
-        encode = { it?.name ?: AccountDefaultVisibility },
-        decode = { stored ->
-            if (stored == AccountDefaultVisibility) {
-                Decoded(null)
-            } else {
-                // ダイレクト等、既定にできない値は読めない扱い
-                enumOrNull<PostVisibility>(stored)?.takeIf { it in DefaultVisibilityChoices }?.let(::Decoded)
-            }
-        },
-    ),
-    SettingField(
         stringSetPreferencesKey("hidden_post_menu_items"),
         { it.hiddenPostMenuItems },
         { s, v -> s.copy(hiddenPostMenuItems = v) },
@@ -208,9 +222,7 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         // 知らない名前 (将来消した項目等) は捨てる
         decode = { names -> Decoded(names.mapNotNullTo(HashSet()) { enumOrNull<PostMenuItem>(it) }) },
     ),
-    boolean("compress_oversized_images", { it.compressOversizedImages }) { s, v -> s.copy(compressOversizedImages = v) },
-    boolean("strip_image_metadata", { it.stripImageMetadata }) { s, v -> s.copy(stripImageMetadata = v) },
-    boolean("translation_enabled", { it.translation.enabled }) { s, v -> s.copy(translation = s.translation.copy(enabled = v)) },
+    boolean<DeviceSettings>("translation_enabled", { it.translation.enabled }) { s, v -> s.copy(translation = s.translation.copy(enabled = v)) },
     SettingField(
         stringPreferencesKey("translation_default_mode"),
         { it.translation.defaultMode },
@@ -265,4 +277,37 @@ private val SettingFields: List<SettingField<*, *>> = listOf(
         encode = { it },
         decode = { stored -> stored.takeIf { it in PredictiveBackSettings.TransitionMillisRange }?.let(::Decoded) },
     ),
+)
+
+/** アカウントごとの項目。 */
+private fun AccountSettingFields(): List<SettingField<AccountSettings, *, *>> = listOf(
+    SettingField(
+        stringPreferencesKey("notification_api"),
+        { it.notificationApi },
+        { s, v -> s.copy(notificationApi = v) },
+        encode = { it.name },
+        decode = { stored -> enumOrNull<NotificationApi>(stored)?.let(::Decoded) },
+    ),
+    boolean<AccountSettings>("stream_home", { it.streaming.home }) { s, v -> s.copy(streaming = s.streaming.copy(home = v)) },
+    boolean<AccountSettings>("stream_notifications", { it.streaming.notifications }) { s, v ->
+        s.copy(streaming = s.streaming.copy(notifications = v))
+    },
+    boolean<AccountSettings>("stream_local", { it.streaming.local }) { s, v -> s.copy(streaming = s.streaming.copy(local = v)) },
+    boolean<AccountSettings>("stream_global", { it.streaming.global }) { s, v -> s.copy(streaming = s.streaming.copy(global = v)) },
+    SettingField(
+        stringPreferencesKey("default_visibility"),
+        { it.defaultVisibility },
+        { s, v -> s.copy(defaultVisibility = v) },
+        encode = { it?.name ?: AccountDefaultVisibility },
+        decode = { stored ->
+            if (stored == AccountDefaultVisibility) {
+                Decoded(null)
+            } else {
+                // ダイレクト等、既定にできない値は読めない扱い
+                enumOrNull<PostVisibility>(stored)?.takeIf { it in DefaultVisibilityChoices }?.let(::Decoded)
+            }
+        },
+    ),
+    boolean<AccountSettings>("compress_oversized_images", { it.compressOversizedImages }) { s, v -> s.copy(compressOversizedImages = v) },
+    boolean<AccountSettings>("strip_image_metadata", { it.stripImageMetadata }) { s, v -> s.copy(stripImageMetadata = v) },
 )

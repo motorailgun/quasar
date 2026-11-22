@@ -1,6 +1,5 @@
 package es.aria_on_the_planet.quasar.ui.composer
 
-import es.aria_on_the_planet.quasar.data.session.Session
 import es.aria_on_the_planet.quasar.domain.model.Post
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,9 +12,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 今の書きかけの投稿 ([ComposerSession]) をアプリ全体で 1 つ持つ。クイック投稿バーとフルの投稿画面
- * (クイック投稿バーから開くもの・単独の投稿画面 `Route.Composer`) はここから同じものを受け取る。
- * 詳細のパネルの中の画面は別のインスタンス (`AppContainer.panelDraftStore`) を使う。
+ * 今の書きかけの投稿 ([ComposerSession]) をアカウントごとに 1 つ持つ (`AccountUiContext.draftStore`)。クイック投稿バーと
+ * フルの投稿画面 (クイック投稿バーから開くもの・単独の投稿画面 `Route.Composer`) はここから同じものを受け取る。
+ * 詳細のパネルの中の画面は別のインスタンス (`AccountUiContext.panelDraftStore`) を使う。
  *
  * 各 session は自分のコルーチンの範囲を持ち、画面が閉じても添付のアップロードは続く。プロセスが終わると消える
  * (保存はしない)。
@@ -23,12 +22,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * 投稿できたらここで下書きを終えて空のものに替え、[published] で知らせる。同じ下書きを複数の画面
  * (メイン画面とポスト画面等) が表示しているので、後始末は画面ではなくここで 1 回だけ行う。
  *
- * @param create 新しい session を作る (`AppContainer` がリポジトリを渡す)。3 つ目の引数は投稿できたときに呼ぶ。
+ * @param create 新しい session を作る (`AccountUiContext.composerSession`)。2 つ目の引数は投稿できたときに呼ぶ。
  */
 class DraftStore(
-    private val create: (Session, CoroutineScope, (Post) -> Unit) -> ComposerSession,
+    private val create: (CoroutineScope, (Post) -> Unit) -> ComposerSession,
 ) {
-    private var owner: Session? = null
     private val _current = MutableStateFlow<ComposerSession?>(null)
 
     /** 今の下書き。[open] するまでは `null`。 */
@@ -39,25 +37,26 @@ class DraftStore(
     /** 投稿できたポスト (フル画面を閉じる・スレッドに足す等)。この時点で [current] は空の下書きに替わっている。 */
     val published: SharedFlow<Post> = _published.asSharedFlow()
 
-    /** [session] の下書きを返す。別のアカウントの下書きがあれば捨てて作り直す。 */
-    fun open(session: Session): ComposerSession {
-        _current.value?.takeIf { owner == session }?.let { return it }
-        _current.value?.close()
-        owner = session
-        return newDraft(session)
-    }
+    /** 今の下書きを返す。まだ無ければ作る。 */
+    fun open(): ComposerSession = _current.value ?: newDraft()
 
-    /** 投稿・破棄で今の下書きを終え、同じアカウントの空の下書きに替える。 */
+    /** 投稿・破棄で今の下書きを終え、空の下書きに替える。 */
     fun finish() {
-        val session = owner ?: return
-        _current.value?.close()
-        newDraft(session)
+        val current = _current.value ?: return
+        current.close()
+        newDraft()
     }
 
-    private fun newDraft(session: Session): ComposerSession {
+    /** 今の下書きのアップロード等を止める (ログアウト)。以後は使わない。 */
+    fun close() {
+        _current.value?.close()
+        _current.value = null
+    }
+
+    private fun newDraft(): ComposerSession {
         lateinit var draft: ComposerSession
-        draft = create(session, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) { post ->
-            // 投稿した下書きがまだ今のものなら終える (アカウントの切り替え等で替わっていれば何もしない)
+        draft = create(CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) { post ->
+            // 投稿した下書きがまだ今のものなら終える (破棄等で替わっていれば何もしない)
             if (_current.value === draft) finish()
             _published.tryEmit(post)
         }

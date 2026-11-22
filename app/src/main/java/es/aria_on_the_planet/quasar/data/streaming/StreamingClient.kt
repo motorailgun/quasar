@@ -23,9 +23,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Mastodon の Streaming API (WebSocket) のクライアント。1 本の接続で複数のストリームを購読する。
+ * [session] のアカウントのもので、受け取ったポスト等はそのアカウントのキャッシュ ([cache]) に書く。
  * https://docs.joinmastodon.org/methods/streaming/
  */
 class StreamingClient(
+    private val session: Session,
     okHttpClient: OkHttpClient,
     private val json: Json,
     private val instanceRepository: InstanceRepository,
@@ -41,7 +43,7 @@ class StreamingClient(
      * [channels] を購読し、イベントを流す。切断されたら待ってから再接続し続ける (collect をやめるまで)。
      * 接続 (再接続を含む) のたびに [StreamEvent.Connected] を流す。
      */
-    fun events(session: Session, channels: Set<StreamChannel>): Flow<StreamEvent> = flow {
+    fun events(channels: Set<StreamChannel>): Flow<StreamEvent> = flow {
         if (channels.isEmpty()) return@flow
         val base = try {
             instanceRepository.instance(session.serverUrl).streamingUrl

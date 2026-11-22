@@ -17,6 +17,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
+| 差分 | java-diff-utils (`io.github.java-diff-utils`。編集履歴の版どうしの差分のアルゴリズムだけ。`domain/model/VersionDiff.kt`) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
 | オンデバイス翻訳 (実験的機能) | llama.cpp (git submodule `third_party/llama.cpp`、タグ v1.0.0 = b12359) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
@@ -795,7 +796,19 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     (左が古い。トップバーの ‹ › と「2 / 4」)。各版は投稿者の行 (`PostDetailAuthor`) / `PostBody(fixed = true, extras = false)`
     (見比べるので CW は開いたまま・長文も折りたたまない・訳さない) / 投票の選択肢 (件数は返らないので文言だけの枠線のピル) /
     「日時 · 編集 / 作成」。版を `Post` にするのは `PostVersion.asPost` (`statusId` は版ごとに `<id>#<番号>`、開閉の状態を分けるため)。
-    版の一覧はシートで取ったもの (`cachedHistory`) を使い、無ければ (プロセスの再生成等) 取り直す。差分の色分けは無い。
+    版の一覧はシートで取ったもの (`cachedHistory`) を使い、無ければ (プロセスの再生成等) 取り直す。
+    * **差分の色付け** (2 つ目以降の版。1 つ前の版と比べる): 本文・CW は単語単位で足された所 (緑の背景) と消された所 (赤の背景 +
+      取り消し線) を 1 つの文に両方出す (`EmojiText(diffFrom = 前の版)` → `AnnotatedString.withDiffFrom`。`fromHtml` の後・絵文字の
+      置き換えの前に書き込むので、リンク・絵文字はそのまま)。投票の選択肢は、選択肢ごと足された / 消されたものはピルより一回り (左右 6dp・上下 4dp) 大きい
+      四角形 (本文の差分と揃えて角は丸めない)を差分の色で後ろに敷き (`diffBackdrop`。描くだけで高さは変えない)、同じ位置で文言だけ変わったもの
+      (`diffList(pairChanges = true)` の `Changed`) はピルはそのままで文言に本文と同じ差分。投票ごと足された / 外された版は欄全体に同じ形の四角形。添付は ID で比べ、足された / 外されたものの左上に ＋ / － の印
+      (`MediaAttachments(overlay)`)。外された添付・選択肢・CW も元の位置に出す。CW ごと足された / 外された版は警告文だけでなく警告のアイコンまで塗る。
+    * 差分は純粋関数 `diffText` / `diffList` (`domain/model/VersionDiff.kt`、`VersionDiffTest`)。単語の区切りは
+      `java.text.BreakIterator` (Android では ICU で日本語も辞書で区切る。JVM のテストでは区切り方が違うので、テストは英語か
+      区切りに依らない性質で書く)。`:shortcode:` は 1 単位。変わった所に挟まれた短い一致 (空白を除いて 2 文字以下) は変わった所に
+      含め、変わった所は「消された分 → 足された分」の 1 組にまとめる。
+    * 色は `extendedColors.diffAdded` / `diffRemoved` (`textDiffStyles()`)。カスタム絵文字 (inline content) には背景が付かないので、
+      足された・消された絵文字は色で見分けられない。
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。
@@ -1391,7 +1404,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   * 描き始めたら: `QuasarAppContent` の `SyncWindowBackground()` (`ui/theme/WindowBackground.kt`) がテーマの `background` に合わせる。
   * 以前はテーマが Light 固定でウィンドウが白く、ダークテーマで設定画面のページ切り替えの間に光っていた。
 * アプリ独自の意味を持つ色は Material 3 の Custom colors として `MaterialTheme.extendedColors` (`ui/theme/ExtendedColors.kt`)
-  で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3) を dynamic color の primary に harmonize し、
+  で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3、編集履歴の差分の追加=緑 #2E7D32 / 削除=赤 #E53935) を dynamic color の primary に harmonize し、
   ライト/ダークに応じた役割色 (color / onColor / container / onContainer) を MDC の `MaterialColors` で作る。
   色を直接ハードコードせず、新しい意味の色が要るときはここに追加する。
 * メディアの上・メディアビューアの黒背景の上に重ねる白文字・半透明の黒は `MediaOverlayColors` (`ui/component/player/`) に

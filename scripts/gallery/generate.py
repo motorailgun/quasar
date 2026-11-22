@@ -347,7 +347,7 @@ def build_fixtures(e, avatars, header, media, tall):
     ]
 
     # --- post-history: 編集履歴 (StatusEdit の配列、古い順。最後が今の版 = post-variety の「編集した投稿」)。
-    # 投票の選択肢を変え、CW・閲覧注意の添付・絵文字を足し、最後に添付と投票を外す
+    # 本文 (日本語・英語の単語)・投票の選択肢・CW・閲覧注意の添付・絵文字を版ごとに変える (差分の色付けの確認用)
     def edit(content, at, **extra):
         data = {"content": content, "spoiler_text": "", "sensitive": False, "created_at": at,
                 "account": bob, "media_attachments": [], "emojis": []}
@@ -355,14 +355,18 @@ def build_fixtures(e, avatars, header, media, tall):
         return data
 
     post_history = [
-        edit(p("編集する前の投稿"), "2025-12-31T14:20:00.000Z",
-             poll={"options": [{"title": "A"}, {"title": "B"}]}),
-        edit(p("誤字を直した投稿 :blink_gif:<br>2 行目"), "2026-01-01T03:00:00.000Z",
-             poll={"options": [{"title": "A"}, {"title": "B"}, {"title": "C :spin_fast:"}]},
+        edit(p("編集する前の投稿です。The quick brown fox."), "2025-12-31T14:20:00.000Z",
+             poll={"options": [{"title": "Apple"}, {"title": "Orange juice"}]}),
+        edit(p("誤字を直した投稿です :blink_gif:<br>The quick brown fox jumps."), "2026-01-01T03:00:00.000Z",
+             # 選択肢: 1 つ目はそのまま、2 つ目は文言だけ直し (変更)、3 つ目を足す (追加)
+             poll={"options": [{"title": "Apple"}, {"title": "Orange smoothie"}, {"title": "Grape :spin_fast:"}]},
              emojis=ems("blink_gif", "spin_fast")),
-        edit(p("CW と添付を足した投稿"), "2026-01-01T12:30:00.000Z", spoiler_text="CW を足した", sensitive=True,
+        edit(p("CW と添付を足した投稿です。<br>The slow brown fox jumps."), "2026-01-01T12:30:00.000Z",
+             spoiler_text="CW を足した", sensitive=True,
              media_attachments=[mediaj(30, stripes), mediaj(31, media[1])]),
-        edit(p("編集した投稿"), "2026-01-02T00:00:00.000Z"),
+        # 添付は 1 つ外し (30)、1 つ残し (31)、1 つ足す (32)。CW は外す
+        edit(p("編集した投稿"), "2026-01-02T00:00:00.000Z",
+             media_attachments=[mediaj(31, media[1]), mediaj(32, media[2])]),
     ]
 
     # --- translation: オンデバイス翻訳の HTML の変換 (メンション・ハッシュタグ・短縮表示の URL・絵文字・書式・引用の RE:)

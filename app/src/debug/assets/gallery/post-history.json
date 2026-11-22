@@ -1,6 +1,6 @@
 [
  {
-  "content": "<p>編集する前の投稿</p>",
+  "content": "<p>編集する前の投稿です。The quick brown fox.</p>",
   "spoiler_text": "",
   "sensitive": false,
   "created_at": "2025-12-31T14:20:00.000Z",
@@ -41,16 +41,16 @@
   "poll": {
    "options": [
     {
-     "title": "A"
+     "title": "Apple"
     },
     {
-     "title": "B"
+     "title": "Orange juice"
     }
    ]
   }
  },
  {
-  "content": "<p>誤字を直した投稿 :blink_gif:<br>2 行目</p>",
+  "content": "<p>誤字を直した投稿です :blink_gif:<br>The quick brown fox jumps.</p>",
   "spoiler_text": "",
   "sensitive": false,
   "created_at": "2026-01-01T03:00:00.000Z",
@@ -106,19 +106,19 @@
   "poll": {
    "options": [
     {
-     "title": "A"
+     "title": "Apple"
     },
     {
-     "title": "B"
+     "title": "Orange smoothie"
     },
     {
-     "title": "C :spin_fast:"
+     "title": "Grape :spin_fast:"
     }
    ]
   }
  },
  {
-  "content": "<p>CW と添付を足した投稿</p>",
+  "content": "<p>CW と添付を足した投稿です。<br>The slow brown fox jumps.</p>",
   "spoiler_text": "CW を足した",
   "sensitive": true,
   "created_at": "2026-01-01T12:30:00.000Z",
@@ -229,7 +229,42 @@
    "following_count": 56,
    "followers_count": 78
   },
-  "media_attachments": [],
+  "media_attachments": [
+   {
+    "id": "m31",
+    "type": "image",
+    "url": "file:///android_asset/gallery/images/media1.jpg",
+    "preview_url": "file:///android_asset/gallery/images/media1.jpg",
+    "description": null,
+    "meta": {
+     "original": {
+      "width": 800,
+      "height": 600
+     },
+     "small": {
+      "width": 400,
+      "height": 300
+     }
+    }
+   },
+   {
+    "id": "m32",
+    "type": "image",
+    "url": "file:///android_asset/gallery/images/media2.jpg",
+    "preview_url": "file:///android_asset/gallery/images/media2.jpg",
+    "description": null,
+    "meta": {
+     "original": {
+      "width": 800,
+      "height": 600
+     },
+     "small": {
+      "width": 400,
+      "height": 300
+     }
+    }
+   }
+  ],
   "emojis": []
  }
 ]

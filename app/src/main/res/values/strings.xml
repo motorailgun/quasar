@@ -65,6 +65,8 @@
     <string name="post_history_next">Next version</string>
     <string name="post_history_error">Failed to load edit history: %1$s</string>
     <string name="post_history_retry">Retry</string>
+    <string name="post_history_media_added">Added</string>
+    <string name="post_history_media_removed">Removed</string>
     <string name="post_reply_to">Reply to %1$s</string>
     <string name="post_reply">Reply</string>
     <string name="post_boosted_by">%1$s boosted</string>

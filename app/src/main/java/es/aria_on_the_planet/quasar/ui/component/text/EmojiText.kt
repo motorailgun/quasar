@@ -38,6 +38,8 @@ import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
  * @param onLinkClick HTML のリンクのタップ (href とリンクの文字列)。`null` なら
  *   [androidx.compose.ui.platform.LocalUriHandler] でそのまま開く。メンション・ハッシュタグを画面内で開く等、
  *   リンク先によって振り分けるときに渡す。
+ * @param diffFrom 前の版の文字列 ([text] と同じ形式)。渡すと前の版との差分 (単語単位) を [diffStyles] で書き込む
+ *   (足された所・消された所の両方を出す。[withDiffFrom])。編集履歴用。[emojis] には両方の版の絵文字を渡す。
  */
 @Composable
 fun EmojiText(
@@ -52,30 +54,35 @@ fun EmojiText(
     overflow: TextOverflow = TextOverflow.Clip,
     onTextLayout: (TextLayoutResult) -> Unit = {},
     onLinkClick: ((url: String, text: String?) -> Unit)? = null,
+    diffFrom: String? = null,
+    diffStyles: TextDiffStyles? = if (diffFrom != null) textDiffStyles() else null,
 ) {
     val linkColor = MaterialTheme.colorScheme.primary
     // ラムダは毎回変わりうるので、変換をやり直さないよう最新の値を参照する固定のリスナーにする
     val currentOnLinkClick by rememberUpdatedState(onLinkClick)
     val handlesLinks = onLinkClick != null
-    val annotated = remember(text, emojis, isHtml, linkColor, handlesLinks) {
-        val base = if (isHtml) {
-            // リスナーにはリンクしか渡らないので、リンクの文字列 (`#tag` 等) は変換後に引けるようにしておく
-            var linkTexts = emptyMap<String, String>()
-            val listener = if (handlesLinks) {
-                LinkInteractionListener { link ->
-                    (link as? LinkAnnotation.Url)?.let { currentOnLinkClick?.invoke(it.url, linkTexts[it.url]) }
-                }
-            } else {
-                null
+    val annotated = remember(text, emojis, isHtml, linkColor, handlesLinks, diffFrom, diffStyles) {
+        // リスナーにはリンクしか渡らないので、リンクの文字列 (`#tag` 等) は変換後に引けるようにしておく
+        var linkTexts = emptyMap<String, String>()
+        val listener = if (isHtml && handlesLinks) {
+            LinkInteractionListener { link ->
+                (link as? LinkAnnotation.Url)?.let { currentOnLinkClick?.invoke(it.url, linkTexts[it.url]) }
             }
+        } else {
+            null
+        }
+        fun annotate(source: String): AnnotatedString = if (isHtml) {
             AnnotatedString.fromHtml(
-                htmlString = simplifyMastodonHtml(text),
+                htmlString = simplifyMastodonHtml(source),
                 linkStyles = TextLinkStyles(style = SpanStyle(color = linkColor)),
                 linkInteractionListener = listener,
-            ).trimWhitespace().also { if (handlesLinks) linkTexts = it.linkTexts() }
+            ).trimWhitespace()
         } else {
-            AnnotatedString(text)
+            AnnotatedString(source)
         }
+        val current = annotate(text)
+        val base = if (diffFrom != null && diffStyles != null) current.withDiffFrom(annotate(diffFrom), diffStyles) else current
+        if (listener != null) linkTexts = base.linkTexts()
         base.replaceEmojiShortcodes(emojis)
     }
     // 絵文字の高さは行の高さに合わせ、幅は読み込み済みの画像の縦横比から決める (未読み込みは正方形)

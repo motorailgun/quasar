@@ -66,6 +66,7 @@ import es.aria_on_the_planet.quasar.ui.component.player.isPlayable
  * @param artworkUrl audio をインライン再生するときに回すアイコン (投稿者)。
  * @param onClick ビューアを開く等。インライン再生中にタップされた場合は再生位置が付く。
  *   各メディアのウィンドウ上の位置も付ける (ビューアを閉じるときに縮んで戻る先)。
+ * @param overlay 各メディアの上に重ねて描くもの (編集履歴の追加・削除の印等)。目アイコン等より上に描く。
  */
 @Composable
 fun MediaAttachments(
@@ -75,6 +76,7 @@ fun MediaAttachments(
     sensitive: Boolean = false,
     artworkUrl: String? = null,
     onClick: (MediaTap) -> Unit = {},
+    overlay: (@Composable BoxScope.(MediaAttachment) -> Unit)? = null,
 ) {
     if (attachments.isEmpty()) return
     // 位置はタップしたときにだけ要るので、置かれた座標系だけを持っておき、タップ時にウィンドウ上の位置を求める
@@ -106,6 +108,7 @@ fun MediaAttachments(
                     height = height,
                     sensitive = sensitive,
                     artworkUrl = artworkUrl,
+                    overlay = overlay?.let { draw -> { draw(attachment) } },
                     onClick = { playback ->
                         val bounds = placements
                             .filterValues { it.isAttached }
@@ -128,6 +131,7 @@ fun MediaAttachments(
  *
  * @param sensitive `true` なら初期状態でぼかし、右上の目アイコン (またはメディア自体のタップ) で表示する。
  *   `false` なら目アイコンは出さない。
+ * @param overlay メディアの上に重ねて描くもの ([MediaAttachments] の同名の引数)。
  */
 @Composable
 fun MediaAttachmentItem(
@@ -137,6 +141,7 @@ fun MediaAttachmentItem(
     sensitive: Boolean = false,
     artworkUrl: String? = null,
     onClick: (PlaybackSnapshot?) -> Unit = {},
+    overlay: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     var hidden by rememberSaveable(attachment.id, sensitive) { mutableStateOf(sensitive) }
     val playback = LocalInlinePlayback.current?.takeIf { attachment.type.isPlayable }
@@ -197,6 +202,7 @@ fun MediaAttachmentItem(
                 modifier = Modifier.align(Alignment.TopEnd),
             )
         }
+        overlay?.invoke(this)
     }
 }
 

@@ -63,6 +63,8 @@
     <string name="post_history_next">次の版</string>
     <string name="post_history_error">編集履歴を読み込めませんでした: %1$s</string>
     <string name="post_history_retry">再試行</string>
+    <string name="post_history_media_added">追加</string>
+    <string name="post_history_media_removed">削除</string>
     <string name="post_reply_to">%1$s さんへの返信</string>
     <string name="post_reply">返信</string>
     <string name="post_boosted_by">%1$sさんがブースト</string>

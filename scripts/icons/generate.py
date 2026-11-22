@@ -70,6 +70,7 @@ ICONS = [
     ("Public", "public", False, [O]),
     ("PushPin", "push_pin", False, [O]),
     ("Refresh", "refresh", False, [O]),
+    ("Remove", "remove", False, [F]),
     ("Repeat", "repeat", False, [O, F]),
     ("Reply", "reply", True, [O]),
     ("Schedule", "schedule", False, [O]),

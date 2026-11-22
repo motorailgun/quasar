@@ -35,6 +35,7 @@ import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.post.PostCard
 import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
+import es.aria_on_the_planet.quasar.ui.component.post.PostHistoryMenu
 import es.aria_on_the_planet.quasar.ui.component.post.PostMenu
 import es.aria_on_the_planet.quasar.ui.composer.DraftStore
 import es.aria_on_the_planet.quasar.ui.composer.QuickComposerHost
@@ -57,6 +58,7 @@ private val AvatarTopY = ThreadLineDefaults.AvatarTopY
  *
  * 本体の投稿者の行に︙メニュー ([PostMenu]。ブラウザで開く・ブロック等、自分のポストなら編集・削除も。他の画面のメニューと同じ)
  * を出す。編集を保存したら本体を差し替え、本体を削除したら画面を閉じる (どちらも `StatusRepository.postChanges` から)。
+ * 編集された本体の「Edited」で編集履歴のシート ([PostHistoryMenu]) を開き、版を選ぶと [onHistoryClick] (版の画面)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -69,8 +71,10 @@ fun PostScreen(
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
     onReactionCountClick: (Post, PostActionType) -> Unit,
+    onHistoryClick: (statusId: String, index: Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
     val composer = drafts.current.collectAsStateWithLifecycle().value
     val barState = rememberQuickPostBarState()
     val hazeState = rememberHazeState()
@@ -122,6 +126,14 @@ fun PostScreen(
         }
     }
 
+    PostHistoryMenu(
+        state = history,
+        onDismissRequest = viewModel::hideHistory,
+        onSelect = { index ->
+            viewModel.hideHistory()
+            thread?.let { onHistoryClick(it.post.statusId, index) }
+        },
+    )
     Box(Modifier.fillMaxSize()) {
         QuickComposerHost(
             drafts = drafts,
@@ -187,6 +199,7 @@ fun PostScreen(
                                     menu = { PostMenu(thread.post, modifier = Modifier.offset(x = 12.dp), preview = false) },
                                     reactionDetail = true,
                                     onReactionCountClick = onReactionCountClick,
+                                    onEditedClick = viewModel::showHistory,
                                 )
                                 HorizontalDivider()
                             }

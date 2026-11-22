@@ -53,6 +53,18 @@
     </plurals>
     <string name="post_pinned">Pinned</string>
     <string name="post_edited">Edited</string>
+    <string name="post_history_title">Edit history</string>
+    <plurals name="post_history_edited_times">
+        <item quantity="one">Edited %d time</item>
+        <item quantity="other">Edited %d times</item>
+    </plurals>
+    <string name="post_history_kind_edited">Edited</string>
+    <string name="post_history_kind_created">Created</string>
+    <string name="post_history_position" translatable="false">%1$d / %2$d</string>
+    <string name="post_history_previous">Previous version</string>
+    <string name="post_history_next">Next version</string>
+    <string name="post_history_error">Failed to load edit history: %1$s</string>
+    <string name="post_history_retry">Retry</string>
     <string name="post_reply_to">Reply to %1$s</string>
     <string name="post_reply">Reply</string>
     <string name="post_boosted_by">%1$s boosted</string>

@@ -53,6 +53,16 @@
     </plurals>
     <string name="post_pinned">固定</string>
     <string name="post_edited">編集済み</string>
+    <string name="post_history_title">編集履歴</string>
+    <plurals name="post_history_edited_times">
+        <item quantity="other">%d回編集</item>
+    </plurals>
+    <string name="post_history_kind_edited">編集</string>
+    <string name="post_history_kind_created">作成</string>
+    <string name="post_history_previous">前の版</string>
+    <string name="post_history_next">次の版</string>
+    <string name="post_history_error">編集履歴を読み込めませんでした: %1$s</string>
+    <string name="post_history_retry">再試行</string>
     <string name="post_reply_to">%1$s さんへの返信</string>
     <string name="post_reply">返信</string>
     <string name="post_boosted_by">%1$sさんがブースト</string>

@@ -65,6 +65,20 @@ class GalleryFixturesTest {
     }
 
     @Test
+    fun postHistoryFixtureParses() {
+        val versions = GalleryFixtures.postHistory(read(PostHistoryFixture))
+        assertTrue("編集が 2 回以上", versions.size >= 3)
+        assertEquals("古い順", versions.sortedBy { it.createdAt }, versions)
+        assertTrue("投票の選択肢を持つ版がある", versions.any { it.pollOptions != null })
+        assertTrue("CW を持つ版がある", versions.any { it.contentWarning != null })
+        versions.forEach { version ->
+            listOfNotNull(version.text, version.contentWarning).plus(version.pollOptions.orEmpty())
+                .forEach { assertResolved(PostHistoryFixture, it, version.emojis) }
+            assertResolved(PostHistoryFixture, version.author.displayName, version.author.emojis)
+        }
+    }
+
+    @Test
     fun everyAssetUrlExists() {
         val urls = dir.listFiles { f -> f.extension == "json" }!!.flatMap { AssetUrl.findAll(it.readText()).map { m -> m.groupValues[1] } }
         assertTrue(urls.isNotEmpty())
@@ -92,6 +106,9 @@ class GalleryFixturesTest {
             GalleryScenario.Profile.fixture,
             GalleryScenario.AccountSwitcher.fixture,
         )
+
+        /** ポスト詳細 (post-detail) の編集履歴。シナリオの固定データとは別に読む。 */
+        const val PostHistoryFixture = "post-history.json"
 
         val Shortcode = Regex(":([A-Za-z0-9_]+):")
         val AssetUrl = Regex("file:///android_asset/([^\"]+)")

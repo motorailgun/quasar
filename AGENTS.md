@@ -55,6 +55,7 @@ es.aria_on_the_planet.quasar
 │                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
 │                                   PostDraft, PostLanguage, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag,
+│                                   PostVersion = 編集履歴の版,
 │                                   ProfileEdit = ProfileSource / ProfileLimits)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
@@ -64,6 +65,7 @@ es.aria_on_the_planet.quasar
     │   ├── post/PostCard.kt        ポスト 1 件 (+ PostActionRow)
     │   ├── post/PostBody.kt        ポストの中身 (CW / 本文 / 投票 / メディア / カード / 引用。PostCard・PostDetail 共通) + PostMedia / PostExcerpt
     │   ├── post/PostMenu.kt        ポストの︙のメニュー + PostMenuPreview.kt (メニューの上に出す対象のポスト)
+    │   ├── post/PostHistoryMenu.kt 編集履歴の版の一覧のシート (ポスト詳細の「Edited」から)
     │   ├── post/PostCallbacks.kt   ポストへの操作の口 (タップ・投票・アクション・返信・ハッシュタグ) をまとめたもの
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
@@ -120,7 +122,7 @@ es.aria_on_the_planet.quasar
     ├── search/                     検索 (SearchScreen / ViewModel。アカウント / 投稿 / ハッシュタグのタブ)
     ├── personal/                   ドロワーから開く自分の一覧: お気に入り / ブックマーク / 非公開の返信 (PersonalPostsScreen / ViewModel)、
     │                               フォローリクエスト (FollowRequestsScreen / ViewModel)
-    ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
+    ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList) / 編集履歴の版 (PostHistoryScreen / ViewModel)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
     ├── translation/                ポストの訳の状態 (PostTranslationStore。アプリ全体で 1 つ、LocalPostTranslations) / 言語の表示名
@@ -336,6 +338,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 通知 (個別) | `GET /api/v1/notifications` (max_id ページング。`NotificationApi.Ungrouped` 時) |
 | ハッシュタグのタイムライン | `GET /api/v1/timelines/tag/:hashtag` (max_id ページング) |
 | ポスト | `GET /api/v1/statuses/:id` (まとめの中身は 1 件ずつ・同時 4 件まで。`StatusRepository.fetchPosts`) |
+| 編集履歴 | `GET /api/v1/statuses/:id/history` (StatusEdit の配列。今の版も含む。`StatusRepository.fetchHistory`。最近 8 件分をプロセス内で覚える = `cachedHistory`) |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`) |
 | ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` |
 | お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` |
@@ -785,6 +788,14 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     日時の隣に投稿アプリ (`Status.application`) を「日時 · アプリ名」で出し、`website` があればリンクにする。
     application は他サーバからのポストでは返らないため、表示されるのは主にローカルユーザーのポスト。
     編集されたポスト (`Post.editedAt`) はさらに「 · Edited」(編集済み) を続ける (アプリが無ければ日時の直後)。
+  * **編集履歴** (Mastodon Web のスマホの形): 「Edited」(primary 色のリンク、`PostDetail(onEditedClick)`) で版の一覧のシート
+    (`PostHistoryMenu`。ポストのメニューと同じ `ActionMenu`。見出し「N 回編集」、新しい順に「(鉛筆) **編集** <日時>」/「(鉛筆) **Edited** <日時>」、最後が「(post_add) 作成」。種類の欄は広い方の幅に揃え、日時の位置を揃える。名前は出さない)。
+    開くたびに `/history` を取り直す (`PostViewModel.showHistory`、取得中は LoadingIndicator)。版を選ぶと版の画面
+    (`Route.PostHistory(statusId, index)`、`Navigator.openPostHistory`。詳細のパネルでも開く): `HorizontalPager` で版を左右に送る
+    (左が古い。トップバーの ‹ › と「2 / 4」)。各版は投稿者の行 (`PostDetailAuthor`) / `PostBody(fixed = true, extras = false)`
+    (見比べるので CW は開いたまま・長文も折りたたまない・訳さない) / 投票の選択肢 (件数は返らないので文言だけの枠線のピル) /
+    「日時 · 編集 / 作成」。版を `Post` にするのは `PostVersion.asPost` (`statusId` は版ごとに `<id>#<番号>`、開閉の状態を分けるため)。
+    版の一覧はシートで取ったもの (`cachedHistory`) を使い、無ければ (プロセスの再生成等) 取り直す。差分の色分けは無い。
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。
@@ -1453,7 +1464,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。本物と同じ `QuickComposerHost` で組む。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
   post-detail (ポスト詳細の本体を
-  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
+  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety。
+  編集済みのポストの「Edited」で編集履歴のシート → 版の画面 (`PostHistoryContent`)。履歴は `post-history.json` で、どのポストでも同じ)。 /
   translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
   translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ) /
   account-switcher (ドロワーのアカウントの切り替え。`account-switcher.json` の保存しているアカウントで本物の `TimelineDrawerSheet`。

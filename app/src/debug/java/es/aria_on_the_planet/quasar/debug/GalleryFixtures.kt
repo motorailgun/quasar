@@ -8,8 +8,10 @@ import es.aria_on_the_planet.quasar.data.mapper.toProfile
 import es.aria_on_the_planet.quasar.data.remote.dto.AccountDto
 import es.aria_on_the_planet.quasar.data.remote.dto.CustomEmojiDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
+import es.aria_on_the_planet.quasar.data.remote.dto.StatusEditDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Post
+import es.aria_on_the_planet.quasar.domain.model.PostVersion
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -26,6 +28,9 @@ internal object GalleryFixtures {
 
     /** `Status` の配列。 */
     fun posts(text: String): List<Post> = json.decodeFromString<List<StatusDto>>(text).map { it.toDomain() }
+
+    /** `StatusEdit` の配列 (編集履歴。`GET /api/v1/statuses/:id/history` と同じ形)。 */
+    fun postHistory(text: String): List<PostVersion> = json.decodeFromString<List<StatusEditDto>>(text).map { it.toDomain() }
 
     /** `{"account": Account, "statuses": [Status]}`。 */
     fun profile(text: String): ProfileFixture {

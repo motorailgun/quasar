@@ -14,6 +14,7 @@ import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostDraft
+import es.aria_on_the_planet.quasar.domain.model.PostVersion
 import es.aria_on_the_planet.quasar.domain.model.StatusSource
 import es.aria_on_the_planet.quasar.domain.model.User
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +59,11 @@ class StatusRepository(
 ) {
     private val changes = MutableSharedFlow<PostChange>(extraBufferCapacity = 16)
 
+    /** 最近取った編集履歴 (ステータス ID → 版の一覧)。版の一覧のシートから版の画面を開くときに取り直さないため。 */
+    private val histories = object : LinkedHashMap<String, List<PostVersion>>(MaxCachedHistories, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<PostVersion>>) = size > MaxCachedHistories
+    }
+
     /** 自分の編集・削除で変わったポスト。各画面の一覧の差し替え・削除に使う (どの画面から操作したかに関わらず)。 */
     val postChanges: SharedFlow<PostChange> = changes.asSharedFlow()
 
@@ -98,6 +104,18 @@ class StatusRepository(
             isPostFresh = post.isFresh(CachePolicy.StatusTtlMillis),
         )
     }
+
+    /** [statusId] の版の一覧 (古い順。最後が今の版)。取ったものはプロセス内で覚えておく ([cachedHistory])。 */
+    suspend fun fetchHistory(statusId: String): List<PostVersion> {
+        val versions = api.statusHistory(session.serverUrl, session.accessToken, statusId)
+            .map { it.toDomain() }
+            .sortedBy { it.createdAt }
+        synchronized(histories) { histories[statusId] = versions }
+        return versions
+    }
+
+    /** 最近 [fetchHistory] で取った [statusId] の版の一覧。無ければ `null`。 */
+    fun cachedHistory(statusId: String): List<PostVersion>? = synchronized(histories) { histories[statusId] }
 
     /**
      * [statusIds] のポストを 1 件ずつ取得し、同じ順で返す (同時に [MaxParallelFetches] 件まで)。
@@ -198,6 +216,8 @@ class StatusRepository(
 }
 
 private const val MaxParallelFetches = 4
+
+private const val MaxCachedHistories = 8
 
 private val PostAction.endpoint: String
     get() = when (type) {

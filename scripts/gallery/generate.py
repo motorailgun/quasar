@@ -346,6 +346,25 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(bob, p("ブーストされた投稿"), reblog=st.make(carol, p("ブーストの中身 :pulse_webp:"), ems("pulse_webp"))),
     ]
 
+    # --- post-history: 編集履歴 (StatusEdit の配列、古い順。最後が今の版 = post-variety の「編集した投稿」)。
+    # 投票の選択肢を変え、CW・閲覧注意の添付・絵文字を足し、最後に添付と投票を外す
+    def edit(content, at, **extra):
+        data = {"content": content, "spoiler_text": "", "sensitive": False, "created_at": at,
+                "account": bob, "media_attachments": [], "emojis": []}
+        data.update(extra)
+        return data
+
+    post_history = [
+        edit(p("編集する前の投稿"), "2025-12-31T14:20:00.000Z",
+             poll={"options": [{"title": "A"}, {"title": "B"}]}),
+        edit(p("誤字を直した投稿 :blink_gif:<br>2 行目"), "2026-01-01T03:00:00.000Z",
+             poll={"options": [{"title": "A"}, {"title": "B"}, {"title": "C :spin_fast:"}]},
+             emojis=ems("blink_gif", "spin_fast")),
+        edit(p("CW と添付を足した投稿"), "2026-01-01T12:30:00.000Z", spoiler_text="CW を足した", sensitive=True,
+             media_attachments=[mediaj(30, stripes), mediaj(31, media[1])]),
+        edit(p("編集した投稿"), "2026-01-02T00:00:00.000Z"),
+    ]
+
     # --- translation: オンデバイス翻訳の HTML の変換 (メンション・ハッシュタグ・短縮表示の URL・絵文字・書式・引用の RE:)
     translation = [
         st.make(bob, p(f"{mention(alice)} thanks for the review! I'll fix it tomorrow :spin_slow:"), ems("spin_slow")),
@@ -396,6 +415,7 @@ def build_fixtures(e, avatars, header, media, tall):
         "emoji-picker.json": picker,
         "profile.json": {"account": profile_account, "statuses": profile_posts},
         "post-variety.json": post_variety,
+        "post-history.json": post_history,
         "translation.json": translation,
     }
 

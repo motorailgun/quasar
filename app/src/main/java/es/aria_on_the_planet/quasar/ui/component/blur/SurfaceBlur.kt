@@ -119,7 +119,7 @@ fun Modifier.surfaceBlurSource(state: HazeState, enabled: Boolean): Modifier =
 
 /**
  * ぼかした面 ([rememberSurfaceBlurStyle]) の縁。後ろの一覧から浮いて見えるよう、薄い outlineVariant の 1dp。
- * タイムラインのヘッダのタブ・クイック投稿バーで共通。
+ * 今はクイック投稿バーだけが使う (タイムラインのヘッダには付けない)。
  */
 @Composable
 fun surfaceBlurBorder(): BorderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

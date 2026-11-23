@@ -349,7 +349,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト) |
 | 編集 | `PUT /api/v1/statuses/:id` (form。公開範囲・返信先は送らない。代替テキストは `media_attributes[][id/description]`) |
 | 削除 | `DELETE /api/v1/statuses/:id` |
-| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲。`source.note` / `source.fields` がプロフィール編集の原文) |
+| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲。`source.note` / `source.fields` がプロフィール編集の原文。`source.follow_requests_count` がドロワーのフォローリクエストの件数) |
 | プロフィールの編集 | `PATCH /api/v1/accounts/update_credentials` (multipart。画像も同じリクエスト。フィールドは送ったもので丸ごと置き換わる) |
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
@@ -941,7 +941,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
     投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
     お気に入り・ブックマーク・非公開の返信 (`Route.PersonalPosts`。`DetailScaffold` + `PostList`、`PostFeed.linked`。外しても一覧からは
-    消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く)。
+    消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く。
+    項目の右端に件数 = `CurrentAccount.followRequestsCount`。M3 のドロワーの形で丸の無い数字だけ、0 なら出さない。件数は `fetchMe` の
+    メモリのキャッシュで、承認・拒否 (`AccountRepository.answerFollowRequest`) で手元で 1 減らし、取得・ストリームで届いた通知に
+    follow / follow_request があれば `refreshMeAfterFollowNotification` で取り直す (最後に取った時刻 − 1 分より後の通知だけ・同じ
+    通知では 1 回。純粋関数 `needsRefreshForFollowNotification`、`FollowNotificationRefreshTest`))。
     どれも詳細のパネルで開く。
     開くのはボタンだけ (左右のスワイプはカラムの切り替え)、状態は保存しないので別画面から戻ると閉じている。開いている間の「戻る」は閉じる (`NavigationBackHandler`。`ModalNavigationDrawer` 自身は「戻る」を受けない))、
     右にカラムのタブ (Expressive の連結 `ToggleButton`)。

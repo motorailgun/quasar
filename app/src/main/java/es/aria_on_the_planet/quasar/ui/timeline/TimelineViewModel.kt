@@ -7,7 +7,10 @@ import es.aria_on_the_planet.quasar.data.account.AccountContext
 import es.aria_on_the_planet.quasar.data.remote.MastodonApi
 import es.aria_on_the_planet.quasar.data.repository.PostChange
 import es.aria_on_the_planet.quasar.data.repository.withPoll
+import es.aria_on_the_planet.quasar.data.repository.AccountRepository
+import es.aria_on_the_planet.quasar.data.streaming.StreamEvent
 import es.aria_on_the_planet.quasar.domain.model.NotificationGroup
+import es.aria_on_the_planet.quasar.domain.model.NotificationType
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
@@ -25,6 +28,7 @@ import es.aria_on_the_planet.quasar.ui.notification.nextNotificationMaxId
 import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.NotificationApi
 import es.aria_on_the_planet.quasar.domain.model.settings.StreamingSettings
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import java.time.Instant
 
 /** メイン画面のカラム。ポストのタイムラインに加えて通知を含む。 */
 enum class ColumnType(val timeline: TimelineType?) {
@@ -83,9 +88,37 @@ class TimelineViewModel(
         // ストリーム・補完で伸びたら古い側を捨てる (gap は作らない)
         trim = { it.take(MaxNotificationEntries) },
         nextMaxIdOfItems = { entries -> nextNotificationMaxId(entries.flatMap { it.groups }) },
-    ) { maxId -> notificationRepository.fetch(notificationApi(), maxId) }
+    ) { maxId -> notificationRepository.fetch(notificationApi(), maxId).also(::onNotifications) }
 
     private suspend fun notificationApi(): NotificationApi = settings.first().notificationApi
+
+    /** 自分へのフォローリクエストの件数 (ドロワーのバッジ)。ログイン中のアカウントを取るまでは 0。 */
+    val followRequestsCount: StateFlow<Int> = accountRepository.myAccount()
+        .map { it.followRequestsCount }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), accountRepository.cachedMe()?.followRequestsCount ?: 0)
+
+    /** 取得した通知にフォロー・フォローリクエストがあれば、フォローリクエストの件数を取り直す。 */
+    private fun onNotifications(groups: List<NotificationGroup>) {
+        groups.forEach { group -> group.latestAt?.let { onFollowNotification(group.type, it) } }
+    }
+
+    /**
+     * フォロー・フォローリクエストの通知 ([at] に届いた) を見たら、フォローリクエストの件数が変わっているかもしれないので
+     * ログイン中のアカウントを取り直す (前に取ったときより後の通知だけ。[AccountRepository.refreshMeAfterFollowNotification])。
+     * フォローも見るのは、承認制のアカウントでリクエストが承認されたときや、承認制を外したときにも件数が変わるため。
+     */
+    private fun onFollowNotification(type: NotificationType, at: Instant) {
+        if (type != NotificationType.Follow && type != NotificationType.FollowRequest) return
+        viewModelScope.launch {
+            try {
+                accountRepository.refreshMeAfterFollowNotification(at)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to refresh the follow request count", e)
+            }
+        }
+    }
 
     private val selected = MutableStateFlow(ColumnType.Home)
 
@@ -153,7 +186,9 @@ class TimelineViewModel(
         streamedTimelines = streamedTimelinesFor(streaming),
         notifications = notifications.takeIf { streaming.isEnabled(ColumnType.Notifications) },
         fetchPosts = { type, maxId, sinceId -> repository.fetch(type, maxId = maxId, sinceId = sinceId) },
-        fetchNewerNotifications = { sinceId -> notificationRepository.fetch(notificationApi, sinceId = sinceId) },
+        fetchNewerNotifications = { sinceId ->
+            notificationRepository.fetch(notificationApi, sinceId = sinceId).also(::onNotifications)
+        },
         toGroup = { notificationRepository.toGroup(it, notificationApi) },
         pageLimit = MastodonApi.DEFAULT_LIMIT,
         onError = { message, error -> Log.w(TAG, message, error) },
@@ -172,7 +207,12 @@ class TimelineViewModel(
             val channels = streamChannelsFor(streaming)
             if (channels.isEmpty()) return@collectLatest
             val sync = syncFor(streaming, api)
-            streamingClient.events(channels).collect(sync::handle)
+            streamingClient.events(channels).collect { event ->
+                if (event is StreamEvent.NotificationReceived) {
+                    onFollowNotification(event.notification.type, event.notification.createdAt)
+                }
+                sync.handle(event)
+            }
         }
     }
 

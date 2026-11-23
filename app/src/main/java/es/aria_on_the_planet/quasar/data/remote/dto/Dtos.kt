@@ -53,6 +53,8 @@ data class AccountSourceDto(
     val fields: List<FieldDto> = emptyList(),
     /** 投稿の言語の設定 (ISO 639)。設定していなければ `null` か空。 */
     val language: String? = null,
+    /** 自分へのフォローリクエストの件数 (Mastodon 3.0+)。 */
+    @SerialName("follow_requests_count") val followRequestsCount: Int = 0,
 )
 
 /** https://docs.joinmastodon.org/entities/Status/#Mention */

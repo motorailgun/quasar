@@ -18,12 +18,14 @@ data class StatusSource(
  * * 添付は投稿済みのメディアをアップロード済みとして並べる (`localId` はメディアの ID)。
  * * 投票は編集で送った時点から期間が数え直しになるので、残り時間に最も近い [pollDurations] の値にする。
  * * 公開範囲・返信先は編集できない (下書きの公開範囲はポストのまま、返信先は持たない)。
+ * * 言語はポストのまま (変えられる)。
  */
 fun editDraftOf(post: Post, source: StatusSource, pollDurations: List<Duration>, now: Instant): PostDraft = PostDraft(
     text = source.text,
     contentWarning = source.contentWarning.ifEmpty { null },
     visibility = post.visibility,
     sensitive = post.sensitive,
+    language = post.language,
     attachments = post.mediaAttachments.map { it.toDraftAttachment() },
     poll = post.poll?.let { poll ->
         // 期限の無い投票は新規と同じ既定値

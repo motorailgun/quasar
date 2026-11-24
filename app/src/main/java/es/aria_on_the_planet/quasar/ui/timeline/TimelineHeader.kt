@@ -1,8 +1,6 @@
 package es.aria_on_the_planet.quasar.ui.timeline
 
-import es.aria_on_the_planet.quasar.ui.component.blur.surfaceBlurBorder
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -120,7 +118,6 @@ private fun MenuButton(hazeState: HazeState, blurStyle: SurfaceBlurStyle, onClic
             .size(MenuButtonSize)
             .shadow(HeaderShadowElevation, CircleShape)
             .blurredSurface(hazeState, blurStyle, CircleShape)
-            .border(surfaceBlurBorder(), CircleShape)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -151,11 +148,8 @@ private fun ColumnTabs(
             .height(TabHeight)
             // 一覧の上に浮いて見えるよう軽い影を付ける (視認性のため)
             .shadow(HeaderShadowElevation, CircleShape)
-            .blurredSurface(hazeState, blurStyle, CircleShape)
-            .border(surfaceBlurBorder(), CircleShape)
-            // ボタンはカプセルの内側に少し寄せる。カプセルと同じ高さだと、枠 (中身の上に描かれる) と切り抜きが選択中の
-            // ボタンの上下の縁に掛かり、切れて見える
-            .padding(TabInset),
+            // 選択中のボタンはカプセルの高さいっぱいに塗る (内側に寄せない)
+            .blurredSurface(hazeState, blurStyle, CircleShape),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         ColumnType.entries.forEachIndexed { index, type ->
@@ -169,7 +163,7 @@ private fun ColumnTabs(
                 onCheckedChange = { onSelect(type) },
                 modifier = Modifier
                     .weight(weight)
-                    .height(TabHeight - TabInset * 2)
+                    .height(TabHeight)
                     .semantics { role = Role.RadioButton },
                 shapes = columnTabShapes(index, selected),
                 colors = ToggleButtonDefaults.colors(
@@ -217,5 +211,4 @@ private val GroupInnerCorner = CornerSize(6.dp)
 private const val SelectedWeight = 1.8f
 private val MenuButtonSize: Dp = 44.dp
 private val TabHeight: Dp = 44.dp
-private val TabInset: Dp = 4.dp
 private val HeaderShadowElevation: Dp = 8.dp

@@ -51,10 +51,12 @@ fun PostDraft.toFormParams(): List<Pair<String, String>> = buildList {
     }
     inReplyToId?.let { add("in_reply_to_id" to it) }
     quotedStatusId?.let { add("quoted_status_id" to it) }
+    language?.let { add("language" to it) }
 }
 
 /**
  * `PUT /api/v1/statuses/:id` (編集) のフォーム項目。公開範囲・返信先は変えられないので送らない。
+ * 言語は `null` なら送らない (サーバはポストの今の言語を保つ)。
  * CW・閲覧注意は外す場合も送る。添付・投票は送らなければ外れる。添付の代替テキストは `media_attributes` で送る
  * (投稿済みのメディアは `PUT /api/v1/media/:id` で変えられない)。
  */
@@ -76,6 +78,7 @@ fun PostDraft.toEditFormParams(): List<Pair<String, String>> = buildList {
         add("poll[expires_in]" to poll.expiresIn.inWholeSeconds.toString())
         add("poll[multiple]" to poll.multiple.toString())
     }
+    language?.let { add("language" to it) }
 }
 
 /** API での公開範囲の名前 ([postVisibility] の逆)。 */

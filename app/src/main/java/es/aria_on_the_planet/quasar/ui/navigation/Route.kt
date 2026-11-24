@@ -57,6 +57,12 @@ sealed interface Route : NavKey {
     @Serializable data class PostReactions(val statusId: String, val tab: PostReactionsTab) : Route
 
     /**
+     * ポストの編集履歴の版。[statusId] はブーストなら中身の ID、[index] は最初に出す版 (古い順の 0 始まり)、[language] は
+     * ポストの言語 (版には無いので開くときに渡す)。
+     */
+    @Serializable data class PostHistory(val statusId: String, val index: Int, val language: String? = null) : Route
+
+    /**
      * 他のアプリから共有された URL・`@user@domain` ([query]) を接続中サーバで引いている途中。引けたら行き先の画面
      * (ポスト・プロフィール・ハッシュタグ) に置き換わる。
      */

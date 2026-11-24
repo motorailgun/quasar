@@ -167,6 +167,8 @@ dependencies {
     // 設定の保存
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.exifinterface)
+    // 編集履歴の版どうしの差分 (domain/model/VersionDiff.kt)
+    implementation(libs.java.diff.utils)
     // API の結果のキャッシュ (ポスト・アカウント等。data/cache/)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

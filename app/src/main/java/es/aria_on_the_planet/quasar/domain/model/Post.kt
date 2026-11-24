@@ -51,6 +51,8 @@ data class Post(
     val url: String? = null,
     /** 本文の言語 (`language`、ISO 639 / BCP 47。投稿者が選んだもの)。無いことがある。 */
     val language: String? = null,
+    /** 最後に編集された日時 (`edited_at`)。編集されていなければ `null`。 */
+    val editedAt: Instant? = null,
 )
 
 /**

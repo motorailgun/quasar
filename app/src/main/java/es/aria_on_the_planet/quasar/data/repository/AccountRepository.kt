@@ -35,6 +35,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.time.Duration
+import java.time.Instant
 
 /** ログイン中のアカウントと、その投稿の既定値。 */
 data class CurrentAccount(
@@ -43,6 +45,10 @@ data class CurrentAccount(
     val defaultVisibility: PostVisibility,
     /** メディアを既定で閲覧注意にするか (`source.sensitive`)。 */
     val defaultSensitive: Boolean,
+    /** 投稿の言語の設定 (`source.language`)。設定していなければ `null` (サーバは UI の言語を使う)。 */
+    val defaultLanguage: String? = null,
+    /** 自分へのフォローリクエストの件数 (`source.follow_requests_count`)。ドロワーのバッジに出す。 */
+    val followRequestsCount: Int = 0,
 )
 
 /** 自分の操作で [accountId] との関係が [relationship] に変わった。 */
@@ -71,16 +77,49 @@ class AccountRepository(
     private val meMutex = Mutex()
     private val me = MutableStateFlow<CurrentAccount?>(null)
 
+    /** [me] の版 ([EntityCache.issue]。リクエストを出した時点)。先に出した取得の応答が後から届いても巻き戻さない。 */
+    private var meVersion = Long.MIN_VALUE
+
+    /** [me] を取りに行った時刻 (端末の時計)。これより後のフォロー・フォローリクエストの通知は件数に入っていない。 */
+    private var meFetchedAt: Instant? = null
+
+    /** 取り直しのきっかけにした通知のうち最も新しいものの日時 (同じ通知で何度も取り直さない)。 */
+    private var followNotificationHandledAt: Instant? = null
+
     /** 取得済みならログイン中のアカウント ([fetchMe] のキャッシュ)。待たずに返す。 */
     fun cachedMe(): CurrentAccount? = me.value
 
-    /** ログイン中のアカウント。メモリへキャッシュする (この Repository は 1 つのセッションに結びついている)。 */
+    /**
+     * ログイン中のアカウント。メモリへキャッシュし、取得済みなら取りに行かない (この Repository は 1 つのセッションに
+     * 結びついている)。取り直すのは [refreshMe] / [refreshMeAfterFollowNotification]。
+     */
     suspend fun fetchMe(): CurrentAccount =
+        meMutex.withLock { cachedMe() ?: fetchMeLocked() }
+
+    /** ログイン中のアカウントを取り直す (フォローリクエストの件数等)。結果は [myAccount] に流れる。 */
+    suspend fun refreshMe(): CurrentAccount = meMutex.withLock { fetchMeLocked() }
+
+    /**
+     * [at] に届いたフォロー・フォローリクエストの通知を見た。最後に取ったときより後のものなら、フォローリクエストの件数が
+     * 変わっているかもしれないので取り直す。まだ一度も取っていなければ何もしない (取るときに入る)。
+     */
+    suspend fun refreshMeAfterFollowNotification(at: Instant) {
+        if (!needsRefreshForFollowNotification(at, meFetchedAt, followNotificationHandledAt)) return
         meMutex.withLock {
-            cachedMe() ?: cache.issue().let { version ->
-                api.verifyCredentials(session.serverUrl, session.accessToken).also { cache.putAccounts(listOf(it), version) }
-            }.let { dto -> rememberMe(dto) }
+            // 待っている間にほかが取り直していれば取らない
+            if (!needsRefreshForFollowNotification(at, meFetchedAt, followNotificationHandledAt)) return
+            followNotificationHandledAt = at
+            fetchMeLocked()
         }
+    }
+
+    private suspend fun fetchMeLocked(): CurrentAccount {
+        val version = cache.issue()
+        val fetchedAt = Instant.now()
+        val dto = api.verifyCredentials(session.serverUrl, session.accessToken)
+        cache.putAccounts(listOf(dto), version)
+        return rememberMe(dto, version, fetchedAt)
+    }
 
     /**
      * ログイン中のアカウントの取得済みの値と、その後の変化 (プロフィールの編集)。投稿欄・タイムラインのヘッダの
@@ -89,12 +128,23 @@ class AccountRepository(
     fun myAccount(): Flow<CurrentAccount> =
         me.filterNotNull().distinctUntilChanged()
 
-    private fun rememberMe(dto: AccountDto): CurrentAccount =
-        CurrentAccount(
+    /** [dto] (`verify_credentials` / `update_credentials` の応答) を [me] にする。[version] が古ければ捨てる。 */
+    private fun rememberMe(dto: AccountDto, version: Long, fetchedAt: Instant): CurrentAccount {
+        val account = CurrentAccount(
             user = dto.toDomain(),
             defaultVisibility = dto.source?.privacy?.let(::postVisibility) ?: PostVisibility.Public,
             defaultSensitive = dto.source?.sensitive == true,
-        ).also { me.value = it }
+            defaultLanguage = dto.source?.language?.takeIf { it.isNotBlank() },
+            followRequestsCount = dto.source?.followRequestsCount ?: 0,
+        )
+        synchronized(me) {
+            if (version < meVersion) return me.value ?: account
+            meVersion = version
+            meFetchedAt = fetchedAt
+            me.value = account
+        }
+        return account
+    }
 
     /**
      * 自分のプロフィールの編集用の原文。表示中のプロフィールは HTML なので、`verify_credentials` の `source` を
@@ -102,9 +152,10 @@ class AccountRepository(
      */
     suspend fun fetchProfileSource(): ProfileSource {
         val version = cache.issue()
+        val fetchedAt = Instant.now()
         val dto = api.verifyCredentials(session.serverUrl, session.accessToken)
         cache.putAccounts(listOf(dto), version)
-        rememberMe(dto)
+        rememberMe(dto, version, fetchedAt)
         return dto.toProfileSource() ?: throw IOException("The server did not return the profile source")
     }
 
@@ -122,9 +173,10 @@ class AccountRepository(
             header?.let { Triple("header", it.fileName, ProgressRequestBody(it) {}) },
         )
         val version = cache.issue()
+        val fetchedAt = Instant.now()
         val dto = api.updateCredentials(session.serverUrl, session.accessToken, source.toUpdateCredentialsParams(), images)
         cache.putAccounts(listOf(dto), version)
-        rememberMe(dto)
+        rememberMe(dto, version, fetchedAt)
         return dto.toProfile()
     }
 
@@ -225,8 +277,20 @@ class AccountRepository(
         changeRelationship(accountId) { api.follow(session.serverUrl, session.accessToken, accountId, follow) }
 
     /** [accountId] から自分へのフォローリクエストを承認する (`accept = false` なら拒否)。更新後の関係を返す。 */
-    suspend fun answerFollowRequest(accountId: String, accept: Boolean): Relationship =
-        changeRelationship(accountId) { api.answerFollowRequest(session.serverUrl, session.accessToken, accountId, accept) }
+    suspend fun answerFollowRequest(accountId: String, accept: Boolean): Relationship {
+        val version = cache.issue()
+        val relationship = api.answerFollowRequest(session.serverUrl, session.accessToken, accountId, accept)
+        onRelationshipChanged(accountId, relationship, version)
+        // 件数は取り直さずに手元で減らす。返事より前に出した取得の応答が後から届いても戻さない (版を進める)
+        synchronized(me) {
+            val current = me.value
+            if (current != null && version >= meVersion) {
+                meVersion = version
+                me.value = current.copy(followRequestsCount = (current.followRequestsCount - 1).coerceAtLeast(0))
+            }
+        }
+        return relationship.toDomain()
+    }
 
     /** [accountId] をブロックする (`block = false` なら解除)。ブロックするとフォロー・フォローされている関係も切れる。 */
     suspend fun setBlocking(accountId: String, block: Boolean): Relationship =
@@ -278,3 +342,18 @@ class AccountRepository(
         const val MaxPinnedPosts = 20
     }
 }
+
+/**
+ * 端末とサーバの時計のずれの許容。通知の日時はサーバの時計、取りに行った時刻は端末の時計なので、取りに行った少し前の
+ * 通知でも取り直す (多めに取り直すだけで、取りこぼすよりよい)。
+ */
+private val ClockSkewAllowance: Duration = Duration.ofMinutes(1)
+
+/**
+ * [at] のフォロー・フォローリクエストの通知を見て、ログイン中のアカウントを取り直すか。[meFetchedAt] (最後に取りに
+ * 行った時刻、まだなら `null` = 取らない) の少し前より後で、[handledAt] (前に取り直すきっかけにした通知) より新しいもの。
+ */
+internal fun needsRefreshForFollowNotification(at: Instant, meFetchedAt: Instant?, handledAt: Instant?): Boolean =
+    meFetchedAt != null &&
+        at > meFetchedAt - ClockSkewAllowance &&
+        (handledAt == null || at > handledAt)

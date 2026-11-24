@@ -1,11 +1,16 @@
 package es.aria_on_the_planet.quasar.ui.settings
 
 import android.text.format.Formatter
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +46,29 @@ import es.aria_on_the_planet.quasar.ui.translation.PostTranslationStore
 import es.aria_on_the_planet.quasar.ui.translation.deviceLanguageTags
 import es.aria_on_the_planet.quasar.ui.translation.languageDisplayName
 import java.util.Locale
+
+/**
+ * モデルのダウンロードの進み具合 (Expressive の波打つバー)。状態は 1 秒ごとに読むので、その間を補って動かす。
+ * 始まる前 (順番待ち)・確かめている間は割合が無いので、流れるバー。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ModelProgress(model: TranslationModelState) {
+    val modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)
+    val fraction = (model as? TranslationModelState.Downloading)
+        ?.takeIf { !(it.waiting && it.downloaded == 0L) && it.total > 0 }
+        ?.let { (it.downloaded.toFloat() / it.total).coerceIn(0f, 1f) }
+    if (fraction == null) {
+        LinearWavyProgressIndicator(modifier = modifier)
+    } else {
+        val progress by animateFloatAsState(
+            targetValue = fraction,
+            animationSpec = WavyProgressIndicatorDefaults.ProgressAnimationSpec,
+            label = "modelProgress",
+        )
+        LinearWavyProgressIndicator(progress = { progress }, modifier = modifier)
+    }
+}
 
 /** 翻訳の設定の確認ダイアログ。 */
 private enum class TranslationDialog { Download, CancelDownload, Disable }
@@ -106,6 +134,12 @@ fun TranslationSettingsPage(
                         )
                     },
                     icon = Symbols.Outlined.Translate,
+                    below = when (model) {
+                        is TranslationModelState.Downloading, TranslationModelState.Verifying -> {
+                            { ModelProgress(model) }
+                        }
+                        else -> null
+                    },
                     onClick = {
                         when (model) {
                             TranslationModelState.Missing, is TranslationModelState.Failed -> dialog = TranslationDialog.Download

@@ -96,6 +96,8 @@ fun Composer(
     val targetField = if (activeField === state.contentWarning && !state.contentWarningEnabled) state.text else activeField
     val suggestions by rememberEmojiSuggestions(targetField, emojis)
     val highlight = rememberEmojiShortcodeHighlight(emojis)
+    // ハッシュタグはサーバが本文からしか拾わないので本文だけ
+    val textHighlight = rememberPostTextHighlight(emojis)
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
     var editingDescriptionOf by rememberSaveable { mutableStateOf<String?>(null) }
     // 動画 (GIF 含む) は単独でしか付けられないので、あればそれ以上足せない
@@ -129,7 +131,7 @@ fun Composer(
                         enabled = enabled,
                         placeholder = placeholder,
                         minHeight = TextMinHeight,
-                        outputTransformation = highlight,
+                        outputTransformation = textHighlight,
                         // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
                         modifier = Modifier
                             .focusRequester(focusRequester)

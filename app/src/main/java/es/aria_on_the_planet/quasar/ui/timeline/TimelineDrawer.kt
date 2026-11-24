@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +50,7 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
  * ──────────
  * ⚙ Settings
  * 🔍 Search
- * ☆ Favourites / 🔖 Bookmarks / 👤+ Follow requests / ✉ Private mentions
+ * ☆ Favourites / 🔖 Bookmarks / 👤+ Follow requests    3 / ✉ Private mentions
  * ```
  *
  * 上のアカウントの部分 ([DrawerAccountHeader]): 名前の部分のタップで自分のプロフィール、右上の他のアカウントの小さな
@@ -56,8 +58,12 @@ import es.aria_on_the_planet.quasar.ui.personal.PersonalPostList
  * [account] は投稿欄が取得した使っているアカウント (無ければ [accounts] の保存している情報)。
  * ドロワーは閉じていてもコンポジションに残るので、閉じ切ったら ([closed]) 一覧も閉じる (開き直すと閉じている)。
  *
- * 幅は項目に合わせる (M3 の既定は項目が幅いっぱいに広がるので最大の 360dp になる。下限の 240dp は M3 のまま)。
+ * 幅は項目に合わせる (M3 の既定は項目が幅いっぱいに広がるので最大の 360dp になる)。下限は [DrawerMinWidth] (M3 の 240dp
+ * では項目の右端の件数が名前のすぐ横に来るため広げている)。
  * アカウントの部分は幅を決めるのに数えず、長い名前は省略する。
+ *
+ * [followRequestsCount] (自分へのフォローリクエストの件数) が 1 以上なら Follow requests の右端に数字を出す
+ * (M3 のドロワーのバッジは丸の付かない数字だけ。`Badge` はナビゲーションバー・レールのアイコン用)。
  */
 @Composable
 fun TimelineDrawerSheet(
@@ -70,8 +76,9 @@ fun TimelineDrawerSheet(
     onOpenSearch: () -> Unit,
     closed: Boolean,
     modifier: Modifier = Modifier,
+    followRequestsCount: Int = 0,
 ) {
-    ModalDrawerSheet(modifier.width(IntrinsicSize.Max)) {
+    ModalDrawerSheet(modifier.width(IntrinsicSize.Max).widthIn(min = DrawerMinWidth)) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             if (account != null || accounts != null) {
                 // アカウントの部分は幅を決めるのに数えない (長い名前・アカウントの数でドロワーが広がらない)
@@ -91,26 +98,39 @@ fun TimelineDrawerSheet(
             } else {
                 Spacer(Modifier.height(12.dp))
             }
-            DrawerItem(R.string.settings, Symbols.Outlined.Settings, onOpenSettings)
-            DrawerItem(R.string.search_hint, Symbols.Outlined.Search, onOpenSearch)
+            DrawerItem(R.string.settings, Symbols.Outlined.Settings, onClick = onOpenSettings)
+            DrawerItem(R.string.search_hint, Symbols.Outlined.Search, onClick = onOpenSearch)
             DrawerItem(R.string.profile_tab_favourites, Symbols.Outlined.Star) { onOpenPersonalPosts(PersonalPostList.Favourites) }
             DrawerItem(R.string.profile_tab_bookmarks, Symbols.Outlined.Bookmark) { onOpenPersonalPosts(PersonalPostList.Bookmarks) }
-            DrawerItem(R.string.settings_follow_requests, Symbols.Outlined.PersonAdd, onOpenFollowRequests)
+            DrawerItem(R.string.settings_follow_requests, Symbols.Outlined.PersonAdd, badge = followRequestsCount, onClick = onOpenFollowRequests)
             DrawerItem(R.string.private_mentions, Symbols.Outlined.Mail) { onOpenPersonalPosts(PersonalPostList.PrivateMentions) }
         }
     }
 }
 
 @Composable
-private fun DrawerItem(@StringRes label: Int, icon: ImageVector, onClick: () -> Unit) {
+private fun DrawerItem(@StringRes label: Int, icon: ImageVector, badge: Int = 0, onClick: () -> Unit) {
     NavigationDrawerItem(
         label = { Text(stringResource(label)) },
         icon = { Icon(icon, contentDescription = null) },
+        badge = if (badge > 0) {
+            { Text(badgeText(badge), style = MaterialTheme.typography.labelLarge) }
+        } else {
+            null
+        },
         selected = false,
         onClick = onClick,
         modifier = Modifier.padding(horizontal = 12.dp),
     )
 }
+
+/** ドロワーの項目の右端の件数。4 桁以上は「999+」(M3 のバッジの上限の表記)。 */
+private fun badgeText(count: Int): String = if (count > MaxBadgeCount) "$MaxBadgeCount+" else count.toString()
+
+private const val MaxBadgeCount = 999
+
+/** ドロワーの幅の下限。項目がこれより長ければ広がる (上限は M3 の 360dp)。 */
+private val DrawerMinWidth = 280.dp
 
 /** 親の intrinsic な幅の問い合わせに 0 を返す (測るときはそのまま)。 */
 private object IgnoreIntrinsicWidth : LayoutModifier {

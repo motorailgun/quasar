@@ -31,12 +31,18 @@ data class ExtendedColors(
     val reblog: CustomColorRoles,
     /** フォロー (青)。 */
     val follow: CustomColorRoles,
+    /** 編集履歴の差分で足された所 (緑)。 */
+    val diffAdded: CustomColorRoles,
+    /** 編集履歴の差分で消された所 (赤)。 */
+    val diffRemoved: CustomColorRoles,
 )
 
 /** 元にする色。dynamic color の primary に向けて harmonize してから使う。 */
 private val FavouriteSeed = Color(0xFFFFC107)
 private val ReblogSeed = Color(0xFF4CAF50)
 private val FollowSeed = Color(0xFF2196F3)
+private val DiffAddedSeed = Color(0xFF2E7D32)
+private val DiffRemovedSeed = Color(0xFFE53935)
 
 /**
  * [seed] を [scheme] の primary に馴染むよう色相を寄せ (harmonize)、ライト/ダークに応じた
@@ -57,6 +63,8 @@ internal fun extendedColorsFor(scheme: ColorScheme, isLight: Boolean) = Extended
     favourite = customColorRoles(FavouriteSeed, scheme, isLight),
     reblog = customColorRoles(ReblogSeed, scheme, isLight),
     follow = customColorRoles(FollowSeed, scheme, isLight),
+    diffAdded = customColorRoles(DiffAddedSeed, scheme, isLight),
+    diffRemoved = customColorRoles(DiffRemovedSeed, scheme, isLight),
 )
 
 internal val LocalExtendedColors = staticCompositionLocalOf<ExtendedColors> {

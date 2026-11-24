@@ -39,6 +39,7 @@ import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
+import es.aria_on_the_planet.quasar.ui.component.composer.LanguageButton
 import es.aria_on_the_planet.quasar.ui.component.composer.QuoteTargetPreview
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
@@ -46,6 +47,7 @@ import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
 /**
  * フルの投稿画面。トップバーの Post で送信する。返信中は上に返信先 ([ReplyContext]、✕ で返信をやめる) を出す。
  * 編集 ([ComposerSession.isEditing]) では Save で保存し、公開範囲は変えられない。
+ * Post / Save の左はポストの言語 ([LanguageButton]。クイック投稿バーには出さない)。
  *
  * 投稿できたときの後始末は [DraftStore] が行う (下書きが空のものに替わり、[DraftStore.published] で知らせる)。
  * 閉じるのは呼び出し側がそれを受けて行う。
@@ -121,6 +123,13 @@ fun ComposerScreen(
                     }
                 },
                 actions = {
+                    LanguageButton(
+                        language = composer.language,
+                        onChange = { composer.language = it },
+                        accountDefault = state.defaultLanguage,
+                        enabled = !state.sending,
+                        modifier = Modifier.padding(end = 4.dp),
+                    )
                     Button(
                         onClick = rememberConfirmedSubmit(session),
                         enabled = canSubmit && !state.sending,

@@ -45,6 +45,9 @@ class ComposerState(
     var poll by mutableStateOf<PollDraft?>(null)
     var attachments by mutableStateOf<List<DraftAttachment>>(emptyList())
 
+    /** ポストの言語 (ISO 639)。`null` (Auto) なら送らずサーバに任せる。 */
+    var language by mutableStateOf<String?>(null)
+
     /** 返信先。返信でなければ `null`。 */
     var inReplyTo by mutableStateOf<Post?>(null)
         private set
@@ -117,6 +120,7 @@ class ComposerState(
         poll = poll,
         inReplyToId = inReplyTo?.statusId,
         quotedStatusId = quote?.statusId,
+        language = language,
     )
 
     /** 投票の有無を切り替える (メディアがある間は付けられない)。 */
@@ -128,7 +132,7 @@ class ComposerState(
         attachments = attachments.filterNot { it.localId == localId }
     }
 
-    /** 送信後などに空へ戻す (公開範囲・閲覧注意の設定は保つ)。 */
+    /** 送信後などに空へ戻す (公開範囲・閲覧注意・言語の設定は保つ)。 */
     fun clear() {
         text.clearText()
         contentWarning.clearText()
@@ -151,11 +155,12 @@ class ComposerState(
         sensitive = draft.sensitive
         poll = draft.poll
         attachments = draft.attachments
+        language = draft.language
     }
 
     companion object {
         /**
-         * 本文・CW・公開範囲・閲覧注意・投票を保存する。添付はアップロードの途中状態を戻せないので、返信先・引用は
+         * 本文・CW・公開範囲・閲覧注意・投票・言語を保存する。添付はアップロードの途中状態を戻せないので、返信先・引用は
          * ポストを持てないので保存しない。
          */
         val Saver: Saver<ComposerState, Any> = listSaver(
@@ -170,6 +175,7 @@ class ComposerState(
                     poll?.options,
                     poll?.expiresIn?.inWholeSeconds,
                     poll?.multiple,
+                    state.language,
                 )
             },
             restore = { saved ->
@@ -185,6 +191,7 @@ class ComposerState(
                     if (options != null) {
                         poll = PollDraft(options, (saved[6] as Long).seconds, saved[7] as Boolean)
                     }
+                    language = saved[8] as String?
                 }
             },
         )

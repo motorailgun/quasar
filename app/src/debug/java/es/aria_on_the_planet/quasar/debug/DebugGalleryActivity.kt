@@ -67,6 +67,10 @@ import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsContent
 import es.aria_on_the_planet.quasar.ui.reactions.PostReactionsState
 import es.aria_on_the_planet.quasar.ui.component.post.PostCallbacks
 import es.aria_on_the_planet.quasar.ui.component.post.PostDetail
+import es.aria_on_the_planet.quasar.ui.component.post.PostHistoryMenu
+import es.aria_on_the_planet.quasar.ui.component.post.PostHistoryMenuState
+import es.aria_on_the_planet.quasar.ui.post.PostHistoryContent
+import es.aria_on_the_planet.quasar.ui.post.PostHistoryState
 import es.aria_on_the_planet.quasar.ui.feed.FeedState
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
 import es.aria_on_the_planet.quasar.domain.model.toggleOn
@@ -199,6 +203,7 @@ private class GalleryNavigator(
     override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
     override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) = Unit
     override fun openPostReactions(post: Post, tab: PostReactionsTab) = Unit
+    override fun openPostHistory(statusId: String, index: Int, language: String?) = Unit
     override fun openComposer(panelDraft: Boolean) = Unit
     override fun openSettings() = Unit
     override fun openPersonalPosts(list: PersonalPostList) = Unit
@@ -487,12 +492,48 @@ private fun GalleryScreen(scenario: GalleryScenario, onBack: () -> Unit) {
 /**
  * ポスト詳細の本体を `reactionDetail` で並べる。ブースト等は手元で反映するだけ (件数の動きも確かめられる)。
  * 件数のタップでリアクションしたユーザーの一覧 ([PostReactionsContent]) に切り替え、「戻る」で戻る。
+ * 編集済みのポストの「Edited」で編集履歴のシート ([PostHistoryMenu]、`post-history.json`) → 版の画面 ([PostHistoryContent])。
  */
 @Composable
 private fun PostDetailGallery(text: String, onBack: () -> Unit) {
     val navigator = LocalNavigator.current
     var posts by remember(text) { mutableStateOf(GalleryFixtures.posts(text)) }
     var reactions by remember { mutableStateOf<PostReactionsTab?>(null) }
+    // 編集履歴: 「Edited」でシート (0.6 秒読み込み中を出す) → 版を選ぶと版の画面。どの編集済みのポストでも同じ固定データ
+    val context = LocalContext.current
+    val history = remember {
+        GalleryFixtures.postHistory(context.assets.open("gallery/post-history.json").bufferedReader().use { it.readText() })
+    }
+    var historyMenu by remember { mutableStateOf<PostHistoryMenuState?>(null) }
+    var historyIndex by remember { mutableStateOf<Int?>(null) }
+    var historyLanguage by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(historyMenu) {
+        if (historyMenu == PostHistoryMenuState.Loading) {
+            delay(600)
+            historyMenu = PostHistoryMenuState.Loaded(history)
+        }
+    }
+    historyIndex?.let { index ->
+        NavigationBackHandler(state = rememberNavigationEventState(NavigationEventInfo.None), onBackCompleted = { historyIndex = null })
+        PostHistoryContent(
+            state = PostHistoryState(versions = history),
+            statusId = "gallery",
+            initialIndex = index,
+            onBack = { historyIndex = null },
+            onRetry = {},
+            callbacks = PostCallbacks(onMediaClick = navigator::openMedia),
+            language = historyLanguage,
+        )
+        return
+    }
+    PostHistoryMenu(
+        state = historyMenu,
+        onDismissRequest = { historyMenu = null },
+        onSelect = { index ->
+            historyMenu = null
+            historyIndex = index
+        },
+    )
     reactions?.let { tab ->
         val users = remember(posts) { posts.map { it.author }.distinctBy { it.inServerId } }
         fun feed(users: List<User>) = FeedState(items = users, loaded = true, endReached = true)
@@ -533,6 +574,10 @@ private fun PostDetailGallery(text: String, onBack: () -> Unit) {
                         reactionDetail = true,
                         onReactionCountClick = { _, type ->
                             reactions = if (type == PostActionType.Boost) PostReactionsTab.Boosts else PostReactionsTab.Favourites
+                        },
+                        onEditedClick = {
+                            historyLanguage = post.language
+                            historyMenu = PostHistoryMenuState.Loading
                         },
                     )
                     HorizontalDivider(thickness = 4.dp)

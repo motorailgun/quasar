@@ -10,6 +10,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.InstanceDto
 import es.aria_on_the_planet.quasar.data.remote.dto.MediaAttachmentDto
 import es.aria_on_the_planet.quasar.data.remote.dto.NotificationDto
 import es.aria_on_the_planet.quasar.data.remote.dto.PollDto
+import es.aria_on_the_planet.quasar.data.remote.dto.StatusEditDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RegisteredAppDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.SearchResultsDto
@@ -97,6 +98,10 @@ class MastodonApi(
     /** https://docs.joinmastodon.org/methods/statuses/#get */
     suspend fun status(serverUrl: String, accessToken: String, id: String): StatusDto =
         get(serverUrl, accessToken, "api/v1/statuses/$id") {}
+
+    /** ポストの版の一覧 (古い順。今の版も含む)。https://docs.joinmastodon.org/methods/statuses/#history */
+    suspend fun statusHistory(serverUrl: String, accessToken: String, id: String): List<StatusEditDto> =
+        get(serverUrl, accessToken, "api/v1/statuses/$id/history") {}
 
     /** https://docs.joinmastodon.org/methods/statuses/#context */
     suspend fun statusContext(serverUrl: String, accessToken: String, id: String): ContextDto =

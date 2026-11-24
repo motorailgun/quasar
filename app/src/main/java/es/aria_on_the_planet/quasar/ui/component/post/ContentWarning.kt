@@ -22,6 +22,8 @@ fun rememberContentWarningExpanded(post: Post): MutableState<Boolean> =
 /**
  * Content Warning。本文の代わりに警告文を出し、その下の「Show more >」で本文を展開する。
  * 本文側の表示切り替えは呼び出し側が [expanded] を見て行う (PostBody は [ContentWarningBody]、QuotedPost は `if (expanded)`)。
+ *
+ * @param language 警告文の言語 ([EmojiText] の同名の引数)。
  */
 @Composable
 fun ContentWarning(
@@ -31,9 +33,10 @@ fun ContentWarning(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
+    language: String? = null,
 ) {
     Column(modifier) {
-        EmojiText(text = text, emojis = emojis, postContent = true, style = style)
+        EmojiText(text = text, emojis = emojis, postContent = true, style = style, language = language)
         ShowMoreToggle(expanded = expanded, onToggle = onToggle)
     }
 }

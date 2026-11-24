@@ -13,6 +13,7 @@ import es.aria_on_the_planet.quasar.data.remote.dto.PreviewCardDto
 import es.aria_on_the_planet.quasar.data.remote.dto.QuoteDto
 import es.aria_on_the_planet.quasar.data.remote.dto.RelationshipDto
 import es.aria_on_the_planet.quasar.data.remote.dto.StatusDto
+import es.aria_on_the_planet.quasar.data.remote.dto.StatusEditDto
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.Hashtag
 import es.aria_on_the_planet.quasar.domain.model.MediaAttachment
@@ -27,6 +28,7 @@ import es.aria_on_the_planet.quasar.domain.model.Poll
 import es.aria_on_the_planet.quasar.domain.model.PollOption
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostApplication
+import es.aria_on_the_planet.quasar.domain.model.PostVersion
 import es.aria_on_the_planet.quasar.domain.model.PreviewCard
 import es.aria_on_the_planet.quasar.domain.model.Profile
 import es.aria_on_the_planet.quasar.domain.model.ProfileField
@@ -139,8 +141,20 @@ fun StatusDto.toDomain(): Post {
         tags = body.tags.map { Hashtag(it.name, it.url) },
         url = body.url ?: body.uri,
         language = body.language?.takeIf { it.isNotBlank() },
+        editedAt = body.editedAt?.let { parseInstantOrNull(it) },
     )
 }
+
+fun StatusEditDto.toDomain() = PostVersion(
+    createdAt = Instant.parse(createdAt),
+    author = account.toDomain(),
+    text = content,
+    contentWarning = spoilerText.takeIf { it.isNotBlank() },
+    sensitive = sensitive,
+    pollOptions = poll?.options?.map { it.title },
+    mediaAttachments = mediaAttachments.map { it.toDomain() },
+    emojis = emojis.map { it.toDomain() },
+)
 
 fun NotificationDto.toDomain() = Notification(
     id = id,

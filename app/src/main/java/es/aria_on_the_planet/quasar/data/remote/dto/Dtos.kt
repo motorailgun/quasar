@@ -51,6 +51,10 @@ data class AccountSourceDto(
     val note: String? = null,
     /** フィールドの原文 (値は HTML ではない)。 */
     val fields: List<FieldDto> = emptyList(),
+    /** 投稿の言語の設定 (ISO 639)。設定していなければ `null` か空。 */
+    val language: String? = null,
+    /** 自分へのフォローリクエストの件数 (Mastodon 3.0+)。 */
+    @SerialName("follow_requests_count") val followRequestsCount: Int = 0,
 )
 
 /** https://docs.joinmastodon.org/entities/Status/#Mention */
@@ -291,6 +295,28 @@ data class MediaSizeDto(
     val duration: Double? = null,
 )
 
+/**
+ * ポストの版 (編集履歴の 1 件)。https://docs.joinmastodon.org/entities/StatusEdit/
+ * 投票は選択肢の文言だけ (件数・期限は無い)。
+ */
+@Serializable
+data class StatusEditDto(
+    val content: String = "",
+    @SerialName("spoiler_text") val spoilerText: String = "",
+    val sensitive: Boolean = false,
+    @SerialName("created_at") val createdAt: String,
+    val account: AccountDto,
+    val poll: StatusEditPollDto? = null,
+    @SerialName("media_attachments") val mediaAttachments: List<MediaAttachmentDto> = emptyList(),
+    val emojis: List<CustomEmojiDto> = emptyList(),
+)
+
+@Serializable
+data class StatusEditPollDto(val options: List<StatusEditPollOptionDto> = emptyList())
+
+@Serializable
+data class StatusEditPollOptionDto(val title: String)
+
 /** 編集用のポストの原文。https://docs.joinmastodon.org/entities/StatusSource/ */
 @Serializable
 data class StatusSourceDto(
@@ -314,6 +340,8 @@ data class ConversationDto(
 data class StatusDto(
     val id: String,
     @SerialName("created_at") val createdAt: String,
+    /** 最後に編集された日時。編集されていなければ `null`。 */
+    @SerialName("edited_at") val editedAt: String? = null,
     val account: AccountDto,
     /** ActivityPub の ID。 */
     val uri: String? = null,

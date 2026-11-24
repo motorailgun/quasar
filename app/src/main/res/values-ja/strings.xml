@@ -52,6 +52,19 @@
         <item quantity="other">%d お気に入り</item>
     </plurals>
     <string name="post_pinned">固定</string>
+    <string name="post_edited">編集済み</string>
+    <string name="post_history_title">編集履歴</string>
+    <plurals name="post_history_edited_times">
+        <item quantity="other">%d回編集</item>
+    </plurals>
+    <string name="post_history_kind_edited">編集</string>
+    <string name="post_history_kind_created">作成</string>
+    <string name="post_history_previous">前の版</string>
+    <string name="post_history_next">次の版</string>
+    <string name="post_history_error">編集履歴を読み込めませんでした: %1$s</string>
+    <string name="post_history_retry">再試行</string>
+    <string name="post_history_media_added">追加</string>
+    <string name="post_history_media_removed">削除</string>
     <string name="post_reply_to">%1$s さんへの返信</string>
     <string name="post_reply">返信</string>
     <string name="post_boosted_by">%1$sさんがブースト</string>
@@ -247,6 +260,9 @@
     <string name="composer_remove_poll">アンケートを削除</string>
     <string name="composer_content_warning">閲覧注意</string>
     <string name="composer_visibility">公開範囲</string>
+    <string name="composer_language">言語</string>
+    <string name="composer_language_auto_account">投稿の言語の設定 (%1$s)</string>
+    <string name="composer_language_auto_server">サーバーに任せる</string>
     <string name="composer_remaining_characters">残り %1$d 文字</string>
     <string name="composer_discard_title">下書きを破棄しますか？</string>
     <string name="composer_discard_message">現在作成中の投稿が破棄されます。</string>

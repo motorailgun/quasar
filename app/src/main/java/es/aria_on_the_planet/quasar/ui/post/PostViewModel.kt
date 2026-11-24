@@ -13,7 +13,9 @@ import es.aria_on_the_planet.quasar.domain.model.PostAction
 import es.aria_on_the_planet.quasar.ui.feed.PostActionController
 import es.aria_on_the_planet.quasar.ui.feed.submitVote
 import es.aria_on_the_planet.quasar.ui.feed.withPostChange
+import es.aria_on_the_planet.quasar.ui.component.post.PostHistoryMenuState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -53,6 +55,12 @@ class PostViewModel(
 
     private val _events = Channel<PostScreenEvent>(Channel.BUFFERED)
     val events: Flow<PostScreenEvent> = _events.receiveAsFlow()
+
+    private val _history = MutableStateFlow<PostHistoryMenuState?>(null)
+
+    /** 編集履歴のシートの中身。閉じていれば `null`。 */
+    val history: StateFlow<PostHistoryMenuState?> = _history.asStateFlow()
+    private var historyJob: Job? = null
 
     init {
         load(force = false)
@@ -125,6 +133,28 @@ class PostViewModel(
             val updated = thread.copy(post = bump(thread.post), descendants = descendants.map(bump))
             s.copy(thread = updated, replies = linearReplies(updated.descendants))
         }
+    }
+
+    /** 本体の編集履歴のシートを開き、版の一覧を取る (開くたびに取り直す)。 */
+    fun showHistory() {
+        val id = _state.value.thread?.post?.statusId ?: return
+        historyJob?.cancel()
+        _history.value = PostHistoryMenuState.Loading
+        historyJob = viewModelScope.launch {
+            _history.value = try {
+                PostHistoryMenuState.Loaded(repository.fetchHistory(id))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load history", e)
+                PostHistoryMenuState.Failed(e.toLoadError())
+            }
+        }
+    }
+
+    fun hideHistory() {
+        historyJob?.cancel()
+        _history.value = null
     }
 
     /** 引っ張って更新: 本体もスレッドも取り直す。 */

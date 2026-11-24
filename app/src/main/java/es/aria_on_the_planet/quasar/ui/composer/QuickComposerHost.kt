@@ -5,11 +5,15 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -28,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import es.aria_on_the_planet.quasar.ui.component.layout.LocalFloatingPanelInset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -81,6 +86,21 @@ fun QuickComposerHost(
 
     Box(modifier.fillMaxSize()) {
         content(if (session != null) barHeight + BarMargin * 2 else 0.dp)
+        if (session != null) {
+            // バーの下 (余白・ナビゲーションバー) と左右の余白は一覧が見えていても押させない。指が少しずれただけで
+            // 後ろのポストが開く・スクロールするのを防ぐ。バーより上 (スナックバー・その上の余白) は覆わない
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(end = LocalFloatingPanelInset.current)
+                    .widthIn(max = BarMaxWidth)
+                    .fillMaxWidth()
+                    .blockPointerInput(),
+            ) {
+                Spacer(Modifier.height(barHeight + BarMargin))
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime.union(WindowInsets.navigationBars)))
+            }
+        }
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -126,6 +146,16 @@ fun QuickComposerHost(
                 )
             }
         }
+    }
+}
+
+/** 触れても何も起きない領域にする (後ろの兄弟には届かず、親にも消費済みで渡す)。 */
+private fun Modifier.blockPointerInput(): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        do {
+            val event = awaitPointerEvent()
+            event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
     }
 }
 

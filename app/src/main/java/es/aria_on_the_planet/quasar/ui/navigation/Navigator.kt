@@ -29,6 +29,12 @@ interface Navigator {
     /** [post] (ブーストなら中身) をブースト / お気に入りにしたユーザーの一覧。 */
     fun openPostReactions(post: Post, tab: PostReactionsTab)
 
+    /**
+     * ポスト [statusId] (ブーストなら中身の ID) の編集履歴の版 [index] (古い順の 0 始まり)。[language] はポストの言語
+     * (版には言語が無いので、文字の字形を合わせるために渡す)。
+     */
+    fun openPostHistory(statusId: String, index: Int, language: String?)
+
     /** 投稿画面 (下書きは共有)。[panelDraft] なら詳細のパネルの下書きを書く。 */
     fun openComposer(panelDraft: Boolean = false)
 

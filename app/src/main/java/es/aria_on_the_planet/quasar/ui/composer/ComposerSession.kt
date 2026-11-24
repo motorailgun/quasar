@@ -40,6 +40,8 @@ data class ComposerScreenState(
     /** 補完・強調に使うサーバのカスタム絵文字。取得前・失敗時は空 (補完が出ないだけ)。 */
     val emojis: List<CustomEmoji> = emptyList(),
     val limits: ComposeLimits = ComposeLimits(),
+    /** アカウントの投稿の言語の設定 (言語を Auto にしたときにサーバが使う)。取得前・未設定なら `null`。 */
+    val defaultLanguage: String? = null,
     val sending: Boolean = false,
     /** 送信失敗の内容。表示したら [ComposerSession.errorShown] で消す。 */
     val error: String? = null,
@@ -155,6 +157,7 @@ class ComposerSession(
         scope.launch {
             val sensitiveBefore = composer.sensitive
             runCatchingLogged("account") { accountRepository.fetchMe() }?.let { me ->
+                _state.update { it.copy(defaultLanguage = me.defaultLanguage) }
                 // 編集では既定値を入れない (公開範囲は変えられず、閲覧注意はポストのまま)
                 if (editing != null) return@let
                 accountDefaultVisibility = me.defaultVisibility

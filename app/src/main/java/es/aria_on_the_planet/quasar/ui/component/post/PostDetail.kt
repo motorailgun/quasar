@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -27,8 +29,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.Post
 import es.aria_on_the_planet.quasar.domain.model.PostActionType
+import es.aria_on_the_planet.quasar.domain.model.User
 import es.aria_on_the_planet.quasar.ui.component.user.UserIcon
 import es.aria_on_the_planet.quasar.ui.component.user.UserName
 
@@ -43,6 +47,7 @@ object PostDetailDefaults {
  * @param menu 投稿者の行の右端 (公開範囲のアイコンの右) に出すもの (ポストのメニュー [PostMenu])。
  * @param reactionDetail アクション行のブースト・お気に入りの件数を「N boosts」「M favourites」で出し、件数のタップで
  *   [onReactionCountClick] (リアクションしたユーザーの一覧) を呼ぶ ([PostActionRow] の同名の引数)。
+ * @param onEditedClick 編集されたポストの日時の行の「Edited」のタップ (編集履歴)。`null` なら押せない文字だけ。
  */
 @Composable
 fun PostDetail(
@@ -53,6 +58,7 @@ fun PostDetail(
     menu: (@Composable () -> Unit)? = null,
     reactionDetail: Boolean = false,
     onReactionCountClick: ((Post, PostActionType) -> Unit)? = null,
+    onEditedClick: (() -> Unit)? = null,
 ) {
     val onUserClick = callbacks.onUserClick
     Column(
@@ -69,28 +75,7 @@ fun PostDetail(
             )
         }
         // 投稿者 (タップでプロフィール) と、右端に公開範囲のアイコン (+ メニュー)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // タップ領域は投稿者の部分だけにする
-            Box(Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.clickable { onUserClick(post.author) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // 一覧 (PostCard) より小さくならないよう同じ大きさにする
-                    UserIcon(user = post.author, size = PostCardDefaults.AvatarSize)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        UserName(post.author, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                        Text(
-                            text = "@${post.author.fullScreenName}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+        PostDetailAuthor(post, onUserClick) {
             if (post.visibility.hasIcon) {
                 Spacer(Modifier.width(8.dp))
                 VisibilityIcon(post.visibility, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -111,9 +96,10 @@ fun PostDetail(
         // ロケールや 12/24 時間設定の変更で再計算されるよう Configuration を読む
         LocalConfiguration.current
         val linkColor = MaterialTheme.colorScheme.primary
+        val edited = stringResource(R.string.post_edited)
         val time = formatDetailedTime(post.createdAt, is24Hour = DateFormat.is24HourFormat(context))
         Text(
-            // 日時 · 投稿に使ったアプリ (website があればリンク)
+            // 日時 · 投稿に使ったアプリ (website があればリンク) · 編集済み
             text = buildAnnotatedString {
                 append(time)
                 post.application?.let { app ->
@@ -124,6 +110,16 @@ fun PostDetail(
                         }
                     } else {
                         append(app.name)
+                    }
+                }
+                if (post.editedAt != null) {
+                    append(" · ")
+                    if (onEditedClick != null) {
+                        withLink(LinkAnnotation.Clickable("edited", TextLinkStyles(SpanStyle(color = linkColor))) { onEditedClick() }) {
+                            append(edited)
+                        }
+                    } else {
+                        append(edited)
                     }
                 }
             },
@@ -139,5 +135,39 @@ fun PostDetail(
             reactionDetail = reactionDetail,
             onReactionCountClick = onReactionCountClick?.let { click -> { type -> click(post, type) } },
         )
+    }
+}
+
+/** 詳細表示の投稿者の行: アイコン・名前・@acct (タップでプロフィール) と、右端に [trailing]。 */
+@Composable
+internal fun PostDetailAuthor(
+    post: Post,
+    onUserClick: (User) -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // タップ領域は投稿者の部分だけにする
+        Box(Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.clickable { onUserClick(post.author) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // 一覧 (PostCard) より小さくならないよう同じ大きさにする
+                UserIcon(user = post.author, size = PostCardDefaults.AvatarSize)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    UserName(post.author, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(
+                        text = "@${post.author.fullScreenName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        trailing()
     }
 }

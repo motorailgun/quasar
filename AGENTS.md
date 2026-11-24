@@ -17,6 +17,7 @@ API リファレンス: https://docs.joinmastodon.org/api/ , https://docs.joinma
 | 通信 | OkHttp + kotlinx.serialization (薄い自前 API クライアント) |
 | 画像 | Coil 3 (`coil-compose`, `coil-network-okhttp`, `coil-gif`)。APNG は LINE の apng-drawable (`com.linecorp:apng`) |
 | 色 | Material Components (`com.google.android.material`) の `MaterialColors` (Custom colors の harmonize のみに使用) |
+| 差分 | java-diff-utils (`io.github.java-diff-utils`。編集履歴の版どうしの差分のアルゴリズムだけ。`domain/model/VersionDiff.kt`) |
 | ビルド | AGP 9 (built-in Kotlin), Kotlin 2.4 (compose / serialization プラグイン), version catalog `gradle/libs.versions.toml` |
 | SDK | compileSdk 37 (Compose / Coil の最新版が要求)、targetSdk 36、minSdk 33 |
 | オンデバイス翻訳 (実験的機能) | llama.cpp (git submodule `third_party/llama.cpp`、タグ v1.0.0 = b12359) を `:llama` モジュール (NDK 29 + CMake + 薄い JNI) で。モデルは PLaMo 3 Translate 0.8B の GGUF (Q4_0)。フレーバー `full` だけ (下記「オンデバイス翻訳」) |
@@ -54,7 +55,8 @@ es.aria_on_the_planet.quasar
 │   └── repository/                 TimelineRepository, AccountRepository, StatusRepository, InstanceRepository, EmojiRepository,
 │                                   MediaRepository, SearchRepository
 ├── domain/model/                   UI が扱うモデル (User, Profile, Relationship, Page, Post, PostAction, Timeline, CustomEmoji, PreviewCard, MediaAttachment, Poll, Quote,
-│                                   PostDraft, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag,
+│                                   PostDraft, PostLanguage, ComposeLimits, PostLength, MediaSave, Reply, Mention, Hashtag,
+│                                   PostVersion = 編集履歴の版,
 │                                   ProfileEdit = ProfileSource / ProfileLimits)
 └── ui/
     ├── theme/                      MaterialExpressiveTheme
@@ -64,6 +66,7 @@ es.aria_on_the_planet.quasar
     │   ├── post/PostCard.kt        ポスト 1 件 (+ PostActionRow)
     │   ├── post/PostBody.kt        ポストの中身 (CW / 本文 / 投票 / メディア / カード / 引用。PostCard・PostDetail 共通) + PostMedia / PostExcerpt
     │   ├── post/PostMenu.kt        ポストの︙のメニュー + PostMenuPreview.kt (メニューの上に出す対象のポスト)
+    │   ├── post/PostHistoryMenu.kt 編集履歴の版の一覧のシート (ポスト詳細の「Edited」から)
     │   ├── post/PostCallbacks.kt   ポストへの操作の口 (タップ・投票・アクション・返信・ハッシュタグ) をまとめたもの
     │   ├── post/PostActionHandler.kt アクション行のハンドラ (操作の決定 + 確認の差し込み口)
     │   ├── post/PostList.kt        ポストの集合 (LazyColumn)
@@ -82,7 +85,8 @@ es.aria_on_the_planet.quasar
     │   ├── tabs/ConnectedTabRow.kt 画面内のタブ (Expressive の連結 ToggleButton。ExtraSmall 32dp・角丸 10dp で控えめに。
     │                               各タブは `ConnectedTab(label, icon, selectedIcon)`。幅は `layoutTabs`: 等幅で収まれば
     │                               ラベル、収まらなければ選択中だけラベル + 他はアイコン、それでもはみ出せば横スクロール + 端のフェード)
-    │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除)
+    │   ├── dialog/ConfirmDialog.kt 確認ダイアログ (投稿の破棄・フォロー / 解除) / ChoiceDialog.kt ラジオボタンで 1 つ選ぶダイアログ
+│   │                           (中身は LazyColumn。設定の `SettingsChoiceItem`・投稿の言語)
     │   ├── dialog/ActionConfirmation.kt 設定に従う操作前の確認 (ActionConfirmationHost / LocalActionConfirmer)
     │   ├── settings/               AOSP 風の設定の部品 (SettingsScaffold / SettingsGroup / Switch・Choice・Slider 等の項目)
     │   ├── blur/SurfaceBlur.kt     浮かぶ UI の背景のぼかし (rememberSurfaceBlurStyle。半径・濃さは DisplaySettings)
@@ -96,7 +100,7 @@ es.aria_on_the_planet.quasar
     │   ├── list/LoadMoreEffect.kt  末尾付近で追加読み込みを呼ぶ (PostList / NotificationList 共通)
     │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く) + LoadErrorMessage.kt (失敗の文言 + 401 / 403 なら「ログインし直す」)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
-    │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / ComposerToolbar /
+    │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / LanguageButton / ComposerToolbar /
     │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
     │   │                           ReplyTarget = 返信先の表示: ReplyTargetPreview / ReplyContext / ReplyingToLabel)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle) /
@@ -119,7 +123,7 @@ es.aria_on_the_planet.quasar
     ├── search/                     検索 (SearchScreen / ViewModel。アカウント / 投稿 / ハッシュタグのタブ)
     ├── personal/                   ドロワーから開く自分の一覧: お気に入り / ブックマーク / 非公開の返信 (PersonalPostsScreen / ViewModel)、
     │                               フォローリクエスト (FollowRequestsScreen / ViewModel)
-    ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList)
+    ├── post/                       ポスト詳細 (Screen / ViewModel / ReplyList) / 編集履歴の版 (PostHistoryScreen / ViewModel)
     ├── composer/                   投稿 (ComposerSession / DraftStore / ComposerScreen / QuickPostBar /
     │                               QuickComposerHost / AttachmentUploads / MediaPickerHost)
     ├── translation/                ポストの訳の状態 (PostTranslationStore。アプリ全体で 1 つ、LocalPostTranslations) / 言語の表示名
@@ -239,6 +243,7 @@ data class Post(
     val mentions: List<Mention>,   // mentions (id / username / acct / url)。返信の宛先・本文のメンションのタップに使う
     val tags: List<Hashtag>,       // tags (name / url)。本文のハッシュタグのタップに使う
     val language: String?,         // language (ISO 639)。翻訳の元の言語。無いことがある
+    val editedAt: Instant?,        // edited_at (最後に編集された日時)。編集されていなければ null
 )
 
 /** ログイン中ユーザーから見た状態。 */
@@ -334,6 +339,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 通知 (個別) | `GET /api/v1/notifications` (max_id ページング。`NotificationApi.Ungrouped` 時) |
 | ハッシュタグのタイムライン | `GET /api/v1/timelines/tag/:hashtag` (max_id ページング) |
 | ポスト | `GET /api/v1/statuses/:id` (まとめの中身は 1 件ずつ・同時 4 件まで。`StatusRepository.fetchPosts`) |
+| 編集履歴 | `GET /api/v1/statuses/:id/history` (StatusEdit の配列。今の版も含む。`StatusRepository.fetchHistory`。最近 8 件分をプロセス内で覚える = `cachedHistory`) |
 | 投票する | `POST /api/v1/polls/:id/votes` (form `choices[]`) |
 | ブースト / 取り消し | `POST /api/v1/statuses/:id/reblog` / `unreblog` |
 | お気に入り / 取り消し | `POST /api/v1/statuses/:id/favourite` / `unfavourite` |
@@ -343,7 +349,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 編集用の原文 | `GET /api/v1/statuses/:id/source` (本文・CW のプレーンテキスト) |
 | 編集 | `PUT /api/v1/statuses/:id` (form。公開範囲・返信先は送らない。代替テキストは `media_attributes[][id/description]`) |
 | 削除 | `DELETE /api/v1/statuses/:id` |
-| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲。`source.note` / `source.fields` がプロフィール編集の原文) |
+| ログイン中のアカウント | `GET /api/v1/accounts/verify_credentials` (`source.privacy` が既定の公開範囲。`source.note` / `source.fields` がプロフィール編集の原文。`source.follow_requests_count` がドロワーのフォローリクエストの件数) |
 | プロフィールの編集 | `PATCH /api/v1/accounts/update_credentials` (multipart。画像も同じリクエスト。フィールドは送ったもので丸ごと置き換わる) |
 | メディアのアップロード | `POST /api/v2/media` (multipart、要 `write:media`)。動画等は 202 で処理待ち → `GET /api/v1/media/:id` で `url` が入るまで待つ |
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
@@ -387,6 +393,10 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
     Compose のリスナーにはリンク (href) しか渡らないので、文字列は変換後の AnnotatedString から引いている。
   * `postContent = true` はポストの中身 (本文・CW・投票・通知の抜粋)。絵文字のアニメーションの設定が「本文」と
     「それ以外」(表示名・bio・フィールド等、既定の `false`) で分かれているため。
+  * `language` はポストの中身の言語 (`Post.language`。訳を出している間は訳した先、編集履歴の版は `Route.PostHistory.language`
+    で渡すポストの言語)。文字のロケール (`TextStyle.localeList`、`withContentLanguage`、`ContentLanguageTest`) にして、漢字を
+    その言語の字形で出す (端末の言語に日本語が無いと、言語の無い日本語のポストは中国語の簡体字の字形になる)。ポストの中身を
+    出す所 (`PostBody` / `QuotedPost` / `PostExcerpt` / `PollView` / 編集履歴) は必ず渡す。ギャラリーの post-variety の末尾で見比べられる。
   * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
     (横長の絵文字は横長に表示)。API はサイズを返さないため、画像読み込み時に `EmojiAspectRatios` (URL ごとの
     アプリ全体キャッシュ) へ記録し、記録されると再レイアウトする。未読み込みの間は正方形。比率は 1/4〜8 に丸める。
@@ -782,6 +792,27 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     詳細日時は `yyyy MM/dd HH:mm:ss` (システム設定が 12 時間なら `yyyy MM/dd h:mm:ss a`)。
     日時の隣に投稿アプリ (`Status.application`) を「日時 · アプリ名」で出し、`website` があればリンクにする。
     application は他サーバからのポストでは返らないため、表示されるのは主にローカルユーザーのポスト。
+    編集されたポスト (`Post.editedAt`) はさらに「 · Edited」(編集済み) を続ける (アプリが無ければ日時の直後)。
+  * **編集履歴** (Mastodon Web のスマホの形): 「Edited」(primary 色のリンク、`PostDetail(onEditedClick)`) で版の一覧のシート
+    (`PostHistoryMenu`。ポストのメニューと同じ `ActionMenu`。見出し「N 回編集」、新しい順に「(鉛筆) **編集** <日時>」/「(鉛筆) **Edited** <日時>」、最後が「(post_add) 作成」。種類の欄は広い方の幅に揃え、日時の位置を揃える。名前は出さない)。
+    開くたびに `/history` を取り直す (`PostViewModel.showHistory`、取得中は LoadingIndicator)。版を選ぶと版の画面
+    (`Route.PostHistory(statusId, index)`、`Navigator.openPostHistory`。詳細のパネルでも開く): `HorizontalPager` で版を左右に送る
+    (左が古い。トップバーの ‹ › と「2 / 4」)。各版は投稿者の行 (`PostDetailAuthor`) / `PostBody(fixed = true, extras = false)`
+    (見比べるので CW は開いたまま・長文も折りたたまない・訳さない) / 投票の選択肢 (件数は返らないので文言だけの枠線のピル) /
+    「日時 · 編集 / 作成」。版を `Post` にするのは `PostVersion.asPost` (`statusId` は版ごとに `<id>#<番号>`、開閉の状態を分けるため)。
+    版の一覧はシートで取ったもの (`cachedHistory`) を使い、無ければ (プロセスの再生成等) 取り直す。
+    * **差分の色付け** (2 つ目以降の版。1 つ前の版と比べる): 本文・CW は単語単位で足された所 (緑の背景) と消された所 (赤の背景 +
+      取り消し線) を 1 つの文に両方出す (`EmojiText(diffFrom = 前の版)` → `AnnotatedString.withDiffFrom`。`fromHtml` の後・絵文字の
+      置き換えの前に書き込むので、リンク・絵文字はそのまま)。投票の選択肢は、選択肢ごと足された / 消されたものはピルより一回り (左右 6dp・上下 4dp) 大きい
+      四角形 (本文の差分と揃えて角は丸めない)を差分の色で後ろに敷き (`diffBackdrop`。描くだけで高さは変えない)、同じ位置で文言だけ変わったもの
+      (`diffList(pairChanges = true)` の `Changed`) はピルはそのままで文言に本文と同じ差分。投票ごと足された / 外された版は欄全体に同じ形の四角形。添付は ID で比べ、足された / 外されたものの左上に ＋ / － の印
+      (`MediaAttachments(overlay)`)。外された添付・選択肢・CW も元の位置に出す。CW ごと足された / 外された版は警告文だけでなく警告のアイコンまで塗る。
+    * 差分は純粋関数 `diffText` / `diffList` (`domain/model/VersionDiff.kt`、`VersionDiffTest`)。単語の区切りは
+      `java.text.BreakIterator` (Android では ICU で日本語も辞書で区切る。JVM のテストでは区切り方が違うので、テストは英語か
+      区切りに依らない性質で書く)。`:shortcode:` は 1 単位。変わった所に挟まれた短い一致 (空白を除いて 2 文字以下) は変わった所に
+      含め、変わった所は「消された分 → 足された分」の 1 組にまとめる。
+    * 色は `extendedColors.diffAdded` / `diffRemoved` (`textDiffStyles()`)。カスタム絵文字 (inline content) には背景が付かないので、
+      足された・消された絵文字は色で見分けられない。
   * リプライ (`ReplyList.kt`): ツリーにはせず、API (`descendants`) の順のまま一列に並べる。インデント・折りたたみは無し。
     直前の行へのリプライが続く場合はアイコン位置の縦線で繋ぎ (X と同様)、繋がらない行の間は区切り線。
   * トップバーは「Post」、本体が画面外に出ると投稿者名 + `@acct` に切り替わる。
@@ -914,7 +945,11 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     `HorizontalPager`、各タブは開いたときに読む。検索し直すたびに 3 つの一覧を作り直す。`PagedFeed` の `max_id` に次の offset を入れる。
     投稿の全文検索はサーバの設定次第で、無ければ自分のポスト・URL だけが当たる) /
     お気に入り・ブックマーク・非公開の返信 (`Route.PersonalPosts`。`DetailScaffold` + `PostList`、`PostFeed.linked`。外しても一覧からは
-    消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く)。
+    消さない) / フォローリクエスト (`Route.FollowRequests`。`UserList` の行の右端に承認・拒否。拒否は設定に従って確認、返事をしたら一覧から除く。
+    項目の右端に件数 = `CurrentAccount.followRequestsCount`。M3 のドロワーの形で丸の無い数字だけ、0 なら出さない。件数は `fetchMe` の
+    メモリのキャッシュで、承認・拒否 (`AccountRepository.answerFollowRequest`) で手元で 1 減らし、取得・ストリームで届いた通知に
+    follow / follow_request があれば `refreshMeAfterFollowNotification` で取り直す (最後に取った時刻 − 1 分より後の通知だけ・同じ
+    通知では 1 回。純粋関数 `needsRefreshForFollowNotification`、`FollowNotificationRefreshTest`))。
     どれも詳細のパネルで開く。
     開くのはボタンだけ (左右のスワイプはカラムの切り替え)、状態は保存しないので別画面から戻ると閉じている。開いている間の「戻る」は閉じる (`NavigationBackHandler`。`ModalNavigationDrawer` 自身は「戻る」を受けない))、
     右にカラムのタブ (Expressive の連結 `ToggleButton`)。
@@ -965,6 +1000,8 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     ボタン優先、押せないもの (空の送信ボタン等)・アイコン・ピルのタップはバー全体に回る。ピルはドラッグのみ。
   * 一覧はバーの後ろまで描き (ぼかしの元)、下端の余白は `contentPadding` (ナビゲーションバー + バーの高さ + 余白) で取る。
     バーはキーボードの上に乗る (`WindowInsets.ime ∪ navigationBars`)。スナックバーはバーの上。
+  * バーの下 (余白・ナビゲーションバー) と左右の余白は一覧が透けて見えるが、タップ・スクロールを受けて捨てる
+    (`QuickComposerHost` の `blockPointerInput`。指が少しずれただけで後ろのポストが開くのを防ぐ)。バーより上は覆わない。
   * 「戻る」でキーボードだけ閉じられたらフォーカスも外して縮める (`WindowInsets.isImeVisible` が出ていた → 消えたとき)。
     公開範囲のメニュー・絵文字 / メディアのピッカー・OS 標準のピッカーは別ウィンドウ (別画面) に移ってキーボードが閉じるので、
     閉じてから少し待って、まだこの画面のウィンドウにフォーカスがある (`LocalWindowInfo.isWindowFocused`) ときだけ縮める。キーボードが出ていないときの「戻る」もフォーカスを外すだけ。バーからの投稿の結果・エラーはタイムラインのスナックバー。
@@ -1003,6 +1040,13 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     primary 色 + SemiBold にする (本文は変えない)。判定はサーバ (`CustomEmoji::SCAN_RE`) と同じ前後条件で、Ruby の
     `[[:alnum:]]` に合わせ、かな・漢字の直後も絵文字にならない。
   * `BasicTextField(TextFieldState)` は `InlineTextContent` 非対応のため、入力欄内で画像にはしない。
+* **ハッシュタグの強調**: 本文の中でサーバがハッシュタグにする `#名前` も、絵文字と同じ primary 色 + SemiBold にする
+  (`ComposerHighlight`。本文用は `rememberPostTextHighlight`、CW・プロフィールは絵文字だけの `rememberEmojiShortcodeHighlight`。
+  サーバは CW からタグを拾わない)。判定は純粋関数 `findHashtags` (`domain/model/Hashtag.kt`、`FindHashtagsTest`) で、Mastodon 4.x の
+  `Tag::HASHTAG_RE` + `Extractor` に合わせる: `#` / `＃` は先頭か空白の直後のみ、名前は文字を 1 つ以上含む単語の文字の並び
+  (`·` `・` ZWNJ を挟める、末尾の区切りは含めない)、直後が `://` なら末尾の `http(s)` を除く。Ruby の `[[:word:]]` 等は JVM / Android の
+  正規表現と意味が違うのでコードポイントごとに判定している。テストの期待値は Mastodon のイメージの Ruby で正規表現を走らせて出したもの。
+  3.5 は `(` 等の後もタグにする (4.x に揃えているので 3.5 では強調されないタグがありうる)。
 * **絵文字ピッカー** (`EmojiPicker.kt`): ツールバーの絵文字ボタンで `ModalBottomSheet` を開く (開くときにキーボードは閉じる)。
   `EmojiPicker` (検索欄 + `LazyVerticalGrid`) は入れ物に依存しない部品で、`EmojiPickerSheet` がシートに載せる。
   * 並びは `groupEmojisByCategory` (分類なし「Custom」が先頭、残りはカテゴリ名順、カテゴリ内はサーバの順)。検索中は
@@ -1070,6 +1114,16 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * `UploadSource` でデータ層を `ContentResolver` から切り離している (`AppContainer.uploadSource(uri)` が作る。IO スレッドで呼ぶ)。
   * アクセストークンに `write:media` が無いとアップロードは 403 になる (以前の手入力のトークンで起きうる。OAuth では `write` に含まれる)。
   * 未実装: 画像の縮小 (圧縮は上記)、焦点 (focus) の指定、カメラ撮影、プロセス再生成後の添付の復元。
+* **言語** (`PostDraft.language` / `ComposerState.language`): フルの投稿画面のトップバーの Post / Save の左の `LanguageButton`
+  (言語のアイコン + `JA` 等のコード、未指定なら「Auto」。色はツールバーと同じ `ComposerIconColors` で、選んでいれば on、Auto は off。
+  クイック投稿バーには出さない)。押すと翻訳先の設定と同じラジオボタンの
+  ダイアログ (`ChoiceDialog`) で一覧: Auto / アカウントの投稿の言語の設定 (`verify_credentials` の `source.language`、
+  `CurrentAccount.defaultLanguage`)・端末の言語・選んでいる言語 (`preferredPostLanguages`) / 区切り / 残りの ISO 639-1
+  (`postLanguageCodes`、表示名の順) (`PostLanguageTest`)。
+  * Auto (`null`) は `language` を送らない。サーバは 4.x ならアカウントの投稿の言語の設定 → 無ければ UI の言語 (`valid_locale_cascade`)、
+    3.5 は本文から推定する。空文字も同じ扱いだが送らない。
+  * 編集はポストの言語 (`Post.language`) で始まり、変えれば `PUT` で送る。`null` のままなら送らず、サーバはポストの言語を保つ。
+  * 下書きごと (`ComposerSession`) なので、投稿したら次の下書きは Auto から。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
@@ -1128,7 +1182,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
 * **未実装**: 下書き保存 (TODO: 永続化して、ログインし直し・プロセスの終了をまたいで残す。今はどちらでも消える)、
   メンション・ハッシュタグの補完、
-  言語の指定、予約投稿。
+  最後に選んだ言語を覚えること (今は下書きごとに Auto から)、予約投稿。
 
 ## オンデバイス翻訳 (実験的機能。`:llama` + `data/translation/`)
 
@@ -1332,7 +1386,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   * 部品 (`ui/component/settings/`): `SettingsScaffold` (`LargeFlexibleTopAppBar` が縮む + 丸い戻るボタン)、`SettingsGroup`
     (見出し + `SegmentedListItem` を 2dp の隙間で並べ、まとまり全体を 24dp の角丸で切る。項目は 4dp の角丸)、
     `SettingsSwitchItem` / `SettingsSplitSwitchItem` (左は詳細ページ、縦線の右はスイッチ) / `SettingsNavigationItem` /
-    `SettingsChoiceItem` (ラジオのダイアログ) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。 `SettingsFooter` はページ末尾の注意書き (AOSP の FooterPreference: 丸い面の情報アイコン + 控えめな文)。
+    `SettingsChoiceItem` (ラジオのダイアログ、`ChoiceDialog`) / `SettingsSliderItem` (スライダーのダイアログ、OK で決定)。 `SettingsFooter` はページ末尾の注意書き (AOSP の FooterPreference: 丸い面の情報アイコン + 控えめな文)。
   * 面の色は surfaceBright (背景は surfaceContainer)。`SegmentedListItem` の checked 版は選択中の色・形に変わるので、
     selected 系の色と `selectedShape` を通常と同じにしている (AOSP は面の色でオン / オフを示さない)。
 * **ぼかし (Haze) のスタイルは必ず `rememberSurfaceBlurStyle(tintColor)` (`ui/component/blur/`) から取り、`Modifier.surfaceBlur` で
@@ -1365,7 +1419,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   * 描き始めたら: `QuasarAppContent` の `SyncWindowBackground()` (`ui/theme/WindowBackground.kt`) がテーマの `background` に合わせる。
   * 以前はテーマが Light 固定でウィンドウが白く、ダークテーマで設定画面のページ切り替えの間に光っていた。
 * アプリ独自の意味を持つ色は Material 3 の Custom colors として `MaterialTheme.extendedColors` (`ui/theme/ExtendedColors.kt`)
-  で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3) を dynamic color の primary に harmonize し、
+  で参照する。元の色 (お気に入り=黄 #FFC107、ブースト=緑 #4CAF50、フォロー=青 #2196F3、編集履歴の差分の追加=緑 #2E7D32 / 削除=赤 #E53935) を dynamic color の primary に harmonize し、
   ライト/ダークに応じた役割色 (color / onColor / container / onContainer) を MDC の `MaterialColors` で作る。
   色を直接ハードコードせず、新しい意味の色が要るときはここに追加する。
 * メディアの上・メディアビューアの黒背景の上に重ねる白文字・半透明の黒は `MediaOverlayColors` (`ui/component/player/`) に
@@ -1435,10 +1489,11 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。本物と同じ `QuickComposerHost` で組む。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
   post-detail (ポスト詳細の本体を
-  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety)。 /
+  `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety。
+  編集済みのポストの「Edited」で編集履歴のシート → 版の画面 (`PostHistoryContent`)。履歴は `post-history.json` で、どのポストでも同じ)。 /
   translation (オンデバイス翻訳。固定データは Mastodon の形の HTML (`translation.json`)。下記「オンデバイス翻訳」) /
   translation-languages (翻訳の設定の言語ごとの扱い。設定は手元だけ) /
   account-switcher (ドロワーのアカウントの切り替え。`account-switcher.json` の保存しているアカウントで本物の `TimelineDrawerSheet`。

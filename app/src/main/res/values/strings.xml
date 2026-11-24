@@ -52,6 +52,21 @@
         <item quantity="other">%d favourites</item>
     </plurals>
     <string name="post_pinned">Pinned</string>
+    <string name="post_edited">Edited</string>
+    <string name="post_history_title">Edit history</string>
+    <plurals name="post_history_edited_times">
+        <item quantity="one">Edited %d time</item>
+        <item quantity="other">Edited %d times</item>
+    </plurals>
+    <string name="post_history_kind_edited">Edited</string>
+    <string name="post_history_kind_created">Created</string>
+    <string name="post_history_position" translatable="false">%1$d / %2$d</string>
+    <string name="post_history_previous">Previous version</string>
+    <string name="post_history_next">Next version</string>
+    <string name="post_history_error">Failed to load edit history: %1$s</string>
+    <string name="post_history_retry">Retry</string>
+    <string name="post_history_media_added">Added</string>
+    <string name="post_history_media_removed">Removed</string>
     <string name="post_reply_to">Reply to %1$s</string>
     <string name="post_reply">Reply</string>
     <string name="post_boosted_by">%1$s boosted</string>
@@ -265,6 +280,10 @@
     <string name="composer_remove_poll">Remove poll</string>
     <string name="composer_content_warning">Content warning</string>
     <string name="composer_visibility">Visibility</string>
+    <string name="composer_language">Language</string>
+    <string name="composer_language_auto" translatable="false">Auto</string>
+    <string name="composer_language_auto_account">Your posting language (%1$s)</string>
+    <string name="composer_language_auto_server">Leave it to the server</string>
     <string name="composer_remaining_characters">%1$d characters remaining</string>
     <string name="composer_discard_title">Discard post?</string>
     <string name="composer_discard_message">What you\'ve written will be lost.</string>

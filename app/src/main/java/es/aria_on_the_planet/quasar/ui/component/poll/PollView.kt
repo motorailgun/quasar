@@ -54,26 +54,28 @@ private val OptionMinHeight = 40.dp
  *
  * @param onVote 選んだ選択肢のインデックスで投票する。成功したら `true`。
  *   単一選択は選択肢のタップで即投票、複数選択は選んでから「Vote」で投票する。
+ * @param language 選択肢の言語 (ポストの `language`。[EmojiText] の同名の引数)。
  */
 @Composable
 fun PollView(
     poll: Poll,
     modifier: Modifier = Modifier,
     onVote: (suspend (List<Int>) -> Boolean)? = null,
+    language: String? = null,
 ) {
     val showResults = poll.expired || poll.voted || onVote == null
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (showResults) {
-            PollResults(poll)
+            PollResults(poll, language)
         } else {
-            PollChoices(poll, onVote)
+            PollChoices(poll, onVote, language)
         }
         PollFooter(poll)
     }
 }
 
 @Composable
-private fun PollResults(poll: Poll) {
+private fun PollResults(poll: Poll, language: String?) {
     val locale = LocalConfiguration.current.locales[0]
     val fractions = poll.fractions()
     val leading = poll.leadingOptions()
@@ -118,6 +120,7 @@ private fun PollResults(poll: Poll) {
                         ),
                         color = if (isLeading) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f, fill = false),
+                        language = language,
                     )
                     if (own) {
                         Spacer(Modifier.width(6.dp))
@@ -148,7 +151,7 @@ private fun PollResults(poll: Poll) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PollChoices(poll: Poll, onVote: suspend (List<Int>) -> Boolean) {
+private fun PollChoices(poll: Poll, onVote: suspend (List<Int>) -> Boolean, language: String?) {
     val scope = rememberCoroutineScope()
     var selected by rememberSaveable(poll.id) { mutableStateOf(emptyList<Int>()) }
     var submitting by remember(poll.id) { mutableStateOf(false) }
@@ -175,6 +178,7 @@ private fun PollChoices(poll: Poll, onVote: suspend (List<Int>) -> Boolean) {
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary.takeIf { !(poll.multiple && index in selected) }
                         ?: MaterialTheme.colorScheme.onPrimary,
+                    language = language,
                 )
             }
             if (poll.multiple) {

@@ -135,6 +135,7 @@ fun TimelineScreen(
     val composer = drafts.current.collectAsStateWithLifecycle().value
     // ドロワーに出すログイン中のアカウント (投稿用に取得しているものを使う)
     val account: User? = composer?.state?.collectAsStateWithLifecycle()?.value?.account
+    val followRequestsCount by viewModel.followRequestsCount.collectAsStateWithLifecycle()
     // 返信ボタン: 下書き (返信と通常の投稿で共有) の返信先にしてバーで書き始める
     val onReply: ((Post) -> Unit)? = composer?.let { session ->
         { post ->
@@ -165,6 +166,7 @@ fun TimelineScreen(
         drawerContent = {
             TimelineDrawerSheet(
                 account = account,
+                followRequestsCount = followRequestsCount,
                 accounts = accounts?.let { accounts ->
                     // 切り替え・追加はドロワーを閉じてから (切り替えは画面ごと作り直すので閉じるのを待たない)
                     accounts.copy(onAdd = {

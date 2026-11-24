@@ -66,6 +66,8 @@ import es.aria_on_the_planet.quasar.ui.mediaviewer.MediaViewerArgs
 import es.aria_on_the_planet.quasar.ui.openlink.OpenLinkScreen
 import es.aria_on_the_planet.quasar.ui.openlink.OpenLinkViewModel
 import es.aria_on_the_planet.quasar.ui.openlink.hashtagOfUrl
+import es.aria_on_the_planet.quasar.ui.post.PostHistoryScreen
+import es.aria_on_the_planet.quasar.ui.post.PostHistoryViewModel
 import es.aria_on_the_planet.quasar.ui.post.PostScreen
 import es.aria_on_the_planet.quasar.ui.post.PostViewModel
 import es.aria_on_the_planet.quasar.ui.profile.ProfileScreen
@@ -223,6 +225,9 @@ fun QuasarNavHost(
                         WithSession(account) { PostReactionsEntry(it, key, navigator) }
                     }
                     entry<Route.Post>(metadata = DetailPanelSceneStrategy.panel()) { key -> WithSession(account) { PostEntry(it, key, navigator) } }
+                    entry<Route.PostHistory>(metadata = DetailPanelSceneStrategy.panel()) { key ->
+                        WithSession(account) { PostHistoryEntry(it, key, navigator) }
+                    }
                     entry<Route.OpenLink>(metadata = DetailPanelSceneStrategy.panel()) { key ->
                         WithSession(account) { ui ->
                             OpenLinkEntry(ui, key, navigator) { backStack.replace(key, it) }
@@ -291,6 +296,10 @@ private class BackStackNavigator(
 
     override fun openPostReactions(post: Post, tab: PostReactionsTab) {
         backStack.add(Route.PostReactions(post.statusId, tab))
+    }
+
+    override fun openPostHistory(statusId: String, index: Int, language: String?) {
+        backStack.add(Route.PostHistory(statusId, index, language))
     }
 
     override fun openComposer(panelDraft: Boolean) {
@@ -561,6 +570,26 @@ private fun PostEntry(account: AccountUiContext, key: Route.Post, navigator: Nav
             val tab = if (type == PostActionType.Boost) PostReactionsTab.Boosts else PostReactionsTab.Favourites
             navigator.openPostReactions(post, tab)
         },
+        onHistoryClick = navigator::openPostHistory,
+    )
+}
+
+@Composable
+private fun PostHistoryEntry(account: AccountUiContext, key: Route.PostHistory, navigator: Navigator) {
+    val viewModel: PostHistoryViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { PostHistoryViewModel(account.account, key.statusId) }
+        },
+    )
+    PostHistoryScreen(
+        viewModel = viewModel,
+        statusId = key.statusId,
+        initialIndex = key.index,
+        onBack = navigator::back,
+        onUserClick = navigator::openProfile,
+        onMediaClick = navigator::openMedia,
+        onHashtagClick = navigator::openHashtag,
+        language = key.language,
     )
 }
 

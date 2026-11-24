@@ -203,7 +203,7 @@ private class GalleryNavigator(
     override fun openFollowList(accountId: String, tab: FollowListTab) = Unit
     override fun openAccountReactions(account: User, type: NotificationType, posts: List<Post>) = Unit
     override fun openPostReactions(post: Post, tab: PostReactionsTab) = Unit
-    override fun openPostHistory(statusId: String, index: Int) = Unit
+    override fun openPostHistory(statusId: String, index: Int, language: String?) = Unit
     override fun openComposer(panelDraft: Boolean) = Unit
     override fun openSettings() = Unit
     override fun openPersonalPosts(list: PersonalPostList) = Unit
@@ -506,6 +506,7 @@ private fun PostDetailGallery(text: String, onBack: () -> Unit) {
     }
     var historyMenu by remember { mutableStateOf<PostHistoryMenuState?>(null) }
     var historyIndex by remember { mutableStateOf<Int?>(null) }
+    var historyLanguage by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(historyMenu) {
         if (historyMenu == PostHistoryMenuState.Loading) {
             delay(600)
@@ -521,6 +522,7 @@ private fun PostDetailGallery(text: String, onBack: () -> Unit) {
             onBack = { historyIndex = null },
             onRetry = {},
             callbacks = PostCallbacks(onMediaClick = navigator::openMedia),
+            language = historyLanguage,
         )
         return
     }
@@ -573,7 +575,10 @@ private fun PostDetailGallery(text: String, onBack: () -> Unit) {
                         onReactionCountClick = { _, type ->
                             reactions = if (type == PostActionType.Boost) PostReactionsTab.Boosts else PostReactionsTab.Favourites
                         },
-                        onEditedClick = { historyMenu = PostHistoryMenuState.Loading },
+                        onEditedClick = {
+                            historyLanguage = post.language
+                            historyMenu = PostHistoryMenuState.Loading
+                        },
                     )
                     HorizontalDivider(thickness = 4.dp)
                 }

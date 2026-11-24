@@ -100,6 +100,7 @@ fun QuotedPost(
                             expanded = expanded,
                             onToggle = { expanded = !expanded },
                             modifier = Modifier.padding(top = 6.dp),
+                            language = post.language,
                         )
                     }
                     if (expanded) {
@@ -112,10 +113,11 @@ fun QuotedPost(
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 6.dp),
                                 onLinkClick = rememberPostLinkHandler(post, callbacks.onUserClick, callbacks.onHashtagClick),
+                                language = post.language,
                             )
                         }
                         // 引用内の投票は閲覧のみ (結果表示)
-                        post.poll?.let { PollView(poll = it, modifier = Modifier.padding(top = 8.dp)) }
+                        post.poll?.let { PollView(poll = it, modifier = Modifier.padding(top = 8.dp), language = post.language) }
                     }
                 }
             }

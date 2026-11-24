@@ -298,8 +298,8 @@ private class BackStackNavigator(
         backStack.add(Route.PostReactions(post.statusId, tab))
     }
 
-    override fun openPostHistory(statusId: String, index: Int) {
-        backStack.add(Route.PostHistory(statusId, index))
+    override fun openPostHistory(statusId: String, index: Int, language: String?) {
+        backStack.add(Route.PostHistory(statusId, index, language))
     }
 
     override fun openComposer(panelDraft: Boolean) {
@@ -589,6 +589,7 @@ private fun PostHistoryEntry(account: AccountUiContext, key: Route.PostHistory, 
         onUserClick = navigator::openProfile,
         onMediaClick = navigator::openMedia,
         onHashtagClick = navigator::openHashtag,
+        language = key.language,
     )
 }
 

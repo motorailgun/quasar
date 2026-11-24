@@ -26,6 +26,7 @@ private val FadeHeight = 40.dp
  * @param maxCollapsedLines `null` なら折りたたまない。
  * @param showToggle `false` なら「Show more」を出さず、折りたたんだ高さで切ってフェードさせるだけ (開けない)。
  * @param onLinkClick 本文のリンクのタップ ([EmojiText] の同名の引数)。
+ * @param language 本文の言語 ([EmojiText] の同名の引数)。
  */
 @Composable
 fun CollapsiblePostText(
@@ -37,12 +38,13 @@ fun CollapsiblePostText(
     showToggle: Boolean = true,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     onLinkClick: ((url: String, text: String?) -> Unit)? = null,
+    language: String? = null,
 ) {
     val lineHeight = lineHeightDp(style)
     if (maxCollapsedLines == null || lineHeight == null) {
         EmojiText(
             text = html, emojis = emojis, isHtml = true, postContent = true, style = style, modifier = modifier,
-            onLinkClick = onLinkClick,
+            onLinkClick = onLinkClick, language = language,
         )
         return
     }
@@ -55,6 +57,7 @@ fun CollapsiblePostText(
     ) {
         EmojiText(
             text = html, emojis = emojis, isHtml = true, postContent = true, style = style, onLinkClick = onLinkClick,
+            language = language,
         )
     }
 }

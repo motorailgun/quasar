@@ -393,6 +393,10 @@ loaded / nextMaxId) と `refresh()` / `loadMore()` / `updateItems()` をまと�
     Compose のリスナーにはリンク (href) しか渡らないので、文字列は変換後の AnnotatedString から引いている。
   * `postContent = true` はポストの中身 (本文・CW・投票・通知の抜粋)。絵文字のアニメーションの設定が「本文」と
     「それ以外」(表示名・bio・フィールド等、既定の `false`) で分かれているため。
+  * `language` はポストの中身の言語 (`Post.language`。訳を出している間は訳した先、編集履歴の版は `Route.PostHistory.language`
+    で渡すポストの言語)。文字のロケール (`TextStyle.localeList`、`withContentLanguage`、`ContentLanguageTest`) にして、漢字を
+    その言語の字形で出す (端末の言語に日本語が無いと、言語の無い日本語のポストは中国語の簡体字の字形になる)。ポストの中身を
+    出す所 (`PostBody` / `QuotedPost` / `PostExcerpt` / `PollView` / 編集履歴) は必ず渡す。ギャラリーの post-variety の末尾で見比べられる。
   * 絵文字の高さは文字スタイルの行の高さ (`lineHeight`、未指定なら 1.2em) に合わせ、幅は画像の縦横比から決める
     (横長の絵文字は横長に表示)。API はサイズを返さないため、画像読み込み時に `EmojiAspectRatios` (URL ごとの
     アプリ全体キャッシュ) へ記録し、記録されると再レイアウトする。未読み込みの間は正方形。比率は 1/4〜8 に丸める。

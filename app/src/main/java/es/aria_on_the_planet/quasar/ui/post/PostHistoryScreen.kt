@@ -76,6 +76,8 @@ import kotlinx.coroutines.launch
  * 1 つ前の版との差分を色付けする ([PostVersionPage])。
  *
  * @param initialIndex 最初に出す版 (古い順の 0 始まり)。
+ * @param language ポストの言語 (今の版の `language`)。版 (`StatusEdit`) には言語が無いので、全部の版をこの言語で出す
+ *   ([EmojiText] の同名の引数)。
  */
 @Composable
 fun PostHistoryScreen(
@@ -86,6 +88,7 @@ fun PostHistoryScreen(
     onUserClick: (User) -> Unit,
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
+    language: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     PostHistoryContent(
@@ -95,6 +98,7 @@ fun PostHistoryScreen(
         onBack = onBack,
         onRetry = viewModel::retry,
         callbacks = PostCallbacks(onUserClick = onUserClick, onMediaClick = onMediaClick, onHashtagClick = onHashtagClick),
+        language = language,
     )
 }
 
@@ -108,6 +112,7 @@ fun PostHistoryContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     callbacks: PostCallbacks,
+    language: String? = null,
 ) {
     val versions = state.versions
     val pagerState = rememberPagerState(initialPage = initialIndex) { versions?.size ?: 0 }
@@ -172,7 +177,7 @@ fun PostHistoryContent(
                     modifier = Modifier.fillMaxSize(),
                     key = { it },
                 ) { index ->
-                    PostVersionPage(versions[index], versions.getOrNull(index - 1), statusId, index, callbacks)
+                    PostVersionPage(versions[index], versions.getOrNull(index - 1), statusId, index, callbacks, language)
                 }
             }
         }
@@ -187,7 +192,14 @@ fun PostHistoryContent(
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PostVersionPage(version: PostVersion, previous: PostVersion?, statusId: String, index: Int, callbacks: PostCallbacks) {
+private fun PostVersionPage(
+    version: PostVersion,
+    previous: PostVersion?,
+    statusId: String,
+    index: Int,
+    callbacks: PostCallbacks,
+    language: String?,
+) {
     val media = remember(version, previous) {
         if (previous == null) {
             version.mediaAttachments.map { ListDiffItem(it, ListDiffKind.Equal) }
@@ -231,6 +243,7 @@ private fun PostVersionPage(version: PostVersion, previous: PostVersion?, status
                 diffFrom = if (whole == null) previousWarning else null,
                 whole = whole,
                 emojis = emojis,
+                language = language,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
         }
@@ -242,6 +255,7 @@ private fun PostVersionPage(version: PostVersion, previous: PostVersion?, status
             style = MaterialTheme.typography.bodyLarge,
             onLinkClick = rememberPostLinkHandler(post, callbacks.onUserClick, callbacks.onHashtagClick),
             diffFrom = previous?.text,
+            language = language,
         )
         if (!pollOptions.isNullOrEmpty()) {
             // 投票ごと足された・外された版は、選択肢ごとではなく投票の欄全体に色を敷く
@@ -251,7 +265,7 @@ private fun PostVersionPage(version: PostVersion, previous: PostVersion?, status
                 previous.pollOptions != null && version.pollOptions == null -> ListDiffKind.Deleted
                 else -> null
             }
-            PollOptions(pollOptions, emojis, wholePoll, Modifier.padding(top = 12.dp))
+            PollOptions(pollOptions, emojis, wholePoll, language, Modifier.padding(top = 12.dp))
         }
         if (media.isNotEmpty()) {
             val kinds = media.associate { it.item.id to it.kind }
@@ -289,6 +303,7 @@ private fun VersionContentWarning(
     diffFrom: String?,
     whole: ListDiffKind?,
     emojis: List<CustomEmoji>,
+    language: String?,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.extendedColors
@@ -315,6 +330,7 @@ private fun VersionContentWarning(
             color = roles?.onContainer ?: Color.Unspecified,
             style = if (whole == ListDiffKind.Deleted) style.copy(textDecoration = TextDecoration.LineThrough) else style,
             diffFrom = diffFrom,
+            language = language,
         )
     }
 }
@@ -331,6 +347,7 @@ private fun PollOptions(
     options: List<ListDiffItem<String>>,
     emojis: List<CustomEmoji>,
     wholePoll: ListDiffKind?,
+    language: String?,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.extendedColors
@@ -370,6 +387,7 @@ private fun PollOptions(
                         textStyle
                     },
                     diffFrom = option.previous,
+                    language = language,
                 )
             }
         }

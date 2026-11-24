@@ -49,6 +49,8 @@ internal fun PostBody(
     val translated = translation?.shownTranslation
     val text = translated?.html ?: post.text
     val contentWarning = translated?.contentWarning ?: post.contentWarning
+    // 訳を出している間は訳した先の言語
+    val language = if (translated != null) translation.offer.target else post.language
     if (translation != null) {
         val store = LocalPostTranslations.current
         PostTranslationBar(
@@ -61,7 +63,7 @@ internal fun PostBody(
     val hasWarning = contentWarning != null && !fixed
     if (fixed) {
         contentWarning?.let { cw ->
-            FixedContentWarning(cw, post, textStyle, Modifier.padding(bottom = spacing))
+            FixedContentWarning(cw, post, textStyle, language, Modifier.padding(bottom = spacing))
         }
     } else contentWarning?.let { cw ->
         ContentWarning(
@@ -70,6 +72,7 @@ internal fun PostBody(
             expanded = expanded,
             onToggle = { expanded = !expanded },
             style = textStyle,
+            language = language,
         )
     }
     ContentWarningBody(hasWarning = hasWarning, expanded = expanded) {
@@ -81,6 +84,7 @@ internal fun PostBody(
             showToggle = !fixed,
             style = textStyle,
             onLinkClick = rememberPostLinkHandler(post, callbacks.onUserClick, callbacks.onHashtagClick),
+            language = language,
         )
         if (extras) {
             post.poll?.let { poll ->
@@ -88,6 +92,8 @@ internal fun PostBody(
                     poll = poll,
                     onVote = callbacks.onVote?.let { vote -> { choices -> vote(post, choices) } },
                     modifier = Modifier.padding(top = spacing),
+                    // 投票は訳さない
+                    language = post.language,
                 )
             }
         }
@@ -115,7 +121,7 @@ internal fun PostBody(
 
 /** 開いたままの CW ([PostBody] の `fixed`)。本文と見分けられるよう、警告文の左に警告のアイコンを付ける。 */
 @Composable
-private fun FixedContentWarning(text: String, post: Post, style: TextStyle, modifier: Modifier = Modifier) {
+private fun FixedContentWarning(text: String, post: Post, style: TextStyle, language: String?, modifier: Modifier = Modifier) {
     Row(modifier) {
         // 1 行目の文字の高さの中央に合わせる (bodyMedium は行の高さ 20sp)
         Icon(
@@ -124,7 +130,7 @@ private fun FixedContentWarning(text: String, post: Post, style: TextStyle, modi
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 1.dp, end = 6.dp).size(18.dp),
         )
-        EmojiText(text = text, emojis = post.emojis, postContent = true, style = style)
+        EmojiText(text = text, emojis = post.emojis, postContent = true, style = style, language = language)
     }
 }
 
@@ -162,5 +168,6 @@ internal fun PostExcerpt(
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier,
+        language = post.language,
     )
 }

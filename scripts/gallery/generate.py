@@ -216,6 +216,10 @@ def p(text):
     return f"<p>{text}</p>"
 
 
+# 日本語と中国語 (簡体字) で字形の違う漢字
+KanjiGlyphSample = "直角 骨 今 海 化 次 刃 写"
+
+
 # Mastodon (4.x) が返す本文の HTML の形。翻訳 (translation) の変換の確認用
 def mention(acc):
     return (f'<span class="h-card" translate="no"><a href="{acc["url"]}" class="u-url mention">'
@@ -324,8 +328,8 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(bob, p("CW 付き"), spoiler_text="ネタバレ注意"),
         # 編集済み (ポスト詳細の日時の行に「· Edited」)。アプリ付きと無し
         st.make(alice, p("編集した投稿 (アプリ付き)"), edited_at="2026-01-02T00:00:00.000Z",
-                application={"name": "Quasar", "website": None}),
-        st.make(bob, p("編集した投稿"), edited_at="2026-01-02T00:00:00.000Z"),
+                application={"name": "Quasar", "website": None}, language="ja"),
+        st.make(bob, p("編集した投稿"), edited_at="2026-01-02T00:00:00.000Z", language="ja"),
         # 長文 (折りたたみ) + 添付。メニューの上の表示 (6 行で切る) の確認にも使う
         st.make(carol, "".join(p(f"長文の {i + 1} 行目") for i in range(10)),
                 media_attachments=[mediaj(20, media[0]), mediaj(21, media[2])]),
@@ -344,6 +348,10 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(longname, p("未収載"), visibility="unlisted"),
         st.make(alice, p("フォロワー限定"), visibility="private"),
         st.make(bob, p("ブーストされた投稿"), reblog=st.make(carol, p("ブーストの中身 :pulse_webp:"), ems("pulse_webp"))),
+        # 漢字の字形はポストの言語 (language) で選ぶ。端末の言語に日本語が無いと、言語の無いポストは中国語の字形になりうる
+        st.make(carol, p(f"language: ja — {KanjiGlyphSample}"), language="ja"),
+        st.make(carol, p(f"language: zh-CN — {KanjiGlyphSample}"), language="zh-CN"),
+        st.make(carol, p(f"language: (none) — {KanjiGlyphSample}")),
     ]
 
     # --- post-history: 編集履歴 (StatusEdit の配列、古い順。最後が今の版 = post-variety の「編集した投稿」)。
@@ -390,7 +398,7 @@ def build_fixtures(e, avatars, header, media, tall):
         st.make(dave, f'<p class="quote-inline">RE: {link(SERVER + "/@alice/1001")}</p>' +
                 p(f'Totally agree, see <a href="https://remote.invalid/notes/abc" rel="nofollow noopener">this note</a> too')),
         st.make(alice, p("lol same")),
-        # 言語 (language) の無いポストの推定用 (Misskey 等は言語を送らない。固定データは全部 language 無し)
+        # 言語 (language) の無いポストの推定用 (Misskey 等は言語を送らない。この 3 つは language 無し)
         st.make(carol, p(f"Bonjour {mention(alice)}, je teste la traduction sur l'appareil ce soir {hashtag('quasar')}")),
         st.make(bob, p("今天的天气很好，我们一起去公园散步吧。")),
         st.make(dave, p("오늘 저녁에 같이 밥 먹을래요? 새로 생긴 식당이 있어요")),

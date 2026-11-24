@@ -40,6 +40,7 @@ import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
  *   リンク先によって振り分けるときに渡す。
  * @param diffFrom 前の版の文字列 ([text] と同じ形式)。渡すと前の版との差分 (単語単位) を [diffStyles] で書き込む
  *   (足された所・消された所の両方を出す。[withDiffFrom])。編集履歴用。[emojis] には両方の版の絵文字を渡す。
+ * @param language 中身の言語 (ポストの `language` 等)。文字のロケールにして、漢字をその言語の字形で出す ([withContentLanguage])。
  */
 @Composable
 fun EmojiText(
@@ -56,7 +57,9 @@ fun EmojiText(
     onLinkClick: ((url: String, text: String?) -> Unit)? = null,
     diffFrom: String? = null,
     diffStyles: TextDiffStyles? = if (diffFrom != null) textDiffStyles() else null,
+    language: String? = null,
 ) {
+    val textStyle = remember(style, language) { style.withContentLanguage(language) }
     val linkColor = MaterialTheme.colorScheme.primary
     // ラムダは毎回変わりうるので、変換をやり直さないよう最新の値を参照する固定のリスナーにする
     val currentOnLinkClick by rememberUpdatedState(onLinkClick)
@@ -93,7 +96,7 @@ fun EmojiText(
     Text(
         text = annotated,
         modifier = modifier,
-        style = style,
+        style = textStyle,
         color = color,
         maxLines = maxLines,
         overflow = overflow,

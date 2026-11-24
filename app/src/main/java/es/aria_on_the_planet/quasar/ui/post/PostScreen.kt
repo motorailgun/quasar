@@ -71,7 +71,7 @@ fun PostScreen(
     onMediaClick: (MediaClick) -> Unit,
     onHashtagClick: (String) -> Unit,
     onReactionCountClick: (Post, PostActionType) -> Unit,
-    onHistoryClick: (statusId: String, index: Int) -> Unit,
+    onHistoryClick: (statusId: String, index: Int, language: String?) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
@@ -131,7 +131,7 @@ fun PostScreen(
         onDismissRequest = viewModel::hideHistory,
         onSelect = { index ->
             viewModel.hideHistory()
-            thread?.let { onHistoryClick(it.post.statusId, index) }
+            thread?.let { onHistoryClick(it.post.statusId, index, it.post.language) }
         },
     )
     Box(Modifier.fillMaxSize()) {

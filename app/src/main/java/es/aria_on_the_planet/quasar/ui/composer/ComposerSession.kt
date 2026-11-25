@@ -69,6 +69,8 @@ class ComposerSession(
     private val emojiRepository: EmojiRepository,
     /** 設定の「新しい投稿の公開範囲」(`null` ならアカウントの既定)。読み込みを待ってから流れる。 */
     private val defaultVisibilitySetting: Flow<PostVisibility?>,
+    /** 設定の「新しい投稿の言語」(`null` なら Auto)。読み込みを待ってから流れる。 */
+    private val defaultLanguageSetting: Flow<String?>,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
     /** 編集するポスト。`null` なら新しい投稿。 */
@@ -135,6 +137,9 @@ class ComposerSession(
     /** 最後に自動で入れた公開範囲。今の値がこれと違えば、ユーザーが選び直した (または返信で変わった) ので触らない。 */
     private var appliedVisibility = composer.visibility
 
+    /** 最後に自動で入れた言語 (設定の値)。今の値がこれと違えば、ユーザーが選び直したので触らない。 */
+    private var appliedLanguage = composer.language
+
     init {
         scope.launch {
             // 取得できなければ既定値のまま (最終的な判定はサーバが行う)
@@ -151,6 +156,14 @@ class ComposerSession(
                 defaultVisibilitySetting.collect { setting ->
                     visibilitySetting = setting
                     applyDefaultVisibility()
+                }
+            }
+            scope.launch {
+                // 設定の言語を入れる (ユーザーが選び直していたら触らない。編集ではポストの言語のまま)
+                defaultLanguageSetting.collect { setting ->
+                    if (composer.language != appliedLanguage) return@collect
+                    composer.language = setting
+                    appliedLanguage = setting
                 }
             }
         }

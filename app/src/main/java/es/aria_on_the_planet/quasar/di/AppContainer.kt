@@ -215,6 +215,7 @@ class AppContainer(context: Context) {
         instanceRepository = instanceRepository,
         emojiRepository = emojiRepository,
         defaultVisibilitySetting = account.settings.loaded.map { it.defaultVisibility }.distinctUntilChanged(),
+        defaultLanguageSetting = account.settings.loaded.map { it.defaultLanguage }.distinctUntilChanged(),
         openUploadSource = ::uploadSource,
         editing = editing,
         prepareUpload = { source, limits ->

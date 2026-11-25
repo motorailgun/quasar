@@ -13,6 +13,11 @@ data class AccountSettings(
     /** 新しい投稿の公開範囲。`null` ならアカウントの既定 (`verify_credentials` の `source.privacy`)。 */
     val defaultVisibility: PostVisibility? = null,
     /**
+     * 新しい投稿の言語 (ISO 639-1。[es.aria_on_the_planet.quasar.domain.model.postLanguageCodes] のどれか)。`null` なら Auto
+     * (送らずサーバに任せる)。
+     */
+    val defaultLanguage: String? = null,
+    /**
      * 投稿の添付で、サーバの上限を超える (または受け付けない形式の) 画像を送る前に端末で圧縮し直すか
      * (大きさ (縦横) は変えず、WebP / JPEG で画質を下げる)。既定はオフ (そのまま送り、上限を超えれば送れない)。
      */

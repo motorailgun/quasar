@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
+import es.aria_on_the_planet.quasar.domain.model.postLanguageCodes
 import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
 import es.aria_on_the_planet.quasar.domain.model.settings.ColumnLayout
@@ -134,6 +135,9 @@ private fun <S> float(
 private inline fun <reified E : Enum<E>> enumOrNull(name: String): E? = enumValues<E>().firstOrNull { it.name == name }
 
 private const val AccountDefaultVisibility = "account"
+
+/** 新しい投稿の言語の Auto (`null`)。 */
+private const val AutoPostLanguage = "auto"
 
 /** 翻訳先の「端末の言語」(`null`)。 */
 private const val DeviceTranslationTarget = "device"
@@ -305,6 +309,19 @@ private fun AccountSettingFields(): List<SettingField<AccountSettings, *, *>> = 
             } else {
                 // ダイレクト等、既定にできない値は読めない扱い
                 enumOrNull<PostVisibility>(stored)?.takeIf { it in DefaultVisibilityChoices }?.let(::Decoded)
+            }
+        },
+    ),
+    SettingField(
+        stringPreferencesKey("default_language"),
+        { it.defaultLanguage },
+        { s, v -> s.copy(defaultLanguage = v) },
+        encode = { it ?: AutoPostLanguage },
+        decode = { stored ->
+            when (stored) {
+                AutoPostLanguage -> Decoded(null)
+                in postLanguageCodes() -> Decoded(stored)
+                else -> null
             }
         },
     ),

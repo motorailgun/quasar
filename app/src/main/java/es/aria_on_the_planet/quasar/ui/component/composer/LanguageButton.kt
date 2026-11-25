@@ -81,15 +81,19 @@ fun LanguageButton(
 }
 
 /**
- * 言語を選ぶダイアログ (翻訳の設定の「翻訳先」と同じ形)。上から Auto / よく使いそうな言語
+ * 投稿の言語を選ぶダイアログ (翻訳の設定の「翻訳先」と同じ形)。上から Auto / よく使いそうな言語
  * ([preferredPostLanguages]。選んでいる言語もここに入る) / 区切り / 残りの言語 (表示名の順)。
+ * 投稿画面の [LanguageButton] と設定の「既定の言語」で使う。
+ *
+ * @param accountDefault アカウントの投稿の言語の設定 (Auto の補足に出す)。分からなければ `null`。
  */
 @Composable
-private fun LanguageDialog(
+fun LanguageDialog(
     selected: String?,
     accountDefault: String?,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
+    title: String = stringResource(R.string.composer_language),
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val preferred = remember(selected, accountDefault) {
@@ -101,7 +105,7 @@ private fun LanguageDialog(
         names.keys.filter { it !in preferred }.sortedWith(compareBy(collator) { names.getValue(it) })
     }
     ChoiceDialog(
-        title = stringResource(R.string.composer_language),
+        title = title,
         groups = listOf(listOf(null) + preferred, others),
         selected = selected,
         label = { code ->

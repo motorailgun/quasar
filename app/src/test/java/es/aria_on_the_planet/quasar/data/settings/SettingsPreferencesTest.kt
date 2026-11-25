@@ -62,6 +62,7 @@ class SettingsPreferencesTest {
         notificationApi = NotificationApi.Ungrouped,
         streaming = StreamingSettings(home = false, notifications = false, local = false, global = true),
         defaultVisibility = PostVisibility.Private,
+        defaultLanguage = "ja",
         compressOversizedImages = true,
         stripImageMetadata = true,
     )
@@ -118,7 +119,7 @@ class SettingsPreferencesTest {
         assertEquals(
             setOf(
                 "notification_api", "stream_home", "stream_notifications", "stream_local", "stream_global",
-                "default_visibility", "compress_oversized_images", "strip_image_metadata",
+                "default_visibility", "default_language", "compress_oversized_images", "strip_image_metadata",
             ),
             account,
         )
@@ -205,6 +206,7 @@ class SettingsPreferencesTest {
             stringPreferencesKey("notification_api") to "Something",
             stringPreferencesKey("avatar_shape") to "Hexagon",
             stringPreferencesKey("default_visibility") to "Direct",
+            stringPreferencesKey("default_language") to "xx-unknown",
             intPreferencesKey("long_post_max_lines") to -3,
             floatPreferencesKey("surface_blur_tint_alpha") to 3f,
             floatPreferencesKey("surface_blur_radius_dp") to 100f,
@@ -221,6 +223,8 @@ class SettingsPreferencesTest {
         assertEquals(NotificationApi.Grouped, account.notificationApi)
         // ダイレクトは既定にできない
         assertEquals(null, account.defaultVisibility)
+        // 知らない言語は Auto
+        assertEquals(null, account.defaultLanguage)
         assertEquals(DisplaySettings(), settings.display)
         assertEquals(PredictiveBackSettings(), settings.predictiveBack)
         // 個別のキーで持つもの (既定でオン) はキーが無いので既定値

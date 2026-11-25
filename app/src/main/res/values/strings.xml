@@ -383,7 +383,7 @@
     <string name="settings_timelines">Timelines</string>
     <string name="settings_timelines_summary">Auto-update, notifications</string>
     <string name="settings_posting">Posting</string>
-    <string name="settings_posting_summary">Default visibility, images</string>
+    <string name="settings_posting_summary">Default visibility, language, images</string>
     <string name="settings_confirmations">Confirmations</string>
     <string name="settings_confirmations_summary">Posting, boost, favourite, bookmark, my posts</string>
 
@@ -445,6 +445,8 @@
     <string name="settings_post_menu_others">Other posts</string>
 
     <string name="settings_default_visibility">Default visibility</string>
+    <string name="settings_default_language">Default language</string>
+    <string name="settings_default_language_auto">%1$s (leave it to the server)</string>
     <string name="settings_visibility_account_default">Account default</string>
     <string name="settings_visibility_account_default_description">The default set for your account on the server</string>
     <string name="settings_confirm_post">Post</string>

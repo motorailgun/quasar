@@ -1123,7 +1123,10 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * Auto (`null`) は `language` を送らない。サーバは 4.x ならアカウントの投稿の言語の設定 → 無ければ UI の言語 (`valid_locale_cascade`)、
     3.5 は本文から推定する。空文字も同じ扱いだが送らない。
   * 編集はポストの言語 (`Post.language`) で始まり、変えれば `PUT` で送る。`null` のままなら送らず、サーバはポストの言語を保つ。
-  * 下書きごと (`ComposerSession`) なので、投稿したら次の下書きは Auto から。
+  * 新しい下書きの最初の値は設定 (アカウントごと、Posting →「既定の言語」`AccountSettings.defaultLanguage`。`null` = Auto) で、設定の
+    画面も同じダイアログ (`LanguageDialog`)。`ComposerSession` が公開範囲と同じく、最後に自動で入れた値 (`appliedLanguage`) から
+    ユーザーが選び直していなければ入れる (設定を変えたときも追従)。編集では入れない。保存は `default_language` (Auto は `"auto"`、
+    `postLanguageCodes` に無い値は読めない扱い)。
 * 二重投稿の防止: 同じ内容の再送は同じ `Idempotency-Key` を使う (内容を変えたら新しいキー)。
 * フォームの組み立ては `PostDraft.toFormParams()` (`data/mapper/DraftMappers.kt`)。テストは `PostLengthTest` / `PostDraftTest` /
   `DraftMappersTest`。
@@ -1182,7 +1185,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
 * **未実装**: 下書き保存 (TODO: 永続化して、ログインし直し・プロセスの終了をまたいで残す。今はどちらでも消える)、
   メンション・ハッシュタグの補完、
-  最後に選んだ言語を覚えること (今は下書きごとに Auto から)、予約投稿。
+  最後に選んだ言語を覚えること (今は下書きごとに設定の既定の言語から)、予約投稿。
 
 ## オンデバイス翻訳 (実験的機能。`:llama` + `data/translation/`)
 
@@ -1329,7 +1332,8 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
     予測型「戻る」の動き (`PredictiveBackSettings`: 引いたときの最大のずれ・
     log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
   * アカウントごと: 通知の取得 API・カラムごとの自動更新 (`StreamingSettings`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
-    アカウントの既定 `source.privacy`。ダイレクトは選べない)・大きな画像の圧縮・画像のメタデータの削除。
+    アカウントの既定 `source.privacy`。ダイレクトは選べない)・新しい投稿の言語 (`defaultLanguage`、`null` = Auto)・大きな画像の圧縮・
+    画像のメタデータの削除。
 * 保存は `SettingsStore<S>` (`data/settings/`、Preferences DataStore)。端末共通は `AppContainer.deviceSettings` (`settings` のファイル)、
   アカウントごとは `AccountContext.settings` (`settings_<AccountKey>` のファイル。DataStore は 1 つのファイルにプロセスで 1 つしか
   作れないので、`AppContainer` がキーごとに 1 つ持つ。ログアウトで止めてファイルを消す)。項目ごとに 1 キーで、
@@ -1342,7 +1346,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   * 確認する操作は 1 つのキー (`confirm_targets`) にまとめるが、既定でオンのもの (`DefaultConfirmations`) だけは個別の
     boolean のキー (`confirm_edit_post` / `confirm_delete_post` / `confirm_reject_follow_request`)。まとめたキーに足すと、追加前に保存したユーザーにはオフで読めてしまうため。
   * キーが無ければ既定値。書き込みは変わった項目だけ (`SettingsSchema.writeChanges`)。`null` を値に持つ項目は番兵値
-    (折りたたみ・fps は 0、公開範囲は `"account"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
+    (折りたたみ・fps は 0、公開範囲は `"account"`、言語は `"auto"`) で保存し、読めない値 (知らない列挙値・範囲外) はその項目だけ既定値。
     `null` 自体が値なので、decode は「読めない」と区別するため `Decoded` で包んで返す。
   * 読み込みは非同期: `settings: StateFlow<S?>` は読み込み前 `null` (作ったときから読み始める)。`QuasarAppContent` は
     端末共通の設定の読み込みまで中身を描かない (既定値で描いてから切り替わらない。アカウントごとの設定は待たないので、ログアウト中も
@@ -1379,7 +1383,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` / `SettingsPostMenu` /
   `SettingsPosting` / `SettingsConfirmations` / `SettingsExperimental` (実験的機能。今は翻訳の入口だけで、翻訳の無いビルドでは出さない)) は他の画面と同じバックスタックに積む。
-  トップは「アカウントの設定 (@acct@host)」(Timelines = 自動更新・通知 API / Posting = 公開範囲・画像の扱い。使っているアカウントの設定を
+  トップは「アカウントの設定 (@acct@host)」(Timelines = 自動更新・通知 API / Posting = 公開範囲・言語・画像の扱い。使っているアカウントの設定を
   読み書きする。ログアウト中は出さない) と「アプリの設定」(Display / Post menu / Confirmations / 実験的機能。端末共通) に分け、
   その下にライセンス・ログアウト。ページの中身はエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`)。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
@@ -1490,7 +1494,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
   reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。本物と同じ `QuickComposerHost` で組む。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
-  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定) /
+  使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Posting / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines・Posting はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定。Posting の既定の言語は同じプロセスの quick-post-bar の投稿画面に効く) /
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety。
   編集済みのポストの「Edited」で編集履歴のシート → 版の画面 (`PostHistoryContent`)。履歴は `post-history.json` で、どのポストでも同じ)。 /

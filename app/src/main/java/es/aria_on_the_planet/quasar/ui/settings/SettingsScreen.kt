@@ -10,6 +10,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.translation.languageDisplayName
+import es.aria_on_the_planet.quasar.ui.component.composer.LanguageDialog
 import es.aria_on_the_planet.quasar.domain.model.PostVisibility
 import es.aria_on_the_planet.quasar.domain.model.settings.AccountSettings
 import es.aria_on_the_planet.quasar.domain.model.settings.AvatarShape
@@ -435,7 +437,35 @@ fun PostMenuSettingsPage(hidden: Set<PostMenuItem>, update: UpdateDeviceSettings
     }
 }
 
-/** 投稿 (アカウントごと): 新しい投稿の公開範囲・添付の画像の扱い。 */
+/**
+ * 新しい投稿の言語 (Auto = サーバに任せる / 言語)。押すと投稿画面と同じ言語のダイアログ ([LanguageDialog])。
+ */
+@Composable
+private fun DefaultLanguageItem(language: String?, onSelect: (String?) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    val title = stringResource(R.string.settings_default_language)
+    SettingsNavigationItem(
+        title = title,
+        summary = language?.let { languageDisplayName(it) }
+            ?: stringResource(R.string.settings_default_language_auto, stringResource(R.string.composer_language_auto)),
+        onClick = { open = true },
+        showChevron = false,
+    )
+    if (open) {
+        LanguageDialog(
+            selected = language,
+            accountDefault = null,
+            title = title,
+            onSelect = {
+                open = false
+                onSelect(it)
+            },
+            onDismiss = { open = false },
+        )
+    }
+}
+
+/** 投稿 (アカウントごと): 新しい投稿の公開範囲・言語・添付の画像の扱い。 */
 @Composable
 fun PostingSettingsPage(settings: AccountSettings, update: UpdateAccountSettings, onBack: () -> Unit) {
     SettingsScaffold(title = stringResource(R.string.settings_posting), onBack = onBack) {
@@ -451,6 +481,10 @@ fun PostingSettingsPage(settings: AccountSettings, update: UpdateAccountSettings
                     stringResource(visibility?.descriptionRes ?: R.string.settings_visibility_account_default_description)
                 },
                 onSelect = { visibility -> update { it.copy(defaultVisibility = visibility) } },
+            )
+            DefaultLanguageItem(
+                language = settings.defaultLanguage,
+                onSelect = { language -> update { it.copy(defaultLanguage = language) } },
             )
             SettingsSwitchItem(
                 title = stringResource(R.string.settings_compress_oversized_images),

@@ -10,12 +10,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.aria_on_the_planet.quasar.QuasarApplication
 import es.aria_on_the_planet.quasar.ui.navigation.Route
 import es.aria_on_the_planet.quasar.ui.settings.PostMenuSettingsPage
+import es.aria_on_the_planet.quasar.ui.settings.PostingSettingsPage
 import es.aria_on_the_planet.quasar.ui.settings.SettingsTopPage
 import es.aria_on_the_planet.quasar.ui.settings.TimelineSettingsPage
 
 /**
- * 設定のトップと、そこから開く Timelines (アカウントごと) / Post menu (端末共通) のページ。Post menu は本物の端末共通の設定を
- * 読み書きする (ポストのメニューの項目を変えて post-variety の︙で確かめられる)。Timelines はギャラリーのアカウント
+ * 設定のトップと、そこから開く Timelines・Posting (アカウントごと) / Post menu (端末共通) のページ。Post menu は本物の端末共通の設定を
+ * 読み書きする (ポストのメニューの項目を変えて post-variety の︙で確かめられる)。Timelines・Posting はギャラリーのアカウント
  * ([rememberGalleryAccount]) の設定で、本物のアカウントの設定には触れない。他のページ・ログアウトは開かない。
  */
 @Composable
@@ -34,6 +35,9 @@ internal fun TimelineSettingsGallery(onBack: () -> Unit) {
         TimelinesPage -> accountSettings?.let {
             TimelineSettingsPage(it, accountStore::launchUpdate, onBack = { page = null })
         }
+        PostingPage -> accountSettings?.let {
+            PostingSettingsPage(it, accountStore::launchUpdate, onBack = { page = null })
+        }
         else -> SettingsTopPage(
             account = "@gallery@gallery.invalid",
             translationAvailable = false,
@@ -41,6 +45,7 @@ internal fun TimelineSettingsGallery(onBack: () -> Unit) {
                 when (route) {
                     Route.SettingsPostMenu -> page = PostMenuPage
                     Route.SettingsTimelines -> page = TimelinesPage
+                    Route.SettingsPosting -> page = PostingPage
                     else -> Unit
                 }
             },
@@ -52,3 +57,4 @@ internal fun TimelineSettingsGallery(onBack: () -> Unit) {
 
 private const val PostMenuPage = "post-menu"
 private const val TimelinesPage = "timelines"
+private const val PostingPage = "posting"

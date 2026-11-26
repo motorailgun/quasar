@@ -702,7 +702,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
     出さない。自分 (`fetchMe` の ID と一致) なら「Edit profile」(下記「プロフィールの編集」)。他人は
     `Relationship.followState` (Relationship エンティティの `following` / `requested` / `blocking` / `blocked_by`) で決める:
     * NotFollowing: Follow (塗り)。相手からフォローされていれば Follow back、**鍵アカウントなら Request to follow** (リクエスト送信)。
-    * Requested (リクエスト送信済み・承認待ち。リモートの応答待ちでも立つ): Requested (枠線)。押すとリクエストの取り下げ (`unfollow`)。
+    * Requested (リクエスト送信済み・承認待ち。リモートの応答待ちでも立つ): Pending (枠線。日本語は「保留中」)。押すとリクエストの取り下げ (`unfollow`)。
     * Following: Following (枠線)。押すと解除。
     * Blocking: Unblock (error 色の塗り + onError の文字で目立たせる。確認なし)。
     * BlockedBy: 押せない「Blocked」(グレーアウトではなく、error 色の枠線と文字)。サーバは投稿・ピン留め・
@@ -1474,8 +1474,15 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
     `BackHandler` / `OnBackPressedCallback` は使わない。manifest で `enableOnBackInvokedCallback="true"`。
 * 文字列リソースは `res/values/strings.xml` (英語、既定) と `res/values-ja/strings.xml` (日本語) に置く。**文字列を足すときは両方に足す**。
   言語に依らないもの (アプリ名・`%1$s / %2$s` 等) は values/ で `translatable="false"` にして ja には書かない (訳漏れは release の
-  lintVital で MissingTranslation のエラーになる)。文言は Mastodon 公式 Web の訳 (`app/javascript/mastodon/locales/ja.json`) に合わせ、無いものは X に倣う
-  (投票 = アンケート、編集の保存 = 更新、サーバー・ヘッダーは長音付き、疑問符は全角、表示名・acct には「さん」)。
+  lintVital で MissingTranslation のエラーになる)。**機能の名前は Mastodon、UI の言い回しは X に揃える** (英語・日本語とも):
+  * 機能の名前 (ブースト・お気に入り・ブックマーク・公開範囲・閲覧注意・承認制・代替テキスト等) は Mastodon 公式 Web の訳
+    (`app/javascript/mastodon/locales/{en,ja}.json`。安定版 4.7 の用語。5.0 の いいね / 保存した投稿 / メッセージ には移らない) に合わせる。
+    英語は Mastodon と違い英綴りの Favourite のまま。タイムラインのタブの英語は Global (日本語は「連合」)。
+  * プレースホルダ・確認ダイアログ・空の表示・ボタン等の言い回しは、X に同じ場面の文言があれば X に倣う (Mastodon にあっても X を優先。
+    例: 「いまどうしてる？」・「この操作は取り消せません。下書きは失われます。」・「やりなおす」)。ただしブロック・ミュートの説明など
+    挙動が X と違うものは中身を Mastodon に合わせる。どちらにも無いものは自分で書く。
+  * 日本語の「post」の名詞は X の「ポスト」(投稿一覧 = ポスト、自分のポスト等)。「投稿する」「投稿しました」等の動詞・送信のボタンは「投稿」のまま。
+  * 投票 = アンケート、編集の保存 = 更新、サーバー・ヘッダーは長音付き、疑問符は全角、表示名・acct には「さん」(前に空白を入れない)。
   * per-app language (Android 13+ の「アプリの言語」) に対応: `androidResources.generateLocaleConfig = true` が values-xx から
     `locales_config.xml` を作って manifest に入れる。values/ の言語は `res/resources.properties` の `unqualifiedResLocale=en-US`。
     言語を足すときは `values-xx/strings.xml` を置くだけでよい。

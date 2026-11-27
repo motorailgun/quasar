@@ -89,6 +89,9 @@ import es.aria_on_the_planet.quasar.ui.component.composer.VisibilityButton
 import es.aria_on_the_planet.quasar.ui.component.composer.insertEmoji
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberPostTextHighlight
 import es.aria_on_the_planet.quasar.ui.component.composer.rememberEmojiSuggestions
+import es.aria_on_the_planet.quasar.ui.component.composer.MentionSearch
+import es.aria_on_the_planet.quasar.ui.component.composer.MentionSuggestionMenu
+import es.aria_on_the_planet.quasar.ui.component.composer.rememberMentionSuggestions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -111,6 +114,7 @@ import kotlinx.coroutines.launch
  *
  * @param barState 外から入力を始めさせる (返信ボタン等。[QuickPostBarState.requestInput])。
  * @param onMediaClick 返信先のメディアのタップ。
+ * @param mentionSearch `@user` の補完の候補を引く (既定はサーバ。ギャラリーが差し替える)。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -121,6 +125,7 @@ fun QuickPostBar(
     modifier: Modifier = Modifier,
     barState: QuickPostBarState = rememberQuickPostBarState(),
     onMediaClick: (MediaClick) -> Unit = {},
+    mentionSearch: MentionSearch = session::searchMentions,
 ) {
     val state by session.state.collectAsStateWithLifecycle()
     val composer = session.composer
@@ -131,6 +136,7 @@ fun QuickPostBar(
     val isEmpty by remember(composer) { derivedStateOf { composer.toDraft().isEmpty || composer.isUntouched() } }
     val characterCount by remember(composer, limits) { derivedStateOf { composer.toDraft().characterCount(limits) } }
     val suggestions by rememberEmojiSuggestions(composer.text, state.emojis)
+    val mentionSuggestions by rememberMentionSuggestions(composer.text, mentionSearch)
     val highlight = rememberPostTextHighlight(state.emojis)
     val openMediaPicker = rememberMediaPicker(session)
 
@@ -213,6 +219,9 @@ fun QuickPostBar(
             }
         }
         EmojiSuggestionStrip(suggestions)
+        // 入力していない (縮んでいる) 間は出さない。メニューはバー全体の上に開く (バーの中の返信先等を覆わない)
+        val shownMentions = mentionSuggestions.takeIf { focused }
+        MentionSuggestionMenu(shownMentions, showAvatars = state.mentionSuggestionAvatars)
         AttachmentStrip(
             attachments = attachments,
             onRemove = { session.removeAttachment(it.localId) },

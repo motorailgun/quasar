@@ -27,6 +27,8 @@ data class AccountSettings(
      * 作り直さずメタデータだけを除く (HEIC 等それができない形式は作り直す)。既定はオフ。
      */
     val stripImageMetadata: Boolean = false,
+    /** 投稿欄の `@user` の補完の候補 (`@acct` のメニュー) にアカウントのアイコンを出すか。 */
+    val mentionSuggestionAvatars: Boolean = true,
 )
 
 /** 通知の取得に使う API。 */

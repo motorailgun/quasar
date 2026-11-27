@@ -97,4 +97,72 @@ class AutocompleteTest {
         // 範囲選択は置き換える
         assertEquals("x :blob: z" to 9, insertEmojiAtCursor("x yy z", TextRange(2, 4), "blob"))
     }
+
+    /** `|` の位置をカーソルとして [findMentionQuery] を呼ぶ。 */
+    private fun mentionAt(marked: String): AutocompleteQuery? {
+        val cursor = marked.indexOf('|')
+        return findMentionQuery(marked.removeRange(cursor, cursor + 1), TextRange(cursor))
+    }
+
+    @Test
+    fun findsMentionBeforeCursor() {
+        assertEquals(AutocompleteQuery('@', "al", TextRange(0, 3)), mentionAt("@al|"))
+        assertEquals(AutocompleteQuery('@', "alice", TextRange(6, 12)), mentionAt("hello @alice| world"))
+        assertEquals(AutocompleteQuery('@', "a.b-c_d", TextRange(1, 9)), mentionAt("(@a.b-c_d|"))
+        assertEquals(AutocompleteQuery('@', "ab", TextRange(7, 10)), mentionAt("こんにちは\n\n@ab|"))
+    }
+
+    @Test
+    fun findsMentionWithDomain() {
+        assertEquals(AutocompleteQuery('@', "dave@", TextRange(0, 6)), mentionAt("@dave@|"))
+        assertEquals(AutocompleteQuery('@', "dave@remote.inv", TextRange(3, 19)), mentionAt("hi @dave@remote.inv|"))
+    }
+
+    @Test
+    fun acceptsFullWidthAt() {
+        assertEquals(AutocompleteQuery('@', "neko", TextRange(4, 9)), mentionAt("あいう ＠neko|"))
+        assertEquals(AutocompleteQuery('@', "neko@example", TextRange(0, 13)), mentionAt("＠neko＠example|"))
+    }
+
+    @Test
+    fun mentionRequiresTwoCharacters() {
+        assertNull(mentionAt("@|"))
+        assertNull(mentionAt("@a|"))
+        assertNull(mentionAt("@@ab|"))
+    }
+
+    @Test
+    fun ignoresAtInsideWordsAndUrls() {
+        assertNull(mentionAt("mail@example|"))
+        assertNull(mentionAt("あ@ab|"))
+        assertNull(mentionAt("https://example.com/@ab|"))
+        assertNull(mentionAt("a=@ab|"))
+        assertNull(mentionAt("a@b@cd|"))
+    }
+
+    @Test
+    fun ignoresNonAsciiUsernames() {
+        assertNull(mentionAt("@あいう|"))
+        assertNull(mentionAt("@.ab|"))
+    }
+
+    @Test
+    fun ignoresMentionWhenCursorInsideWord() {
+        assertNull(mentionAt("@al|ice"))
+        assertNull(mentionAt("@al|@x"))
+        assertEquals(AutocompleteQuery('@', "al", TextRange(0, 3)), mentionAt("@al| next"))
+    }
+
+    @Test
+    fun ignoresMentionWhenSelecting() {
+        assertNull(findMentionQuery("@alice", TextRange(1, 3)))
+    }
+
+    @Test
+    fun insertsMentionWithTrailingSpace() {
+        assertEquals("@alice " to 7, insertMention("@al", TextRange(0, 3), "alice"))
+        assertEquals("hi @dave@remote.invalid !" to 24, insertMention("hi @dav !", TextRange(3, 7), "dave@remote.invalid"))
+        assertEquals("＠x → @alice " to 12, insertMention("＠x → ＠al", TextRange(5, 8), "alice"))
+    }
 }
+

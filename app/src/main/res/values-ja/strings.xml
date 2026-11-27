@@ -375,6 +375,8 @@
     <string name="settings_avatar_shape">アイコンの形</string>
     <string name="settings_avatar_shape_circle">円形</string>
     <string name="settings_avatar_shape_rounded_square">角丸四角形</string>
+    <string name="settings_mention_suggestion_avatars">メンションの候補にアイコンを表示</string>
+    <string name="settings_mention_suggestion_avatars_summary">メンションの入力中に出る @ユーザー名 の候補の横に、アカウントのアイコンを表示します。</string>
     <string name="settings_layout">レイアウト</string>
     <string name="settings_column_layout">表示レイアウトの固定</string>
     <string name="settings_column_layout_auto">自動 (画面の幅に合わせる)</string>

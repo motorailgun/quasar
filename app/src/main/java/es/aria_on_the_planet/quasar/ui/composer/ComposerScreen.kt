@@ -40,6 +40,7 @@ import es.aria_on_the_planet.quasar.ui.component.dialog.ConfirmDialog
 import es.aria_on_the_planet.quasar.domain.model.problems
 import es.aria_on_the_planet.quasar.ui.component.composer.Composer
 import es.aria_on_the_planet.quasar.ui.component.composer.LanguageButton
+import es.aria_on_the_planet.quasar.ui.component.composer.MentionSearch
 import es.aria_on_the_planet.quasar.ui.component.composer.QuoteTargetPreview
 import es.aria_on_the_planet.quasar.ui.component.composer.ReplyContext
 import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
@@ -58,6 +59,7 @@ import es.aria_on_the_planet.quasar.ui.navigation.LocalNavigator
  * @param keepDraftOnClose `true` なら × / 戻るはそのまま [onClose] (クイック投稿バーに下書きが残るので確認は要らない)。
  *   `false` なら変更があるとき ([ComposerSession.hasChanges]) は破棄の確認を出す (下書きを残さない使い方。編集・共有)。
  * @param notice スナックバーで知らせること (共有で添付できなかったメディアの件数等)。出したら [onNoticeShown]。
+ * @param mentionSearch `@user` の補完の候補を引く (既定はサーバ。ギャラリーが差し替える)。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -69,6 +71,7 @@ fun ComposerScreen(
     modifier: Modifier = Modifier,
     notice: String? = null,
     onNoticeShown: () -> Unit = {},
+    mentionSearch: MentionSearch = session::searchMentions,
 ) {
     val state by session.state.collectAsStateWithLifecycle()
     val composer = session.composer
@@ -156,6 +159,8 @@ fun ComposerScreen(
             account = state.account,
             limits = limits,
             emojis = state.emojis,
+            mentionSearch = mentionSearch,
+            mentionSuggestionAvatars = state.mentionSuggestionAvatars,
             enabled = !state.sending,
             visibilityEditable = !editing,
             autoFocus = true,

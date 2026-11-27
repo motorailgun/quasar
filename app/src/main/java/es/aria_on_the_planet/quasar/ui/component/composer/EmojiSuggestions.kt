@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
 import es.aria_on_the_planet.quasar.domain.model.findHashtags
+import es.aria_on_the_planet.quasar.domain.model.findMentions
 import es.aria_on_the_planet.quasar.ui.component.image.ImageKind
 import es.aria_on_the_planet.quasar.ui.component.image.RemoteImage
 
@@ -118,7 +119,7 @@ fun EmojiSuggestionStrip(
 }
 
 /** 直前の `null` でない値を覚える (退場アニメーション中に中身を保つため)。 */
-private class LastNonNull<T : Any> {
+internal class LastNonNull<T : Any> {
     private var last: T? = null
     fun update(value: T?): T? {
         if (value != null) last = value
@@ -127,13 +128,13 @@ private class LastNonNull<T : Any> {
 }
 
 /**
- * 絵文字になる `:shortcode:` と、[hashtags] ならハッシュタグになる `#名前` を、本文はそのままに少し太く + 色付きで表示する
- * (Discord の入力欄のように)。判定は [findEmojiShortcodes] (サーバと同じ前後の条件 + 実在するショートコードのみ) と
- * [findHashtags] (サーバと同じ規則)。
+ * 絵文字になる `:shortcode:` と、[postText] ならハッシュタグになる `#名前`・メンションになる `@user` を、本文はそのままに
+ * 少し太く + 色付きで表示する (Discord の入力欄のように)。判定は [findEmojiShortcodes] (サーバと同じ前後の条件 + 実在する
+ * ショートコードのみ)・[findHashtags]・[findMentions] (どちらもサーバと同じ規則。メンションはアカウントの実在を見ない)。
  */
 class ComposerHighlight(
     emojis: List<CustomEmoji>,
-    private val hashtags: Boolean,
+    private val postText: Boolean,
     private val style: SpanStyle,
 ) : OutputTransformation {
     private val known = emojis.mapTo(HashSet()) { it.shortcode }
@@ -143,8 +144,11 @@ class ComposerHighlight(
         findEmojiShortcodes(text, known).forEach { range ->
             addStyle(style, range.first, range.last + 1)
         }
-        if (hashtags) {
+        if (postText) {
             findHashtags(text).forEach { range ->
+                addStyle(style, range.first, range.last + 1)
+            }
+            findMentions(text).forEach { range ->
                 addStyle(style, range.first, range.last + 1)
             }
         }
@@ -154,19 +158,19 @@ class ComposerHighlight(
 /** 絵文字だけの [ComposerHighlight] (CW・プロフィール等、サーバがハッシュタグにしない欄)。絵文字が無ければ `null`。 */
 @Composable
 fun rememberEmojiShortcodeHighlight(emojis: List<CustomEmoji>): OutputTransformation? {
-    val highlight = rememberComposerHighlight(emojis, hashtags = false)
+    val highlight = rememberComposerHighlight(emojis, postText = false)
     return if (emojis.isEmpty()) null else highlight
 }
 
-/** 投稿の本文用の [ComposerHighlight] (絵文字 + ハッシュタグ)。 */
+/** 投稿の本文用の [ComposerHighlight] (絵文字 + ハッシュタグ + メンション)。 */
 @Composable
-fun rememberPostTextHighlight(emojis: List<CustomEmoji>): OutputTransformation = rememberComposerHighlight(emojis, hashtags = true)
+fun rememberPostTextHighlight(emojis: List<CustomEmoji>): OutputTransformation = rememberComposerHighlight(emojis, postText = true)
 
 /** [emojis] や色が変わったときだけ作り直す。 */
 @Composable
-private fun rememberComposerHighlight(emojis: List<CustomEmoji>, hashtags: Boolean): ComposerHighlight {
+private fun rememberComposerHighlight(emojis: List<CustomEmoji>, postText: Boolean): ComposerHighlight {
     val color = MaterialTheme.colorScheme.primary
-    return remember(emojis, hashtags, color) {
-        ComposerHighlight(emojis, hashtags, SpanStyle(color = color, fontWeight = FontWeight.SemiBold))
+    return remember(emojis, postText, color) {
+        ComposerHighlight(emojis, postText, SpanStyle(color = color, fontWeight = FontWeight.SemiBold))
     }
 }

@@ -22,6 +22,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import es.aria_on_the_planet.quasar.R
@@ -32,6 +34,7 @@ import es.aria_on_the_planet.quasar.ui.theme.QuasarTheme
  *
  * @param minHeight 空でもこの高さを確保し、余白のタップでも入力を始められるようにする。
  * @param outputTransformation 表示だけの装飾 (本文は変えない)。絵文字・ハッシュタグの強調 ([rememberPostTextHighlight] / [rememberEmojiShortcodeHighlight]) 等。
+ * @param onTextLayout [BasicTextField] の同名の引数。文字の配置は [modifier] の余白の内側 (左上が原点) のもの。
  */
 @Composable
 fun ComposerTextField(
@@ -43,6 +46,7 @@ fun ComposerTextField(
     lineLimits: TextFieldLineLimits = TextFieldLineLimits.MultiLine(),
     enabled: Boolean = true,
     outputTransformation: OutputTransformation? = null,
+    onTextLayout: (Density.(getResult: () -> TextLayoutResult?) -> Unit)? = null,
 ) {
     val color = MaterialTheme.colorScheme.onSurface
     BasicTextField(
@@ -52,6 +56,7 @@ fun ComposerTextField(
         textStyle = textStyle.copy(color = color),
         lineLimits = lineLimits,
         outputTransformation = outputTransformation,
+        onTextLayout = onTextLayout,
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         decorator = { innerTextField ->

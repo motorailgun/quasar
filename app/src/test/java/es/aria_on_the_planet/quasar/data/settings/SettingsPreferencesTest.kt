@@ -65,6 +65,7 @@ class SettingsPreferencesTest {
         defaultLanguage = "ja",
         compressOversizedImages = true,
         stripImageMetadata = true,
+        mentionSuggestionAvatars = false,
     )
 
     private fun written(before: DeviceSettings, after: DeviceSettings) =
@@ -120,6 +121,8 @@ class SettingsPreferencesTest {
             setOf(
                 "notification_api", "stream_home", "stream_notifications", "stream_local", "stream_global",
                 "default_visibility", "default_language", "compress_oversized_images", "strip_image_metadata",
+                // ここから下は分けた後に足したもの
+                "mention_suggestion_avatars",
             ),
             account,
         )

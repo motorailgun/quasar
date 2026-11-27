@@ -45,6 +45,8 @@ data class ComposerScreenState(
     val sending: Boolean = false,
     /** 送信失敗の内容。表示したら [ComposerSession.errorShown] で消す。 */
     val error: String? = null,
+    /** 設定 (アカウントごと) の「メンションの候補にアイコンを表示」。 */
+    val mentionSuggestionAvatars: Boolean = true,
 )
 
 /** 編集する自分のポストと、その原文。 */
@@ -71,6 +73,8 @@ class ComposerSession(
     private val defaultVisibilitySetting: Flow<PostVisibility?>,
     /** 設定の「新しい投稿の言語」(`null` なら Auto)。読み込みを待ってから流れる。 */
     private val defaultLanguageSetting: Flow<String?>,
+    /** 設定の「メンションの候補にアイコンを表示」。読み込みを待ってから流れる。 */
+    private val mentionSuggestionAvatarsSetting: Flow<Boolean>,
     /** 端末のファイルをアップロード元にする (`AppContainer.uploadSource`)。IO スレッドで呼ぶ。 */
     private val openUploadSource: (Uri) -> UploadSource,
     /** 編集するポスト。`null` なら新しい投稿。 */
@@ -84,6 +88,7 @@ class ComposerSession(
     private val accountRepository = account.accountRepository
     private val statusRepository = account.statusRepository
     private val mediaRepository = account.mediaRepository
+    private val searchRepository = account.searchRepository
 
     /** 入力内容。 */
     val composer = ComposerState()
@@ -150,6 +155,9 @@ class ComposerSession(
         scope.launch {
             runCatchingLogged("emojis") { emojiRepository.pickerEmojis(serverUrl) }
                 ?.let { emojis -> _state.update { it.copy(emojis = emojis) } }
+        }
+        scope.launch {
+            mentionSuggestionAvatarsSetting.collect { show -> _state.update { it.copy(mentionSuggestionAvatars = show) } }
         }
         if (editing == null) {
             scope.launch {
@@ -282,6 +290,25 @@ class ComposerSession(
     }
 
     /** アップロード等を止める。以後は使わない。 */
+    /** 問い合わせ → メンションの候補。打ち直し (Backspace で戻る等) で同じ問い合わせを投げ直さないため。成功したものだけ覚える。 */
+    private val mentionCache = object : LinkedHashMap<String, List<User>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<User>>?) = size > MentionCacheSize
+    }
+
+    /**
+     * メンションの補完の候補 ([query] は `@` を除いた `user` / `user@dom`)。`/api/v1/accounts/search` で、フォローしている
+     * アカウントほど上に来る。失敗したら空 (候補が出ないだけ)。Main から呼ぶ。
+     */
+    suspend fun searchMentions(query: String): List<User> {
+        val key = query.lowercase()
+        mentionCache[key]?.let { return it }
+        val users = runCatchingLogged("mention suggestions") {
+            searchRepository.suggestAccounts(query, MentionSuggestionLimit)
+        } ?: return emptyList()
+        mentionCache[key] = users
+        return users
+    }
+
     fun close() {
         scope.cancel()
     }
@@ -297,5 +324,7 @@ class ComposerSession(
 
     private companion object {
         const val TAG = "ComposerSession"
+        const val MentionSuggestionLimit = 8
+        const val MentionCacheSize = 32
     }
 }

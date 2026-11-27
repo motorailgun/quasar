@@ -498,6 +498,12 @@ fun PostingSettingsPage(settings: AccountSettings, update: UpdateAccountSettings
                 checked = settings.stripImageMetadata,
                 onCheckedChange = { checked -> update { it.copy(stripImageMetadata = checked) } },
             )
+            SettingsSwitchItem(
+                title = stringResource(R.string.settings_mention_suggestion_avatars),
+                summary = stringResource(R.string.settings_mention_suggestion_avatars_summary),
+                checked = settings.mentionSuggestionAvatars,
+                onCheckedChange = { checked -> update { it.copy(mentionSuggestionAvatars = checked) } },
+            )
         }
     }
 }

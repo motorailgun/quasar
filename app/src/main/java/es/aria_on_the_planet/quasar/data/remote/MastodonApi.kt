@@ -447,6 +447,22 @@ class MastodonApi(
         if (offset > 0) addQueryParameter("offset", offset.toString())
     }
 
+    /**
+     * https://docs.joinmastodon.org/methods/accounts/#search (要認証)。ユーザー名・表示名の前方一致で、フォローしている
+     * アカウントほど上に来る。[resolve] が `false` ならサーバが知っているアカウントだけ (WebFinger で取りに行かない)。
+     */
+    suspend fun searchAccounts(
+        serverUrl: String,
+        accessToken: String,
+        query: String,
+        limit: Int,
+        resolve: Boolean = false,
+    ): List<AccountDto> = get(serverUrl, accessToken, "api/v1/accounts/search") {
+        addQueryParameter("q", query)
+        addQueryParameter("limit", limit.toString())
+        addQueryParameter("resolve", resolve.toString())
+    }
+
     /** https://docs.joinmastodon.org/methods/accounts/#relationships (要認証) */
     suspend fun relationships(serverUrl: String, accessToken: String, ids: List<String>): List<RelationshipDto> =
         get(serverUrl, accessToken, "api/v1/accounts/relationships") {

@@ -402,6 +402,8 @@
     <string name="settings_avatar_shape">Avatar shape</string>
     <string name="settings_avatar_shape_circle">Circle</string>
     <string name="settings_avatar_shape_rounded_square">Rounded square</string>
+    <string name="settings_mention_suggestion_avatars">Show avatars in mention suggestions</string>
+    <string name="settings_mention_suggestion_avatars_summary">Show the account\'s avatar next to each @username suggested while typing a mention.</string>
     <string name="settings_layout">Layout</string>
     <string name="settings_column_layout">Force display layout</string>
     <string name="settings_column_layout_auto">Automatic (by screen width)</string>

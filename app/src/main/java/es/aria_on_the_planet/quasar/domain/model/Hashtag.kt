@@ -84,7 +84,7 @@ private fun hashtagNameEnd(text: CharSequence, start: Int): Int? {
     var inWordPrefix = true
     while (pos < text.length) {
         val cp = Character.codePointAt(text, pos)
-        val word = cp.isHashtagWordChar()
+        val word = cp.isRubyWordChar()
         val separator = cp.isHashtagSeparator()
         if (!word && !separator) break
         if (count == 0 && !word) return null
@@ -131,8 +131,8 @@ private fun CharSequence.isHashtagSpaceBefore(index: Int): Boolean {
 /** Ruby の `[[:alpha:]]` (Alphabetic)。 */
 private fun Int.isHashtagAlpha(): Boolean = Character.isAlphabetic(this)
 
-/** Ruby の `[[:word:]]` (Alphabetic・結合文字・10 進数字・連結符・ZWJ / ZWNJ)。 */
-private fun Int.isHashtagWordChar(): Boolean {
+/** Ruby の `[[:word:]]` (Alphabetic・結合文字・10 進数字・連結符・ZWJ / ZWNJ)。メンションのドメインと前の文字の判定 ([findMentions]) にも使う。 */
+internal fun Int.isRubyWordChar(): Boolean {
     if (Character.isAlphabetic(this)) return true
     return when (Character.getType(this).toByte()) {
         Character.NON_SPACING_MARK, Character.ENCLOSING_MARK, Character.COMBINING_SPACING_MARK,

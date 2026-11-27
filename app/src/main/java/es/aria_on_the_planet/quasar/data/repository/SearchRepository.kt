@@ -18,7 +18,10 @@ sealed interface ResolvedLink {
     data object NotFound : ResolvedLink
 }
 
-/** 検索 (`/api/v2/search`)。検索画面と、他のアプリから共有された URL を開くのに使う。 */
+/**
+ * 検索 (`/api/v2/search`)。検索画面と、他のアプリから共有された URL を開くのに使う。
+ * 投稿欄のメンションの補完は `/api/v1/accounts/search` ([suggestAccounts])。
+ */
 class SearchRepository(
     private val session: Session,
     private val api: MastodonApi,
@@ -60,6 +63,14 @@ class SearchRepository(
         searchPage(query, "hashtags", offset) { results, _ ->
             results.hashtags.map { Hashtag(it.name, it.url) }
         }
+
+    /** 投稿欄のメンションの補完の候補 ([query] は `@` を除いた `user` / `user@dom`)。サーバが知っているアカウントだけ。 */
+    suspend fun suggestAccounts(query: String, limit: Int): List<User> {
+        val version = cache.issue()
+        val accounts = api.searchAccounts(session.serverUrl, session.accessToken, query, limit)
+        cache.putAccounts(accounts, version)
+        return accounts.map { it.toDomain() }
+    }
 
     private suspend fun <T> searchPage(
         query: String,

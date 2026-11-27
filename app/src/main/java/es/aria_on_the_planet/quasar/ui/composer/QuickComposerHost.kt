@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chrisbanes.haze.HazeState
 import es.aria_on_the_planet.quasar.R
+import es.aria_on_the_planet.quasar.ui.component.composer.MentionSearch
 import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
 
 /**
@@ -52,6 +53,8 @@ import es.aria_on_the_planet.quasar.ui.component.media.MediaClick
  *
  * 投稿できたら ([DraftStore.published]) フル画面を閉じる。送信エラーはフル画面を開いていなければ
  * [snackbarHostState] (バーの上) に出す。
+ *
+ * [mentionSearch] は `@user` の補完の候補を引く口。`null` なら下書きのサーバに問い合わせる (ギャラリーが差し替える)。
  */
 @Composable
 fun QuickComposerHost(
@@ -61,6 +64,7 @@ fun QuickComposerHost(
     modifier: Modifier = Modifier,
     barState: QuickPostBarState = rememberQuickPostBarState(),
     onMediaClick: (MediaClick) -> Unit = {},
+    mentionSearch: MentionSearch? = null,
     content: @Composable (barSpace: Dp) -> Unit,
 ) {
     val session = drafts.current.collectAsStateWithLifecycle().value
@@ -121,6 +125,7 @@ fun QuickComposerHost(
                     onExpand = { expanded = true },
                     barState = barState,
                     onMediaClick = onMediaClick,
+                    mentionSearch = mentionSearch ?: session::searchMentions,
                     modifier = Modifier
                         .fillMaxWidth()
                         .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
@@ -143,6 +148,7 @@ fun QuickComposerHost(
                         drafts.finish()
                     },
                     keepDraftOnClose = true,
+                    mentionSearch = mentionSearch ?: it::searchMentions,
                 )
             }
         }

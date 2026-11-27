@@ -101,7 +101,7 @@ es.aria_on_the_planet.quasar
     │   ├── list/ListStatus.kt      一覧が空のときの読み込み中 / 失敗 / 空の表示 (一覧の header に置く) + LoadErrorMessage.kt (失敗の文言 + 401 / 403 なら「ログインし直す」)
     │   ├── time/Now.kt             表示用の現在時刻 (LocalNow、一定間隔で進む)
     │   ├── composer/               投稿欄の部品 (ComposerState / Composer / ComposerTextField / VisibilityButton / LanguageButton / ComposerToolbar /
-    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions + Autocomplete / EmojiPicker /
+    │   │                           AttachmentStrip / PollEditor / ComposerAccountIcon / EmojiSuggestions・MentionSuggestions + Autocomplete / EmojiPicker /
     │   │                           ReplyTarget = 返信先の表示: ReplyTargetPreview / ReplyContext / ReplyingToLabel)
     │   ├── layout/                 折りたたみ (CollapsibleContent / rememberExpandedState / ShowMoreToggle / ChevronToggle) /
     │   │                           CollapsingHeaderLayout (スクロールで畳まれるヘッダ + 残るタブ + 本体)
@@ -355,6 +355,7 @@ data class Timeline(val type: TimelineType, val posts: List<Post>)  // タイム
 | 代替テキストの更新 (投稿前) | `PUT /api/v1/media/:id` (`description`) |
 | カスタム絵文字 (補完・ピッカー) | `GET /api/v1/custom_emojis` (`EmojiRepository` がプロセス内でキャッシュ、`visible_in_picker` のみ) |
 | 検索 | `GET /api/v2/search?q=...&type=accounts/statuses/hashtags&limit=20&offset=...` (種類ごとに `offset` でページング。最初のページだけ `resolve=true`。`SearchRepository.searchAccounts` 等) |
+| メンションの補完 | `GET /api/v1/accounts/search?q=...&limit=8&resolve=false` (前方一致・フォロー中が上。`SearchRepository.suggestAccounts`) |
 | URL・`@user@domain` を引く | `GET /api/v2/search?q=...&resolve=true&limit=1` (サーバが知らなければ AP / WebFinger で取りに行く。`SearchRepository.resolve`) |
 | サーバ情報 (上限・ストリーミング URL) | `GET /api/v2/instance` (`InstanceRepository` がプロセス内でキャッシュ) |
 | OAuth クライアントの登録 | `POST /api/v1/apps` (ログインのたびに登録) |
@@ -1034,12 +1035,33 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   タップで `:shortcode: ` に置き換える。フォーカスのある欄 (本文 / CW) が対象。
   * 純粋関数 (`Autocomplete.kt`、テストは `AutocompleteTest`): `findAutocompleteQuery` (検出。全角 `：` も可、`12:30` や
     英数字・かな直後の `:` では出さない)、`rankEmojis` (前方一致 → 部分一致、短い順)、`insertEmoji`、`findEmojiShortcodes`。
-    `AutocompleteQuery` は引き金の文字を持つので、メンション・ハッシュタグの補完も同じ形に載せる想定。
+    `AutocompleteQuery` は引き金の文字を持つ (メンションも同じ形。ハッシュタグの補完も載せる想定)。
   * 状態は `rememberEmojiSuggestions(field, emojis)` (`derivedStateOf` で `TextFieldState` に追従)。
   * 入力中の実在する `:shortcode:` は `OutputTransformation` (`EmojiShortcodeHighlight`、`TextFieldBuffer.addStyle`) で
     primary 色 + SemiBold にする (本文は変えない)。判定はサーバ (`CustomEmoji::SCAN_RE`) と同じ前後条件で、Ruby の
     `[[:alnum:]]` に合わせ、かな・漢字の直後も絵文字にならない。
   * `BasicTextField(TextFieldState)` は `InlineTextContent` 非対応のため、入力欄内で画像にはしない。
+* **メンションの補完**: 本文のカーソル直前の `@us` (ユーザー名 2 文字以上。`@user@dom` の途中も) で候補を出し、タップで `@acct ` に
+  置き換える。CW では出さない (サーバは CW からメンションを拾わない)。バーは入力中だけ出す。
+  * 候補は Material 3 Expressive のメニュー (`MentionSuggestionMenu`: `DropdownMenuPopup` + `DropdownMenuGroup` + `DropdownMenuItem`)。
+    バーではバー全体、フル画面では本文の打っている `@` の位置 (`ComposerTextField(onTextLayout)` の `getCursorRect(@ の位置)`。打っている間は動かない) をアンカーにし、上下の
+    空きの大きい方に開く。横はアンカーの始端 (`@`) から始め、収まらなければ収まる範囲でいちばん近い位置 (`MenuAnchorPosition.Custom`
+    で横の候補を 1 つにすると、M3 の位置決めは収まらない最後の候補を画面の端から 8dp の内側に押し込む。標準の `Below` / `Above` は
+    最後の候補が「画面の左端 / 右端」なので、アンカーが左半分にあると左端に寄っていた)。幅は中身に合わせる (上限は M3 の 280dp。
+    変える API は無い) ので、細いメニューほど `@` の近くに出る。高さはその空きに収める (収まらないと M3 の位置決めがメニューをアンカーに重ね、打っている本文が隠れる。
+    位置決めの「ウィンドウ」は見えている範囲 = ステータスバー・キーボード抜きで、端から 48dp 空ける)。フォーカスを取らない
+    (`PopupProperties(focusable = false)`) のでキーボードは閉じない。外側のタップで閉じたら `@…` を打ち直すまで出さない。
+    小さい画面 (720×1280) でキーボードが出ているとバーの上には 2 項目ほどしか入らない。
+  * 項目は `@acct` の 1 行 (表示名は出さない) + 左にアイコン (24dp)。アイコンは設定 (アカウントごと、Posting →「メンションの候補に
+    アイコンを表示」`AccountSettings.mentionSuggestionAvatars`、既定オン) で消せる (`ComposerSession` が `ComposerScreenState` に流す)。
+    縦の一覧・`SuggestionChip` の帯・表示名 + @acct の 2 行も試したが、この形にした。
+  * 検出・挿入は純粋関数 `findMentionQuery` / `insertMention` (`Autocomplete.kt`、`AutocompleteTest`)。前後の条件は Mastodon 4.x の
+    `Account::MENTION_RE` (`@` の直前が文字・数字・`_`・`=`・`/` でない)。全角の `＠` も拾い、挿入で半角にする。
+  * 候補はサーバだけ (`ComposerSession.searchMentions` → `/api/v1/accounts/search`。手元のキャッシュ・返信の参加者は混ぜない)。
+    `rememberMentionSuggestions` が打ち終えて 250ms 待ってから引き、新しい入力が来たら前の問い合わせは捨てる。引く間は前の候補を
+    出したまま。結果は session が問い合わせごとに 32 件まで覚える (失敗は覚えず、空で返す)。
+  * 部品は Repository を知らず、引く口 (`MentionSearch`) を受ける (`Composer(mentionSearch)` / `QuickPostBar` / `ComposerScreen` /
+    `QuickComposerHost`。既定は session。ギャラリーが差し替える)。
 * **ハッシュタグの強調**: 本文の中でサーバがハッシュタグにする `#名前` も、絵文字と同じ primary 色 + SemiBold にする
   (`ComposerHighlight`。本文用は `rememberPostTextHighlight`、CW・プロフィールは絵文字だけの `rememberEmojiShortcodeHighlight`。
   サーバは CW からタグを拾わない)。判定は純粋関数 `findHashtags` (`domain/model/Hashtag.kt`、`FindHashtagsTest`) で、Mastodon 4.x の
@@ -1047,6 +1069,12 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   (`·` `・` ZWNJ を挟める、末尾の区切りは含めない)、直後が `://` なら末尾の `http(s)` を除く。Ruby の `[[:word:]]` 等は JVM / Android の
   正規表現と意味が違うのでコードポイントごとに判定している。テストの期待値は Mastodon のイメージの Ruby で正規表現を走らせて出したもの。
   3.5 は `(` 等の後もタグにする (4.x に揃えているので 3.5 では強調されないタグがありうる)。
+* **メンションの強調**: 本文の `@user` / `@user@domain` もハッシュタグと同じ色で強調する (`ComposerHighlight` の本文用。アカウントが
+  実在するかは見ない)。判定は純粋関数 `findMentions` (`domain/model/Mention.kt`、`FindMentionsTest`) で、Mastodon 4.x の
+  `Account::MENTION_RE` + `Extractor.extract_mentions_or_lists_with_indices` に合わせる: `@` は半角のみ (全角 `＠` はメンションに
+  ならない)・直前が単語の文字・`=`・`/` でない、ユーザー名 `[a-z0-9_]+([.-]+[a-z0-9_]+)*`、`@` + ドメイン `[[:word:]]+([.-]+[[:word:]]+)*`。
+  直後が `@` / `＠`・アクセント付きのラテン文字 (twitter-text の `LATIN_ACCENTS`)・`://` なら弾く (打ちかけの `@user@` は強調されない)。
+  `[[:word:]]` はハッシュタグと同じ `isRubyWordChar`。期待値は stable のコンテナで `Extractor` を `rails runner` で走らせて出したもの。
 * **絵文字ピッカー** (`EmojiPicker.kt`): ツールバーの絵文字ボタンで `ModalBottomSheet` を開く (開くときにキーボードは閉じる)。
   `EmojiPicker` (検索欄 + `LazyVerticalGrid`) は入れ物に依存しない部品で、`EmojiPickerSheet` がシートに載せる。
   * 並びは `groupEmojisByCategory` (分類なし「Custom」が先頭、残りはカテゴリ名順、カテゴリ内はサーバの順)。検索中は
@@ -1184,7 +1212,7 @@ Coil を触るのは `ui/component/image/` の中だけ、apng-drawable (`com.li
   * MainActivity → `QuasarNavHost(externalLinks)` は Channel (画面ができる前に受けた分も溜まる)。未ログインなら Toast。
   * 確認: `adb shell "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://...' -n <pkg>/es.aria_on_the_planet.quasar.OpenLink"`。
 * **未実装**: 下書き保存 (TODO: 永続化して、ログインし直し・プロセスの終了をまたいで残す。今はどちらでも消える)、
-  メンション・ハッシュタグの補完、
+  ハッシュタグの補完、
   最後に選んだ言語を覚えること (今は下書きごとに設定の既定の言語から)、予約投稿。
 
 ## オンデバイス翻訳 (実験的機能。`:llama` + `data/translation/`)
@@ -1333,7 +1361,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
     log の曲がり具合・遷移の長さ。保存・読み込みはできるが設定画面には出しておらず、今は既定値のみ。上級者向けの設定で出す想定)。
   * アカウントごと: 通知の取得 API・カラムごとの自動更新 (`StreamingSettings`)・新しい投稿の公開範囲 (`defaultVisibility`、`null` =
     アカウントの既定 `source.privacy`。ダイレクトは選べない)・新しい投稿の言語 (`defaultLanguage`、`null` = Auto)・大きな画像の圧縮・
-    画像のメタデータの削除。
+    画像のメタデータの削除・メンションの候補のアイコン (`mentionSuggestionAvatars`)。
 * 保存は `SettingsStore<S>` (`data/settings/`、Preferences DataStore)。端末共通は `AppContainer.deviceSettings` (`settings` のファイル)、
   アカウントごとは `AccountContext.settings` (`settings_<AccountKey>` のファイル。DataStore は 1 つのファイルにプロセスで 1 つしか
   作れないので、`AppContainer` がキーごとに 1 つ持つ。ログアウトで止めてファイルを消す)。項目ごとに 1 キーで、
@@ -1383,7 +1411,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
 * **設定画面** (`Route.Settings` ほか、`Navigator.openSettings()`。入口はタイムラインのドロワー): AOSP
   (Android 16) の設定画面の形。ページ (`Route.Settings` / `SettingsDisplay` / `SettingsAnimation` / `SettingsTimelines` / `SettingsPostMenu` /
   `SettingsPosting` / `SettingsConfirmations` / `SettingsExperimental` (実験的機能。今は翻訳の入口だけで、翻訳の無いビルドでは出さない)) は他の画面と同じバックスタックに積む。
-  トップは「アカウントの設定 (@acct@host)」(Timelines = 自動更新・通知 API / Posting = 公開範囲・言語・画像の扱い。使っているアカウントの設定を
+  トップは「アカウントの設定 (@acct@host)」(Timelines = 自動更新・通知 API / Posting = 公開範囲・言語・画像の扱い・メンションの候補のアイコン。使っているアカウントの設定を
   読み書きする。ログアウト中は出さない) と「アプリの設定」(Display / Post menu / Confirmations / 実験的機能。端末共通) に分け、
   その下にライセンス・ログアウト。ページの中身はエントリの中で読む (`WithDeviceSettings` / `WithAccountSettings`)。
   変更は `SettingsStore.launchUpdate` (ストアのスコープで書くので画面を閉じても止まらない)。
@@ -1500,7 +1528,7 @@ UI_HIDDEN を除く)・`onLowMemory` でも解放する** (約 600MB を持っ�
   ```
   `scenario` 無しなら一覧。シナリオ: animated-emoji / animated-avatars / emoji-stress / emoji-picker /
   picker-sheets (投稿欄の絵文字ピッカー・埋め込みの Photo Picker のシートをボタンで開く。選んだ数を出すだけ) / profile / post-variety (︙でポストのメニューも開ける。長文 + 添付・CW + 閲覧注意の添付も入っている) /
-  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。本物と同じ `QuickComposerHost` で組む。ピルを引き上げるとフルの投稿画面。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
+  reply (返信先の 2 つの表示。データは post-variety を使い回す) / quick-post-bar (クイック投稿バーを一覧の上に浮かべる。本物と同じ `QuickComposerHost` で組む。ピルを引き上げるとフルの投稿画面。`@al` 等でメンションの補完が一覧のポストの投稿者から出る (0.3 秒待たせる)。下書きは本物の `ComposerSession` (ギャラリーのアカウント `rememberGalleryAccount`) だがサーバは `.invalid` で、アイコンは取得前のプレースホルダ・送信は失敗する) / follow-request (フォローリクエストのカード。押すと 2 秒送信中になって消える) / account-reactions (通知のまとめの中身。データは profile を
   使い回し、`AccountReactionsContent` を骨組みごと出す) / my-profile・other-profile (タブ付きのプロフィールを `ProfileContent` で骨組みごと出す。自分なら Favourites・Bookmarks のタブが出る。そのデータは post-variety。my-profile は Edit profile で編集もでき、原文の読み込みは 0.6 秒・保存は 2 秒待ってから表示に当てるだけ)。 / timeline-settings (設定のトップと、そこから開く Timelines / Posting / Post menu のページ。Post menu は本物の端末共通の設定に書くので、ポストのメニューの項目を変えて post-variety の︙で確かめられる。Timelines・Posting はギャラリーのアカウント (`rememberGalleryAccount`、`AccountKey("gallery")`・`.invalid`。ファイルは次の起動で消える) の設定。Posting の既定の言語は同じプロセスの quick-post-bar の投稿画面に効く) /
   post-detail (ポスト詳細の本体を
   `reactionDetail` で並べる。アイコンでの操作は手元だけで反映、件数のタップで `PostReactionsContent` に切り替わる。データは post-variety。

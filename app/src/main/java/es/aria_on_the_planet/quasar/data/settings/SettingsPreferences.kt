@@ -327,4 +327,7 @@ private fun AccountSettingFields(): List<SettingField<AccountSettings, *, *>> = 
     ),
     boolean<AccountSettings>("compress_oversized_images", { it.compressOversizedImages }) { s, v -> s.copy(compressOversizedImages = v) },
     boolean<AccountSettings>("strip_image_metadata", { it.stripImageMetadata }) { s, v -> s.copy(stripImageMetadata = v) },
+    boolean<AccountSettings>("mention_suggestion_avatars", { it.mentionSuggestionAvatars }) { s, v ->
+        s.copy(mentionSuggestionAvatars = v)
+    },
 )

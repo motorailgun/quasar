@@ -27,7 +27,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import es.aria_on_the_planet.quasar.R
 import es.aria_on_the_planet.quasar.domain.model.ComposeLimits
 import es.aria_on_the_planet.quasar.domain.model.CustomEmoji
@@ -55,6 +63,8 @@ import es.aria_on_the_planet.quasar.domain.model.characterCount
  * @param onRetryAttachment 通信エラーで失敗した添付のタップ。
  * @param onAttachmentDescriptionChange 代替テキストのダイアログで保存したとき。
  * @param emojis サーバのカスタム絵文字。`:sho` の補完 (ツールバー直上の帯)、ピッカー、入力中の `:shortcode:` の強調に使う。
+ * @param mentionSearch 本文の `@user` の補完の候補を引く。`null` なら補完しない。候補は打っている `@` の位置に付けたメニューで出す。
+ * @param mentionSuggestionAvatars 補完の候補にアカウントのアイコンを出すか (設定)。
  * @param visibilityEditable `false` なら公開範囲を変えられない (編集。公開範囲は表示だけ)。
  * @param autoFocus 最初の表示で本文欄にフォーカスし、キーボードを出す。
  * @param header 自分のアイコンの行より上に出すもの (返信先の [ReplyContext])。一緒にスクロールする。
@@ -69,6 +79,8 @@ fun Composer(
     limits: ComposeLimits,
     modifier: Modifier = Modifier,
     emojis: List<CustomEmoji> = emptyList(),
+    mentionSearch: MentionSearch? = null,
+    mentionSuggestionAvatars: Boolean = true,
     enabled: Boolean = true,
     visibilityEditable: Boolean = true,
     autoFocus: Boolean = false,
@@ -95,6 +107,20 @@ fun Composer(
     // CW 欄を閉じた後は本文へ戻す
     val targetField = if (activeField === state.contentWarning && !state.contentWarningEnabled) state.text else activeField
     val suggestions by rememberEmojiSuggestions(targetField, emojis)
+    // メンションはサーバが本文からしか拾わないので本文だけ
+    val mentionSuggestions by rememberMentionSuggestions(state.text, mentionSearch)
+    val bodyMentionSuggestions = mentionSuggestions.takeIf { targetField === state.text }
+    // 本文の文字の配置 (メニューの候補を打っている `@` の位置に付けるため)
+    var textLayout by remember(state) { mutableStateOf<(() -> TextLayoutResult?)?>(null) }
+    // 打っている `@…` の先頭 (`@` の左) の位置。打っている間は動かない。`@…` を打っていなければカーソルの位置
+    val mentionAnchorRect by remember(state) {
+        derivedStateOf {
+            val layout = textLayout?.invoke() ?: return@derivedStateOf Rect.Zero
+            val field = state.text
+            val offset = findMentionQuery(field.text, field.selection)?.range?.start ?: field.selection.start
+            layout.getCursorRect(offset.coerceIn(0, layout.layoutInput.text.length))
+        }
+    }
     val highlight = rememberEmojiShortcodeHighlight(emojis)
     // ハッシュタグはサーバが本文からしか拾わないので本文だけ
     val textHighlight = rememberPostTextHighlight(emojis)
@@ -126,18 +152,31 @@ fun Composer(
                             .focusRequester(contentWarningFocusRequester)
                             .onFocusChanged { if (it.hasFocus) activeField = state.contentWarning },
                     )
-                    ComposerTextField(
-                        state = state.text,
-                        enabled = enabled,
-                        placeholder = placeholder,
-                        minHeight = TextMinHeight,
-                        outputTransformation = textHighlight,
-                        // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
-                        modifier = Modifier
-                            .focusRequester(focusRequester)
-                            .onFocusChanged { if (it.isFocused) activeField = state.text }
-                            .padding(top = 8.dp),
-                    )
+                    // メニューの候補は打っている `@` の位置に付けて開く
+                    Box {
+                        ComposerTextField(
+                            state = state.text,
+                            enabled = enabled,
+                            placeholder = placeholder,
+                            minHeight = TextMinHeight,
+                            outputTransformation = textHighlight,
+                            // アイコン (40dp) の縦中央に 1 行目が来るように少し下げる
+                            modifier = Modifier
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { if (it.isFocused) activeField = state.text }
+                                .padding(top = TextTopPadding),
+                            onTextLayout = { textLayout = it },
+                        )
+                        mentionAnchorRect.let { caret ->
+                            Box(
+                                Modifier
+                                    .offset { IntOffset(caret.left.roundToInt(), caret.top.roundToInt() + TextTopPadding.roundToPx()) }
+                                    .size(with(LocalDensity.current) { DpSize(1.dp, caret.height.toDp()) }),
+                            ) {
+                                MentionSuggestionMenu(bodyMentionSuggestions, showAvatars = mentionSuggestionAvatars)
+                            }
+                        }
+                    }
                     belowText?.let { content ->
                         Box(Modifier.padding(top = 12.dp)) { content() }
                     }
@@ -243,3 +282,5 @@ fun Composer(
 }
 
 private val TextMinHeight = 120.dp
+/** 本文欄の上の余白 (アイコン (40dp) の縦中央に 1 行目が来るように少し下げる)。 */
+private val TextTopPadding = 8.dp
